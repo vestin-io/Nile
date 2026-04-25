@@ -1,0 +1,91 @@
+{
+  "schema_version": "1",
+  "initiative": "nile",
+  "modules": [
+    {
+      "id": "core",
+      "name": "Core",
+      "module_path": ".vestin/specs/core/",
+      "module_spec_path": ".vestin/specs/core/module.md",
+      "features": [
+        {
+          "id": "workspace-state",
+          "name": "Workspace State",
+          "spec_path": ".vestin/specs/core/features/workspace-state.md"
+        },
+        {
+          "id": "agent-runtime",
+          "name": "Agent Runtime",
+          "spec_path": ".vestin/specs/core/features/agent-runtime.md"
+        },
+        {
+          "id": "mutation-history",
+          "name": "Mutation History",
+          "spec_path": ".vestin/specs/core/features/mutation-history.md"
+        },
+        {
+          "id": "usage",
+          "name": "Usage",
+          "spec_path": ".vestin/specs/core/features/usage.md"
+        }
+      ]
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "module_path": ".vestin/specs/codex/",
+      "module_spec_path": ".vestin/specs/codex/module.md",
+      "features": [
+        {
+          "id": "adapter",
+          "name": "Codex Adapter",
+          "spec_path": ".vestin/specs/codex/features/adapter.md"
+        }
+      ]
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "module_path": ".vestin/specs/cursor/",
+      "module_spec_path": ".vestin/specs/cursor/module.md",
+      "features": [
+        {
+          "id": "adapter",
+          "name": "Cursor Adapter",
+          "spec_path": ".vestin/specs/cursor/features/adapter.md"
+        }
+      ]
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "module_path": ".vestin/specs/claude/",
+      "module_spec_path": ".vestin/specs/claude/module.md",
+      "features": [
+        {
+          "id": "adapter",
+          "name": "Claude Adapter",
+          "spec_path": ".vestin/specs/claude/features/adapter.md"
+        }
+      ]
+    },
+    {
+      "id": "surfaces",
+      "name": "Surfaces",
+      "module_path": ".vestin/specs/surfaces/",
+      "module_spec_path": ".vestin/specs/surfaces/module.md",
+      "features": [
+        {
+          "id": "cli-surface",
+          "name": "CLI Surface",
+          "spec_path": ".vestin/specs/surfaces/features/cli-surface.md"
+        },
+        {
+          "id": "desktop-surface",
+          "name": "Desktop Surface",
+          "spec_path": ".vestin/specs/surfaces/features/desktop-surface.md"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"],
+    "baseUrl": ".",
+    "paths": {
+      "@nile/core": ["packages/core/src/index.ts"],
+      "@nile/core/*": ["packages/core/src/*"],
+      "@nile/core/application": ["packages/core/src/application/index.ts"],
+      "@nile/core/application/*": ["packages/core/src/application/*/index.ts"],
+      "@nile/core/agents": ["packages/core/src/agents/index.ts"],
+      "@nile/core/models/*": ["packages/core/src/models/*/index.ts"],
+      "@nile/core/models/connection/enabled-agents-policy": [
+        "packages/core/src/models/connection/EnabledAgentsPolicy.ts"
+      ],
+      "@nile/core/runtime-local": ["packages/core/src/runtime-local/index.ts"],
+      "@nile/core/services/EnvironmentSource": ["packages/core/src/services/EnvironmentSource.ts"],
+      "@nile/core/services/NileLogger": ["packages/core/src/services/NileLogger.ts"],
+      "@nile/core/services/*": ["packages/core/src/services/*/index.ts"],
+      "@nile/host-local": ["packages/host-local/src/index.ts"],
+      "@nile/host-local/*": ["packages/host-local/src/*"]
+    }
+  },
+  "include": ["packages/**/*.ts", "packages/**/*.tsx", "packages/**/*.d.ts", "apps/**/*.ts", "apps/**/*.tsx", "apps/**/*.d.ts"]
+}

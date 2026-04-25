@@ -1,0 +1,234 @@
+{
+  "providers": [
+    {
+      "providerKey": "openai",
+      "officialLink": "https://platform.openai.com/docs/overview",
+      "translations": {
+        "en": {
+          "provider": "OpenAI",
+          "description": "OpenAI's official model and API platform for general reasoning, generation, and tool-calling workflows."
+        },
+        "zh": {
+          "provider": "OpenAI",
+          "description": "OpenAI 官方模型与 API 平台，适合通用推理、生成和工具调用场景。"
+        },
+        "ko": {
+          "provider": "OpenAI",
+          "description": "일반 추론, 생성, 도구 호출 워크플로에 적합한 OpenAI의 공식 모델 및 API 플랫폼입니다."
+        },
+        "ja": {
+          "provider": "OpenAI",
+          "description": "汎用的な推論、生成、ツール呼び出しのワークフローに適した OpenAI の公式モデル/API プラットフォームです。"
+        },
+        "th": {
+          "provider": "OpenAI",
+          "description": "แพลตฟอร์มโมเดลและ API อย่างเป็นทางการของ OpenAI เหมาะสำหรับงาน reasoning, generation และ tool calling ทั่วไป"
+        },
+        "fr": {
+          "provider": "OpenAI",
+          "description": "La plateforme officielle de modèles et d’API d’OpenAI, adaptée aux usages généraux de raisonnement, génération et appel d’outils."
+        },
+        "es": {
+          "provider": "OpenAI",
+          "description": "La plataforma oficial de modelos y API de OpenAI, adecuada para flujos generales de razonamiento, generación y uso de herramientas."
+        },
+        "it": {
+          "provider": "OpenAI",
+          "description": "La piattaforma ufficiale di modelli e API di OpenAI, adatta a flussi generali di ragionamento, generazione e uso di strumenti."
+        },
+        "de": {
+          "provider": "OpenAI",
+          "description": "Die offizielle Modell- und API-Plattform von OpenAI, geeignet für allgemeine Workflows zu Reasoning, Generierung und Tool-Aufrufen."
+        },
+        "vi": {
+          "provider": "OpenAI",
+          "description": "Nền tảng mô hình và API chính thức của OpenAI, phù hợp cho các luồng suy luận, sinh nội dung và gọi công cụ nói chung."
+        }
+      }
+    },
+    {
+      "providerKey": "anthropic",
+      "officialLink": "https://docs.anthropic.com",
+      "translations": {
+        "en": {
+          "provider": "Anthropic",
+          "description": "Anthropic's official Claude API and documentation entry point for Claude model integrations."
+        },
+        "zh": {
+          "provider": "Anthropic",
+          "description": "Anthropic Claude 官方 API 与文档入口，适合 Claude 系列模型接入。"
+        },
+        "ko": {
+          "provider": "Anthropic",
+          "description": "Claude 모델 연동에 적합한 Anthropic의 공식 Claude API 및 문서 진입점입니다."
+        },
+        "ja": {
+          "provider": "Anthropic",
+          "description": "Claude モデル連携に適した Anthropic の公式 Claude API / ドキュメント入口です。"
+        },
+        "th": {
+          "provider": "Anthropic",
+          "description": "จุดเข้าใช้งาน API และเอกสาร Claude อย่างเป็นทางการของ Anthropic สำหรับการเชื่อมต่อโมเดล Claude"
+        },
+        "fr": {
+          "provider": "Anthropic",
+          "description": "Le point d’entrée officiel de l’API Claude et de la documentation Anthropic, adapté aux intégrations des modèles Claude."
+        },
+        "es": {
+          "provider": "Anthropic",
+          "description": "El punto de entrada oficial de la API y la documentación de Claude de Anthropic, adecuado para integraciones con modelos Claude."
+        },
+        "it": {
+          "provider": "Anthropic",
+          "description": "Il punto di accesso ufficiale all’API Claude e alla documentazione di Anthropic, adatto alle integrazioni con i modelli Claude."
+        },
+        "de": {
+          "provider": "Anthropic",
+          "description": "Der offizielle Einstiegspunkt für Anthropics Claude-API und Dokumentation, geeignet für Integrationen mit Claude-Modellen."
+        },
+        "vi": {
+          "provider": "Anthropic",
+          "description": "Điểm truy cập API và tài liệu Claude chính thức của Anthropic, phù hợp để tích hợp các mô hình Claude."
+        }
+      }
+    },
+    {
+      "providerKey": "azure-openai",
+      "officialLink": "https://azure.microsoft.com/products/ai-services/openai-service",
+      "translations": {
+        "en": {
+          "provider": "Azure OpenAI",
+          "description": "Azure-hosted OpenAI service suited for enterprise compliance, regional deployment, and Azure ecosystem integration."
+        },
+        "zh": {
+          "provider": "Azure OpenAI",
+          "description": "Azure 托管的 OpenAI 服务，适合企业合规、区域部署和 Azure 体系集成。"
+        },
+        "ko": {
+          "provider": "Azure OpenAI",
+          "description": "엔터프라이즈 규정 준수, 지역 배포, Azure 생태계 통합에 적합한 Azure 호스팅 OpenAI 서비스입니다."
+        },
+        "ja": {
+          "provider": "Azure OpenAI",
+          "description": "企業向けコンプライアンス、リージョン配置、Azure エコシステム統合に適した Azure ホスト型 OpenAI サービスです。"
+        },
+        "th": {
+          "provider": "Azure OpenAI",
+          "description": "บริการ OpenAI ที่โฮสต์บน Azure เหมาะสำหรับการกำกับดูแลระดับองค์กร การปรับใช้ตามภูมิภาค และการเชื่อมต่อกับระบบนิเวศ Azure"
+        },
+        "fr": {
+          "provider": "Azure OpenAI",
+          "description": "Le service OpenAI hébergé sur Azure, adapté à la conformité d’entreprise, au déploiement régional et à l’intégration dans l’écosystème Azure."
+        },
+        "es": {
+          "provider": "Azure OpenAI",
+          "description": "El servicio OpenAI alojado en Azure, adecuado para cumplimiento empresarial, despliegue regional e integración con el ecosistema de Azure."
+        },
+        "it": {
+          "provider": "Azure OpenAI",
+          "description": "Il servizio OpenAI ospitato su Azure, adatto a conformità aziendale, distribuzione regionale e integrazione con l’ecosistema Azure."
+        },
+        "de": {
+          "provider": "Azure OpenAI",
+          "description": "Der auf Azure gehostete OpenAI-Dienst, geeignet für Unternehmens-Compliance, regionale Bereitstellung und Azure-Ökosystem-Integration."
+        },
+        "vi": {
+          "provider": "Azure OpenAI",
+          "description": "Dịch vụ OpenAI được lưu trữ trên Azure, phù hợp cho tuân thủ doanh nghiệp, triển khai theo khu vực và tích hợp hệ sinh thái Azure."
+        }
+      }
+    },
+    {
+      "providerKey": "openrouter",
+      "officialLink": "https://openrouter.ai",
+      "translations": {
+        "en": {
+          "provider": "OpenRouter",
+          "description": "An aggregated model gateway that exposes multiple model providers through one unified interface."
+        },
+        "zh": {
+          "provider": "OpenRouter",
+          "description": "聚合式模型网关，可通过统一接口访问多个模型提供方。"
+        },
+        "ko": {
+          "provider": "OpenRouter",
+          "description": "하나의 통합 인터페이스로 여러 모델 제공자를 노출하는 집계형 모델 게이트웨이입니다."
+        },
+        "ja": {
+          "provider": "OpenRouter",
+          "description": "単一の統一インターフェースで複数のモデルプロバイダーにアクセスできる集約型モデルゲートウェイです。"
+        },
+        "th": {
+          "provider": "OpenRouter",
+          "description": "เกตเวย์รวมโมเดลที่เปิดให้เข้าถึงผู้ให้บริการโมเดลหลายรายผ่านอินเทอร์เฟซเดียว"
+        },
+        "fr": {
+          "provider": "OpenRouter",
+          "description": "Une passerelle de modèles agrégée qui expose plusieurs fournisseurs de modèles via une interface unifiée."
+        },
+        "es": {
+          "provider": "OpenRouter",
+          "description": "Una pasarela agregada de modelos que expone varios proveedores de modelos mediante una única interfaz unificada."
+        },
+        "it": {
+          "provider": "OpenRouter",
+          "description": "Un gateway aggregato di modelli che espone più provider tramite un’unica interfaccia unificata."
+        },
+        "de": {
+          "provider": "OpenRouter",
+          "description": "Ein aggregiertes Modell-Gateway, das mehrere Modellanbieter über eine einheitliche Schnittstelle zugänglich macht."
+        },
+        "vi": {
+          "provider": "OpenRouter",
+          "description": "Cổng mô hình tổng hợp cho phép truy cập nhiều nhà cung cấp mô hình thông qua một giao diện thống nhất."
+        }
+      }
+    },
+    {
+      "providerKey": "groq",
+      "officialLink": "https://console.groq.com/docs/overview",
+      "translations": {
+        "en": {
+          "provider": "Groq",
+          "description": "A model platform known for low-latency inference and a good fit for response-time-sensitive workloads."
+        },
+        "zh": {
+          "provider": "Groq",
+          "description": "以低延迟推理见长的模型平台，适合对响应速度敏感的场景。"
+        },
+        "ko": {
+          "provider": "Groq",
+          "description": "낮은 지연 시간 추론으로 잘 알려져 있으며, 응답 시간에 민감한 워크로드에 적합한 모델 플랫폼입니다."
+        },
+        "ja": {
+          "provider": "Groq",
+          "description": "低レイテンシ推論で知られ、応答時間に敏感なワークロードに適したモデルプラットフォームです。"
+        },
+        "th": {
+          "provider": "Groq",
+          "description": "แพลตฟอร์มโมเดลที่เด่นด้านการอนุมานความหน่วงต่ำ เหมาะกับงานที่ไวต่อเวลาในการตอบสนอง"
+        },
+        "fr": {
+          "provider": "Groq",
+          "description": "Une plateforme de modèles réputée pour son inférence à faible latence, adaptée aux charges de travail sensibles au temps de réponse."
+        },
+        "es": {
+          "provider": "Groq",
+          "description": "Una plataforma de modelos conocida por su inferencia de baja latencia, adecuada para cargas sensibles al tiempo de respuesta."
+        },
+        "it": {
+          "provider": "Groq",
+          "description": "Una piattaforma di modelli nota per l’inferenza a bassa latenza, adatta a carichi sensibili ai tempi di risposta."
+        },
+        "de": {
+          "provider": "Groq",
+          "description": "Eine Modellplattform, die für Inferenz mit niedriger Latenz bekannt ist und sich für antwortzeitkritische Workloads eignet."
+        },
+        "vi": {
+          "provider": "Groq",
+          "description": "Nền tảng mô hình nổi bật với suy luận độ trễ thấp, phù hợp cho các tác vụ nhạy cảm với thời gian phản hồi."
+        }
+      }
+    }
+  ]
+}

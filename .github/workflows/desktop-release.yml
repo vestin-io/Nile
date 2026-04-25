@@ -1,0 +1,126 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "desktop-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos-release:
+    name: Build macOS release
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_ID: ${{ secrets.NILE_DESKTOP_APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.NILE_DESKTOP_APPLE_TEAM_ID }}
+      CSC_KEY_PASSWORD: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_PASSWORD }}
+      CSC_LINK: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_P12 }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            packages/core/package-lock.json
+            packages/host-local/package-lock.json
+            apps/cli/package-lock.json
+            apps/desktop/package-lock.json
+
+      - name: Validate signing secrets
+        run: |
+          missing=()
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if ((${#missing[@]} > 0)); then
+            printf 'Missing required macOS release secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Derive release version
+        id: version
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#desktop-v}"
+          version="${version#v}"
+
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            printf 'Release tag must be v<semver> or desktop-v<semver>, got %s\n' "${tag}" >&2
+            exit 1
+          fi
+
+          printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run full test suite
+        run: npm test
+
+      - name: Stamp desktop package version
+        env:
+          DESKTOP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const packageJsonPath = "apps/desktop/package.json";
+          const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+          packageJson.version = process.env.DESKTOP_VERSION;
+          writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+          EOF
+
+      - name: Build signed macOS release
+        run: npm run build:app --prefix apps/desktop
+
+      - name: Upload release assets
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mapfile -d '' artifacts < <(find apps/desktop/release -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' \) -print0 | sort -z)
+
+          if ((${#artifacts[@]} == 0)); then
+            printf 'No desktop release assets were produced.\n' >&2
+            exit 1
+          fi
+
+          prerelease_args=()
+          if [[ "${RELEASE_VERSION}" == *-* ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+
+          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
+              --title "Nile Desktop ${RELEASE_TAG}" \
+              "${prerelease_args[@]}"
+          fi
+
+          gh release upload "${RELEASE_TAG}" "${artifacts[@]}" --clobber

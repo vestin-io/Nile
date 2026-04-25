@@ -1,0 +1,303 @@
+import { afterEach, describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+
+import { AccessRegistry } from "../../models/access";
+import { EndpointRegistry } from "../../models/endpoint";
+import { AgentSelection } from "../../models/selection/Selection";
+import { type StoredCredential } from "../../services/credential/Types";
+import { KeychainCredentialStore } from "../../services/credential/KeychainCredentialStore";
+import { EnvironmentSource } from "../../services/EnvironmentSource";
+import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
+import { ApplySelection } from "./ApplySelection";
+import { OPENCLAW_AGENT_ID } from "./types";
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  while (tempDirs.length > 0) {
+    rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  }
+});
+
+describe("OpenClaw ApplySelection", () => {
+  it("writes a Nile-managed provider and default model into openclaw.json", () => {
+    const setup = createSetup();
+    seedOpenAiEndpoint(setup.dbPath, "gateway", "Gateway", "https://router.example", "/v1");
+    seedAccess(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "router-work",
+        endpointId: "gateway",
+        label: "Router Work",
+        authMode: "api_key",
+        openclawModelId: "gpt-4.1",
+      },
+      {
+        kind: "api_key",
+        source: "env_key",
+        envKey: "ROUTER_WORK_KEY",
+      },
+    );
+
+    const apply = ApplySelection.open(setup.dbPath, {
+      openclawHome: setup.openclawHome,
+      credentialStore: setup.credentialStore,
+      environment: EnvironmentSource.from({
+        ROUTER_WORK_KEY: "router-secret",
+      }),
+      secureSnapshotStore: setup.secureSnapshots,
+    });
+
+    apply.apply("router-work");
+
+    const config = readConfig(setup.openclawHome);
+    expect(config.models).toEqual({
+      mode: "merge",
+      providers: {
+        "nile-router-work": {
+          api: "openai-responses",
+          apiKey: "${ROUTER_WORK_KEY}",
+          baseUrl: "https://router.example/v1",
+          models: [
+            {
+              id: "gpt-4.1",
+              name: "gpt-4.1",
+            },
+          ],
+        },
+      },
+    });
+    expect(config.agents).toEqual({
+      defaults: {
+        model: {
+          primary: "nile-router-work/gpt-4.1",
+          fallbacks: [],
+        },
+      },
+    });
+
+    const selection = AgentSelection.open(setup.dbPath);
+    expect(selection.get(OPENCLAW_AGENT_ID)?.connectionId).toBe("router-work");
+    selection.close();
+    apply.close();
+  });
+
+  it("writes env var references for env-backed api keys", () => {
+    const setup = createSetup();
+    seedAnthropicEndpoint(setup.dbPath, "anthropic-work", "Anthropic Work", "https://api.anthropic.com");
+    seedAccess(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "anthropic-work",
+        endpointId: "anthropic-work",
+        label: "Anthropic Work",
+        authMode: "api_key",
+        openclawModelId: "claude-sonnet-4",
+      },
+      {
+        kind: "api_key",
+        source: "env_key",
+        envKey: "ANTHROPIC_WORK_KEY",
+      },
+    );
+
+    const apply = ApplySelection.open(setup.dbPath, {
+      openclawHome: setup.openclawHome,
+      credentialStore: setup.credentialStore,
+      environment: EnvironmentSource.from({
+        ANTHROPIC_WORK_KEY: "anthropic-secret",
+      }),
+      secureSnapshotStore: setup.secureSnapshots,
+    });
+
+    apply.apply("anthropic-work");
+
+    const config = readConfig(setup.openclawHome);
+    expect(config.models.providers["nile-anthropic-work"]).toEqual({
+      api: "anthropic-messages",
+      apiKey: "${ANTHROPIC_WORK_KEY}",
+      baseUrl: "https://api.anthropic.com",
+      models: [
+        {
+          id: "claude-sonnet-4",
+          name: "claude-sonnet-4",
+        },
+      ],
+    });
+
+    apply.close();
+  });
+
+  it("rejects direct api keys to avoid writing secrets into openclaw.json", () => {
+    const setup = createSetup();
+    seedOpenAiEndpoint(setup.dbPath, "gateway", "Gateway", "https://router.example", "/v1");
+    seedAccess(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "router-direct",
+        endpointId: "gateway",
+        label: "Router Direct",
+        authMode: "api_key",
+        openclawModelId: "gpt-4.1",
+      },
+      {
+        kind: "api_key",
+        apiKey: "router-secret",
+      },
+    );
+
+    const apply = ApplySelection.open(setup.dbPath, {
+      openclawHome: setup.openclawHome,
+      credentialStore: setup.credentialStore,
+      secureSnapshotStore: setup.secureSnapshots,
+    });
+
+    expect(() => apply.apply("router-direct")).toThrow(
+      "OpenClaw requires an env-backed api_key credential to avoid writing secrets into config files",
+    );
+    apply.close();
+  });
+});
+
+function createSetup(): {
+  dbPath: string;
+  openclawHome: string;
+  credentialStore: StubCredentialStore;
+  secureSnapshots: MemorySecureSnapshotStore;
+} {
+  const dir = mkdtempSync(join(tmpdir(), "nile-openclaw-apply-"));
+  tempDirs.push(dir);
+  const openclawHome = join(dir, ".openclaw");
+  mkdirSync(openclawHome, { recursive: true });
+
+  return {
+    dbPath: join(dir, "switcher.sqlite"),
+    openclawHome,
+    credentialStore: new StubCredentialStore(),
+    secureSnapshots: new MemorySecureSnapshotStore(),
+  };
+}
+
+function seedOpenAiEndpoint(
+  dbPath: string,
+  id: string,
+  label: string,
+  rootUrl: string,
+  basePath: string,
+): void {
+  const registry = EndpointRegistry.open(dbPath);
+  registry.add({
+    id,
+    label,
+    rootUrl,
+    profile: "generic-gateway",
+    protocols: {
+      openai: {
+        basePath,
+        wireApis: ["responses"],
+        authSchemes: ["bearer"],
+      },
+    },
+  });
+  registry.close();
+}
+
+function seedAnthropicEndpoint(
+  dbPath: string,
+  id: string,
+  label: string,
+  rootUrl: string,
+): void {
+  const registry = EndpointRegistry.open(dbPath);
+  registry.add({
+    id,
+    label,
+    rootUrl,
+    profile: "anthropic-official",
+    protocols: {
+      anthropic: {
+        authSchemes: ["x_api_key"],
+      },
+    },
+  });
+  registry.close();
+}
+
+function seedAccess(
+  dbPath: string,
+  credentialStore: StubCredentialStore,
+  input: {
+    id: string;
+    endpointId: string;
+    label: string;
+    authMode: "api_key";
+    openclawModelId: string;
+  },
+  credential: StoredCredential,
+): void {
+  const registry = AccessRegistry.open(dbPath, credentialStore);
+  registry.add(input, credential);
+  registry.close();
+}
+
+function readConfig(openclawHome: string): any {
+  return JSON.parse(readFileSync(join(openclawHome, "openclaw.json"), "utf8"));
+}
+
+class StubCredentialStore extends KeychainCredentialStore {
+  private readonly records = new Map<string, StoredCredential>();
+
+  override create(reference: string, credential: StoredCredential): void {
+    this.records.set(reference, credential);
+  }
+
+  override update(reference: string, credential: StoredCredential): void {
+    this.records.set(reference, credential);
+  }
+
+  override get(reference: string): StoredCredential {
+    const credential = this.records.get(reference);
+    if (!credential) {
+      throw new Error(`Credential not found: ${reference}`);
+    }
+    return credential;
+  }
+
+  override has(reference: string): boolean {
+    return this.records.has(reference);
+  }
+
+  override remove(reference: string): void {
+    this.records.delete(reference);
+  }
+}
+
+class MemorySecureSnapshotStore extends SecureSnapshotStore {
+  private readonly snapshots = new Map<string, string>();
+
+  override writeBeforeSnapshot(snapshotRef: string, content: string | null) {
+    this.snapshots.set(snapshotRef, content ?? "");
+    return {
+      snapshotRef,
+      checksum: this.checksum(content),
+    };
+  }
+
+  override restoreSnapshot(snapshotRef: string, targetPath: string, existedBefore: boolean): void {
+    if (!existedBefore) {
+      rmSync(targetPath, { force: true });
+      return;
+    }
+
+    mkdirSync(dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, this.snapshots.get(snapshotRef) ?? "", {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+  }
+}

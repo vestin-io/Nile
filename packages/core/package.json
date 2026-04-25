@@ -1,0 +1,27 @@
+{
+  "name": "@nile/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "json5": "^2.2.3",
+    "pino": "^10.1.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./application": "./src/application/index.ts",
+    "./application/local": "./src/application/local/index.ts",
+    "./models/agent": "./src/models/agent/index.ts",
+    "./models/agent/homes": "./src/models/agent/Homes.ts",
+    "./models/agent/types": "./src/models/agent/Types.ts",
+    "./models/connection/enabled-agents-policy": "./src/models/connection/EnabledAgentsPolicy.ts",
+    "./models/*": "./src/models/*/index.ts",
+    "./projection": "./src/projection/index.ts",
+    "./runtime-local": "./src/runtime-local/index.ts",
+    "./usage/cursor": "./src/usage/cursor.ts",
+    "./services/EnvironmentSource": "./src/services/EnvironmentSource.ts",
+    "./services/NileLogger": "./src/services/NileLogger.ts",
+    "./services/*": "./src/services/*/index.ts",
+    "./agents": "./src/agents/index.ts"
+  }
+}

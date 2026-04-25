@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nile</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="app-shell app-shell-menubar">
+    <main class="panel">
+      <section class="hero-card">
+        <div class="hero-kicker">Nile</div>
+        <h1 id="menubar-current-title" class="hero-title"></h1>
+        <p id="menubar-current" class="hero-value"></p>
+        <p id="menubar-drift" class="hero-subtle is-hidden"></p>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <h2 id="menubar-switch-title"></h2>
+          <button id="refresh-button" class="text-button"></button>
+        </div>
+        <div id="menubar-connections" class="connection-list"></div>
+      </section>
+
+      <section class="section">
+        <div class="actions-grid">
+          <button id="settings-button" class="action-button action-button-secondary"></button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./menubar.js"></script>
+  </body>
+</html>

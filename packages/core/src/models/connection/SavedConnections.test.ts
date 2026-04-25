@@ -1,0 +1,470 @@
+import { afterEach, describe, expect, test } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { AccessRegistry } from "../access";
+import { SqliteAccessStore } from "../access/store/SqliteStore";
+import { KeychainCredentialStore } from "../../services/credential/KeychainCredentialStore";
+import type { StoredCredential } from "../../services/credential/Types";
+import { EndpointRegistry } from "../endpoint";
+import { SqliteEndpointStore } from "../endpoint/store/SqliteStore";
+import { AgentSelection } from "../selection/Selection";
+import { SqliteDatabase } from "../../services/database/SqliteDatabase";
+import { SUPPORTED_AGENT_IDS } from "../agent";
+import { SavedConnections } from "./SavedConnections";
+
+const tempRoots: string[] = [];
+
+describe("SavedConnections", () => {
+  afterEach(() => {
+    while (tempRoots.length > 0) {
+      rmSync(tempRoots.pop()!, { recursive: true, force: true });
+    }
+  });
+
+  test("lists saved connections with selected targets", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedConnection(dbPath, credentialStore, {
+      endpointId: "openai",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      accessId: "openai-session",
+      accountLabel: "jiqiang90@gmail.com",
+      authMode: "openai_session",
+      credential: {
+        kind: "openai_session",
+        accountId: "acct_123",
+        idToken: "id",
+        accessToken: "access",
+        refreshToken: "refresh",
+      },
+    });
+
+    const selection = AgentSelection.open(dbPath);
+    selection.setApplied("codex", "openai-session");
+    selection.close();
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.list()).toEqual([
+        {
+          id: "openai-session",
+          endpointId: "openai",
+          endpointUrl: "https://api.openai.com/v1",
+          label: "jiqiang90@gmail.com",
+          endpointLabel: "OpenAI",
+          endpointFamily: "openai",
+          authMode: "openai_session",
+          enabledAgents: ["codex"],
+          configurableAgents: ["codex"],
+          selectedByAgents: ["codex"],
+        },
+      ]);
+    } finally {
+      connections.close();
+    }
+  });
+
+  test("lists multi-protocol gateway connections for both codex and claude", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+
+    const endpointRegistry = EndpointRegistry.open(dbPath);
+    endpointRegistry.add({
+      id: "gateway-llmfk-dpdns-org",
+      label: "Gateway (gateway.example.test)",
+      rootUrl: "https://gateway.example.test",
+      profile: "generic-gateway",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+        anthropic: {
+          authSchemes: ["bearer"],
+          envKeyOverride: "ANTHROPIC_AUTH_TOKEN",
+          versionHeader: "2023-06-01",
+        },
+      },
+    });
+    endpointRegistry.close();
+
+    const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+    accessRegistry.add({
+      id: "frank",
+      endpointId: "gateway-llmfk-dpdns-org",
+      label: "Frank",
+      authMode: "api_key",
+    }, {
+      kind: "api_key",
+      apiKey: "secret",
+    });
+    accessRegistry.close();
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.listForAgent("codex").map((entry) => entry.id)).toEqual(["frank"]);
+      expect(connections.listForAgent("claude").map((entry) => entry.id)).toEqual(["frank"]);
+    } finally {
+      connections.close();
+    }
+  });
+
+  test("treats saved gateway connections as configurable for all supported agents", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+
+    const endpointRegistry = EndpointRegistry.open(dbPath);
+    endpointRegistry.add({
+      id: "gateway-all-agents",
+      label: "Gateway (all agents)",
+      rootUrl: "https://gateway.example.com",
+      profile: "generic-gateway",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+    endpointRegistry.close();
+
+    const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+    accessRegistry.add({
+      id: "gateway-primary",
+      endpointId: "gateway-all-agents",
+      label: "Gateway Primary",
+      authMode: "api_key",
+    }, {
+      kind: "api_key",
+      apiKey: "secret",
+    });
+    accessRegistry.close();
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.list()).toEqual([
+        expect.objectContaining({
+          id: "gateway-primary",
+          endpointFamily: "gateway",
+          configurableAgents: [...SUPPORTED_AGENT_IDS],
+        }),
+      ]);
+    } finally {
+      connections.close();
+    }
+  });
+
+  test("removes saved connections and keeps agent selections as orphaned runtime facts", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedConnection(dbPath, credentialStore, {
+      endpointId: "azure",
+      endpointLabel: "Azure OpenAI",
+      endpointFamily: "azure-openai",
+      accessId: "azure-key",
+      accountLabel: "Azure API Key",
+      authMode: "api_key",
+      credential: {
+        kind: "api_key",
+        apiKey: "secret",
+      },
+    });
+
+    const selection = AgentSelection.open(dbPath);
+    selection.setApplied("codex", "azure-key");
+    selection.close();
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.remove("azure-key")).toEqual({
+        id: "azure-key",
+        removed: true,
+        orphanedAgents: ["codex"],
+      });
+    } finally {
+      connections.close();
+    }
+
+    const agentSelection = AgentSelection.open(dbPath);
+    try {
+      expect(agentSelection.get("codex")).toEqual(
+        expect.objectContaining({
+          agentId: "codex",
+          connectionId: "azure-key",
+          endpointId: "azure",
+          accessId: "azure-key",
+        }),
+      );
+    } finally {
+      agentSelection.close();
+    }
+
+    const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+    try {
+      expect(accessRegistry.get("azure-key")).toBeNull();
+    } finally {
+      accessRegistry.close();
+    }
+  });
+
+  test("updates a saved connection label and keeps selected agents enabled", async () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedConnection(dbPath, credentialStore, {
+      endpointId: "openai",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      accessId: "openai-session",
+      accountLabel: "jiqiang90@gmail.com",
+      authMode: "openai_session",
+      credential: {
+        kind: "openai_session",
+        accountId: "acct_123",
+        idToken: "id",
+        accessToken: "access",
+        refreshToken: "refresh",
+      },
+    });
+
+    const selection = AgentSelection.open(dbPath);
+    selection.setApplied("codex", "openai-session");
+    selection.close();
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      await expect(connections.update({
+        connectionId: "openai-session",
+        label: "Primary session",
+        enabledAgents: [],
+      })).resolves.toEqual({
+        id: "openai-session",
+        endpointId: "openai",
+        endpointUrl: "https://api.openai.com/v1",
+        label: "Primary session",
+        endpointLabel: "OpenAI",
+        endpointFamily: "openai",
+        authMode: "openai_session",
+        enabledAgents: ["codex"],
+        configurableAgents: ["codex"],
+        selectedByAgents: ["codex"],
+      });
+    } finally {
+      connections.close();
+    }
+  });
+
+  test("removes the endpoint only after its last access is removed", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedConnection(dbPath, credentialStore, {
+      endpointId: "openai",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      accessId: "shared-session",
+      accountLabel: "jiqiang90@gmail.com",
+      authMode: "openai_session",
+      credential: {
+        kind: "openai_session",
+        accountId: "acct_123",
+        idToken: "id",
+        accessToken: "access",
+        refreshToken: "refresh",
+      },
+    });
+
+    const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+    try {
+      accessRegistry.add({
+        id: "work-session",
+        endpointId: "openai",
+        label: "Work Session",
+        authMode: "openai_session",
+      }, {
+        kind: "openai_session",
+        accountId: "acct_456",
+        idToken: "id-2",
+        accessToken: "access-2",
+        refreshToken: "refresh-2",
+      });
+    } finally {
+      accessRegistry.close();
+    }
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.remove("shared-session")).toEqual({
+        id: "shared-session",
+        removed: true,
+        orphanedAgents: [],
+      });
+    } finally {
+      connections.close();
+    }
+
+    const endpointRegistry = EndpointRegistry.open(dbPath);
+    try {
+      expect(endpointRegistry.get("openai")).toEqual(
+        expect.objectContaining({ id: "openai" }),
+      );
+    } finally {
+      endpointRegistry.close();
+    }
+  });
+
+  test("rolls back the access delete when access cleanup fails", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedConnection(dbPath, credentialStore, {
+      endpointId: "azure",
+      endpointLabel: "Azure OpenAI",
+      endpointFamily: "azure-openai",
+      accessId: "azure-key",
+      accountLabel: "Azure API Key",
+      authMode: "api_key",
+      credential: {
+        kind: "api_key",
+        apiKey: "secret",
+      },
+    });
+
+    const database = SqliteDatabase.open(dbPath);
+    const endpointRegistry = new EndpointRegistry(
+      new SqliteEndpointStore(database),
+      null,
+    );
+    const accessRegistry = new AccessRegistry(
+      new ThrowingAccessStore(database),
+      endpointRegistry,
+      credentialStore,
+      new StaticCredentialSourceFactory(),
+    );
+    const connections = new SavedConnections(
+      database,
+      endpointRegistry,
+      accessRegistry,
+      AgentSelection.fromDatabase(database),
+      database,
+    );
+
+    try {
+      expect(() => connections.remove("azure-key")).toThrow("Injected access remove failure");
+      expect(accessRegistry.get("azure-key")).toEqual(
+        expect.objectContaining({
+          id: "azure-key",
+        }),
+      );
+      expect(credentialStore.has("access:azure-key")).toBe(true);
+    } finally {
+      connections.close();
+    }
+  });
+});
+
+function createTempDatabasePath(): string {
+  const root = mkdtempSync(join(tmpdir(), "nile-saved-connections-"));
+  tempRoots.push(root);
+  return join(root, "switcher.sqlite");
+}
+
+function seedConnection(
+  dbPath: string,
+  credentialStore: StubCredentialStore,
+  input: {
+    endpointId: string;
+    endpointLabel: string;
+    endpointFamily: "openai" | "azure-openai";
+    accessId: string;
+    accountLabel: string;
+    authMode: "openai_session" | "api_key";
+    credential: StoredCredential;
+  },
+): void {
+  const endpointRegistry = EndpointRegistry.open(dbPath);
+  endpointRegistry.add({
+    id: input.endpointId,
+    label: input.endpointLabel,
+    rootUrl: input.endpointFamily === "azure-openai"
+      ? "https://example.cognitiveservices.azure.com"
+      : "https://api.openai.com",
+    profile: input.endpointFamily === "azure-openai" ? "azure-openai" : "openai-official",
+    protocols: {
+      openai: {
+        basePath: input.endpointFamily === "azure-openai" ? "/openai/v1" : "/v1",
+        wireApis: ["responses"],
+        authSchemes: ["bearer"],
+      },
+    },
+  });
+  endpointRegistry.close();
+
+  const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+  accessRegistry.add(
+    {
+      id: input.accessId,
+      endpointId: input.endpointId,
+      label: input.accountLabel,
+      authMode: input.authMode,
+    },
+    input.credential,
+  );
+  accessRegistry.close();
+}
+
+class StubCredentialStore extends KeychainCredentialStore {
+  private readonly credentials = new Map<string, StoredCredential>();
+
+  override create(credentialId: string, credential: StoredCredential): void {
+    this.credentials.set(credentialId, credential);
+  }
+
+  override update(credentialId: string, credential: StoredCredential): void {
+    this.credentials.set(credentialId, credential);
+  }
+
+  override get(credentialId: string): StoredCredential {
+    const credential = this.credentials.get(credentialId);
+    if (!credential) {
+      throw new Error(`Missing stub credential: ${credentialId}`);
+    }
+    return credential;
+  }
+
+  override has(credentialId: string): boolean {
+    return this.credentials.has(credentialId);
+  }
+
+  override remove(credentialId: string): void {
+    this.credentials.delete(credentialId);
+  }
+}
+
+class ThrowingAccessStore extends SqliteAccessStore {
+  override remove(_accessId: string): void {
+    throw new Error("Injected access remove failure");
+  }
+}
+
+class StaticCredentialSourceFactory {
+  createAccessSource(input: { accessId: string }) {
+    return {
+      kind: "local" as const,
+      reference: `access:${input.accessId}`,
+      scope: "access" as const,
+      allowLocalMaterialization: true,
+    };
+  }
+
+  createCursorUsageSource(input: { connectionId: string }) {
+    return {
+      kind: "local" as const,
+      reference: `usage:cursor:${input.connectionId}`,
+      scope: "usage" as const,
+      allowLocalMaterialization: true,
+    };
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "nile",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@10.9.4",
+  "type": "module",
+  "scripts": {
+    "postinstall": "npm install --prefix packages/core && npm install --prefix packages/host-local && npm install --prefix apps/cli && npm install --prefix apps/desktop",
+    "nile": "node --import tsx ./apps/cli/src/main.ts",
+    "start": "node --import tsx ./apps/cli/src/main.ts",
+    "desktop:build": "npm run build --prefix apps/desktop",
+    "desktop:dev": "npm run dev --prefix apps/desktop",
+    "desktop:start": "npm run start --prefix apps/desktop",
+    "test:core": "vitest run packages/core/src",
+    "test:host-local": "vitest run packages/host-local/src",
+    "test:cli": "vitest run apps/cli/src",
+    "test:desktop": "vitest run apps/desktop/src",
+    "test": "npm run test:core && npm run test:host-local && npm run test:cli && npm run test:desktop",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.11",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3",
+    "vitest": "^4.0.7"
+  }
+}
