@@ -36,6 +36,8 @@ Flow:
 
 Pre-release tags are inferred from semver prerelease suffixes such as `v0.1.0-beta.1`.
 
+Release packaging currently emits separate `arm64` and `x64` macOS artifacts by default instead of one `universal` app. This keeps each downloadable artifact materially smaller and avoids shipping both architectures inside the same bundle.
+
 ## Required GitHub Secrets
 
 - `NILE_DESKTOP_MAC_CERTIFICATE_P12`

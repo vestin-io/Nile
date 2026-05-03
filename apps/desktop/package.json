@@ -5,7 +5,19 @@
   "private": true,
   "type": "module",
   "main": "dist/electron/main.cjs",
-  "dependencies": {
+  "dependencies": {},
+  "scripts": {
+    "build": "node --import tsx ./build.ts",
+    "build:release": "NILE_BUILD_RELEASE=1 node --import tsx ./build.ts",
+    "clean:release": "node --import tsx ./clean-release.ts",
+    "build:app": "npm run clean:release && npm run build:release && electron-builder --publish never",
+    "build:app:dir": "npm run clean:release && npm run build:release && electron-builder --dir --publish never",
+    "build:app:unsigned": "npm run clean:release && npm run build:release && env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never -c.mac.identity=null",
+    "dev": "node --import tsx ./dev.ts",
+    "icons": "node --import tsx ./generate-icons.ts",
+    "start": "npm run build && node --import tsx ./launch.ts"
+  },
+  "devDependencies": {
     "@lobehub/icons-static-svg": "^1.88.0",
     "@nile/core": "file:../../packages/core",
     "@nile/host-local": "file:../../packages/host-local",
@@ -21,26 +33,15 @@
     "autoprefixer": "^10.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron": "^36.3.2",
+    "electron-builder": "^26.8.1",
     "lucide-react": "^1.14.0",
     "postcss": "^8.5.12",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^3.4.19"
-  },
-  "scripts": {
-    "build": "node --import tsx ./build.ts",
-    "build:app": "npm run build && electron-builder --publish never",
-    "build:app:dir": "npm run build && electron-builder --dir --publish never",
-    "build:app:unsigned": "npm run build && env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never -c.mac.identity=null",
-    "dev": "node --import tsx ./dev.ts",
-    "icons": "node --import tsx ./generate-icons.ts",
-    "start": "npm run build && node --import tsx ./launch.ts"
-  },
-  "devDependencies": {
-    "electron": "^36.3.2",
-    "electron-builder": "^26.8.1",
-    "sharp": "^0.34.5"
   },
   "build": {
     "appId": "dev.nile.desktop",
@@ -49,9 +50,15 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
+      "dist/electron/**/*",
+      "dist/renderer/**/*",
       "build/icons/**/*",
-      "package.json"
+      "package.json",
+      "!**/*.map"
+    ],
+    "electronLanguages": [
+      "en-US",
+      "zh-CN"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
@@ -63,13 +70,15 @@
         {
           "target": "dmg",
           "arch": [
-            "universal"
+            "arm64",
+            "x64"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "universal"
+            "arm64",
+            "x64"
           ]
         }
       ]

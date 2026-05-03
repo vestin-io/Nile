@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import autoprefixer from "autoprefixer";
@@ -9,8 +9,10 @@ import tailwindcss from "tailwindcss";
 const root = dirname(fileURLToPath(import.meta.url));
 const src = join(root, "src");
 const dist = join(root, "dist");
+const isReleaseBuild = process.env.NILE_BUILD_RELEASE === "1";
 
 async function build(): Promise<void> {
+  rmSync(dist, { recursive: true, force: true });
   await buildEntry(join(src, "electron", "main.ts"), join(dist, "electron", "main.cjs"), "node");
   await buildEntry(join(src, "electron", "preload.ts"), join(dist, "electron", "preload.cjs"), "node");
   await buildEntry(join(src, "renderer", "app", "menubar.ts"), join(dist, "renderer", "menubar.js"), "browser");
@@ -30,14 +32,16 @@ async function buildEntry(entrypoint: string, outfile: string, target: "node" | 
     platform: target === "node" ? "node" : "browser",
     bundle: true,
     format: target === "node" ? "cjs" : "esm",
-    sourcemap: true,
+    sourcemap: !isReleaseBuild,
     external: target === "node" ? ["electron"] : [],
     loader: {
       ".svg": "text",
       ".png": "dataurl",
     },
     jsx: "automatic",
+    legalComments: "none",
     logLevel: "silent",
+    minify: isReleaseBuild,
   });
 }
 

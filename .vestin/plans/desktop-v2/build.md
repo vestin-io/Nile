@@ -2,6 +2,57 @@
 
 ## 2026-05-04
 
+### Step 19: Desktop Package Size Reduction
+
+- Removed the dev-only macOS Electron host bundle from packaged app contents:
+  - moved `DesktopLauncher` host staging from `apps/desktop/dist/host` to `apps/desktop/.runtime/host`
+  - updated the desktop build step to delete any stale `dist/host` output before bundling
+- Tightened desktop packaging inputs in `apps/desktop/package.json`:
+  - replaced broad `dist/**/*` inclusion with `dist/electron/**/*` and `dist/renderer/**/*`
+  - excluded `*.map` files from packaged contents
+  - kept only `en-US` and `zh-CN` Electron locales
+- Split release builds into separate `arm64` and `x64` macOS artifacts instead of a default `universal` bundle, and documented the change in `docs/desktop-release.md`.
+- Added a dedicated release cleanup step before desktop packaging so stale artifacts from older arch configurations do not remain under `apps/desktop/release/`.
+- Moved desktop build-only packages out of runtime dependencies:
+  - `@types/react`
+  - `@types/react-dom`
+  - `autoprefixer`
+  - `postcss`
+  - `tailwindcss`
+- Added a release-only desktop build mode that disables sourcemaps and enables minification before packaging.
+- Completed the runtime dependency cleanup by moving the remaining desktop libraries out of packaged runtime dependencies:
+  - `@lobehub/icons-static-svg`
+  - `@nile/core`
+  - `@nile/host-local`
+  - `@radix-ui/*`
+  - `class-variance-authority`
+  - `clsx`
+  - `lucide-react`
+  - `react`
+  - `react-dom`
+  - `tailwind-merge`
+- Updated the desktop build step to clear `apps/desktop/dist/` before each build so stale outputs such as legacy `main.js` / `preload.js` no longer leak into release packages.
+- Verified the main size drop after the packaging changes:
+  - previous unpacked universal app: about `744M`
+  - first-pass unpacked arm64 app: about `237M`
+  - final unpacked arm64 app: about `214M`
+  - previous packaged app.asar: about `303M`
+  - first-pass packaged app.asar: about `23M`
+  - final packaged app.asar: about `2.3M`
+  - new unsigned artifacts:
+    - `Nile-0.0.0-arm64.dmg`: about `96M`
+    - `Nile-0.0.0-arm64-mac.zip`: about `99M`
+    - `Nile-0.0.0.dmg` (`x64`): about `96M`
+    - `Nile-0.0.0-mac.zip` (`x64`): about `97M`
+
+### Verification
+
+- `npm install --package-lock-only` (in `apps/desktop`)
+- `npm run build:app:dir` (in `apps/desktop`)
+- `npm run build:app:unsigned` (in `apps/desktop`)
+- `npm run typecheck`
+- Confirmed `release/mac-arm64/Nile.app/Contents/Resources/app.asar` no longer contains `dist/host` or any `*.map` entries.
+
 ### Step 18: Release Verification Hardening
 
 - Tightened `.github/workflows/desktop-release.yml` so tagged desktop releases now run `npm test` instead of only `npm run test:desktop` before packaging and upload.

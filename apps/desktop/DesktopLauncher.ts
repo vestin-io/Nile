@@ -44,7 +44,7 @@ export class DesktopLauncher {
       "dist",
       "Electron.app",
     );
-    const targetRoot = join(this.root, "dist", "host");
+    const targetRoot = join(this.root, ".runtime", "host");
     const targetAppPath = join(targetRoot, DesktopLauncher.macHostName);
     const plistPath = join(targetAppPath, "Contents", "Info.plist");
 
