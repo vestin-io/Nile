@@ -16,6 +16,7 @@ import { ShellEnvironment } from "@nile/host-local";
 
 import { DesktopSurface } from "../DesktopSurface";
 import type { MenubarAgentState } from "../DesktopTypes";
+import { AutoUpdateManager } from "./AutoUpdateManager";
 import { DesktopConnectionManager } from "./DesktopConnectionManager";
 import { DesktopStateStore } from "./DesktopStateStore";
 import { AgentHomesStore } from "./AgentHomesStore";
@@ -42,6 +43,7 @@ export class DesktopMain {
   private readonly surface: DesktopSurface;
   private readonly connectionManager: DesktopConnectionManager;
   private readonly stateStore: DesktopStateStore;
+  private readonly autoUpdateManager: AutoUpdateManager;
   private tray: Tray | null = null;
   private settingsWindow: BrowserWindow | null = null;
   private isQuitting = false;
@@ -75,11 +77,21 @@ export class DesktopMain {
       surface: this.surface,
       connectionManager: this.connectionManager,
     });
+    this.autoUpdateManager = new AutoUpdateManager({
+      logger: this.logger.child({ scope: "auto-update" }),
+      isPackaged: app.isPackaged,
+      platform: process.platform,
+      version: this.readDesktopPackageVersion(),
+      onReleaseInfoChanged: () => {
+        this.settingsWindow?.webContents.send("desktop:state-changed");
+      },
+    });
   }
 
   async start(): Promise<void> {
     app.setName("Nile");
     await app.whenReady();
+    this.autoUpdateManager.start();
     this.configureAboutPanel();
     this.installApplicationMenu();
     this.setAppIcon();
@@ -109,6 +121,9 @@ export class DesktopMain {
     ipcMain.handle("desktop:get-menubar-state", () => this.stateStore.getMenubarState());
     ipcMain.handle("desktop:get-settings-state", () => this.stateStore.getSettingsState());
     ipcMain.handle("desktop:get-history-state", () => this.stateStore.getHistoryState());
+    ipcMain.handle("desktop:get-release-info", () => this.autoUpdateManager.getReleaseInfo());
+    ipcMain.handle("desktop:check-for-updates", () => this.autoUpdateManager.checkForUpdates());
+    ipcMain.handle("desktop:install-update", () => this.autoUpdateManager.installUpdate());
     ipcMain.handle("desktop:list-connection-definitions", () => this.stateStore.listConnectionDefinitions());
     ipcMain.handle("desktop:choose-openai-auth-json-path", async (_event, defaultPath?: string) => {
       return await this.chooseOpenAiAuthJsonPath(defaultPath);

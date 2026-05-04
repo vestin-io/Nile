@@ -1,5 +1,76 @@
 # Desktop V2 Build Log
 
+## 2026-05-05
+
+### Step 46: Add local pre-push verification for release-safe pushes
+
+- Added `husky` at the repo root and installed a `pre-push` hook.
+- The hook now runs `npm run verify:pre-push`, which checks:
+  - `npm run typecheck`
+  - `npm test`
+  - `npm run desktop:build`
+- This specifically protects the desktop release path by catching local regressions before tags or pushes reach GitHub Actions.
+- While validating the hook, it reproduced the same failure captured in `error.log`:
+  - `packages/core/src/services/credential/KeychainCredentialStore.test.ts`
+  - the test expectation had not been updated after the writer call shape started including `type: "write"`
+- Updated that stale assertion so local pre-push verification and CI agree again.
+
+### Verification
+
+- `npm run prepare`
+- `npm run verify:pre-push`
+
+### Step 45: Add a settings entry for desktop version and manual update checks
+
+- Added a dedicated updates section to desktop settings so users can:
+  - see the current Nile desktop version
+  - trigger a manual update check from settings
+- Refined the settings presentation away from a large alert-driven block into a compact control row:
+  - current version shown as the primary value
+  - refresh control kept as a small inline action
+  - once a newer build is downloaded, the row expands to `current -> next` and exposes an explicit `Update` button
+- Exposed release metadata and manual update-check IPC from the Electron main process through preload.
+- Extended the auto-update manager to report release availability and to trigger non-blocking manual checks:
+  - packaged `macOS` and `Windows` builds can start a background check on demand
+  - development builds and unsupported platforms show an inline unavailable state instead of a broken action
+  - transient updater startup/check failures still degrade to non-blocking results and warning logs
+- Disabled the library's default update-downloaded prompt so desktop settings owns the install action explicitly.
+- Kept all new settings copy routed through the desktop translation catalog.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/AutoUpdateManager.test.ts`
+- `npm run test:desktop`
+- `npm run typecheck`
+- `npm run build --prefix apps/desktop`
+
+### Step 44: Enable packaged desktop auto-updates from public GitHub Releases
+
+- Added a dedicated `AutoUpdateManager` in the Electron main process and wired it into desktop startup after `app.whenReady()`.
+- The packaged app now enables `update-electron-app` against the public `vestin-io/Nile` GitHub repository:
+  - only in packaged builds
+  - only on Electron-supported auto-update platforms (`macOS` and `Windows`)
+  - with explicit logging around startup and failure paths
+- Added focused tests for the updater manager so packaged, unpackaged, unsupported-platform, and startup-failure behavior stays covered.
+- Tightened the desktop release workflow and operating docs to require `v<semver>` tags only.
+- Root cause:
+  - Electron's public update service expects releases whose tags are SemVer-compatible
+  - this repository's desktop release flow had been using `desktop-v*` tags
+  - those tags are suitable for GitHub releases but are not compatible with the public in-app update feed Nile now uses
+- Documented the remaining channel behavior:
+  - stable `v<semver>` releases can auto-update in-app
+  - GitHub prereleases stay download-only because Electron's public update service ignores prerelease releases
+- Follow-up hardening:
+  - auto-update initialization now runs on a background task after startup instead of inline with the main startup path
+  - upstream updater fetch failures such as repository access loss are downgraded to non-blocking warnings so Nile keeps launching normally
+
+### Verification
+
+- `./apps/desktop/node_modules/.bin/vitest run apps/desktop/src/electron/AutoUpdateManager.test.ts`
+- `npm run test:desktop`
+- `npm run typecheck`
+- `npm run build --prefix apps/desktop`
+
 ## 2026-05-04
 
 ### Step 43: Unpack the desktop keychain helper so reset works in packaged apps

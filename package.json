@@ -5,6 +5,7 @@
   "packageManager": "npm@10.9.4",
   "type": "module",
   "scripts": {
+    "prepare": "husky",
     "postinstall": "npm install --prefix packages/core && npm install --prefix packages/host-local && npm install --prefix apps/cli && npm install --prefix apps/desktop && npm run build --prefix packages/core",
     "build:core": "npm run build --prefix packages/core",
     "nile": "npm run build:core && node --import tsx ./apps/cli/src/main.ts",
@@ -17,10 +18,12 @@
     "test:cli": "npm run build:core && vitest run apps/cli/src",
     "test:desktop": "npm run build:core && vitest run apps/desktop/src",
     "test": "npm run test:core && npm run test:host-local && npm run test:cli && npm run test:desktop",
-    "typecheck": "npm run build:core && tsc -p tsconfig.json --noEmit"
+    "typecheck": "npm run build:core && tsc -p tsconfig.json --noEmit",
+    "verify:pre-push": "npm run typecheck && npm test && npm run desktop:build"
   },
   "devDependencies": {
     "esbuild": "^0.25.11",
+    "husky": "^9.1.7",
     "tsx": "^4.20.6",
     "typescript": "^5.8.3",
     "vitest": "^4.0.7"

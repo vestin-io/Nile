@@ -55,6 +55,8 @@
     { "module": "surfaces", "feature": "desktop-quick-setup-checklist", "state": "built" },
     { "module": "surfaces", "feature": "desktop-provider-catalog", "state": "built" },
     { "module": "surfaces", "feature": "desktop-release-pipeline", "state": "built" },
+    { "module": "surfaces", "feature": "desktop-auto-update", "state": "built" },
+    { "module": "surfaces", "feature": "desktop-settings-update-entry", "state": "built" },
     { "module": "surfaces", "feature": "desktop-cursor-usage-binding", "state": "built" },
     { "module": "surfaces", "feature": "cli-cursor-usage-auto-bind", "state": "built" },
     { "module": "surfaces", "feature": "desktop-cursor-usage-auto-bind", "state": "built" },

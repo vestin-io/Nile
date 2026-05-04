@@ -21,6 +21,7 @@ describe("KeychainCredentialStore", () => {
 
     expect(writer.calls).toEqual([
       {
+        type: "write",
         account: "openai-work",
         service: "nile.test",
         secret: "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6InNlY3JldC12YWx1ZSJ9",

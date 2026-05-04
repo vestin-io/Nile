@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import nileMarkSvg from "../../../../../assets/icons/nile-mark.svg";
 
 import { AgentPage } from "../agents/AgentPage";
@@ -38,6 +38,7 @@ import {
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { type AgentId } from "@nile/core/models/agent/types";
+import type { DesktopReleaseInfo } from "../../DesktopTypes";
 
 const PAGE_TITLE_KEYS: Record<PageId, string> = {
   "quick-setup": "page.quickSetup",
@@ -87,6 +88,7 @@ export function SettingsApp() {
   const [nileDialogOpen, setNileDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [releaseInfo, setReleaseInfo] = useState<DesktopReleaseInfo | null>(null);
   const [selectedAgentDetailTab, setSelectedAgentDetailTab] = useState<AgentDetailTab>("connections");
   const addConnectionDefinitions = useMemo(
     () => readDefinitionsForAgent(addConnectionTargetAgentId),
@@ -203,6 +205,23 @@ export function SettingsApp() {
     await window.nileDesktop.importCurrentConnection(agentId);
     await refresh();
   };
+
+  useEffect(() => {
+    const readReleaseInfo = async () => {
+      const nextReleaseInfo = await window.nileDesktop.getReleaseInfo().catch(() => ({
+        version: "0.0.0",
+        updateAvailability: "development" as const,
+        status: "idle" as const,
+        availableVersion: null,
+      }));
+      setReleaseInfo(nextReleaseInfo);
+    };
+
+    void readReleaseInfo();
+    return window.nileDesktopEvents.onStateChanged(() => {
+      void readReleaseInfo();
+    });
+  }, []);
 
   if (!settingsState || !historyState) {
     return <LoadingShell label={t("loading.desktop")} />;
@@ -373,6 +392,13 @@ export function SettingsApp() {
                 <SettingsPage
                   isResetting={isResetting}
                   preferences={preferences}
+                  releaseInfo={releaseInfo}
+                  onCheckForUpdates={async () => {
+                    await window.nileDesktop.checkForUpdates().catch(() => ({ status: "unavailable" as const }));
+                  }}
+                  onInstallUpdate={async () => {
+                    await window.nileDesktop.installUpdate().catch(() => ({ status: "unavailable" as const }));
+                  }}
                   onReset={() => setResetDialogOpen(true)}
                   onLanguageChange={(language) => setPreferences((current) => ({ ...current, language }))}
                   onThemeChange={(theme) => setPreferences((current) => ({ ...current, theme }))}

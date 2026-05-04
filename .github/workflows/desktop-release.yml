@@ -4,11 +4,10 @@ on:
   push:
     tags:
       - "v*"
-      - "desktop-v*"
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag to build, for example v0.1.0 or desktop-v0.1.0"
+        description: "Release tag to build, for example v0.1.0"
         required: true
         type: string
 
@@ -76,13 +75,12 @@ jobs:
             tag="${GITHUB_REF_NAME}"
           fi
 
-          version="${tag#desktop-v}"
-          version="${version#v}"
-
-          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-            printf 'Release tag must be v<semver> or desktop-v<semver>, got %s\n' "${tag}" >&2
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            printf 'Release tag must be v<semver>, got %s\n' "${tag}" >&2
             exit 1
           fi
+
+          version="${tag#v}"
 
           printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
           printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"

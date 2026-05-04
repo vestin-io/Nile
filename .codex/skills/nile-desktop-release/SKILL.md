@@ -59,8 +59,8 @@ npm run build:app --prefix apps/desktop
 4. If the task is a GitHub release, prefer a pushed tag:
 
 ```bash
-git tag desktop-v0.1.0
-git push origin desktop-v0.1.0
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 5. Confirm the workflow completes:
@@ -75,7 +75,6 @@ git push origin desktop-v0.1.0
 `workflow_dispatch` is valid only when the `release_tag` input is provided in one of these formats:
 
 - `v<semver>`
-- `desktop-v<semver>`
 
 ## Expected Artifacts
 
@@ -89,4 +88,3 @@ git push origin desktop-v0.1.0
 - Missing secrets: the `Validate signing secrets` step fails early.
 - Wrong certificate type: notarization fails with "not signed with a valid Developer ID certificate."
 - Dirty worktree before tag: the release tag does not include the intended changes.
-

@@ -86,6 +86,24 @@ export type DesktopAdvancedState = {
   importableSetupCount: number;
 };
 
+export type DesktopUpdateAvailability = "available" | "development" | "unsupported_platform";
+export type DesktopReleaseStatus = "idle" | "checking" | "no_update" | "ready";
+
+export type DesktopReleaseInfo = {
+  version: string;
+  updateAvailability: DesktopUpdateAvailability;
+  status: DesktopReleaseStatus;
+  availableVersion: string | null;
+};
+
+export type DesktopUpdateCheckResult = {
+  status: "started" | "unavailable";
+};
+
+export type DesktopInstallUpdateResult = {
+  status: "started" | "unavailable";
+};
+
 export type SettingsState = {
   onboarding: DesktopOnboardingState | null;
   currentConnection: DesktopConnection | null;

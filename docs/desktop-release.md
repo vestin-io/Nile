@@ -17,7 +17,6 @@ GitHub Releases are created and populated by `.github/workflows/desktop-release.
 Trigger tags:
 
 - `v<semver>`
-- `desktop-v<semver>`
 
 Flow:
 
@@ -35,6 +34,7 @@ Flow:
 12. Upload the artifacts to that GitHub Release with `gh release upload --clobber`.
 
 Pre-release tags are inferred from semver prerelease suffixes such as `v0.1.0-beta.1`.
+Those releases remain marked as GitHub prereleases, so Nile's in-app auto-update flow only follows stable releases.
 
 Release packaging currently emits separate `arm64` and `x64` macOS artifacts by default instead of one `universal` app. This keeps each downloadable artifact materially smaller and avoids shipping both architectures inside the same bundle.
 
@@ -59,8 +59,8 @@ For new repositories, prefer the canonical `NILE_DESKTOP_*` names. Existing repo
 Use a pushed git tag as the normal release entrypoint:
 
 ```bash
-git tag desktop-v0.1.0
-git push origin desktop-v0.1.0
+git tag v0.1.0
+git push origin v0.1.0
 ```
 
 The workflow will:
@@ -85,9 +85,20 @@ Expected uploaded artifacts:
 `workflow_dispatch` is supported for reruns or manually triggered releases, but it still requires a release tag value in the same format as the tag trigger:
 
 - `v<semver>`
-- `desktop-v<semver>`
 
-When running the workflow manually, provide the `release_tag` input with one of those values.
+When running the workflow manually, provide the `release_tag` input with that value.
+
+## Desktop Auto-Update
+
+Nile's packaged desktop app now enables Electron's public GitHub Releases updater through `update-electron-app`.
+
+Requirements for the in-app updater to work:
+
+1. Publish a stable GitHub Release from a `v<semver>` tag.
+2. Keep the repository public.
+3. Upload the signed macOS `.zip` assets alongside the `.dmg` files.
+
+The updater checks for new releases when the packaged app starts and continues polling in the background on Electron's default interval.
 
 ## Local Signed Build
 

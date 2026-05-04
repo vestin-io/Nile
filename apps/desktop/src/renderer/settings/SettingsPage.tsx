@@ -14,11 +14,16 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Separator } from "../ui/separator";
+import type { DesktopReleaseInfo } from "../../DesktopTypes";
 import { SettingsSection } from "./SettingsSection";
+import { UpdateSection } from "./UpdateSection";
 
 type SettingsPageProps = {
   isResetting: boolean;
   preferences: DesktopPreferences;
+  releaseInfo: DesktopReleaseInfo | null;
+  onCheckForUpdates(): Promise<void>;
+  onInstallUpdate(): Promise<void>;
   onReset(): void;
   onLanguageChange(language: LanguagePreference): void;
   onThemeChange(theme: ThemePreference): void;
@@ -28,6 +33,9 @@ type SettingsPageProps = {
 export function SettingsPage({
   isResetting,
   preferences,
+  releaseInfo,
+  onCheckForUpdates,
+  onInstallUpdate,
   onReset,
   onLanguageChange,
   onThemeChange,
@@ -70,6 +78,15 @@ export function SettingsPage({
           </SelectContent>
         </Select>
       </SettingsSection>
+
+      <Separator />
+
+      <UpdateSection
+        info={releaseInfo}
+        onCheck={onCheckForUpdates}
+        onInstall={onInstallUpdate}
+        t={t}
+      />
 
       <Separator />
 

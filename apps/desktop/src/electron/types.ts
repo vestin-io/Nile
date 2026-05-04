@@ -83,6 +83,9 @@ export type DesktopBridge = {
   getMenubarState(): Promise<import("../DesktopTypes").MenubarState>;
   getSettingsState(): Promise<import("../DesktopTypes").SettingsState>;
   getHistoryState(): Promise<import("../DesktopTypes").HistoryState>;
+  getReleaseInfo(): Promise<import("../DesktopTypes").DesktopReleaseInfo>;
+  checkForUpdates(): Promise<import("../DesktopTypes").DesktopUpdateCheckResult>;
+  installUpdate(): Promise<import("../DesktopTypes").DesktopInstallUpdateResult>;
   listConnectionDefinitions(): Promise<import("@nile/core/models/connection").ConnectionDefinition[]>;
   chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null>;
   describeConnectionOnboarding(input: DesktopAddConnectionInput): Promise<ConnectionOnboardingSuggestion>;
