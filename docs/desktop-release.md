@@ -38,13 +38,56 @@ Pre-release tags are inferred from semver prerelease suffixes such as `v0.1.0-be
 
 Release packaging currently emits separate `arm64` and `x64` macOS artifacts by default instead of one `universal` app. This keeps each downloadable artifact materially smaller and avoids shipping both architectures inside the same bundle.
 
+GitHub Release entries are created with generated notes when a matching tag does not already have a release.
+
 ## Required GitHub Secrets
 
-- `NILE_DESKTOP_MAC_CERTIFICATE_P12`
-- `NILE_DESKTOP_MAC_CERTIFICATE_PASSWORD`
-- `NILE_DESKTOP_APPLE_ID`
-- `NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD`
-- `NILE_DESKTOP_APPLE_TEAM_ID`
+The workflow accepts either the canonical `NILE_DESKTOP_*` secret names or the matching short names used in `apps/desktop/.env.release`.
+
+| Purpose | Canonical secret | Short-name fallback |
+| --- | --- | --- |
+| Base64 `.p12` certificate | `NILE_DESKTOP_MAC_CERTIFICATE_P12` | `CSC_LINK` |
+| `.p12` export password | `NILE_DESKTOP_MAC_CERTIFICATE_PASSWORD` | `CSC_KEY_PASSWORD` |
+| Apple ID email | `NILE_DESKTOP_APPLE_ID` | `APPLE_ID` |
+| Apple app-specific password | `NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD` | `APPLE_APP_SPECIFIC_PASSWORD` |
+| Apple team ID | `NILE_DESKTOP_APPLE_TEAM_ID` | `APPLE_TEAM_ID` |
+
+For new repositories, prefer the canonical `NILE_DESKTOP_*` names. Existing repositories may keep the short names.
+
+## Recommended Publish Flow
+
+Use a pushed git tag as the normal release entrypoint:
+
+```bash
+git tag desktop-v0.1.0
+git push origin desktop-v0.1.0
+```
+
+The workflow will:
+
+1. Validate secrets.
+2. Run `npm run typecheck`.
+3. Run `npm test`.
+4. Build signed `arm64` and `x64` desktop artifacts.
+5. Submit both artifacts for notarization.
+6. Create or update the matching GitHub Release.
+7. Upload the generated `dmg` and `zip` files.
+
+Expected uploaded artifacts:
+
+- `Nile-<version>-arm64.dmg`
+- `Nile-<version>-arm64-mac.zip`
+- `Nile-<version>.dmg`
+- `Nile-<version>-mac.zip`
+
+## Manual Workflow Dispatch
+
+`workflow_dispatch` is supported for reruns or manually triggered releases, but it still requires a release tag value in the same format as the tag trigger:
+
+- `v<semver>`
+- `desktop-v<semver>`
+
+When running the workflow manually, provide the `release_tag` input with one of those values.
 
 ## Local Signed Build
 

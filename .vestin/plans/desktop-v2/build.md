@@ -2,6 +2,47 @@
 
 ## 2026-05-04
 
+### Step 21: Repo-Local Release And Review Skills
+
+- Added repo-local Codex skills under `.codex/skills/` for repeated Nile operational tasks:
+  - `nile-desktop-release`
+  - `nile-review`
+- Captured the current desktop release operating rules in the release skill:
+  - tag gating against dirty worktrees
+  - accepted GitHub secret names
+  - local signed build flow
+  - expected notarized artifact outputs
+- Captured Nile-specific review priorities in the review skill:
+  - regression-first findings
+  - release-readiness checks
+  - workflow and docs consistency checks
+
+### Verification
+
+- Read both generated skill files in place.
+- Confirmed release instructions match the current workflow and docs.
+
+### Step 20: Release Workflow Secret Compatibility
+
+- Updated `.github/workflows/desktop-release.yml` so the desktop release pipeline now accepts either:
+  - canonical `NILE_DESKTOP_*` GitHub secrets
+  - existing short-name secrets matching `apps/desktop/.env.release`
+- Added a required `release_tag` input for `workflow_dispatch` so manually triggered desktop releases derive the same version format as tag-triggered runs.
+- Updated release creation to generate GitHub Release notes automatically when creating a new release entry.
+- Expanded `docs/desktop-release.md` with:
+  - a secret-name mapping table
+  - the recommended tag-driven publish flow
+  - expected uploaded release artifacts
+  - manual workflow dispatch usage
+- Updated `README.md` to point readers at the full desktop release operating guide.
+- Added desktop package `description` and `author` metadata to remove packaging warnings during release builds.
+
+### Verification
+
+- `npm run build:app --prefix apps/desktop`
+- Confirmed local signed packaging used `Developer ID Application: QIANG JI (6N2P2T69SK)`.
+- Confirmed notarization completed successfully for both `arm64` and `x64` desktop artifacts.
+
 ### Step 19: Desktop Package Size Reduction
 
 - Removed the dev-only macOS Electron host bundle from packaged app contents:

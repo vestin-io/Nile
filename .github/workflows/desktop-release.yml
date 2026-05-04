@@ -6,6 +6,11 @@ on:
       - "v*"
       - "desktop-v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to build, for example v0.1.0 or desktop-v0.1.0"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -22,11 +27,11 @@ jobs:
       run:
         shell: bash
     env:
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_ID: ${{ secrets.NILE_DESKTOP_APPLE_ID }}
-      APPLE_TEAM_ID: ${{ secrets.NILE_DESKTOP_APPLE_TEAM_ID }}
-      CSC_KEY_PASSWORD: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_PASSWORD }}
-      CSC_LINK: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_P12 }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_ID: ${{ secrets.NILE_DESKTOP_APPLE_ID || secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.NILE_DESKTOP_APPLE_TEAM_ID || secrets.APPLE_TEAM_ID }}
+      CSC_KEY_PASSWORD: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_PASSWORD || secrets.CSC_KEY_PASSWORD }}
+      CSC_LINK: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_P12 || secrets.CSC_LINK }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out repository
@@ -62,8 +67,15 @@ jobs:
 
       - name: Derive release version
         id: version
+        env:
+          MANUAL_RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          tag="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${MANUAL_RELEASE_TAG}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+
           version="${tag#desktop-v}"
           version="${version#v}"
 
@@ -120,6 +132,7 @@ jobs:
           if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release create "${RELEASE_TAG}" \
               --title "Nile Desktop ${RELEASE_TAG}" \
+              --generate-notes \
               "${prerelease_args[@]}"
           fi
 

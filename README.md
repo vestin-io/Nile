@@ -153,6 +153,8 @@ Nile is still in active MVP development, but the macOS desktop release path now 
 - signed and notarized desktop release automation via GitHub Actions tags
 - GitHub Release asset upload for macOS `dmg` and `zip` artifacts
 
+The standard publish path is pushing a `v<semver>` or `desktop-v<semver>` tag. See [docs/desktop-release.md](./docs/desktop-release.md) for required secrets, manual workflow dispatch, and release asset details.
+
 Current release limits:
 
 - macOS only

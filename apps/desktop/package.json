@@ -3,6 +3,8 @@
   "productName": "Nile",
   "version": "0.0.0",
   "private": true,
+  "description": "Nile desktop app",
+  "author": "Nile contributors",
   "type": "module",
   "main": "dist/electron/main.cjs",
   "dependencies": {},
