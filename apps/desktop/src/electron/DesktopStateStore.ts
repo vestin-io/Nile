@@ -14,6 +14,7 @@ import type { DesktopConnection, HistoryState, MenubarState, SettingsState } fro
 import { DesktopConnectionManager } from "./DesktopConnectionManager";
 import type {
   DesktopAddConnectionInput,
+  DesktopDiscardPreparedConnectionDraftInput,
   DesktopDescribeSavedConnectionOnboardingInput,
   DesktopConnectionSummary,
   DesktopPreparedConnectionDraft,
@@ -125,6 +126,10 @@ export class DesktopStateStore {
     const result = await this.options.connectionManager.savePreparedConnection(input);
     this.markDirty(this.menubarState, this.settingsState, this.historyState, this.connectionDefinitions);
     return result;
+  }
+
+  discardPreparedConnectionDraft(input: DesktopDiscardPreparedConnectionDraftInput): void {
+    this.options.connectionManager.discardPreparedConnectionDraft(input);
   }
 
   async importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult> {

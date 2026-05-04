@@ -231,6 +231,32 @@ describe("DesktopConnectionManager", () => {
     expect(result.labelSuggestion).toBe("claude@example.com");
   });
 
+  it("discards prepared drafts that are abandoned before save", async () => {
+    const setup = createSetup();
+    const loginRunner = new StubCodexSessionLogin();
+    const manager = new DesktopConnectionManager(
+      {
+        databasePath: setup.dbPath,
+        agentHomes: { codex: setup.codexHome },
+        environment: EnvironmentSource.empty(),
+        credentialStore: setup.credentialStore,
+      },
+      loginRunner,
+    );
+
+    const draft = await manager.prepareConnectionDraft({
+      preset: "openai",
+      authMode: "openai_session",
+      openAiSessionSource: "login",
+    });
+
+    manager.discardPreparedConnectionDraft({ draftId: draft.id });
+
+    await expect(manager.savePreparedConnection({ draftId: draft.id })).rejects.toThrow(
+      "Prepared connection draft not found",
+    );
+  });
+
   it("binds Cursor usage for a saved cursor_session connection", () => {
     const setup = createSetup();
     seedCursorConnection(setup);

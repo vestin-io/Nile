@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/types";
 import { EnabledAgentsPolicy } from "@nile/core/models/connection/enabled-agents-policy";
 
@@ -6,6 +6,7 @@ import type { DesktopConnection } from "../../DesktopTypes";
 import { buildConnectionMethods, readSelectedMethodKey } from "./ConnectionFormParts";
 import { formatAgentsList, sameAgentSelection, type Definition } from "../shared/Support";
 import type { Translator } from "../shared/I18n";
+import { syncDefaultAuthJsonPath } from "./AuthJsonPath";
 
 export type ConnectionEditSubmitInput = {
   label?: string;
@@ -55,6 +56,7 @@ export function useConnectionEditState({
   const [suggestedAgents, setSuggestedAgents] = useState<AgentId[]>([]);
   const [resolvedConfigurableAgents, setResolvedConfigurableAgents] = useState<AgentId[]>(connection.configurableAgents);
   const enabledAgentsPolicy = useMemo(() => new EnabledAgentsPolicy(), []);
+  const previousDefaultOpenAiAuthJsonPath = useRef(defaultOpenAiAuthJsonPath);
 
   const trimmedLabel = label.trim();
   const definition = useMemo(() => resolveDefinition(connection, definitions), [connection, definitions]);
@@ -104,7 +106,19 @@ export function useConnectionEditState({
     setHasProbedSupport(false);
     setSuggestedAgents([]);
     setResolvedConfigurableAgents(connection.configurableAgents);
-  }, [connection.id, defaultOpenAiAuthJsonPath]);
+  }, [connection.id]);
+
+  useEffect(() => {
+    const previousDefault = previousDefaultOpenAiAuthJsonPath.current;
+    previousDefaultOpenAiAuthJsonPath.current = defaultOpenAiAuthJsonPath;
+
+    if (previousDefault === defaultOpenAiAuthJsonPath) {
+      return;
+    }
+
+    setAuthJsonPath((current) =>
+      syncDefaultAuthJsonPath(current, previousDefault, defaultOpenAiAuthJsonPath));
+  }, [defaultOpenAiAuthJsonPath]);
 
   useEffect(() => {
     setActionError(null);

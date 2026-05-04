@@ -64,38 +64,6 @@
     --sidebar-ring: 0 0% 83.1%;
   }
 
-  .agent-tone-codex {
-    color: #10a37f;
-  }
-
-  .agent-tone-cursor {
-    color: #2563eb;
-  }
-
-  .agent-tone-claude {
-    color: #d97706;
-  }
-
-  .agent-tone-openclaw {
-    color: #dc2626;
-  }
-
-  .dark .agent-tone-codex {
-    color: #34d399;
-  }
-
-  .dark .agent-tone-cursor {
-    color: #60a5fa;
-  }
-
-  .dark .agent-tone-claude {
-    color: #f59e0b;
-  }
-
-  .dark .agent-tone-openclaw {
-    color: #f87171;
-  }
-
   * {
     @apply border-border;
     box-sizing: border-box;

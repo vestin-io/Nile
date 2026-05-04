@@ -2,6 +2,156 @@
 
 ## 2026-05-04
 
+### Step 42: Keep quick-setup save buttons pending until Nile confirms the import
+
+- Fixed the desktop quick-setup and agent-card import button transition so it no longer falls back to `Save to Nile` between the loading spinner and the final saved checkmark.
+- Root cause:
+  - the renderer button only tracked a local `isSaving` flag
+  - that flag cleared as soon as the import IPC returned
+  - desktop state confirmation arrived slightly later through the renderer refresh path
+  - the gap briefly re-rendered the idle button before the saved state landed
+- Updated the detected-setup action state to stay in a pending-confirmation phase until the card is actually confirmed saved or the local setup no longer needs an import action.
+- Followed through by refreshing desktop settings immediately after `importCurrentConnection(...)` resolves so both quick setup and the Agents page converge on the confirmed state faster and more deterministically.
+- Added a focused renderer-state test for the pending-confirmation helper.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/quick-setup/SaveState.test.ts`
+- `npm run typecheck`
+
+### Step 41: Probe real agent homes before assuming hidden dot-directories
+
+- Updated core agent-home defaults to prefer real existing install roots before falling back to hardcoded dot-directories.
+- Added common macOS fallback candidates so Nile can find local agent state on machines that do not store Codex or other agent files under `~/.codex`, `~/.claude`, and similar legacy paths.
+- Current default probing order:
+  - Codex: `~/Library/Application Support/Codex`, then `~/.codex`
+  - Cursor: `~/.cursor`, then `~/Library/Application Support/Cursor`
+  - Claude: `~/.claude`, then `~/Library/Application Support/Claude`
+  - OpenClaw: `~/.openclaw`, then `~/Library/Application Support/OpenClaw`
+- Tightened file-read error handling for Codex and Claude state files:
+  - missing files still read as "not configured"
+  - permission-denied and other read failures now surface with explicit file-path context instead of collapsing into a generic missing-state result
+- Follow-up fix:
+  - directory existence alone was too loose for Codex and Claude because app support folders can exist without containing Nile's target state files
+  - default home probing now keys off the presence of real marker files such as `auth.json`, `config.toml`, `settings.json`, and `.credentials.json`
+  - this restores Codex detection to `~/.codex` on machines where `~/Library/Application Support/Codex` exists only as app shell data
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/agent/Homes.test.ts`
+- `npm run typecheck`
+
+### Step 37: Keep agent icons colorful across themes
+
+- Switched desktop agent icons from monochrome `currentColor` SVG variants to the library's color SVG variants:
+  - Codex
+  - Cursor
+  - Claude Code
+  - OpenClaw
+- Removed the theme-specific `agent-tone-*` color classes from the agent card header and icon stack.
+- This keeps the agent brand marks visually consistent across light and dark themes instead of turning them black/white in light mode.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run build --prefix apps/desktop`
+- `git diff --check`
+
+### Step 38: Brand the dev macOS host icon
+
+- Fixed desktop dev mode still showing the Electron app icon for the app bundle and the macOS About panel.
+- Root cause:
+  - the dev launcher already copied `Electron.app` into a temporary Nile host
+  - but it only rewrote the bundle name and identifier
+  - the copied host still kept Electron's bundled `electron.icns`
+- Updated `DesktopLauncher` to replace the copied host icon resource with `apps/desktop/build/icons/icon.icns` when present.
+- Added a focused launcher test to verify the copied dev host icon gets overwritten with the Nile icon asset.
+- Followed up on a dev/runtime mismatch:
+  - this machine's `iconutil` is currently failing and leaving `build/icons/icon.icns` stale
+  - the packaged build configuration already points at `build/icons/icon.png`
+  - desktop runtime surfaces on macOS now use `icon.png` too, so the dock/window/About icon matches the actual build output even when `icon.icns` is behind
+
+### Verification
+
+- `./apps/desktop/node_modules/.bin/vitest run apps/desktop/src/DesktopLauncher.test.ts`
+- `npm run build --prefix apps/desktop`
+- `npm run typecheck`
+
+### Step 39: Fix repeated Codex agent icon rendering in connection tables
+
+- Fixed the connection table's Codex agent icon disappearing on larger layouts.
+- Root cause:
+  - the colored Codex and OpenClaw SVG variants include gradient `<defs>` with fixed ids
+  - desktop renders the same inline SVG multiple times on a page
+  - duplicate gradient ids collide in the DOM, so only the white base path survives and the colored mark disappears
+- Updated agent icon rendering to namespace inline SVG ids per rendered instance.
+- Wired unique instance ids through both the agent card header and the agent icon stack so repeated inline icons stay visually intact.
+
+### Verification
+
+- `npm run build --prefix apps/desktop`
+- `npm run typecheck`
+- `git diff --check`
+
+### Step 40: Increase Codex icon size in agent stacks
+
+- Increased the Codex icon size in shared agent icon stacks so it reads more clearly in connection tables and other compact list views.
+- Kept the larger sizing specific to Codex to avoid throwing off the visual balance of the other agent marks.
+- Matched that adjustment in the Agents page header cards so Codex reads slightly larger there as well without changing the card shell size.
+
+### Verification
+
+- `npm run build --prefix apps/desktop`
+- `npm run typecheck`
+
+### Step 35: Tighten keychain writes and prepared desktop draft lifecycle
+
+- Replaced the prompt-suppression workaround that pushed secrets into `security -w <secret>` argv with a native macOS Keychain write helper built from Swift during `packages/core` build.
+- The new helper writes generic-password items through the Security framework and receives the secret over stdin:
+  - no misleading terminal password prompt in desktop dev flows
+  - no API keys, session tokens, or rollback snapshots exposed through child-process argv
+- Updated the shared credential, secure snapshot, and Cursor credential stores to use the explicit helper-backed generic-password write API instead of generic `-w` placeholder argument rewriting.
+- Split the macOS write path out of `SecurityCli` into a dedicated `GenericPasswordWriter` so responsibilities are explicit:
+  - `SecurityCli` now only wraps direct `security` command execution for read/delete operations
+  - `GenericPasswordWriter` owns helper resolution and stdin-backed generic-password writes
+- Added focused coverage for the helper-backed write path and kept the keychain payload format single and canonical.
+- Added an explicit desktop prepared-draft discard path so session credentials prepared for add-connection flows do not stay resident in main-process memory after the user backs out without saving.
+- Fixed `auth.json` default path follow-up behavior:
+  - add-connection no longer gets stuck on the initial default before settings finish loading
+  - edit-connection no longer resets the whole form when the default Codex home changes
+  - both surfaces now only replace the path when the user is still on the previous default
+- Removed the root TypeScript package alias indirection and let repo-local apps resolve `@nile/core` and `@nile/host-local` through their actual symlinked package dependencies again.
+- Updated the root desktop test script back to the simple root-based vitest entry once package resolution was stable again.
+
+### Verification
+
+- `npm run build:core`
+- `./node_modules/.bin/vitest run packages/core/src/services/credential/SecurityCli.test.ts packages/core/src/services/credential/GenericPasswordWriter.test.ts packages/core/src/services/credential/SecretCodec.test.ts packages/core/src/services/credential/KeychainCredentialStore.test.ts`
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/DesktopConnectionManager.test.ts apps/desktop/src/renderer/connections/AuthJsonPath.test.ts`
+- `npm run test:desktop`
+- `npm run typecheck`
+- `npm run start -- --help`
+- `git diff --check`
+
+### Step 36: Prefer matched live saved connections in desktop state
+
+- Fixed desktop agent/current-connection state so a saved live Codex connection takes precedence over a stale Nile selection record.
+- New effective-current behavior:
+  - if Codex live state matches a saved connection, desktop shows that saved live connection as current
+  - if the live state is a brand-new unsaved setup, desktop keeps the previous detected/new setup behavior
+- Preserved `appliedAt` for the normal synced case where saved selection and live connection still point at the same saved record.
+- Added a desktop regression test for the concrete drift scenario:
+  - two saved OpenAI session connections
+  - Nile selection still points at the old account
+  - Codex live auth has been switched outside Nile to another saved account
+  - desktop now surfaces the saved live account as current
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/DesktopSurface.test.ts -t "prefers the matched live saved connection over the stale selected connection"`
+- `npm run test:desktop`
+- `npm run typecheck`
+
 ### Step 34: Refresh README product previews and surface order
 
 - Updated `README.md` to make the product surfaces more public-facing and easier to understand at a glance.
@@ -979,6 +1129,54 @@
 - `npm run typecheck`
 - `npm run build --prefix apps/desktop`
 - `npm run test:desktop`
+
+### Desktop effective-current selection alignment
+
+- Kept desktop connection rows aligned with the effective current connection when Codex live state matches a saved connection:
+  - agent cards and settings lists now clear stale `selectedByAgents` display state for the active agent
+  - the matched live saved connection is shown as both current and selected in desktop lists
+- Added a regression test covering the real two-connection OpenAI session case:
+  - stale saved selection points at one account
+  - live Codex state matches another saved account
+  - desktop now shows the live saved account as current, selected, and uses that account's quota snapshot
+- Kept this as a display-state correction only; status reads still do not mutate persisted agent selection.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/DesktopSurface.test.ts`
+- `npm run test:desktop`
+- `npm run typecheck`
+- `git diff --check`
+
+### Desktop keychain helper bundling fix
+
+- Fixed desktop `import-current-connection` / save-to-Nile failures caused by the keychain helper path resolver running inside the bundled Electron CJS main process.
+- `GenericPasswordWriter` now resolves its runtime directory in both contexts:
+  - direct ESM package execution via `import.meta.url`
+  - bundled CJS desktop execution via `__filename`
+- Updated desktop build packaging to copy the native `KeychainGenericPasswordHelper` binary from `packages/core/dist/services/credential` into `apps/desktop/dist/electron`, so the bundled Electron main process always has a local sibling helper to execute.
+
+### Verification
+
+- `npm run build --prefix apps/desktop`
+- `./node_modules/.bin/vitest run packages/core/src/services/credential/GenericPasswordWriter.test.ts apps/desktop/src/DesktopSurface.test.ts`
+- `npm run typecheck`
+
+### Desktop About panel metadata fix
+
+- Fixed the macOS system `About Nile` panel to use Nile-owned metadata instead of Electron defaults.
+- Desktop main now configures the About panel explicitly on macOS with:
+  - application name `Nile`
+  - version read from `apps/desktop/package.json`
+  - a `Development build` fallback label when the package version is still the unreleased `0.0.0`
+  - the packaged Nile app icon path
+- Switched desktop app icon resolution on macOS to prefer `build/icons/icon.icns`, which also feeds the About panel and dock icon path consistently.
+
+### Verification
+
+- `npm run build --prefix apps/desktop`
+- `npm run typecheck`
+- `git diff --check`
 
 ### Security hygiene hardening
 

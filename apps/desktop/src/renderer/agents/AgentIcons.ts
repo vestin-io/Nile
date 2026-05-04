@@ -1,16 +1,26 @@
 import type { AgentId } from "@nile/core/models/agent/types";
-import codexSvg from "@lobehub/icons-static-svg/icons/codex.svg";
+import codexSvg from "@lobehub/icons-static-svg/icons/codex-color.svg";
 import cursorSvg from "@lobehub/icons-static-svg/icons/cursor.svg";
-import claudeCodeSvg from "@lobehub/icons-static-svg/icons/claudecode.svg";
-import openClawSvg from "@lobehub/icons-static-svg/icons/openclaw.svg";
+import claudeCodeSvg from "@lobehub/icons-static-svg/icons/claudecode-color.svg";
+import openClawSvg from "@lobehub/icons-static-svg/icons/openclaw-color.svg";
 
-export function renderAgentIcon(agentId: AgentId): string {
+const cursorColorSvg = cursorSvg.replaceAll("currentColor", "#3478F6");
+
+export function renderAgentIcon(agentId: AgentId, instanceId?: string): string {
+  const icon = readAgentIconSvg(agentId);
+  if (!instanceId) {
+    return icon;
+  }
+  return namespaceSvgIds(icon, instanceId);
+}
+
+function readAgentIconSvg(agentId: AgentId): string {
   if (agentId === "codex") {
     return codexSvg;
   }
 
   if (agentId === "cursor") {
-    return cursorSvg;
+    return cursorColorSvg;
   }
   if (agentId === "openclaw") {
     return openClawSvg;
@@ -19,6 +29,19 @@ export function renderAgentIcon(agentId: AgentId): string {
   return claudeCodeSvg;
 }
 
-export function agentToneClass(agentId: AgentId): string {
-  return `agent-tone-${agentId}`;
+function namespaceSvgIds(svg: string, instanceId: string): string {
+  const ids = Array.from(svg.matchAll(/\bid="([^"]+)"/g), (match) => match[1]);
+  if (ids.length === 0) {
+    return svg;
+  }
+
+  let next = svg;
+  for (const id of ids) {
+    const namespaced = `${id}-${instanceId}`;
+    next = next.replaceAll(`id="${id}"`, `id="${namespaced}"`);
+    next = next.replaceAll(`url(#${id})`, `url(#${namespaced})`);
+    next = next.replaceAll(`href="#${id}"`, `href="#${namespaced}"`);
+    next = next.replaceAll(`xlink:href="#${id}"`, `xlink:href="#${namespaced}"`);
+  }
+  return next;
 }

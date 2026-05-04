@@ -1,4 +1,4 @@
-import { SecurityCli } from "./SecurityCli";
+import { GenericPasswordWriter } from "./GenericPasswordWriter";
 import { SecuritySecretCodec } from "./SecretCodec";
 import { type StoredCredential } from "./Types";
 import { NileLogger } from "../../services/NileLogger";
@@ -21,11 +21,11 @@ export class KeychainCredentialStore implements CredentialStore {
   private readonly cache = new Map<string, StoredCredential>();
 
   constructor(
-    private readonly securityCli: SecurityCli = new SecurityCli(),
     private readonly serviceName: string = "nile.switcher.credential",
     private readonly logger: NileLogger = NileLogger.silent().child({ module: "credential-store" }),
     private readonly validators: Record<string, CredentialValidator> = DEFAULT_CREDENTIAL_VALIDATORS,
     private readonly secretCodec: SecuritySecretCodec = new SecuritySecretCodec(),
+    private readonly genericPasswordWriter: GenericPasswordWriter = new GenericPasswordWriter(),
   ) {}
 
   create(credentialId: string, credential: StoredCredential): void {
@@ -36,14 +36,12 @@ export class KeychainCredentialStore implements CredentialStore {
       kind: credential.kind,
     });
 
-    const result = this.securityCli.runWithSecretData([
-      "add-generic-password",
-      "-a",
-      credentialId,
-      "-s",
-      this.serviceName,
-      "-w",
-    ], this.secretCodec.encode(serialized));
+    const result = this.genericPasswordWriter.write({
+      account: credentialId,
+      service: this.serviceName,
+      secret: this.secretCodec.encode(serialized),
+      update: false,
+    });
 
     if (result.exitCode === 0) {
       this.cache.set(credentialId, credential);
@@ -80,15 +78,12 @@ export class KeychainCredentialStore implements CredentialStore {
       throw new CredentialNotFoundError(credentialId);
     }
 
-    const result = this.securityCli.runWithSecretData([
-      "add-generic-password",
-      "-a",
-      credentialId,
-      "-s",
-      this.serviceName,
-      "-U",
-      "-w",
-    ], this.secretCodec.encode(serialized));
+    const result = this.genericPasswordWriter.write({
+      account: credentialId,
+      service: this.serviceName,
+      secret: this.secretCodec.encode(serialized),
+      update: true,
+    });
 
     if (result.exitCode === 0) {
       this.cache.set(credentialId, credential);
@@ -114,14 +109,11 @@ export class KeychainCredentialStore implements CredentialStore {
       return cached;
     }
 
-    const result = this.securityCli.run([
-      "find-generic-password",
-      "-a",
-      credentialId,
-      "-s",
-      this.serviceName,
-      "-w",
-    ]);
+    const result = this.genericPasswordWriter.read({
+      account: credentialId,
+      service: this.serviceName,
+      includeSecret: true,
+    });
 
     if (result.exitCode === 0) {
       const credential = this.deserializeCredential(result.stdout);
@@ -145,13 +137,11 @@ export class KeychainCredentialStore implements CredentialStore {
       return true;
     }
 
-    const result = this.securityCli.run([
-      "find-generic-password",
-      "-a",
-      credentialId,
-      "-s",
-      this.serviceName,
-    ]);
+    const result = this.genericPasswordWriter.read({
+      account: credentialId,
+      service: this.serviceName,
+      includeSecret: false,
+    });
 
     if (result.exitCode === 0) {
       this.logger.debug("credential.has.true", { credentialId });
@@ -169,13 +159,10 @@ export class KeychainCredentialStore implements CredentialStore {
   remove(credentialId: string): void {
     this.validateCredentialId(credentialId);
 
-    const result = this.securityCli.run([
-      "delete-generic-password",
-      "-a",
-      credentialId,
-      "-s",
-      this.serviceName,
-    ]);
+    const result = this.genericPasswordWriter.remove({
+      account: credentialId,
+      service: this.serviceName,
+    });
 
     if (result.exitCode === 0) {
       this.cache.delete(credentialId);

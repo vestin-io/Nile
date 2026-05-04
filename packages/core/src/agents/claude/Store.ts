@@ -1,5 +1,7 @@
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+
+import { readOptionalTextFile } from "../../services/OptionalTextFile";
 
 type CredentialDocument = {
   claudeAiOauth?: Record<string, unknown>;
@@ -14,11 +16,7 @@ export class ClaudeCredentialStore {
   }
 
   snapshot(): string | null {
-    try {
-      return readFileSync(this.credentialsPath, "utf8");
-    } catch {
-      return null;
-    }
+    return readOptionalTextFile(this.credentialsPath, "Claude .credentials.json");
   }
 
   readOauth(): Record<string, unknown> | null {

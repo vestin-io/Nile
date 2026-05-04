@@ -12,6 +12,7 @@ const bridge: DesktopBridge = {
   describeSavedConnectionOnboarding: (input) => ipcRenderer.invoke("desktop:describe-saved-connection-onboarding", input),
   prepareConnectionDraft: (input) => ipcRenderer.invoke("desktop:prepare-connection-draft", input),
   savePreparedConnection: (input) => ipcRenderer.invoke("desktop:save-prepared-connection", input),
+  discardPreparedConnectionDraft: (input) => ipcRenderer.invoke("desktop:discard-prepared-connection-draft", input),
   switchConnection: (agentId, connectionId) => ipcRenderer.invoke("desktop:switch-connection", agentId, connectionId),
   rollbackLatestMutation: (agentId) => ipcRenderer.invoke("desktop:rollback-latest-mutation", agentId),
   addConnection: (input) => ipcRenderer.invoke("desktop:add-connection", input),

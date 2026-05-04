@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/types";
 import { ArrowDownToLine, Check, LoaderCircle } from "lucide-react";
 
@@ -6,6 +6,7 @@ import type { DesktopOnboardingItem } from "../../DesktopTypes";
 import type { Translator } from "../shared/I18n";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
+import { shouldKeepPendingSave, type SavePhase } from "./SaveState";
 
 type DetectedSetupSectionProps = {
   agentId: AgentId;
@@ -26,10 +27,21 @@ export function DetectedSetupSection({
   onConfigure,
   onSave,
 }: DetectedSetupSectionProps) {
-  const [isSaving, setIsSaving] = useState(false);
+  const [savePhase, setSavePhase] = useState<SavePhase>("idle");
   const isNewSetup = detectedSetup?.state === "new";
   const hasLocalSetup = detectedSetup?.state === "new" || detectedSetup?.state === "already_saved";
   const setupContent = readSetupContent(agentId, detectedSetup, t);
+  const keepPendingSave = shouldKeepPendingSave({
+    confirmed,
+    hasLocalSetup,
+    phase: savePhase,
+  });
+
+  useEffect(() => {
+    if (!keepPendingSave && savePhase !== "idle") {
+      setSavePhase("idle");
+    }
+  }, [keepPendingSave, savePhase]);
 
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
@@ -64,20 +76,20 @@ export function DetectedSetupSection({
         ) : hasLocalSetup ? (
           <Button
             className="gap-2 pl-3 pr-4 shadow-sm hover:shadow"
-            disabled={isSaving}
+            disabled={keepPendingSave}
             size="sm"
             onClick={() => {
-              if (isSaving) {
+              if (keepPendingSave) {
                 return;
               }
 
-              setIsSaving(true);
-              void onSave(agentId).finally(() => {
-                setIsSaving(false);
+              setSavePhase("pending-confirmation");
+              void onSave(agentId).catch(() => {
+                setSavePhase("idle");
               });
             }}
           >
-            {isSaving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowDownToLine className="h-4 w-4" />}
+            {keepPendingSave ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ArrowDownToLine className="h-4 w-4" />}
             {t("quickSetup.looksGood")}
           </Button>
         ) : canConfigure ? (

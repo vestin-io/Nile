@@ -53,6 +53,10 @@ export type DesktopSavePreparedConnectionInput = {
   enabledAgents?: AgentId[];
 };
 
+export type DesktopDiscardPreparedConnectionDraftInput = {
+  draftId: string;
+};
+
 export type DesktopUpdateConnectionInput = {
   connectionId: string;
   label?: string;
@@ -85,6 +89,7 @@ export type DesktopBridge = {
   describeSavedConnectionOnboarding(input: DesktopDescribeSavedConnectionOnboardingInput): Promise<ConnectionOnboardingSuggestion>;
   prepareConnectionDraft(input: DesktopAddConnectionInput): Promise<DesktopPreparedConnectionDraft>;
   savePreparedConnection(input: DesktopSavePreparedConnectionInput): Promise<DesktopConnectionSummary>;
+  discardPreparedConnectionDraft(input: DesktopDiscardPreparedConnectionDraftInput): Promise<void>;
   switchConnection(agentId: AgentId, connectionId: string): Promise<import("../DesktopTypes").DesktopConnection>;
   rollbackLatestMutation(agentId: AgentId): Promise<import("@nile/core/runtime-local").RollbackLatestAgentResult>;
   addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary>;

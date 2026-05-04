@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import { AccessRegistry } from "@nile/core/models/access";
 import { EndpointRegistry, type EndpointRegistryInput } from "@nile/core/models/endpoint";
+import { AgentSelection } from "@nile/core/models/selection";
 import { NileSession } from "@nile/core/runtime-local";
 import { KeychainCredentialStore, type StoredCredential } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
@@ -219,7 +220,7 @@ describe("DesktopSurface", () => {
           usage: null,
           enabledAgents: ["codex"],
           configurableAgents: ["codex"],
-          selectedByAgents: [],
+          selectedByAgents: ["codex"],
           endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
           envKey: null,
         }),
@@ -236,7 +237,7 @@ describe("DesktopSurface", () => {
           usage: null,
           enabledAgents: ["codex"],
           configurableAgents: ["codex"],
-          selectedByAgents: [],
+          selectedByAgents: ["codex"],
           endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
           envKey: null,
         }),
@@ -886,6 +887,117 @@ describe("DesktopSurface", () => {
     const state = await createSurface(setup).getSettingsState();
     expect(state.connections[0]?.usage).toBeNull();
   });
+
+  it("prefers the matched live saved connection over the stale selected connection", async () => {
+    const setup = createSetup({
+      configToml: [
+        'model = "gpt-5.4"',
+        'model_provider = "openai-official"',
+        "",
+        "[model_providers.openai-official]",
+        'name = "OpenAI Official"',
+        'base_url = "https://api.openai.com/v1"',
+        'wire_api = "responses"',
+        "",
+      ].join("\n"),
+      authFile: {
+        OPENAI_API_KEY: null,
+        tokens: {
+          id_token: "header.eyJlbWFpbCI6InNwb3R0by5haUBleGFtcGxlLmNvbSJ9.signature",
+          access_token: "spotto-access-token",
+          refresh_token: "spotto-refresh-token",
+          account_id: "acct-spotto",
+        },
+        last_refresh: "2026-04-25T00:00:00.000Z",
+      },
+    });
+    seedProvider(setup.dbPath, {
+      id: "openai-official",
+      label: "OpenAI Official",
+      endpointFamily: "openai",
+      supportedAuthModes: ["openai_session"],
+    });
+    seedBinding(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "jiqiang",
+        endpointId: "openai-official",
+        label: "jiqiang90@gmail.com",
+        authMode: "openai_session",
+        identityKey: "account:acct-jiqiang",
+      },
+      openAiSessionCredential({
+        accountId: "acct-jiqiang",
+        accessToken: "jiqiang-access-token",
+        refreshToken: "jiqiang-refresh-token",
+      }),
+    );
+    seedBinding(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "spotto",
+        endpointId: "openai-official",
+        label: "jay.ji@spotto.ai",
+        authMode: "openai_session",
+        identityKey: "account:acct-spotto",
+      },
+      openAiSessionCredential({
+        accountId: "acct-spotto",
+        accessToken: "spotto-access-token",
+        refreshToken: "spotto-refresh-token",
+      }),
+    );
+
+    const agentSelection = AgentSelection.open(setup.dbPath);
+    agentSelection.setApplied("codex", "jiqiang", "2026-04-25T00:00:00.000Z");
+    agentSelection.close();
+
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({
+        plan_type: "prolite",
+        rate_limit: {
+          primary_window: { used_percent: 4, limit_window_seconds: 18_000, reset_at: 1_777_430_300 },
+          secondary_window: { used_percent: 66, limit_window_seconds: 604_800, reset_at: 1_777_511_900 },
+        },
+        additional_rate_limits: [
+          {
+            limit_name: "GPT-5.3-Codex-Spark",
+            rate_limit: {
+              primary_window: { used_percent: 0, limit_window_seconds: 18_000, reset_at: 1_777_431_500 },
+            },
+          },
+        ],
+      }), { status: 200 })) as unknown as typeof fetch;
+
+    const state = await createSurface(setup).getSettingsState();
+
+    expect(state.currentConnection?.id).toBe("spotto");
+    expect(state.currentConnection?.label).toBe("jay.ji@spotto.ai");
+    expect(state.liveConnection?.id).toBe("spotto");
+    expect(state.syncState).toBe("synced");
+    expect(state.connections[0]?.id).toBe("spotto");
+    expect(state.connections[0]?.isCurrent).toBe(true);
+    expect(state.connections[0]?.selectedByAgents).toEqual(["codex"]);
+    expect(state.connections[1]?.id).toBe("jiqiang");
+    expect(state.connections[1]?.isCurrent).toBe(false);
+    expect(state.connections[1]?.selectedByAgents).toEqual([]);
+    expect(state.agents.find((agent) => agent.agentId === "codex")?.currentUsage).toEqual(
+      expect.objectContaining({
+        status: "available",
+        planLabel: "Pro Lite",
+        windowLabel: "weekly",
+        remainingPercent: 34,
+        text: "weekly 34% left",
+        windows: [
+          { label: "5h", remainingPercent: 96, resetsAt: "2026-04-29T02:38:20.000Z" },
+          { label: "weekly", remainingPercent: 34, resetsAt: "2026-04-30T01:18:20.000Z" },
+          { label: "GPT-5.3-Codex-Spark", remainingPercent: 100, resetsAt: "2026-04-29T02:58:20.000Z" },
+        ],
+      }),
+    );
+  });
 });
 
 function createSetup(options?: {
@@ -991,6 +1103,7 @@ function seedBinding(
     endpointId: string;
     label: string;
     authMode: "api_key" | "openai_session" | "claude_session" | "cursor_session";
+    identityKey?: string;
   },
   credential: StoredCredential,
 ): void {
@@ -1002,6 +1115,7 @@ function seedBinding(
     endpointId: input.endpointId,
     label: input.label,
     authMode: input.authMode,
+    identityKey: input.identityKey,
   }, credential);
   accessRegistry.close();
 }
@@ -1089,14 +1203,16 @@ function readFile(codexHome: string, name: string): string {
   return readFileSync(join(codexHome, name), "utf8");
 }
 
-function openAiSessionCredential(): StoredCredential {
+function openAiSessionCredential(
+  overrides?: Partial<Extract<StoredCredential, { kind: "openai_session" }>>,
+): StoredCredential {
   return {
     kind: "openai_session",
-    idToken: "id-token",
-    accessToken: "access-token",
-    refreshToken: "refresh-token",
-    accountId: "acct-123",
-    lastRefresh: "2026-04-25T00:00:00.000Z",
+    idToken: overrides?.idToken ?? "id-token",
+    accessToken: overrides?.accessToken ?? "access-token",
+    refreshToken: overrides?.refreshToken ?? "refresh-token",
+    accountId: overrides?.accountId ?? "acct-123",
+    lastRefresh: overrides?.lastRefresh ?? "2026-04-25T00:00:00.000Z",
   };
 }
 

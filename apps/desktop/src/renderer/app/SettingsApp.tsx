@@ -201,6 +201,7 @@ export function SettingsApp() {
 
   const handleImportCurrent = async (agentId: AgentId) => {
     await window.nileDesktop.importCurrentConnection(agentId);
+    await refresh();
   };
 
   if (!settingsState || !historyState) {
@@ -292,9 +293,7 @@ export function SettingsApp() {
                     await window.nileDesktop.updateAgentHome(agentId, path);
                   }}
                   onConfigureAgent={openAddConnectionPage}
-                  onImport={async (agentId) => {
-                    await window.nileDesktop.importCurrentConnection(agentId);
-                  }}
+                  onImport={handleImportCurrent}
                   onOpenQuickSetup={() => {
                     setPreferences((current) => ({ ...current, quickSetupDismissed: false }));
                     setCurrentPage("quick-setup");

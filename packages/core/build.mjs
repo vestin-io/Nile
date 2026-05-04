@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
 import { build } from "esbuild";
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const packageDir = dirname(fileURLToPath(import.meta.url));
@@ -41,6 +43,8 @@ await build({
   sourcemap: false,
 });
 
+buildKeychainHelper();
+
 function readIndexEntries(parentDir) {
   return readdirSync(parentDir, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
@@ -50,4 +54,33 @@ function readIndexEntries(parentDir) {
 
 function unique(values) {
   return [...new Set(values)];
+}
+
+function buildKeychainHelper() {
+  if (process.platform !== "darwin") {
+    return;
+  }
+
+  const sourcePath = join(srcDir, "services", "credential", "KeychainGenericPasswordHelper.swift");
+  if (!existsSync(sourcePath)) {
+    return;
+  }
+
+  const outputDir = join(distDir, "services", "credential");
+  mkdirSync(outputDir, { recursive: true });
+  const outputPath = join(outputDir, "KeychainGenericPasswordHelper");
+  const moduleCachePath = join(tmpdir(), "nile-swift-module-cache");
+  mkdirSync(moduleCachePath, { recursive: true });
+  const result = spawnSync("xcrun", ["swiftc", "-O", "-o", outputPath, sourcePath], {
+    env: {
+      ...process.env,
+      CLANG_MODULE_CACHE_PATH: moduleCachePath,
+      SWIFT_MODULECACHE_PATH: moduleCachePath,
+    },
+    stdio: "inherit",
+  });
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
 }

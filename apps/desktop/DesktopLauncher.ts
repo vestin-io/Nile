@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 
@@ -47,6 +47,7 @@ export class DesktopLauncher {
     const targetRoot = join(this.root, ".runtime", "host");
     const targetAppPath = join(targetRoot, DesktopLauncher.macHostName);
     const plistPath = join(targetAppPath, "Contents", "Info.plist");
+    const targetIconPath = join(targetAppPath, "Contents", "Resources", "electron.icns");
 
     rmSync(targetAppPath, { recursive: true, force: true });
     mkdirSync(targetRoot, { recursive: true });
@@ -57,8 +58,18 @@ export class DesktopLauncher {
 
     const infoPlist = readFileSync(plistPath, "utf8");
     writeFileSync(plistPath, DesktopLauncher.rewriteInfoPlist(infoPlist), "utf8");
+    this.copyMacHostIcon(targetIconPath);
 
     return join(targetAppPath, "Contents", "MacOS", "Electron");
+  }
+
+  private copyMacHostIcon(targetIconPath: string): void {
+    const sourceIconPath = join(this.root, "build", "icons", "icon.icns");
+    if (!existsSync(sourceIconPath)) {
+      return;
+    }
+
+    cpSync(sourceIconPath, targetIconPath);
   }
 
   static rewriteInfoPlist(infoPlist: string): string {

@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/types";
 import { EnabledAgentsPolicy } from "@nile/core/models/connection/enabled-agents-policy";
 
 import { orderSupportedAuthModes, sameAgentSelection, type Definition } from "../shared/Support";
+import { syncDefaultAuthJsonPath } from "./AuthJsonPath";
 
 export { sameAgentSelection } from "../shared/Support";
 
@@ -34,6 +35,7 @@ function createInitialFormState(defaultOpenAiAuthJsonPath: string): AddConnectio
 
 export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAuthJsonPath: string) {
   const enabledAgentsPolicy = useMemo(() => new EnabledAgentsPolicy(), []);
+  const previousDefaultOpenAiAuthJsonPath = useRef(defaultOpenAiAuthJsonPath);
   const [formState, setFormState] = useState<AddConnectionFormState>(() =>
     createInitialFormState(defaultOpenAiAuthJsonPath),
   );
@@ -52,6 +54,30 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
     () => definitions.find((definition) => definition.preset === formState.preset) ?? definitions[0] ?? null,
     [definitions, formState.preset],
   );
+
+  useEffect(() => {
+    const previousDefault = previousDefaultOpenAiAuthJsonPath.current;
+    previousDefaultOpenAiAuthJsonPath.current = defaultOpenAiAuthJsonPath;
+
+    if (previousDefault === defaultOpenAiAuthJsonPath) {
+      return;
+    }
+
+    setFormState((current) => {
+      const nextPath = syncDefaultAuthJsonPath(
+        current.authJsonPath,
+        previousDefault,
+        defaultOpenAiAuthJsonPath,
+      );
+      if (nextPath === current.authJsonPath) {
+        return current;
+      }
+      return {
+        ...current,
+        authJsonPath: nextPath,
+      };
+    });
+  }, [defaultOpenAiAuthJsonPath]);
 
   useEffect(() => {
     if (!selectedDefinition) {

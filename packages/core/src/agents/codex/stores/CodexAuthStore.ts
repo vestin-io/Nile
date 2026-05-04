@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
@@ -6,6 +6,7 @@ import {
   type OpenAiSessionCredential,
   type StoredCredential,
 } from "../../../services/credential/Types";
+import { readOptionalTextFile } from "../../../services/OptionalTextFile";
 
 export class CodexAuthStore {
   readonly codexHome: string;
@@ -26,7 +27,7 @@ export class CodexAuthStore {
     if (!existsSync(this.authPath)) {
       return null;
     }
-    return readFileSync(this.authPath, "utf8");
+    return readOptionalTextFile(this.authPath, "Codex auth.json");
   }
 
   readCredential(): StoredCredential | null {

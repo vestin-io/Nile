@@ -26,27 +26,4 @@ export class SecurityCli {
       stderr: result.stderr ?? "",
     };
   }
-
-  runWithSecretData(args: string[], secret: string): SecurityCliResult {
-    const result = this.spawn("security", rewriteSecretArgs(args, secret), { encoding: "utf8" });
-    return {
-      exitCode: result.status ?? 1,
-      stdout: result.stdout ?? "",
-      stderr: result.stderr ?? "",
-    };
-  }
-}
-
-function rewriteSecretArgs(args: string[], secret: string): string[] {
-  const flagIndex = args.lastIndexOf("-w");
-  if (flagIndex === -1) {
-    throw new Error("security secret writes require a trailing -w placeholder");
-  }
-
-  return [
-    ...args.slice(0, flagIndex),
-    "-w",
-    secret,
-    ...args.slice(flagIndex + 1),
-  ];
 }

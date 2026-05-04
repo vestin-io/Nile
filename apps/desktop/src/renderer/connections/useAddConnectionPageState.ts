@@ -177,6 +177,16 @@ export function useAddConnectionPageState({
   }, [requiresSessionPreparation, selectedDefinition?.preset]);
 
   useEffect(() => {
+    if (!preparedDraft) {
+      return;
+    }
+
+    return () => {
+      void window.nileDesktop.discardPreparedConnectionDraft({ draftId: preparedDraft.id });
+    };
+  }, [preparedDraft]);
+
+  useEffect(() => {
     setActionError(null);
   }, [
     formState.apiKey,
@@ -241,6 +251,7 @@ export function useAddConnectionPageState({
           draftId: preparedDraft.id,
           enabledAgents: formState.enabledAgents,
         });
+        setPreparedDraft(null);
         return;
       }
 

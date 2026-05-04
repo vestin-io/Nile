@@ -9,88 +9,116 @@ import {
 } from "./KeychainCredentialStore";
 import { type StoredCredential } from "./Types";
 import { type SecurityCliResult, SecurityCli } from "./SecurityCli";
+import { GenericPasswordWriter } from "./GenericPasswordWriter";
 
 describe("KeychainCredentialStore", () => {
   it("creates credentials with the expected security command", () => {
-    const cli = new StubSecurityCli([{ exitCode: 0, stdout: "", stderr: "" }]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([{ exitCode: 0, stdout: "", stderr: "" }]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
     const credential: StoredCredential = { kind: "api_key", apiKey: "secret-value" };
 
     store.create("openai-work", credential);
 
-    expect(cli.calls).toEqual([
-      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-w"],
-    ]);
-    expect(cli.secretWrites).toEqual([
-      "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6InNlY3JldC12YWx1ZSJ9",
+    expect(writer.calls).toEqual([
+      {
+        account: "openai-work",
+        service: "nile.test",
+        secret: "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6InNlY3JldC12YWx1ZSJ9",
+        update: false,
+      },
     ]);
   });
 
   it("updates existing credentials with -U", () => {
-    const cli = new StubSecurityCli([
+    const writer = new StubGenericPasswordWriter([
       { exitCode: 0, stdout: "", stderr: "" },
       { exitCode: 0, stdout: "", stderr: "" },
     ]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
     const credential: StoredCredential = { kind: "api_key", apiKey: "new-secret" };
 
     store.update("openai-work", credential);
 
-    expect(cli.calls).toEqual([
-      ["find-generic-password", "-a", "openai-work", "-s", "nile.test"],
-      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-U", "-w"],
-    ]);
-    expect(cli.secretWrites).toEqual([
-      "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6Im5ldy1zZWNyZXQifQ==",
+    expect(writer.calls).toEqual([
+      {
+        type: "read",
+        account: "openai-work",
+        service: "nile.test",
+        includeSecret: false,
+      },
+      {
+        type: "write",
+        account: "openai-work",
+        service: "nile.test",
+        secret: "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6Im5ldy1zZWNyZXQifQ==",
+        update: true,
+      },
     ]);
   });
 
   it("returns the stored secret on lookup", () => {
     const credential: StoredCredential = { kind: "api_key", apiKey: "secret-value" };
-    const cli = new StubSecurityCli([{ exitCode: 0, stdout: JSON.stringify(credential), stderr: "" }]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([
+      { exitCode: 0, stdout: JSON.stringify(credential), stderr: "" },
+    ]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(store.get("openai-work")).toEqual(credential);
     expect(store.get("openai-work")).toEqual(credential);
-    expect(cli.calls).toEqual([["find-generic-password", "-a", "openai-work", "-s", "nile.test", "-w"]]);
+    expect(writer.calls).toEqual([
+      {
+        type: "read",
+        account: "openai-work",
+        service: "nile.test",
+        includeSecret: true,
+      },
+    ]);
   });
 
   it("returns false when has checks a missing credential", () => {
-    const cli = new StubSecurityCli([
+    const writer = new StubGenericPasswordWriter([
       { exitCode: 44, stdout: "", stderr: "security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain." },
     ]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(store.has("missing")).toBe(false);
   });
 
   it("uses the in-memory cache after create", () => {
     const credential: StoredCredential = { kind: "api_key", apiKey: "secret-value" };
-    const cli = new StubSecurityCli([{ exitCode: 0, stdout: "", stderr: "" }]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([{ exitCode: 0, stdout: "", stderr: "" }]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     store.create("openai-work", credential);
 
     expect(store.has("openai-work")).toBe(true);
     expect(store.get("openai-work")).toEqual(credential);
-    expect(cli.calls).toEqual([
-      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-w"],
+    expect(writer.calls).toEqual([
+      {
+        type: "write",
+        account: "openai-work",
+        service: "nile.test",
+        secret: "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6InNlY3JldC12YWx1ZSJ9",
+        update: false,
+      },
     ]);
   });
 
   it("reads legacy unencoded credential payloads", () => {
     const credential: StoredCredential = { kind: "api_key", apiKey: "legacy-secret" };
-    const cli = new StubSecurityCli([{ exitCode: 0, stdout: JSON.stringify(credential), stderr: "" }]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([
+      { exitCode: 0, stdout: JSON.stringify(credential), stderr: "" },
+    ]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(store.get("openai-work")).toEqual(credential);
   });
 
   it("maps duplicate create failures clearly", () => {
-    const cli = new StubSecurityCli([
+    const writer = new StubGenericPasswordWriter([
       { exitCode: 45, stdout: "", stderr: "The specified item already exists in the keychain." },
     ]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(() => store.create("openai-work", { kind: "api_key", apiKey: "secret-value" })).toThrow(
       CredentialAlreadyExistsError,
@@ -98,17 +126,17 @@ describe("KeychainCredentialStore", () => {
   });
 
   it("maps missing lookup failures clearly", () => {
-    const cli = new StubSecurityCli([
+    const writer = new StubGenericPasswordWriter([
       { exitCode: 44, stdout: "", stderr: "The specified item could not be found in the keychain." },
     ]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(() => store.get("missing")).toThrow(CredentialNotFoundError);
   });
 
   it("rejects empty credential ids and secrets before calling security", () => {
-    const cli = new StubSecurityCli([]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(() => store.create("", { kind: "api_key", apiKey: "secret" })).toThrow(
       CredentialStoreValidationError,
@@ -125,7 +153,7 @@ describe("KeychainCredentialStore", () => {
           refreshToken: "refresh",
         }),
     ).toThrow(CredentialStoreValidationError);
-    expect(cli.calls).toHaveLength(0);
+    expect(writer.calls).toHaveLength(0);
   });
 
   it("supports openai session credentials", () => {
@@ -137,8 +165,10 @@ describe("KeychainCredentialStore", () => {
       accountId: "acct-123",
       lastRefresh: "2026-04-25T00:00:00.000Z",
     };
-    const cli = new StubSecurityCli([{ exitCode: 0, stdout: JSON.stringify(credential), stderr: "" }]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([
+      { exitCode: 0, stdout: JSON.stringify(credential), stderr: "" },
+    ]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(store.get("openai-chatgpt")).toEqual(credential);
   });
@@ -154,8 +184,10 @@ describe("KeychainCredentialStore", () => {
       displayName: "Jay Ji",
       userId: 247015891,
     };
-    const cli = new StubSecurityCli([{ exitCode: 0, stdout: JSON.stringify(credential), stderr: "" }]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([
+      { exitCode: 0, stdout: JSON.stringify(credential), stderr: "" },
+    ]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(store.get("cursor-session")).toEqual(credential);
   });
@@ -171,37 +203,89 @@ describe("KeychainCredentialStore", () => {
       email: "claude@example.com",
       displayName: "Claude User",
     };
-    const cli = new StubSecurityCli([{ exitCode: 0, stdout: JSON.stringify(credential), stderr: "" }]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([
+      { exitCode: 0, stdout: JSON.stringify(credential), stderr: "" },
+    ]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(store.get("claude-session")).toEqual(credential);
   });
 
   it("raises a command error for unexpected security failures", () => {
-    const cli = new StubSecurityCli([{ exitCode: 1, stdout: "", stderr: "unexpected failure" }]);
-    const store = new KeychainCredentialStore(cli, "nile.test");
+    const writer = new StubGenericPasswordWriter([
+      { exitCode: 1, stdout: "", stderr: "unexpected failure" },
+    ]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(() => store.remove("openai-work")).toThrow(CredentialStoreCommandError);
   });
 });
 
-class StubSecurityCli extends SecurityCli {
-  readonly calls: string[][] = [];
-  readonly secretWrites: string[] = [];
+class StubGenericPasswordWriter extends GenericPasswordWriter {
+  readonly calls: Array<
+    | {
+      type: "write";
+      account: string;
+      service: string;
+      secret: string;
+      update: boolean;
+    }
+    | {
+      type: "read";
+      account: string;
+      service: string;
+      includeSecret: boolean;
+    }
+    | {
+      type: "remove";
+      account: string;
+      service: string;
+    }
+  > = [];
 
   constructor(private readonly results: SecurityCliResult[]) {
     super();
   }
 
-  override run(args: string[]): SecurityCliResult {
-    this.calls.push(args);
-    return this.shiftResult(args);
+  override write(input: {
+    account: string;
+    service: string;
+    secret: string;
+    update: boolean;
+  }): SecurityCliResult {
+    this.calls.push({ type: "write", ...input });
+    return this.shiftResult([
+      "write-generic-password",
+      input.account,
+      input.service,
+      input.update ? "upsert" : "add",
+    ]);
   }
 
-  override runWithSecretData(args: string[], secret: string): SecurityCliResult {
-    this.calls.push(args);
-    this.secretWrites.push(secret);
-    return this.shiftResult(args);
+  override read(input: {
+    account: string;
+    service: string;
+    includeSecret: boolean;
+  }): SecurityCliResult {
+    this.calls.push({ type: "read", ...input });
+    return this.shiftResult([
+      "read-generic-password",
+      input.account,
+      input.service,
+      input.includeSecret ? "secret" : "metadata",
+    ]);
+  }
+
+  override remove(input: {
+    account: string;
+    service: string;
+  }): SecurityCliResult {
+    this.calls.push({ type: "remove", ...input });
+    return this.shiftResult([
+      "delete-generic-password",
+      input.account,
+      input.service,
+    ]);
   }
 
   private shiftResult(args: string[]): SecurityCliResult {

@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type MenuItemConstructorOptions, type OpenDialogOptions } from "electron";
-import { watch, type FSWatcher } from "node:fs";
+import { readFileSync, watch, type FSWatcher } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -34,7 +34,6 @@ type DesktopMainOptions = {
 
 export class DesktopMain {
   private static readonly trayIconName = "nileTemplate@2x.png";
-  private static readonly appIconName = "icon.png";
   private readonly logger: NileLogger;
   private readonly credentialStore: CredentialStore;
   private readonly environment: EnvironmentSource;
@@ -81,6 +80,7 @@ export class DesktopMain {
   async start(): Promise<void> {
     app.setName("Nile");
     await app.whenReady();
+    this.configureAboutPanel();
     this.installApplicationMenu();
     this.setAppIcon();
     this.registerIpc();
@@ -126,6 +126,9 @@ export class DesktopMain {
       const result = await this.stateStore.savePreparedConnection(input);
       this.reloadAll();
       return result;
+    });
+    ipcMain.handle("desktop:discard-prepared-connection-draft", (_event, input) => {
+      this.stateStore.discardPreparedConnectionDraft(input);
     });
     ipcMain.handle("desktop:switch-connection", async (_event, agentId: MenubarAgentState["agentId"], connectionId: string) => {
       const result = await this.stateStore.switchConnection(agentId, connectionId);
@@ -278,7 +281,7 @@ export class DesktopMain {
       title: "Nile",
       backgroundColor: "#ffffff",
       titleBarStyle: process.platform === "darwin" ? "hiddenInset" : undefined,
-      icon: this.resolveAppIconPath(),
+      icon: this.resolveRuntimeAppIconPath(),
       trafficLightPosition: { x: 18, y: 18 },
       webPreferences: {
         preload: join(currentDir, "preload.cjs"),
@@ -553,7 +556,7 @@ export class DesktopMain {
   }
 
   private setAppIcon(): void {
-    const iconPath = this.resolveAppIconPath();
+    const iconPath = this.resolveRuntimeAppIconPath();
     const image = nativeImage.createFromPath(iconPath);
     if (image.isEmpty()) {
       return;
@@ -569,7 +572,48 @@ export class DesktopMain {
   }
 
   private resolveAppIconPath(): string {
-    return join(currentDir, "..", "..", "build", "icons", DesktopMain.appIconName);
+    return process.platform === "darwin"
+      ? this.resolveMacBundleIconPath()
+      : this.resolveRuntimeAppIconPath();
+  }
+
+  private resolveRuntimeAppIconPath(): string {
+    return join(currentDir, "..", "..", "build", "icons", "icon.png");
+  }
+
+  private resolveMacBundleIconPath(): string {
+    return join(
+      currentDir,
+      "..",
+      "..",
+      "build",
+      "icons",
+      "icon.icns",
+    );
+  }
+
+  private configureAboutPanel(): void {
+    if (process.platform !== "darwin") {
+      return;
+    }
+
+    const version = this.readDesktopPackageVersion();
+    app.setAboutPanelOptions({
+      applicationName: "Nile",
+      applicationVersion: version === "0.0.0" ? "Development build" : version,
+      version: version === "0.0.0" ? "" : version,
+      iconPath: this.resolveRuntimeAppIconPath(),
+    });
+  }
+
+  private readDesktopPackageVersion(): string {
+    const packageJsonPath = join(currentDir, "..", "..", "package.json");
+    const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as {
+      version?: unknown;
+    };
+    return typeof packageJson.version === "string" && packageJson.version.trim()
+      ? packageJson.version.trim()
+      : "0.0.0";
   }
 
   private refreshMenubarUsage(): Promise<void> {

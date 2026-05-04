@@ -29,6 +29,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   type DesktopAddConnectionInput,
+  type DesktopDiscardPreparedConnectionDraftInput,
   type DesktopDescribeSavedConnectionOnboardingInput,
   type DesktopConnectionSummary,
   type DesktopPreparedConnectionDraft,
@@ -223,6 +224,10 @@ export class DesktopConnectionManager {
     } finally {
       this.preparedDrafts.delete(input.draftId);
     }
+  }
+
+  discardPreparedConnectionDraft(input: DesktopDiscardPreparedConnectionDraftInput): void {
+    this.preparedDrafts.delete(input.draftId);
   }
 
   private resolveCredentialRequest(input: DesktopAddConnectionInput): LocalCredentialRequest {

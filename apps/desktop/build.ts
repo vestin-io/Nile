@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import autoprefixer from "autoprefixer";
@@ -17,6 +17,7 @@ async function build(): Promise<void> {
   await buildEntry(join(src, "electron", "preload.ts"), join(dist, "electron", "preload.cjs"), "node");
   await buildEntry(join(src, "renderer", "app", "menubar.ts"), join(dist, "renderer", "menubar.js"), "browser");
   await buildEntry(join(src, "renderer", "app", "settings.tsx"), join(dist, "renderer", "settings.js"), "browser");
+  copyCoreKeychainHelper(join(dist, "electron", "KeychainGenericPasswordHelper"));
 
   copyAsset(join(src, "renderer", "app", "menubar.html"), join(dist, "renderer", "menubar.html"));
   copyAsset(join(src, "renderer", "app", "settings.html"), join(dist, "renderer", "settings.html"));
@@ -61,6 +62,15 @@ async function buildCss(inputPath: string, outputPath: string): Promise<void> {
 function copyAsset(from: string, to: string): void {
   mkdirSync(dirname(to), { recursive: true });
   cpSync(from, to);
+}
+
+function copyCoreKeychainHelper(targetPath: string): void {
+  const helperPath = join(root, "..", "..", "packages", "core", "dist", "services", "credential", "KeychainGenericPasswordHelper");
+  if (!existsSync(helperPath)) {
+    return;
+  }
+
+  copyAsset(helperPath, targetPath);
 }
 
 await build();

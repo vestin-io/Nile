@@ -34,6 +34,11 @@ import {
 } from "./DesktopTypes";
 import { type DesktopUsageState, UsageSummary } from "./UsageSummary";
 
+type SelectionDisplayOverride = {
+  agentId: AgentId;
+  connectionId: string | null;
+};
+
 type DesktopSurfaceOptions = {
   databasePath: string;
   agentHomes?: AgentHomes;
@@ -106,15 +111,18 @@ export class DesktopSurface {
       if (!codexState) {
         throw new Error("Codex agent state is missing from desktop settings state");
       }
+      const codexSelectionOverride = this.createSelectionDisplayOverride(CODEX_AGENT_ID, codexState.currentConnection);
       const connections = this.buildConnections(
         savedConnections,
         codexState.currentConnection?.id ?? null,
         usageByConnectionId,
+        codexSelectionOverride,
       );
       const currentAgentConnections = this.buildConnections(
         savedConnections.filter((connection) => connection.enabledAgents.includes(CODEX_AGENT_ID)),
         codexState.currentConnection?.id ?? null,
         usageByConnectionId,
+        codexSelectionOverride,
       );
 
       const state: SettingsState = {
@@ -218,6 +226,7 @@ export class DesktopSurface {
       const status = session.getAgentStatus(agentId);
       const currentConnection = this.resolveEffectiveCurrentConnection(status, savedConnections);
       const compatibleConnections = savedConnections.filter((connection) => connection.enabledAgents.includes(agentId));
+      const selectionOverride = this.createSelectionDisplayOverride(agentId, currentConnection);
       const currentUsage = currentConnection
         ? (this.usageCache.get(currentConnection.id) ?? null)
         : null;
@@ -227,7 +236,12 @@ export class DesktopSurface {
         agentLabel: this.formatAgentLabel(agentId),
         currentConnection,
         currentUsage,
-        connections: this.buildConnections(compatibleConnections, currentConnection?.id ?? null),
+        connections: this.buildConnections(
+          compatibleConnections,
+          currentConnection?.id ?? null,
+          undefined,
+          selectionOverride,
+        ),
       };
     });
   }
@@ -236,6 +250,7 @@ export class DesktopSurface {
     savedConnections: SavedConnectionSummary[],
     currentConnectionId: string | null,
     usageByConnectionId?: Map<string, DesktopUsageState | null>,
+    selectionOverride?: SelectionDisplayOverride,
   ): DesktopConnection[] {
     const items: DesktopConnection[] = savedConnections.map((connection) => ({
       id: connection.id,
@@ -250,7 +265,7 @@ export class DesktopSurface {
       usage: usageByConnectionId?.get(connection.id) ?? null,
       enabledAgents: [...connection.enabledAgents],
       configurableAgents: [...connection.configurableAgents],
-      selectedByAgents: connection.selectedByAgents as AgentId[],
+      selectedByAgents: this.resolveDisplayedSelectedAgents(connection, selectionOverride),
     }));
 
     return items.sort((left, right) => {
@@ -294,12 +309,14 @@ export class DesktopSurface {
       const status = session.getAgentStatus(agentId);
       const currentConnection = this.resolveEffectiveCurrentConnection(status, savedConnections);
       const liveConnection = this.resolveLiveConnection(status.liveConnection, savedConnections, currentConnection);
+      const selectionOverride = this.createSelectionDisplayOverride(agentId, currentConnection);
       const connections = this.buildConnections(
         savedConnections.filter((connection) =>
           connection.enabledAgents.includes(agentId),
         ),
         currentConnection?.id ?? null,
         usageByConnectionId,
+        selectionOverride,
       );
       const state: DesktopAgentState = {
         agentId,
@@ -393,13 +410,18 @@ export class DesktopSurface {
     savedConnections: SavedConnectionSummary[],
   ): DesktopConnection | null {
     const currentConnection = this.resolveCurrentConnection(status.currentConnection, savedConnections);
-    if (currentConnection) {
-      return currentConnection;
+
+    if (status.syncState === "synced") {
+      const liveConnection = this.resolveCurrentConnection(status.liveConnection, savedConnections);
+      if (liveConnection) {
+        if (currentConnection?.id === liveConnection.id) {
+          return currentConnection;
+        }
+        return liveConnection;
+      }
     }
-    if (status.syncState !== "synced") {
-      return null;
-    }
-    return this.resolveCurrentConnection(status.liveConnection, savedConnections);
+
+    return currentConnection;
   }
 
   private resolveEffectiveCurrentConnectionState(
@@ -456,6 +478,32 @@ export class DesktopSurface {
       configurableAgents: [],
       selectedByAgents: [],
     };
+  }
+
+  private createSelectionDisplayOverride(
+    agentId: AgentId,
+    currentConnection: DesktopConnection | null,
+  ): SelectionDisplayOverride {
+    return {
+      agentId,
+      connectionId: currentConnection?.id ?? null,
+    };
+  }
+
+  private resolveDisplayedSelectedAgents(
+    connection: SavedConnectionSummary,
+    selectionOverride?: SelectionDisplayOverride,
+  ): AgentId[] {
+    const selectedByAgents = new Set(connection.selectedByAgents as AgentId[]);
+    if (!selectionOverride) {
+      return [...selectedByAgents];
+    }
+
+    selectedByAgents.delete(selectionOverride.agentId);
+    if (selectionOverride.connectionId === connection.id) {
+      selectedByAgents.add(selectionOverride.agentId);
+    }
+    return [...selectedByAgents];
   }
 
   private formatAgentLabel(agentId: AgentId): string {

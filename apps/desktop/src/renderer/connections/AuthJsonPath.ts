@@ -10,3 +10,17 @@ export function readCodexAuthJsonPath(
 
   return `${codexHome.replace(/\/+$/, "")}/auth.json`;
 }
+
+export function syncDefaultAuthJsonPath(
+  currentPath: string,
+  previousDefaultPath: string,
+  nextDefaultPath: string,
+): string {
+  const trimmedCurrentPath = currentPath.trim();
+  const trimmedPreviousDefaultPath = previousDefaultPath.trim();
+  if (trimmedCurrentPath && trimmedCurrentPath !== trimmedPreviousDefaultPath) {
+    return currentPath;
+  }
+
+  return nextDefaultPath;
+}

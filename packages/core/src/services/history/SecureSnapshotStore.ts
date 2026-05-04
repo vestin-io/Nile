@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
+import { GenericPasswordWriter } from "../credential/GenericPasswordWriter";
 import { SecurityCli } from "../credential/SecurityCli";
 import { SecuritySecretCodec } from "../credential/SecretCodec";
 
@@ -22,17 +23,16 @@ export class SecureSnapshotStore {
     private readonly securityCli: SecurityCli = new SecurityCli(),
     private readonly serviceName: string = "nile.switcher.history.snapshot",
     private readonly secretCodec: SecuritySecretCodec = new SecuritySecretCodec(),
+    private readonly genericPasswordWriter: GenericPasswordWriter = new GenericPasswordWriter(),
   ) {}
 
   writeBeforeSnapshot(snapshotRef: string, content: string | null): StoredSecureSnapshot {
-    const result = this.securityCli.runWithSecretData([
-      "add-generic-password",
-      "-a",
-      snapshotRef,
-      "-s",
-      this.serviceName,
-      "-w",
-    ], this.secretCodec.encode(content ?? ""));
+    const result = this.genericPasswordWriter.write({
+      account: snapshotRef,
+      service: this.serviceName,
+      secret: this.secretCodec.encode(content ?? ""),
+      update: false,
+    });
 
     if (result.exitCode !== 0) {
       throw new SecureSnapshotStoreError(

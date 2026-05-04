@@ -1,7 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 import type { CodexProjection } from "../../../projection";
+import { readOptionalTextFile } from "../../../services/OptionalTextFile";
 import { writePrivateTextFile } from "../../../services/PrivateTextFile";
 
 const MANAGED_BLOCK_START = "# BEGIN nile-switcher managed endpoint";
@@ -21,7 +22,7 @@ export class CodexConfigStore {
     if (!existsSync(this.configPath)) {
       return null;
     }
-    return readFileSync(this.configPath, "utf8");
+    return readOptionalTextFile(this.configPath, "Codex config.toml");
   }
 
   restore(snapshot: string | null): void {

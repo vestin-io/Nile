@@ -81,7 +81,7 @@ The desktop app is the primary Nile surface. This is where you add connections, 
 
 ### Menubar
 
-![Nile menubar preview](./assets/preview/menubar.png)
+<img src="./assets/preview/menubar.png" alt="Nile menubar preview" width="210" />
 
 The menubar gives you a lighter-weight status and switching surface. It is useful when you want to quickly check what is active, inspect saved connections, or change context without opening the full desktop window.
 

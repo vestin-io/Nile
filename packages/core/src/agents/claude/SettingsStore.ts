@@ -1,6 +1,7 @@
 import { readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { readOptionalTextFile } from "../../services/OptionalTextFile";
 import { writePrivateTextFile } from "../../services/PrivateTextFile";
 
 export type ClaudeSettingsEnv = {
@@ -52,11 +53,7 @@ export class ClaudeSettingsStore {
   }
 
   snapshot(): string | null {
-    try {
-      return readFileSync(this.settingsPath, "utf8");
-    } catch {
-      return null;
-    }
+    return readOptionalTextFile(this.settingsPath, "Claude settings.json");
   }
 
   readEnv(): ClaudeSettingsEnv {
@@ -237,17 +234,17 @@ export class ClaudeSettingsStore {
   }
 
   private readGatewayModelCache(): ClaudeGatewayModelCache | null {
-    try {
-      const cachePath = join(dirname(this.settingsPath), "cache", "gateway-models.json");
-      const raw = readFileSync(cachePath, "utf8");
-      const parsed = JSON.parse(raw) as unknown;
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return null;
-      }
-      return parsed as ClaudeGatewayModelCache;
-    } catch {
+    const cachePath = join(dirname(this.settingsPath), "cache", "gateway-models.json");
+    const raw = readOptionalTextFile(cachePath, "Claude gateway model cache");
+    if (!raw?.trim()) {
       return null;
     }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed as ClaudeGatewayModelCache;
   }
 
   private selectPreferredGatewayModel(models: string[]): string | null {
