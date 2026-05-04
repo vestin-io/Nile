@@ -117,7 +117,10 @@ jobs:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          mapfile -d '' artifacts < <(find apps/desktop/release -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' \) -print0 | sort -z)
+          artifacts=()
+          while IFS= read -r -d '' artifact; do
+            artifacts+=("${artifact}")
+          done < <(find apps/desktop/release -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' \) -print0 | sort -z)
 
           if ((${#artifacts[@]} == 0)); then
             printf 'No desktop release assets were produced.\n' >&2

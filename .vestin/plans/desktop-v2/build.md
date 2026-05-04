@@ -2,6 +2,17 @@
 
 ## 2026-05-04
 
+### Step 25: Release Upload Bash Compatibility Fix
+
+- Fixed the final desktop release workflow failure after successful build and notarization.
+- Replaced the `mapfile`-based artifact collection in `.github/workflows/desktop-release.yml` with a portable `while read -d ''` loop.
+- GitHub's macOS runner shell reached the upload step with Bash compatibility that did not provide `mapfile`, causing `desktop-v0.1.3` to fail only during GitHub Release asset upload.
+
+### Verification
+
+- Inspected failing `desktop-v0.1.3` GitHub Actions log in `error.log`.
+- Confirmed both `arm64` and `x64` notarization succeeded before the upload-step shell failure.
+
 ### Step 24: Release CI Electron-Builder Repository Metadata Fix
 
 - Fixed the remaining desktop release CI crash after successful signing and notarization.
