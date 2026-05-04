@@ -2,6 +2,17 @@
 
 ## 2026-05-04
 
+### Step 24: Release CI Electron-Builder Repository Metadata Fix
+
+- Fixed the remaining desktop release CI crash after successful signing and notarization.
+- Added explicit repository metadata to `apps/desktop/package.json` so `electron-builder` can resolve GitHub publish context when `GH_TOKEN` is present during the release workflow.
+- This avoids the `TypeError: Cannot read properties of null (reading 'channel')` failure from `app-builder-lib` update-info generation.
+
+### Verification
+
+- Inspected failing `desktop-v0.1.2` GitHub Actions log in `error.log`.
+- Confirmed the crash occurred after both `arm64` and `x64` notarization completed.
+
 ### Step 23: Release CI CLI Cursor Source Expectation Fix
 
 - Fixed the remaining desktop release CI failure in `apps/cli/src/NileCli.test.ts`.

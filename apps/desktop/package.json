@@ -5,6 +5,10 @@
   "private": true,
   "description": "Nile desktop app",
   "author": "Nile contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vestin-io/Nile.git"
+  },
   "type": "module",
   "main": "dist/electron/main.cjs",
   "dependencies": {},
