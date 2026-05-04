@@ -2,6 +2,16 @@
 
 ## 2026-05-04
 
+### Step 23: Release CI CLI Cursor Source Expectation Fix
+
+- Fixed the remaining desktop release CI failure in `apps/cli/src/NileCli.test.ts`.
+- The test case seeds a Chromium Chrome `Profile 1` browser cookie store, so the correct auto-bind summary source is `Chrome (Profile 1)`, not the older generic `Cursor (Local session)` label.
+- Updated the assertion to match the actual presenter output emitted by the Chromium session probe path.
+
+### Verification
+
+- `npm run test:cli`
+
 ### Step 22: Release CI Host-Local Dependency Fix
 
 - Fixed GitHub release CI failure in `test:host-local` by declaring the missing `@nile/core` dependency in `packages/host-local/package.json`.

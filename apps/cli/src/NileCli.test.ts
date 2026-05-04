@@ -31,6 +31,7 @@ afterEach(() => {
   delete process.env.OPENAI_API_KEY3;
   delete process.env.CURSOR_API_KEY;
   delete process.env.NILE_BROWSER_HOME;
+  delete process.env.NILE_CURSOR_HOME;
   globalThis.fetch = originalFetch;
   SecurityCli.prototype.run = originalSecurityCliRun;
 });
@@ -1227,11 +1228,14 @@ describe("NileCli", () => {
 
     const browserHome = mkdtempSync(join(tmpdir(), "nile-browser-home-"));
     tempDirs.push(browserHome);
+    const cursorHome = mkdtempSync(join(tmpdir(), "nile-cursor-home-"));
+    tempDirs.push(cursorHome);
     writeChromiumCursorCookies(
       join(browserHome, "Library", "Application Support", "Google", "Chrome", "Profile 1", "Cookies"),
       SAFE_STORAGE_SECRET,
     );
     process.env.NILE_BROWSER_HOME = browserHome;
+    process.env.NILE_CURSOR_HOME = cursorHome;
     SecurityCli.prototype.run = function (_args: string[]): SecurityCliResult {
       return {
         exitCode: 0,
@@ -1246,7 +1250,7 @@ describe("NileCli", () => {
     expect(bind.exitCode).toBe(0);
     expect(bind.stdout).toContain("Cursor usage auto-bound");
     expect(bind.stdout).toContain("connection: cursor.user@example.com");
-    expect(bind.stdout).toContain("source: Cursor (Local session)");
+    expect(bind.stdout).toContain("source: Chrome (Profile 1)");
   });
 
   it("shows usage inline in the saved connections interactive view", async () => {
