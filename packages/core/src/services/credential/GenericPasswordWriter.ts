@@ -135,9 +135,22 @@ function resolveCurrentDir(): string {
   throw new Error("Nile keychain helper path could not be resolved for this runtime.");
 }
 
-function readHelperPathCandidates(currentDir: string): string[] {
-  return [
-    join(currentDir, "KeychainGenericPasswordHelper"),
-    join(currentDir, "..", "..", "..", "dist", "services", "credential", "KeychainGenericPasswordHelper"),
-  ];
+export function readHelperPathCandidates(currentDir: string): string[] {
+  const colocatedHelperPath = join(currentDir, "KeychainGenericPasswordHelper");
+  const distHelperPath = join(currentDir, "..", "..", "..", "dist", "services", "credential", "KeychainGenericPasswordHelper");
+
+  return uniqueHelperPaths([
+    readUnpackedAsarPath(colocatedHelperPath),
+    colocatedHelperPath,
+    readUnpackedAsarPath(distHelperPath),
+    distHelperPath,
+  ]);
+}
+
+function readUnpackedAsarPath(path: string): string {
+  return path.includes("app.asar") ? path.replaceAll("app.asar", "app.asar.unpacked") : path;
+}
+
+function uniqueHelperPaths(paths: string[]): string[] {
+  return [...new Set(paths)];
 }

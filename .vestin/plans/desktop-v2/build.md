@@ -2,6 +2,24 @@
 
 ## 2026-05-04
 
+### Step 43: Unpack the desktop keychain helper so reset works in packaged apps
+
+- Fixed packaged desktop builds failing keychain-backed actions such as local state reset.
+- Root cause:
+  - desktop build copies `KeychainGenericPasswordHelper` into `dist/electron/`
+  - electron-builder was packing that native executable into `app.asar`
+  - packaged runtime then tried to spawn the helper from the asar virtual filesystem
+  - macOS cannot execute the helper from inside asar, so reset failed while removing Nile-managed keychain credentials
+- Added an `asarUnpack` rule for `dist/electron/KeychainGenericPasswordHelper` so packaged apps keep the helper outside the archive.
+- Updated helper path resolution to prefer `app.asar.unpacked` candidates before in-archive paths, while preserving the existing repo-local and dev build lookup flow.
+- Added a focused test for packaged asar helper path ordering.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/services/credential/GenericPasswordWriter.test.ts`
+- `npm run typecheck`
+- `npm run build:app --prefix apps/desktop`
+
 ### Step 42: Keep quick-setup save buttons pending until Nile confirms the import
 
 - Fixed the desktop quick-setup and agent-card import button transition so it no longer falls back to `Save to Nile` between the loading spinner and the final saved checkmark.

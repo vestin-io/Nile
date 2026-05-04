@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GenericPasswordWriter } from "./GenericPasswordWriter";
+import { GenericPasswordWriter, readHelperPathCandidates } from "./GenericPasswordWriter";
 
 describe("GenericPasswordWriter", () => {
   it("writes generic passwords through the native helper and stdin", () => {
@@ -47,5 +47,15 @@ describe("GenericPasswordWriter", () => {
       stdout: "",
       stderr: "",
     });
+  });
+
+  it("prefers unpacked helper paths before asar paths in packaged builds", () => {
+    expect(
+      readHelperPathCandidates("/Applications/Nile.app/Contents/Resources/app.asar/dist/electron"),
+    ).toEqual([
+      "/Applications/Nile.app/Contents/Resources/app.asar.unpacked/dist/electron/KeychainGenericPasswordHelper",
+      "/Applications/Nile.app/Contents/Resources/app.asar/dist/electron/KeychainGenericPasswordHelper",
+      "/Applications/Nile.app/Contents/Resources/dist/services/credential/KeychainGenericPasswordHelper",
+    ]);
   });
 });
