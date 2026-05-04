@@ -2,6 +2,17 @@
 
 ## 2026-05-04
 
+### Step 22: Release CI Host-Local Dependency Fix
+
+- Fixed GitHub release CI failure in `test:host-local` by declaring the missing `@nile/core` dependency in `packages/host-local/package.json`.
+- This import already existed in `packages/host-local/src/cursor/SecurityCli.ts`, but the package manifest relied on a local leftover symlink instead of an explicit dependency declaration.
+- The failure only appeared in clean CI because `packages/host-local/package-lock.json` previously contained no dependencies.
+
+### Verification
+
+- `npm install --prefix packages/host-local`
+- `npm run test:host-local`
+
 ### Step 21: Repo-Local Release And Review Skills
 
 - Added repo-local Codex skills under `.codex/skills/` for repeated Nile operational tasks:
