@@ -18,7 +18,7 @@ export function ChoiceCard({
   return (
     <button
       className={cn(
-        "rounded-xl border p-4 text-left transition-colors",
+        "rounded-xl border p-4 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
         selected
           ? "border-foreground bg-accent/50 shadow-sm"
           : "border-border bg-background hover:border-foreground/30 hover:bg-accent/30",

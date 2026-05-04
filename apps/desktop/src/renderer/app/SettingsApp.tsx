@@ -4,6 +4,7 @@ import nileMarkSvg from "../../../../../assets/icons/nile-mark.svg";
 import { AgentPage } from "../agents/AgentPage";
 import type { AgentDetailTab } from "../agents/AgentDetailPage";
 import { AddConnectionPage } from "../connections/AddConnectionPage";
+import { readCodexAuthJsonPath } from "../connections/AuthJsonPath";
 import { ConnectionsPage } from "../connections/ConnectionsPage";
 import { CursorUsageRepairDialog } from "../connections/CursorUsageRepairDialog";
 import { NileDialog } from "../settings/NileDialog";
@@ -90,6 +91,10 @@ export function SettingsApp() {
   const addConnectionDefinitions = useMemo(
     () => readDefinitionsForAgent(addConnectionTargetAgentId),
     [addConnectionTargetAgentId, readDefinitionsForAgent],
+  );
+  const defaultOpenAiAuthJsonPath = useMemo(
+    () => readCodexAuthJsonPath(settingsState?.advanced.agentHomes),
+    [settingsState?.advanced.agentHomes],
   );
   const repairUsageConnection = settingsState?.connections.find((connection) => connection.id === repairUsageConnectionId) ?? null;
   const selectedConnectionContextAgent =
@@ -320,6 +325,7 @@ export function SettingsApp() {
               {visiblePage === "connections" ? (
                 <ConnectionsPage
                   detailContextAgent={selectedConnectionContextAgent}
+                  defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
                   definitions={definitions}
                   language={preferences.language}
                   state={settingsState}
@@ -353,6 +359,7 @@ export function SettingsApp() {
               {visiblePage === "add-connection" ? (
                 <AddConnectionPage
                   key={addConnectionTargetAgentId ?? "all"}
+                  defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
                   definitions={addConnectionDefinitions}
                   language={preferences.language}
                   targetAgentId={addConnectionTargetAgentId}

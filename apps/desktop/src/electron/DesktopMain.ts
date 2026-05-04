@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type MenuItemConstructorOptions, type OpenDialogOptions } from "electron";
 import { watch, type FSWatcher } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { homedir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import type { AgentHomes } from "@nile/core/models/agent";
@@ -309,7 +310,7 @@ export class DesktopMain {
     const options: OpenDialogOptions = {
       title: "Choose auth.json",
       buttonLabel: "Use this file",
-      defaultPath,
+      defaultPath: this.resolveDialogPath(defaultPath),
       filters: [
         { name: "JSON files", extensions: ["json"] },
       ],
@@ -324,6 +325,23 @@ export class DesktopMain {
     }
 
     return result.filePaths[0] ?? null;
+  }
+
+  private resolveDialogPath(path: string | undefined): string | undefined {
+    const trimmed = path?.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+
+    if (trimmed === "~") {
+      return homedir();
+    }
+
+    if (trimmed.startsWith("~/")) {
+      return resolve(homedir(), trimmed.slice(2));
+    }
+
+    return trimmed;
   }
 
   private async popTrayMenu(): Promise<void> {

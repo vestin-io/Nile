@@ -22,6 +22,7 @@ import { Button } from "../ui/button";
 
 type ConnectionsPageProps = {
   detailContextAgent: DesktopAgentState | null;
+  defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
   language: LanguagePreference;
   state: SettingsState;
@@ -50,6 +51,7 @@ type ConnectionsPageProps = {
 
 export function ConnectionsPage({
   detailContextAgent,
+  defaultOpenAiAuthJsonPath,
   definitions,
   language,
   state,
@@ -103,6 +105,7 @@ export function ConnectionsPage({
       return (
         <ConnectionEditPage
           connection={selectedConnection}
+          defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
           definitions={definitions}
           language={language}
           t={t}

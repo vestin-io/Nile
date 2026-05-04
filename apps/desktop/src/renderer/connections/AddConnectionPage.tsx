@@ -1,4 +1,4 @@
-import { ChevronLeft, Waypoints } from "lucide-react";
+import { ChevronLeft, CircleCheckBig, Waypoints } from "lucide-react";
 import openAiSvg from "../../../node_modules/@lobehub/icons-static-svg/icons/openai.svg";
 import azureAiSvg from "../../../node_modules/@lobehub/icons-static-svg/icons/azureai-color.svg";
 import claudeSvg from "../../../node_modules/@lobehub/icons-static-svg/icons/claude.svg";
@@ -33,6 +33,7 @@ import { Input } from "../ui/input";
 import { Separator } from "../ui/separator";
 
 type AddConnectionPageProps = {
+  defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
   language: LanguagePreference;
   targetAgentId: AgentId | null;
@@ -44,6 +45,7 @@ type AddConnectionPageProps = {
 };
 
 export function AddConnectionPage({
+  defaultOpenAiAuthJsonPath,
   definitions,
   language,
   targetAgentId,
@@ -54,6 +56,7 @@ export function AddConnectionPage({
   onSubmit,
 }: AddConnectionPageProps) {
   const {
+    actionError,
     chooseAuthJsonPath,
     configurableAgents,
     displayedEnabledAgents,
@@ -91,6 +94,7 @@ export function AddConnectionPage({
     submit,
     suggestedAgents,
   } = useAddConnectionPageState({
+    defaultOpenAiAuthJsonPath,
     definitions,
     onPrepareDraft,
     onSavePrepared,
@@ -142,6 +146,7 @@ export function AddConnectionPage({
     return t("common.addConnection");
   })();
   const gatewayTrustTarget = describeGatewayTrustTarget(formState.endpointUrl);
+  const isSessionStructureLocked = isPreparedSessionFlow;
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -174,6 +179,7 @@ export function AddConnectionPage({
             </div>
             <div className="grid gap-2">
               <Combobox
+                disabled={isSessionStructureLocked}
                 items={presetItems}
                 value={formState.preset}
                 placeholder={t("addConnection.presetPlaceholder")}
@@ -209,6 +215,7 @@ export function AddConnectionPage({
             {connectionMethods.length > 1 ? (
               <FormField label={t("addConnection.chooseMethod")}>
                 <ConnectionMethodSelector
+                  disabled={isSessionStructureLocked}
                   methods={connectionMethods}
                   selectedKey={selectedMethodKey}
                   onSelect={(method) => {
@@ -275,6 +282,12 @@ export function AddConnectionPage({
               </>
             ) : null}
 
+            {actionError ? (
+              <Alert>
+                <AlertDescription>{actionError}</AlertDescription>
+              </Alert>
+            ) : null}
+
             {showPostPreparationFields ? (
               <>
                 {gatewayProbeError ? (
@@ -298,7 +311,7 @@ export function AddConnectionPage({
                       <Button
                         type="button"
                         variant="secondary"
-                        disabled={isChoosingAuthJsonPath}
+                        disabled={isChoosingAuthJsonPath || isSessionStructureLocked}
                         onClick={() => void chooseAuthJsonPath()}
                       >
                         {isChoosingAuthJsonPath ? t("common.loading") : t("common.chooseFile")}
@@ -308,10 +321,29 @@ export function AddConnectionPage({
                 ) : null}
 
                 {isPreparedSessionFlow ? (
-                  <div className="rounded-xl border bg-emerald-50/70 p-4 text-sm text-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100">
-                    <div className="font-medium">{t("addConnection.sessionReadyTitle")}</div>
-                    <div className="mt-1 text-emerald-800/90 dark:text-emerald-200/90">
-                      {t("addConnection.sessionReadyDescription")}
+                  <div className="rounded-2xl border border-emerald-300 bg-gradient-to-br from-emerald-100 via-white to-teal-50 p-5 text-emerald-950 shadow-sm ring-1 ring-emerald-200/80 dark:border-emerald-700/80 dark:from-emerald-950/70 dark:via-emerald-950/30 dark:to-teal-950/30 dark:text-emerald-50 dark:ring-emerald-800/80">
+                    <div className="flex items-start gap-3">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white shadow-sm dark:bg-emerald-500">
+                        <CircleCheckBig className="size-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="text-base font-semibold tracking-tight">
+                            {t("addConnection.sessionReadyTitle")}
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="border-emerald-300 bg-white/85 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-100"
+                          >
+                            {t("addConnection.sessionReadyAction", {
+                              action: t("addConnection.saveConnection"),
+                            })}
+                          </Badge>
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-emerald-900/90 dark:text-emerald-100/90">
+                          {t("addConnection.sessionReadyDescription")}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : null}

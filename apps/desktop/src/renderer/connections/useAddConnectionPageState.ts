@@ -28,6 +28,7 @@ export type AddConnectionPreparedSaveInput = {
 export type PreparedConnectionDraft = Awaited<ReturnType<typeof window.nileDesktop.prepareConnectionDraft>>;
 
 type UseAddConnectionPageStateOptions = {
+  defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
   onPrepareDraft(input: AddConnectionSubmitInput): Promise<PreparedConnectionDraft>;
   onSavePrepared(input: AddConnectionPreparedSaveInput): Promise<void>;
@@ -35,6 +36,7 @@ type UseAddConnectionPageStateOptions = {
 };
 
 export function useAddConnectionPageState({
+  defaultOpenAiAuthJsonPath,
   definitions,
   onPrepareDraft,
   onSavePrepared,
@@ -52,11 +54,12 @@ export function useAddConnectionPageState({
     setEnabledAgents,
     setPreset,
     setSessionSource,
-  } = useAddConnectionForm(definitions);
+  } = useAddConnectionForm(definitions, defaultOpenAiAuthJsonPath);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreparingDraft, setIsPreparingDraft] = useState(false);
   const [isChoosingAuthJsonPath, setIsChoosingAuthJsonPath] = useState(false);
   const [preparedDraft, setPreparedDraft] = useState<PreparedConnectionDraft | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isPreparingGateway, setIsPreparingGateway] = useState(false);
   const [gatewayPrepared, setGatewayPrepared] = useState(false);
   const [gatewayProbeError, setGatewayProbeError] = useState<string | null>(null);
@@ -174,6 +177,19 @@ export function useAddConnectionPageState({
   }, [requiresSessionPreparation, selectedDefinition?.preset]);
 
   useEffect(() => {
+    setActionError(null);
+  }, [
+    formState.apiKey,
+    formState.apiKeySource,
+    formState.authJsonPath,
+    formState.authMode,
+    formState.endpointUrl,
+    formState.envKey,
+    formState.preset,
+    formState.sessionSource,
+  ]);
+
+  useEffect(() => {
     if (!requiresGatewayPreparation) {
       setGatewayPrepared(false);
       setGatewayProbeError(null);
@@ -219,6 +235,7 @@ export function useAddConnectionPageState({
 
     setIsSubmitting(true);
     try {
+      setActionError(null);
       if (preparedDraft) {
         await onSavePrepared({
           draftId: preparedDraft.id,
@@ -233,6 +250,8 @@ export function useAddConnectionPageState({
       }
 
       await onSubmit(input);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -246,6 +265,7 @@ export function useAddConnectionPageState({
 
     setIsPreparingDraft(true);
     try {
+      setActionError(null);
       const draft = await onPrepareDraft(input);
       setPreparedDraft(draft);
       setSuggestedAgents(draft.suggestedAgents);
@@ -254,6 +274,8 @@ export function useAddConnectionPageState({
         draft.configurableAgents,
       ));
       setEnabledAgents(draft.defaultEnabledAgents);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsPreparingDraft(false);
     }
@@ -302,16 +324,20 @@ export function useAddConnectionPageState({
   const chooseAuthJsonPath = async () => {
     setIsChoosingAuthJsonPath(true);
     try {
+      setActionError(null);
       const path = await window.nileDesktop.chooseOpenAiAuthJsonPath(formState.authJsonPath);
       if (path) {
         setAuthJsonPath(path);
       }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsChoosingAuthJsonPath(false);
     }
   };
 
   return {
+    actionError,
     configurableAgents,
     displayedEnabledAgents,
     enabledAgentsSelectionInvalid,

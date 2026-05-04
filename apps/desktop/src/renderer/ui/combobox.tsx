@@ -15,6 +15,7 @@ export type ComboboxItem<TValue extends string> = {
 };
 
 type ComboboxProps<TValue extends string> = {
+  disabled?: boolean;
   items: ComboboxItem<TValue>[];
   value: TValue | "";
   placeholder: string;
@@ -24,6 +25,7 @@ type ComboboxProps<TValue extends string> = {
 };
 
 export function Combobox<TValue extends string>({
+  disabled = false,
   items,
   value,
   placeholder,
@@ -53,6 +55,11 @@ export function Combobox<TValue extends string>({
   }, [items, query]);
 
   useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+      return;
+    }
+
     if (!open) {
       setQuery("");
       return;
@@ -66,13 +73,14 @@ export function Combobox<TValue extends string>({
 
     window.addEventListener("pointerdown", handlePointerDown);
     return () => window.removeEventListener("pointerdown", handlePointerDown);
-  }, [open]);
+  }, [disabled, open]);
 
   return (
     <div ref={containerRef} className="relative">
       <Button
         variant="outline"
         className="h-11 w-full justify-between rounded-xl px-4"
+        disabled={disabled}
         onClick={() => setOpen((current) => !current)}
       >
         <span className="flex min-w-0 items-center gap-3">
@@ -88,7 +96,7 @@ export function Combobox<TValue extends string>({
         <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
       </Button>
 
-      {open ? (
+      {open && !disabled ? (
         <Card className="absolute inset-x-0 top-full z-20 mt-2 rounded-xl border bg-popover p-2 shadow-lg">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

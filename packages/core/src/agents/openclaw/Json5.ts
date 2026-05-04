@@ -1,4 +1,4 @@
-import { parse as parseJson5 } from "json5";
+import json5 from "json5";
 
 export class Json5ParseError extends Error {
   constructor(message: string) {
@@ -10,7 +10,7 @@ export class Json5ParseError extends Error {
 export function parseJson5Object(content: string): Record<string, unknown> {
   let parsed: unknown;
   try {
-    parsed = parseJson5(content);
+    parsed = json5.parse(content);
   } catch (error) {
     throw new Json5ParseError(error instanceof Error ? error.message : String(error));
   }

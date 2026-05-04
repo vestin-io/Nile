@@ -23,4 +23,4 @@ if (result.stderr) {
   process.stderr.write(`${result.stderr}\n`);
 }
 
-process.exit(result.exitCode);
+process.exitCode = result.exitCode;

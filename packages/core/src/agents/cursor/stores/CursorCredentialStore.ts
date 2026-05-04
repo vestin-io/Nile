@@ -81,7 +81,7 @@ export class CursorCredentialStore {
   }
 
   private upsertValue(service: string, value: string): void {
-    const result = this.securityCli.runWithSecretPrompt([
+    const result = this.securityCli.runWithSecretData([
       "add-generic-password",
       "-a",
       CURSOR_KEYCHAIN_ACCOUNT,

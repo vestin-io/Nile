@@ -104,10 +104,12 @@ export function readSelectedMethodKey(
 }
 
 export function ConnectionMethodSelector({
+  disabled = false,
   methods,
   selectedKey,
   onSelect,
 }: {
+  disabled?: boolean;
   methods: ConnectionMethod[];
   selectedKey: string;
   onSelect(method: ConnectionMethod): void;
@@ -117,6 +119,7 @@ export function ConnectionMethodSelector({
       {methods.map((method) => (
         <ChoiceCard
           key={method.key}
+          disabled={disabled}
           onClick={() => onSelect(method)}
           selected={selectedKey === method.key}
           title={method.title}

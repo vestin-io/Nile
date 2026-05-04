@@ -29,6 +29,7 @@ import { Card, CardContent } from "../ui/card";
 
 type ConnectionEditPageProps = {
   connection: DesktopConnection;
+  defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
   language: LanguagePreference;
   t: Translator;
@@ -38,6 +39,7 @@ type ConnectionEditPageProps = {
 
 export function ConnectionEditPage({
   connection,
+  defaultOpenAiAuthJsonPath,
   definitions,
   language,
   t,
@@ -84,8 +86,10 @@ export function ConnectionEditPage({
     submit,
     trimmedLabel,
     requiresGatewayTrustForSave,
+    actionError,
   } = useConnectionEditState({
     connection,
+    defaultOpenAiAuthJsonPath,
     definitions,
     onSubmit,
     t,
@@ -143,6 +147,12 @@ export function ConnectionEditPage({
           void submit();
         }}
       >
+        {actionError ? (
+          <Alert>
+            <AlertDescription>{actionError}</AlertDescription>
+          </Alert>
+        ) : null}
+
         <div className="grid gap-5 lg:grid-cols-2">
           <FormField label={t("common.name")}>
             <Input value={label} onChange={(event) => setLabel(event.target.value)} />

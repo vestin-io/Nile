@@ -6,11 +6,12 @@ export class SecuritySecretCodec {
   }
 
   decode(secret: string): string {
-    if (!secret.startsWith(SECRET_ENCODING_PREFIX)) {
-      return secret;
+    const normalized = secret.trim();
+    if (!normalized.startsWith(SECRET_ENCODING_PREFIX)) {
+      return normalized;
     }
 
-    const encoded = secret.slice(SECRET_ENCODING_PREFIX.length);
+    const encoded = normalized.slice(SECRET_ENCODING_PREFIX.length);
     return Buffer.from(encoded, "base64").toString("utf8");
   }
 }

@@ -54,8 +54,8 @@ export class DesktopConnectionManager {
 
   constructor(
     private readonly options: DesktopConnectionManagerOptions,
-    loginRunner: CodexSessionLogin = new CodexSessionLogin(),
-    claudeLoginRunner: ClaudeSessionLogin = new ClaudeSessionLogin(),
+    loginRunner: CodexSessionLogin = new CodexSessionLogin(options.environment),
+    claudeLoginRunner: ClaudeSessionLogin = new ClaudeSessionLogin(options.environment),
   ) {
     this.localCredentialResolver = new LocalCredentialResolver(
       this.options.agentHomes,

@@ -25,7 +25,7 @@ export class SecureSnapshotStore {
   ) {}
 
   writeBeforeSnapshot(snapshotRef: string, content: string | null): StoredSecureSnapshot {
-    const result = this.securityCli.runWithSecretPrompt([
+    const result = this.securityCli.runWithSecretData([
       "add-generic-password",
       "-a",
       snapshotRef,

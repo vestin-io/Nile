@@ -2,6 +2,160 @@
 
 ## 2026-05-04
 
+### Step 34: Refresh README product previews and surface order
+
+- Updated `README.md` to make the product surfaces more public-facing and easier to understand at a glance.
+- Added the preview images from `assets/preview/` directly into the README with short user-facing explanations.
+- Reordered the surface walkthrough to match the intended product emphasis:
+  - desktop app first
+  - menubar second
+  - CLI third
+- Kept the CLI command examples under the CLI preview so the terminal surface still has a practical entry point for users.
+
+### Verification
+
+- `git diff --check`
+
+### Step 33: Fix repo-local core path aliases for runtime
+
+- Fixed the root TypeScript path aliases for `@nile/core` so repo-local apps no longer resolve package imports through generated `.d.ts` files at runtime.
+- Root cause:
+  - `tsconfig.json` mapped `@nile/core` and its subpaths to `packages/core/dist/*.d.ts`
+  - `tsx` uses those path aliases when running `apps/cli/src/main.ts`
+  - Node then tried to load declaration files as runtime modules and failed on declaration-only imports like `./Types`
+- Updated the aliases to point at `packages/core/src` instead, which keeps in-repo runtime execution on executable TypeScript source while still allowing `packages/core` to publish built `dist` output externally.
+- Followed through on the next runtime failure exposed by that fix:
+  - `packages/core/src/agents/openclaw/Json5.ts` was importing `json5` as a named ESM export
+  - under the repo-local `tsx` execution path, `json5` resolves through its default export object instead
+  - switched the parser call to `json5.parse(...)` so `npm run start` can execute the source tree cleanly
+- Fixed the final CLI shutdown crash in repo-local `npm run start`:
+  - `apps/cli/src/main.ts` was calling `process.exit(...)` immediately after writing help/output
+  - the default asynchronous `pino` destination in `NileLogger` had not finished initializing yet
+  - switching to `process.exitCode = ...` lets Node exit naturally after stream cleanup
+
+### Verification
+
+- `npm run typecheck`
+- `npm run start -- --help`
+
+### Step 32: Make prepared-session success state explicit
+
+- Reworked the prepared OpenAI session banner on the add-connection page into a stronger success callout.
+- Shifted the message from a passive "session ready" note to an explicit next-step instruction:
+  - authentication succeeded
+  - review the label and enabled capability
+  - click Save connection to add it to Nile
+- Added a small action badge keyed off the existing localized save action so the intended next click is visually obvious.
+- Updated the prepared-session copy across all current desktop locales to keep the new action-oriented meaning consistent.
+
+### Verification
+
+- `npm run typecheck`
+- `git diff --check`
+
+### Step 31: Lock add-connection structure after session preparation
+
+- Locked the structural add-connection controls once an OpenAI or Claude session has been prepared but not yet saved.
+- In the prepared-session state, users can still:
+  - save the connection
+  - cancel/back out
+  - confirm enabled-agent capability selection
+- But they can no longer switch the underlying connection structure mid-draft:
+  - provider preset combobox
+  - connection method cards
+  - auth.json file chooser
+- This prevents invalidating a prepared desktop session draft by clicking into a different provider or auth mode before saving.
+
+### Verification
+
+- `npm run typecheck`
+- `git diff --check`
+
+### Step 30: Unified keychain format after desktop reset
+
+- Dropped the temporary compatibility decode branch for malformed keychain payloads.
+- Kept a single credential payload format:
+  - `__nile_keychain_v1__:` + base64 JSON payload
+- This matches the decision to reset local desktop state instead of carrying long-lived compatibility code for a short-lived broken write format.
+- The keychain write path remains non-prompting in desktop dev flows, but reads are now back to a single canonical format only.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/services/credential/SecretCodec.test.ts packages/core/src/services/credential/SecurityCli.test.ts packages/core/src/services/credential/KeychainCredentialStore.test.ts`
+- `npm run typecheck`
+
+### Step 29: Quota regression recovery after keychain write change
+
+- Fixed the desktop quota regression introduced by the temporary non-interactive keychain write change.
+- Root cause:
+  - the previous `security` write path stored new payloads in a format that `find-generic-password -w` no longer round-tripped back into valid JSON credentials
+  - desktop usage reads then failed with `Stored credential payload is not valid JSON`
+  - the renderer already collapses non-Cursor quota errors to `null`, so the visible symptom looked like quota disappearing completely
+- Restored keychain writes to direct `-w <secret>` argument passing so new credentials stay readable without reintroducing the old terminal prompt flow.
+- Added targeted `SecuritySecretCodec` coverage for the canonical prefixed payload format while the temporary compatibility branch was in place.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/services/credential/SecretCodec.test.ts packages/core/src/services/credential/SecurityCli.test.ts packages/core/src/services/credential/KeychainCredentialStore.test.ts packages/core/src/agents/codex/CodexSessionLogin.test.ts packages/core/src/agents/codex/current-state/CurrentCredentialReader.test.ts`
+- `npm run typecheck`
+
+### Step 28: Desktop keychain prompt suppression
+
+- Reworked the shared `SecurityCli` secret-write path so Nile no longer asks macOS `security` to prompt for password data when writing keychain items.
+- Replaced prompt-based `-w` placeholder writes with non-interactive hex payload writes via `-X`, which removes the confusing:
+  - `password data for new item:`
+  - `retype password for new item:`
+  output from desktop dev terminals.
+- Applied the change to all current Nile keychain write paths:
+  - saved connection credentials
+  - secure mutation-history snapshots
+  - Cursor credential projection writes
+- Tightened the Codex/Claude login helper spawn typings so the new desktop login tests and repo-wide typecheck stay strict-clean.
+- Added targeted `SecurityCli` unit coverage to verify secret writes are rewritten to non-interactive hex payload arguments.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/services/credential/SecurityCli.test.ts packages/core/src/services/credential/KeychainCredentialStore.test.ts packages/core/src/agents/codex/CodexSessionLogin.test.ts packages/core/src/agents/codex/current-state/CurrentCredentialReader.test.ts`
+- `npm run typecheck`
+
+### Step 27: Desktop auth.json import path and error handling fix
+
+- Fixed the desktop OpenAI `Import auth.json` flow to derive its default file path from the current configured Codex home instead of always hardcoding `~/.codex/auth.json`.
+- Added a small renderer helper to map the desktop agent-home state into the concrete auth snapshot path:
+  - custom Codex homes now resolve to `<codex-home>/auth.json`
+  - machines still using the default home keep `~/.codex/auth.json`
+- Wired that derived path into both connection creation and connection edit flows, so a machine with a nonstandard Codex home no longer silently points at the wrong file.
+- Added user-visible error handling for add/edit OpenAI session flows:
+  - auth import failures now render inline in the form
+  - sign-in / save failures no longer look like a dead click with only a renderer console rejection
+- Normalized the desktop file picker default path handling so Electron open dialogs expand leading `~` before opening.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/connections/AuthJsonPath.test.ts apps/desktop/src/electron/DesktopConnectionManager.test.ts`
+- `./node_modules/.bin/vitest run packages/core/src/agents/codex/CodexSessionLogin.test.ts packages/core/src/agents/codex/current-state/CurrentCredentialReader.test.ts`
+- `git diff --check`
+
+### Step 26: Desktop Login PATH Fix And Public README Refresh
+
+- Fixed desktop sign-in flows for Codex and Claude so spawned CLI login commands now inherit the login-shell `PATH` captured by the desktop app environment.
+- Added a user-facing error for missing CLIs:
+  - Codex: "Codex CLI was not found in PATH..."
+  - Claude: "Claude CLI was not found in PATH..."
+- Updated `apps/desktop/src/electron/DesktopConnectionManager.ts` to instantiate shared login helpers with the desktop environment instead of raw process environment.
+- Added targeted unit coverage for `CodexSessionLogin`:
+  - verifies login-shell `PATH` reaches the spawned command
+  - verifies missing CLI errors are translated into actionable user-facing text
+- Rewrote `README.md` toward a public product overview:
+  - clearer user-facing positioning
+  - current capabilities and limits
+  - simpler user workflow framing
+  - development details pushed lower
+
+### Verification
+
+- `npm run test:core`
+
 ### Step 25: Release Upload Bash Compatibility Fix
 
 - Fixed the final desktop release workflow failure after successful build and notarization.

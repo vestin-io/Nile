@@ -4,55 +4,109 @@
   <img src="./assets/icons/nile-mark.svg" alt="Nile mark" width="160" />
 </p>
 
-**Nile** is named for flow, convergence, and movement.  
-Like a great river gathering many branches into a single current, it brings different AI connections into one place, so switching becomes natural, clear, and effortless.
+Nile is a macOS app for people who work across multiple AI accounts, providers, and local agent tools.
 
-The name also reflects a deeper ambition.  
-The Nile was one of the great rivers at the beginning of civilization. In that spirit, Nile is meant to feel less like a utility and more like infrastructure: a main channel connecting models, endpoints, and the ways people work with AI.
+It gives you one place to save connections, switch the active setup for local tools like Codex, Claude, and Cursor, and keep those changes understandable instead of hidden across scattered config files.
 
-> Fun fact: the Nile mark is inspired by N035A, an ancient Egyptian water sign. That reference felt right for this project. Just as the Nile sustained one of the world’s earliest civilizations, we believe AI is becoming a foundational resource for a new one. Nile is designed as a channel into that emerging landscape — helping people access, switch between, and work across AI connections with greater flow and continuity.
+## Why Nile
 
-## What It Is
+If you regularly move between personal and work accounts, direct provider APIs and gateway endpoints, or different agent tools, local setup gets messy fast. Nile is built to make that switching predictable.
 
-Nile is a local switcher for AI agents and connections.
+With Nile you can:
+
+- save multiple AI connections in one place
+- switch the active connection for supported local agents
+- keep secrets in macOS Keychain instead of plain text files
+- see what is currently active, what is saved, and where things have drifted
+- use either a desktop UI or a CLI, depending on how you work
+
+## What It Supports Today
+
+Current surface area:
+
+- macOS desktop app
+- command-line interface
+- local connection switching for `codex`, `claude`, and `cursor`
+
+Current connection types:
+
+- OpenAI API keys
+- OpenAI session auth imported from Codex
+- Claude session auth
+- Cursor session auth
+- provider-compatible gateway endpoints
+- Azure OpenAI endpoints
+
+Current provider presets:
+
+- OpenAI
+- Gateway
+- Azure OpenAI
+- Anthropic
+
+## How It Feels
+
+Nile is designed around a simple loop:
+
+1. Add or import a connection.
+2. See which agents that connection can support.
+3. Save it once.
+4. Switch when needed.
+5. Check status, history, and usage-aware signals when something changes.
+
+The goal is not to be another chat UI. Nile sits underneath the tools you already use and manages the local connection layer around them.
+
+## Current Status
+
+Nile is still early, but the core workflow is real and working:
+
+- desktop setup and switching flow
+- CLI setup and switching flow
+- macOS keychain-backed secret storage
+- signed and notarized desktop release pipeline for macOS
+
+Current limits:
+
+- macOS only
+- local tooling workflows only
+- Windows and Linux support are not in scope yet
+
+## Product Surfaces
+
+### Desktop app
+
+![Nile desktop app preview](./assets/preview/desktop.png)
+
+The desktop app is the primary Nile surface. This is where you add connections, review supported agents, save authenticated sessions, and switch active local setups without digging through scattered config files.
+
+### Menubar
+
+![Nile menubar preview](./assets/preview/menubar.png)
+
+The menubar gives you a lighter-weight status and switching surface. It is useful when you want to quickly check what is active, inspect saved connections, or change context without opening the full desktop window.
+
+### CLI
+
+![Nile CLI preview](./assets/preview/cli.png)
+
+The CLI is for local workflows, scripting, and terminal-first usage. It exposes the same connection model in a form that fits automation and fast inspection.
+
+Common CLI entry points:
+
+```bash
+nile status
+nile list
+nile add
+nile codex import
+nile codex use <connectionId>
+nile cursor usage auto-bind <connectionId>
+```
+
+`nile status`, `nile list`, and `nile history` are human-readable by default. Add `--json` when you want structured output.
 
 Canonical project terms live in [GLOSSARY.md](./GLOSSARY.md).
 
-The current MVP is still Codex-led, but it now also covers Claude and Cursor connection flows. It focuses on:
-
-- managing connections across supported endpoint presets
-- storing secrets in macOS Keychain
-- applying selected connections to local agent state
-- exposing a CLI surface
-- exposing a desktop surface for setup, switching, and usage-aware flows
-
-## Current MVP Scope
-
-Supported endpoint presets in the current MVP:
-
-- `openai`
-- `gateway`
-- `azure-openai`
-- `anthropic`
-
-Supported auth modes in the current MVP:
-
-- `api_key`
-- `openai_session`
-- `claude_session`
-- `cursor_session`
-
-Supported agents in the current MVP:
-
-- `codex`
-- `claude`
-- `cursor`
-
-Current platform support:
-
-- macOS only
-
-## Local Development
+## Development
 
 Install dependencies:
 
@@ -96,70 +150,16 @@ Package the desktop app locally without signing:
 npm run build:app:unsigned --prefix apps/desktop
 ```
 
-For the signed macOS desktop release flow, see [docs/desktop-release.md](./docs/desktop-release.md).
-
-## CLI
-
-Current commands:
-
-```bash
-nile
-nile status [--json]
-nile list [--json]
-nile add [--preset <preset>] [--auth-mode <mode>] [--id <id>] [--label <label>] [--endpoint-url <url>] [--login] [--api-key <key>] [--from-codex-current]
-nile import
-nile history [--json]
-nile rollback
-nile use <connectionId>
-nile remove <connectionId>
-nile reset
-nile cursor usage auto-bind <connectionId>
-```
-
-Optional local overrides:
-
-```bash
-nile status --db-path <path> --home codex=<path>
-```
-
-`nile status`, `nile list`, and `nile history` are human-readable by default. Use `--json` for structured output.
+For signed desktop release operations, see [docs/desktop-release.md](./docs/desktop-release.md).
 
 ## Repository Layout
 
-- `assets/icons`: shared brand/source icon assets used by docs and desktop build exports
-- `packages/core`: shared models, services, and agent-specific apply logic
-- `packages/host-local`: host-specific local integrations such as browser session probes
+- `apps/desktop`: Electron desktop app
 - `apps/cli`: CLI surface
-- `apps/desktop`: Electron menubar + settings shell
-- `.vestin`: discovery, architecture, spec, and execution records
-- `docs`: research notes and supporting investigation
-- `research`: read-only reference repositories and notes
-
-## Icon Assets
-
-- `assets/icons/nile-mark.svg`: the source SVG used in repository docs and as the desktop icon source asset
-- `apps/desktop/build/icons`: desktop-only exported assets such as tray template PNGs and packaged app icons
-
-The menubar icon and the packaged app icon should not reuse the same final file. Keep the SVG as the shared source, then export:
-
-- `nileTemplate.png` and `nileTemplate@2x.png` for the macOS menubar/tray icon
-- `icon.icns` for the packaged macOS app icon
-
-## Release Status
-
-Nile is still in active MVP development, but the macOS desktop release path now exists:
-
-- local unsigned packaging via `npm run build:app:unsigned --prefix apps/desktop`
-- signed and notarized desktop release automation via GitHub Actions tags
-- GitHub Release asset upload for macOS `dmg` and `zip` artifacts
-
-The standard publish path is pushing a `v<semver>` or `desktop-v<semver>` tag. See [docs/desktop-release.md](./docs/desktop-release.md) for required secrets, manual workflow dispatch, and release asset details.
-
-Current release limits:
-
-- macOS only
-- desktop release packaging only
-- Windows and Linux credential backends are still out of scope
+- `packages/core`: shared connection, credential, and apply logic
+- `packages/host-local`: host-specific local integrations
+- `assets/icons`: shared brand assets
+- `docs`: supporting documentation
 
 ## License
 

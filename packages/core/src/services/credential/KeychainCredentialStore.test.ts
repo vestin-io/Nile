@@ -21,7 +21,7 @@ describe("KeychainCredentialStore", () => {
     expect(cli.calls).toEqual([
       ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-w"],
     ]);
-    expect(cli.secretPrompts).toEqual([
+    expect(cli.secretWrites).toEqual([
       "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6InNlY3JldC12YWx1ZSJ9",
     ]);
   });
@@ -40,7 +40,7 @@ describe("KeychainCredentialStore", () => {
       ["find-generic-password", "-a", "openai-work", "-s", "nile.test"],
       ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-U", "-w"],
     ]);
-    expect(cli.secretPrompts).toEqual([
+    expect(cli.secretWrites).toEqual([
       "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6Im5ldy1zZWNyZXQifQ==",
     ]);
   });
@@ -187,7 +187,7 @@ describe("KeychainCredentialStore", () => {
 
 class StubSecurityCli extends SecurityCli {
   readonly calls: string[][] = [];
-  readonly secretPrompts: string[] = [];
+  readonly secretWrites: string[] = [];
 
   constructor(private readonly results: SecurityCliResult[]) {
     super();
@@ -198,9 +198,9 @@ class StubSecurityCli extends SecurityCli {
     return this.shiftResult(args);
   }
 
-  override runWithSecretPrompt(args: string[], secret: string): SecurityCliResult {
+  override runWithSecretData(args: string[], secret: string): SecurityCliResult {
     this.calls.push(args);
-    this.secretPrompts.push(secret);
+    this.secretWrites.push(secret);
     return this.shiftResult(args);
   }
 

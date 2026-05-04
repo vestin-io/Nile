@@ -22,6 +22,7 @@ export type ConnectionEditSubmitInput = {
 
 type UseConnectionEditStateOptions = {
   connection: DesktopConnection;
+  defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
   onSubmit(input: ConnectionEditSubmitInput): Promise<void>;
   t: Translator;
@@ -29,6 +30,7 @@ type UseConnectionEditStateOptions = {
 
 export function useConnectionEditState({
   connection,
+  defaultOpenAiAuthJsonPath,
   definitions,
   onSubmit,
   t,
@@ -41,10 +43,11 @@ export function useConnectionEditState({
   const [envKey, setEnvKey] = useState(connection.envKey ?? "");
   const [sessionSource, setSessionSource] = useState<"login" | "current_codex">("current_codex");
   const [claudeSessionSource, setClaudeSessionSource] = useState<"login" | "current_claude">("login");
-  const [authJsonPath, setAuthJsonPath] = useState("~/.codex/auth.json");
+  const [authJsonPath, setAuthJsonPath] = useState(defaultOpenAiAuthJsonPath);
   const [isChoosingAuthJsonPath, setIsChoosingAuthJsonPath] = useState(false);
   const [isProbingSupport, setIsProbingSupport] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [authUpdateRequested, setAuthUpdateRequested] = useState(false);
   const [agentsDirty, setAgentsDirty] = useState(false);
   const [gatewayTrustConfirmed, setGatewayTrustConfirmed] = useState(false);
@@ -91,16 +94,31 @@ export function useConnectionEditState({
     setEnvKey(connection.envKey ?? "");
     setSessionSource("current_codex");
     setClaudeSessionSource("login");
-    setAuthJsonPath("~/.codex/auth.json");
+    setAuthJsonPath(defaultOpenAiAuthJsonPath);
     setIsChoosingAuthJsonPath(false);
     setIsSaving(false);
+    setActionError(null);
     setAuthUpdateRequested(false);
     setAgentsDirty(false);
     setGatewayTrustConfirmed(false);
     setHasProbedSupport(false);
     setSuggestedAgents([]);
     setResolvedConfigurableAgents(connection.configurableAgents);
-  }, [connection.id]);
+  }, [connection.id, defaultOpenAiAuthJsonPath]);
+
+  useEffect(() => {
+    setActionError(null);
+  }, [
+    apiKey,
+    apiKeySource,
+    authJsonPath,
+    authUpdateRequested,
+    claudeSessionSource,
+    endpointUrl,
+    envKey,
+    label,
+    sessionSource,
+  ]);
 
   useEffect(() => {
     if (!canEditEnabledAgents) {
@@ -145,10 +163,13 @@ export function useConnectionEditState({
     setAuthUpdateRequested(true);
     setIsChoosingAuthJsonPath(true);
     try {
+      setActionError(null);
       const path = await window.nileDesktop.chooseOpenAiAuthJsonPath(authJsonPath);
       if (path) {
         setAuthJsonPath(path);
       }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsChoosingAuthJsonPath(false);
     }
@@ -193,7 +214,10 @@ export function useConnectionEditState({
 
     setIsSaving(true);
     try {
+      setActionError(null);
       await onSubmit(submitInput);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsSaving(false);
     }
@@ -238,6 +262,7 @@ export function useConnectionEditState({
     trimmedLabel,
     endpointUrl,
     authJsonPath,
+    actionError,
     hasProbedSupport,
     requiresGatewayTrustForSave,
     shouldProbeGatewaySupport,

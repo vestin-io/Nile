@@ -18,21 +18,25 @@ type AddConnectionFormState = {
   sessionSource: "login" | "current_codex";
 };
 
-const INITIAL_FORM_STATE: AddConnectionFormState = {
-  apiKey: "",
-  apiKeySource: "direct",
-  authMode: "",
-  authJsonPath: "~/.codex/auth.json",
-  envKey: "",
-  endpointUrl: "",
-  enabledAgents: [],
-  preset: "",
-  sessionSource: "login",
-};
+function createInitialFormState(defaultOpenAiAuthJsonPath: string): AddConnectionFormState {
+  return {
+    apiKey: "",
+    apiKeySource: "direct",
+    authMode: "",
+    authJsonPath: defaultOpenAiAuthJsonPath,
+    envKey: "",
+    endpointUrl: "",
+    enabledAgents: [],
+    preset: "",
+    sessionSource: "login",
+  };
+}
 
-export function useAddConnectionForm(definitions: Definition[]) {
+export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAuthJsonPath: string) {
   const enabledAgentsPolicy = useMemo(() => new EnabledAgentsPolicy(), []);
-  const [formState, setFormState] = useState<AddConnectionFormState>(INITIAL_FORM_STATE);
+  const [formState, setFormState] = useState<AddConnectionFormState>(() =>
+    createInitialFormState(defaultOpenAiAuthJsonPath),
+  );
 
   useEffect(() => {
     if (definitions.length === 0 || formState.preset) {

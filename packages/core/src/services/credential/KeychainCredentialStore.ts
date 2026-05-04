@@ -36,7 +36,7 @@ export class KeychainCredentialStore implements CredentialStore {
       kind: credential.kind,
     });
 
-    const result = this.securityCli.runWithSecretPrompt([
+    const result = this.securityCli.runWithSecretData([
       "add-generic-password",
       "-a",
       credentialId,
@@ -80,7 +80,7 @@ export class KeychainCredentialStore implements CredentialStore {
       throw new CredentialNotFoundError(credentialId);
     }
 
-    const result = this.securityCli.runWithSecretPrompt([
+    const result = this.securityCli.runWithSecretData([
       "add-generic-password",
       "-a",
       credentialId,
