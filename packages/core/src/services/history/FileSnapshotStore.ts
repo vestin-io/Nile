@@ -56,6 +56,10 @@ export class FileSnapshotStore {
     copyFileSync(snapshotRef, targetPath);
   }
 
+  removeSnapshot(snapshotRef: string): void {
+    rmSync(snapshotRef, { force: true });
+  }
+
   checksum(content: string | null): string | null {
     if (content === null) {
       return null;

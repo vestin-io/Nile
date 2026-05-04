@@ -19,7 +19,10 @@ describe("KeychainCredentialStore", () => {
     store.create("openai-work", credential);
 
     expect(cli.calls).toEqual([
-      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-w", JSON.stringify(credential)],
+      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-w"],
+    ]);
+    expect(cli.secretPrompts).toEqual([
+      "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6InNlY3JldC12YWx1ZSJ9",
     ]);
   });
 
@@ -35,7 +38,10 @@ describe("KeychainCredentialStore", () => {
 
     expect(cli.calls).toEqual([
       ["find-generic-password", "-a", "openai-work", "-s", "nile.test"],
-      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-U", "-w", JSON.stringify(credential)],
+      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-U", "-w"],
+    ]);
+    expect(cli.secretPrompts).toEqual([
+      "__nile_keychain_v1__:eyJraW5kIjoiYXBpX2tleSIsImFwaUtleSI6Im5ldy1zZWNyZXQifQ==",
     ]);
   });
 
@@ -68,8 +74,16 @@ describe("KeychainCredentialStore", () => {
     expect(store.has("openai-work")).toBe(true);
     expect(store.get("openai-work")).toEqual(credential);
     expect(cli.calls).toEqual([
-      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-w", JSON.stringify(credential)],
+      ["add-generic-password", "-a", "openai-work", "-s", "nile.test", "-w"],
     ]);
+  });
+
+  it("reads legacy unencoded credential payloads", () => {
+    const credential: StoredCredential = { kind: "api_key", apiKey: "legacy-secret" };
+    const cli = new StubSecurityCli([{ exitCode: 0, stdout: JSON.stringify(credential), stderr: "" }]);
+    const store = new KeychainCredentialStore(cli, "nile.test");
+
+    expect(store.get("openai-work")).toEqual(credential);
   });
 
   it("maps duplicate create failures clearly", () => {
@@ -173,6 +187,7 @@ describe("KeychainCredentialStore", () => {
 
 class StubSecurityCli extends SecurityCli {
   readonly calls: string[][] = [];
+  readonly secretPrompts: string[] = [];
 
   constructor(private readonly results: SecurityCliResult[]) {
     super();
@@ -180,7 +195,16 @@ class StubSecurityCli extends SecurityCli {
 
   override run(args: string[]): SecurityCliResult {
     this.calls.push(args);
+    return this.shiftResult(args);
+  }
 
+  override runWithSecretPrompt(args: string[], secret: string): SecurityCliResult {
+    this.calls.push(args);
+    this.secretPrompts.push(secret);
+    return this.shiftResult(args);
+  }
+
+  private shiftResult(args: string[]): SecurityCliResult {
     const result = this.results.shift();
     if (!result) {
       throw new Error(`Unexpected security invocation: ${args.join(" ")}`);

@@ -142,6 +142,88 @@ describe("MutationHistory", () => {
       history.close();
     }
   });
+
+  it("removes written snapshots when the history row cannot be inserted", () => {
+    const setup = createSetup();
+    const history = MutationHistory.open(setup.dbPath, {
+      secureSnapshotStore: setup.secureSnapshots,
+    });
+    const store = (history as unknown as {
+      store: { insert(record: unknown): void };
+    }).store;
+    store.insert = () => {
+      throw new Error("injected insert failure");
+    };
+
+    expect(() =>
+      history.start({
+        agentId: CODEX_AGENT,
+        type: "apply_selection",
+        connectionId: "openai-work",
+        connectionLabel: "OpenAI Work",
+        endpointLabel: "OpenAI",
+        accessLabel: "Work Session",
+        files: [
+          {
+            path: setup.authPath,
+            content: readFileSync(setup.authPath, "utf8"),
+            existedBefore: true,
+            isSensitive: true,
+          },
+          {
+            path: setup.configPath,
+            content: readFileSync(setup.configPath, "utf8"),
+            existedBefore: true,
+          },
+        ],
+      }),
+    ).toThrow("injected insert failure");
+
+    expect(listSnapshotFiles(setup.dbPath)).toEqual([]);
+    expect(setup.secureSnapshots.snapshotCount()).toBe(0);
+
+    history.close();
+  });
+
+  it("keeps the original rollback error when failure tracking also fails", () => {
+    const setup = createSetup();
+    const history = MutationHistory.open(setup.dbPath, {
+      secureSnapshotStore: setup.secureSnapshots,
+    });
+
+    const mutation = history.start({
+      agentId: CODEX_AGENT,
+      type: "apply_selection",
+      connectionId: "openai-work",
+      connectionLabel: "OpenAI Work",
+      endpointLabel: "OpenAI",
+      accessLabel: "Work Session",
+      files: [
+        {
+          path: setup.authPath,
+          content: readFileSync(setup.authPath, "utf8"),
+          existedBefore: true,
+          isSensitive: true,
+        },
+      ],
+    });
+
+    writeFileSync(setup.authPath, '{\n  "OPENAI_API_KEY": "applied-key"\n}\n', "utf8");
+    history.markApplied(mutation.id, [
+      { path: setup.authPath, content: readFileSync(setup.authPath, "utf8") },
+    ]);
+    writeFileSync(setup.authPath, '{\n  "OPENAI_API_KEY": "externally-changed"\n}\n', "utf8");
+
+    const originalMarkFailed = history.markFailed.bind(history);
+    (history as unknown as { markFailed(mutationId: string, errorMessage: string): unknown }).markFailed = () => {
+      throw new Error("injected markFailed failure");
+    };
+
+    expect(() => history.rollbackLatest(CODEX_AGENT)).toThrow("live file drift detected");
+
+    (history as unknown as { markFailed: typeof originalMarkFailed }).markFailed = originalMarkFailed;
+    history.close();
+  });
 });
 
 function createSetup(): {
@@ -212,5 +294,13 @@ class MemorySecureSnapshotStore extends SecureSnapshotStore {
 
     mkdirSync(dirname(targetPath), { recursive: true });
     writeFileSync(targetPath, this.snapshots.get(snapshotRef) ?? "", { encoding: "utf8", mode: 0o600 });
+  }
+
+  override removeSnapshot(snapshotRef: string): void {
+    this.snapshots.delete(snapshotRef);
+  }
+
+  snapshotCount(): number {
+    return this.snapshots.size;
   }
 }

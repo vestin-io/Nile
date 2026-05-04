@@ -1,4 +1,5 @@
 import { SecurityCli } from "./SecurityCli";
+import { SecuritySecretCodec } from "./SecretCodec";
 import { type StoredCredential } from "./Types";
 import { NileLogger } from "../../services/NileLogger";
 import {
@@ -24,6 +25,7 @@ export class KeychainCredentialStore implements CredentialStore {
     private readonly serviceName: string = "nile.switcher.credential",
     private readonly logger: NileLogger = NileLogger.silent().child({ module: "credential-store" }),
     private readonly validators: Record<string, CredentialValidator> = DEFAULT_CREDENTIAL_VALIDATORS,
+    private readonly secretCodec: SecuritySecretCodec = new SecuritySecretCodec(),
   ) {}
 
   create(credentialId: string, credential: StoredCredential): void {
@@ -34,15 +36,14 @@ export class KeychainCredentialStore implements CredentialStore {
       kind: credential.kind,
     });
 
-    const result = this.securityCli.run([
+    const result = this.securityCli.runWithSecretPrompt([
       "add-generic-password",
       "-a",
       credentialId,
       "-s",
       this.serviceName,
       "-w",
-      serialized,
-    ]);
+    ], this.secretCodec.encode(serialized));
 
     if (result.exitCode === 0) {
       this.cache.set(credentialId, credential);
@@ -79,7 +80,7 @@ export class KeychainCredentialStore implements CredentialStore {
       throw new CredentialNotFoundError(credentialId);
     }
 
-    const result = this.securityCli.run([
+    const result = this.securityCli.runWithSecretPrompt([
       "add-generic-password",
       "-a",
       credentialId,
@@ -87,8 +88,7 @@ export class KeychainCredentialStore implements CredentialStore {
       this.serviceName,
       "-U",
       "-w",
-      serialized,
-    ]);
+    ], this.secretCodec.encode(serialized));
 
     if (result.exitCode === 0) {
       this.cache.set(credentialId, credential);
@@ -206,7 +206,7 @@ export class KeychainCredentialStore implements CredentialStore {
     let parsed: unknown;
 
     try {
-      parsed = JSON.parse(raw);
+      parsed = JSON.parse(this.secretCodec.decode(raw));
     } catch {
       throw new CredentialStoreValidationError("Stored credential payload is not valid JSON");
     }

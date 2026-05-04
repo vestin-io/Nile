@@ -21,3 +21,13 @@
 - Implemented Anthropic OAuth usage lookup via `GET https://api.anthropic.com/api/oauth/usage`.
 - Kept the usage result normalized into the same connection-scoped window contract as Codex.
 - Did not add local transcript-derived Claude analytics in this step.
+
+## 2026-05-04
+
+### Core Hardening
+
+- Switched keychain writes away from argv-based `security ... -w <secret>` usage to prompted secret input with encoded single-line payloads.
+- Kept backward compatibility for existing unencoded keychain rows and secure history snapshots.
+- Added mutation-history snapshot cleanup on failed inserts so partially written secure/file snapshots do not linger orphaned.
+- Hardened apply and rollback failure paths so `markFailed(...)` errors no longer mask the original failure.
+- Reworked saved-connection and status list paths to preload endpoint/access data instead of doing repeated per-row registry lookups.

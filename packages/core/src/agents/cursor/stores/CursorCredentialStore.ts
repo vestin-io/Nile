@@ -1,4 +1,5 @@
 import { NileLogger } from "../../../services/NileLogger";
+import { SecuritySecretCodec } from "../../../services/credential/SecretCodec";
 import { SecurityCli, type SecurityCliResult } from "../../../services/credential/SecurityCli";
 import type { CursorLiveCredentialSnapshot } from "../types";
 
@@ -18,6 +19,7 @@ export class CursorCredentialStore {
   constructor(
     private readonly securityCli: SecurityCli = new SecurityCli(),
     private readonly logger: NileLogger = NileLogger.silent().child({ module: "cursor-credential-store" }),
+    private readonly secretCodec: SecuritySecretCodec = new SecuritySecretCodec(),
   ) {}
 
   snapshot(): CursorLiveCredentialSnapshot {
@@ -66,7 +68,7 @@ export class CursorCredentialStore {
     ]);
 
     if (result.exitCode === 0) {
-      return result.stdout.trim() || null;
+      return this.secretCodec.decode(result.stdout).trim() || null;
     }
     if (this.isMissing(result)) {
       return null;
@@ -79,7 +81,7 @@ export class CursorCredentialStore {
   }
 
   private upsertValue(service: string, value: string): void {
-    const result = this.securityCli.run([
+    const result = this.securityCli.runWithSecretPrompt([
       "add-generic-password",
       "-a",
       CURSOR_KEYCHAIN_ACCOUNT,
@@ -87,8 +89,7 @@ export class CursorCredentialStore {
       service,
       "-U",
       "-w",
-      value,
-    ]);
+    ], this.secretCodec.encode(value));
 
     if (result.exitCode === 0) {
       return;

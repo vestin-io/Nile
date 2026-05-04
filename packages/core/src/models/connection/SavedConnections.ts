@@ -13,6 +13,7 @@ import type { AccessRegistry, AuthMode } from "../access";
 import type { AccessRecord } from "../access";
 import { AccessRegistry as OpenAccessRegistry } from "../access";
 import type { EndpointFamily, EndpointRegistry } from "../endpoint";
+import type { EndpointRecord } from "../endpoint";
 import { EndpointRegistry as OpenEndpointRegistry } from "../endpoint";
 import { EndpointShape } from "../endpoint";
 import { AgentSelection } from "../selection/Selection";
@@ -59,17 +60,31 @@ export class SavedConnections {
   ) {}
 
   list(): SavedConnectionSummary[] {
-    const selections = this.agentSelection.list();
-    return this.accessRegistry.list().map((access) => this.buildSummary(access, selections));
+    const selectionsByConnection = this.readSelectionsByConnection();
+    const endpointsById = this.readEndpointsById();
+    return this.accessRegistry.list().map((access) =>
+      this.buildSummary(
+        access,
+        endpointsById.get(access.endpointId) ?? null,
+        selectionsByConnection.get(access.id) ?? [],
+      ),
+    );
   }
 
   listForAgent(agentId: AgentId): SavedConnectionSummary[] {
-    const selections = this.agentSelection.list();
+    const selectionsByConnection = this.readSelectionsByConnection();
+    const endpointsById = this.readEndpointsById();
     return this.accessRegistry
       .list()
       .filter((access) => access.enabledAgents.includes(agentId))
-      .filter((access) => this.endpointSupportsAgent(access.endpointId, agentId))
-      .map((access) => this.buildSummary(access, selections));
+      .filter((access) => this.endpointSupportsAgent(endpointsById.get(access.endpointId) ?? null, agentId))
+      .map((access) =>
+        this.buildSummary(
+          access,
+          endpointsById.get(access.endpointId) ?? null,
+          selectionsByConnection.get(access.id) ?? [],
+        ),
+      );
   }
 
   async update(input: UpdateConnectionInput): Promise<SavedConnectionSummary> {
@@ -80,7 +95,12 @@ export class SavedConnections {
       this.agentSelection,
     );
     const updated = await updater.update(input);
-    return this.buildSummary(updated, this.agentSelection.list());
+    const endpoint = this.endpointRegistry.get(updated.endpointId);
+    const selectedByAgents = this.agentSelection
+      .list()
+      .filter((selection) => selection.connectionId === updated.id)
+      .map((selection) => selection.agentId);
+    return this.buildSummary(updated, endpoint, selectedByAgents);
   }
 
   remove(connectionId: string): { id: string; removed: true; orphanedAgents: AgentId[] } {
@@ -113,8 +133,7 @@ export class SavedConnections {
     return this.accessRegistry.readCredential(connectionId);
   }
 
-  private endpointSupportsAgent(endpointId: string, agentId: AgentId): boolean {
-    const endpoint = this.endpointRegistry.get(endpointId);
+  private endpointSupportsAgent(endpoint: EndpointRecord | null, agentId: AgentId): boolean {
     if (!endpoint) {
       return false;
     }
@@ -142,12 +161,9 @@ export class SavedConnections {
 
   private buildSummary(
     access: AccessRecord,
-    selections: Array<{ agentId: string; connectionId: string }>,
+    endpoint: EndpointRecord | null,
+    selectedByAgents: string[],
   ): SavedConnectionSummary {
-    const endpoint = this.endpointRegistry.get(access.endpointId);
-    const selectedByAgents = selections
-      .filter((selection) => selection.connectionId === access.id)
-      .map((selection) => selection.agentId);
     const apiKeyMetadata = this.readApiKeyMetadata(access);
 
     return {
@@ -168,7 +184,7 @@ export class SavedConnections {
 
   private readConfigurableAgents(
     access: AccessRecord,
-    endpoint: ReturnType<EndpointRegistry["get"]>,
+    endpoint: EndpointRecord | null,
   ): AgentId[] {
     if (!endpoint) {
       return [];
@@ -181,7 +197,7 @@ export class SavedConnections {
     }).configurableAgents;
   }
 
-  private readEndpointUrl(endpoint: ReturnType<EndpointRegistry["get"]>): string | null {
+  private readEndpointUrl(endpoint: EndpointRecord | null): string | null {
     if (!endpoint) {
       return null;
     }
@@ -235,5 +251,21 @@ export class SavedConnections {
     } catch {
       return null;
     }
+  }
+
+  private readSelectionsByConnection(): Map<string, string[]> {
+    const selectionsByConnection = new Map<string, string[]>();
+
+    for (const selection of this.agentSelection.list()) {
+      const agents = selectionsByConnection.get(selection.connectionId) ?? [];
+      agents.push(selection.agentId);
+      selectionsByConnection.set(selection.connectionId, agents);
+    }
+
+    return selectionsByConnection;
+  }
+
+  private readEndpointsById(): Map<string, EndpointRecord> {
+    return new Map(this.endpointRegistry.list().map((endpoint) => [endpoint.id, endpoint]));
   }
 }

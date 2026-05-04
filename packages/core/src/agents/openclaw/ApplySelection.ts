@@ -8,6 +8,7 @@ import { MutationHistory } from "../../services/history/MutationHistory";
 import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
 import { AgentApplySupport, type PreparedAgentApplySelection } from "../../actions/use/ApplySupport";
+import { ApplyMutation } from "../ApplyMutation";
 import type { OpenClawProjection } from "../../projection";
 import {
   AgentAdapterContextSession,
@@ -42,22 +43,24 @@ export class ApplySelection {
     const context = AgentAdapterContextSession.open(databasePath, credentialStore);
 
     return new ApplySelection(
-      new MutationHistory(
-        context.database,
-        new FileSnapshotStore(historyRoot),
-        options?.secureSnapshotStore ?? new SecureSnapshotStore(),
-        logger.child({ scope: "mutation-history" }),
+      new ApplyMutation(
+        new MutationHistory(
+          context.database,
+          new FileSnapshotStore(historyRoot),
+          options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+          logger.child({ scope: "mutation-history" }),
+        ),
+        this.createApplySupport(
+          context.endpointRegistry,
+          context.accessRegistry,
+          context.agentSelection,
+          logger,
+          credentialStore,
+        ),
+        logger,
       ),
       new OpenClawConfigStore(openclawHome),
       environment,
-      logger,
-      this.createApplySupport(
-        context.endpointRegistry,
-        context.accessRegistry,
-        context.agentSelection,
-        logger,
-        credentialStore,
-      ),
       context,
     );
   }
@@ -79,45 +82,41 @@ export class ApplySelection {
     const historyRoot = join(dirname(context.databasePath), "history");
 
     return new ApplySelection(
-      new MutationHistory(
-        context.database,
-        new FileSnapshotStore(historyRoot),
-        options?.secureSnapshotStore ?? new SecureSnapshotStore(),
-        logger.child({ scope: "mutation-history" }),
+      new ApplyMutation(
+        new MutationHistory(
+          context.database,
+          new FileSnapshotStore(historyRoot),
+          options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+          logger.child({ scope: "mutation-history" }),
+        ),
+        this.createApplySupport(
+          context.endpointRegistry,
+          context.accessRegistry,
+          context.agentSelection,
+          logger,
+          credentialStore,
+        ),
+        logger,
       ),
       new OpenClawConfigStore(openclawHome),
       environment,
-      logger,
-      this.createApplySupport(
-        context.endpointRegistry,
-        context.accessRegistry,
-        context.agentSelection,
-        logger,
-        credentialStore,
-      ),
     );
   }
 
   constructor(
-    private readonly mutationHistory: MutationHistory,
+    private readonly applyMutation: ApplyMutation,
     private readonly configStore: OpenClawConfigStore,
     private readonly environment: EnvironmentSource,
-    private readonly logger: NileLogger,
-    private readonly applySupport: AgentApplySupport,
     private readonly ownedContext: AgentAdapterContextSession | null = null,
   ) {}
 
   apply(connectionId: string) {
-    const prepared = this.applySupport.prepare(connectionId);
     const configSnapshot = this.configStore.snapshot();
-    const mutation = this.mutationHistory.start({
+    return this.applyMutation.execute({
       agentId: OPENCLAW_AGENT_ID,
-      type: "apply_selection",
-      connectionId: prepared.connectionId,
-      connectionLabel: prepared.connection.label,
-      endpointLabel: prepared.endpoint.label,
-      accessLabel: prepared.access.label,
-      files: [
+      connectionId,
+      historyMarkFailedEvent: "openclaw.apply.history_mark_failed",
+      buildFiles: () => [
         {
           path: this.configStore.configPath,
           content: configSnapshot,
@@ -125,36 +124,23 @@ export class ApplySelection {
           isSensitive: true,
         },
       ],
-    });
-
-    try {
-      this.configStore.applyProjection(
-        this.requireOpenClawProjection(prepared.projection),
-        this.requireConfiguredEnvKey(prepared.credential),
-      );
-      this.mutationHistory.markApplied(mutation.id, [
-        { path: this.configStore.configPath, content: this.configStore.snapshot() },
-      ]);
-    } catch (error) {
-      this.configStore.restore(configSnapshot);
-      try {
-        this.mutationHistory.markFailed(
-          mutation.id,
-          error instanceof Error ? error.message : String(error),
+      apply: (prepared) => {
+        this.configStore.applyProjection(
+          this.requireOpenClawProjection(prepared.projection),
+          this.requireConfiguredEnvKey(prepared.credential),
         );
-      } catch (historyError) {
-        this.logger.error("openclaw.apply.history_mark_failed", historyError, {
-          mutationId: mutation.id,
-        });
-      }
-      this.applySupport.logRollback(error, prepared);
-      throw error;
-    }
-
-    return this.applySupport.complete(prepared);
+      },
+      readAppliedFiles: () => [
+        { path: this.configStore.configPath, content: this.configStore.snapshot() },
+      ],
+      restore: () => {
+        this.configStore.restore(configSnapshot);
+      },
+    });
   }
 
   close(): void {
+    this.applyMutation.close();
     this.ownedContext?.close();
   }
 

@@ -15,4 +15,16 @@ export class SecurityCli {
       stderr: result.stderr ?? "",
     };
   }
+
+  runWithSecretPrompt(args: string[], secret: string): SecurityCliResult {
+    const result = spawnSync("security", args, {
+      encoding: "utf8",
+      input: `${secret}\n`,
+    });
+    return {
+      exitCode: result.status ?? 1,
+      stdout: result.stdout ?? "",
+      stderr: result.stderr ?? "",
+    };
+  }
 }

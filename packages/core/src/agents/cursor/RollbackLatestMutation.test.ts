@@ -14,6 +14,7 @@ import { FileSnapshotStore } from "../../services/history/FileSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
 import { AgentApplySupport } from "../../actions/use/ApplySupport";
 import { AgentAdapterContextSession } from "../../runtime-local/AgentAdapterContext";
+import { ApplyMutation } from "../ApplyMutation";
 import { ApplySelection } from "./ApplySelection";
 import { CURSOR_AGENT_ID, type CursorLiveCredentialSnapshot } from "./types";
 import { RollbackLatestMutation } from "./RollbackLatestMutation";
@@ -71,19 +72,23 @@ describe("RollbackLatestMutation", () => {
       secureSnapshotStore: setup.secureSnapshots,
       logger: NileLogger.silent(),
     });
+    const applySupport = new AgentApplySupport(
+      CURSOR_AGENT_ID,
+      context.endpointRegistry,
+      context.accessRegistry,
+      context.agentSelection,
+      setup.credentialStore,
+      NileLogger.silent(),
+      (message: string) => new Error(message),
+    );
     const applySelection = new ApplySelection(
-      mutationHistory,
+      new ApplyMutation(
+        mutationHistory,
+        applySupport,
+        NileLogger.silent(),
+      ),
       new CursorConfigStore(setup.cursorHome),
       setup.cursorCredentialStore as any,
-      new AgentApplySupport(
-        CURSOR_AGENT_ID,
-        context.endpointRegistry,
-        context.accessRegistry,
-        context.agentSelection,
-        setup.credentialStore,
-        NileLogger.silent(),
-        (message: string) => new Error(message),
-      ),
     );
 
     applySelection.apply("cursor-team-connection");

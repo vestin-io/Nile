@@ -3,25 +3,33 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "json5": "^2.2.3",
     "pino": "^10.1.0"
   },
+  "scripts": {
+    "build": "node ./build.mjs && tsc -p ./tsconfig.build.json"
+  },
   "exports": {
-    ".": "./src/index.ts",
-    "./application": "./src/application/index.ts",
-    "./application/local": "./src/application/local/index.ts",
-    "./models/agent": "./src/models/agent/index.ts",
-    "./models/agent/homes": "./src/models/agent/Homes.ts",
-    "./models/agent/types": "./src/models/agent/Types.ts",
-    "./models/connection/enabled-agents-policy": "./src/models/connection/EnabledAgentsPolicy.ts",
-    "./models/*": "./src/models/*/index.ts",
-    "./projection": "./src/projection/index.ts",
-    "./runtime-local": "./src/runtime-local/index.ts",
-    "./usage/cursor": "./src/usage/cursor.ts",
-    "./services/EnvironmentSource": "./src/services/EnvironmentSource.ts",
-    "./services/NileLogger": "./src/services/NileLogger.ts",
-    "./services/*": "./src/services/*/index.ts",
-    "./agents": "./src/agents/index.ts"
+    ".": "./dist/index.js",
+    "./application": "./dist/application/index.js",
+    "./application/local": "./dist/application/local/index.js",
+    "./models/agent": "./dist/models/agent/index.js",
+    "./models/agent/homes": "./dist/models/agent/Homes.js",
+    "./models/agent/types": "./dist/models/agent/Types.js",
+    "./models/connection/enabled-agents-policy": "./dist/models/connection/EnabledAgentsPolicy.js",
+    "./models/*": "./dist/models/*/index.js",
+    "./projection": "./dist/projection/index.js",
+    "./runtime-local": "./dist/runtime-local/index.js",
+    "./usage/cursor": "./dist/usage/cursor.js",
+    "./services/EnvironmentSource": "./dist/services/EnvironmentSource.js",
+    "./services/NileLogger": "./dist/services/NileLogger.js",
+    "./services/*": "./dist/services/*/index.js",
+    "./agents": "./dist/agents/index.js"
   }
 }

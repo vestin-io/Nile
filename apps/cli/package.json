@@ -12,6 +12,7 @@
     "@nile/host-local": "file:../../packages/host-local"
   },
   "scripts": {
+    "prestart": "npm run build --prefix ../../packages/core",
     "start": "node --import tsx ./src/main.ts"
   }
 }

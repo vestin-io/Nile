@@ -3,9 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+import { LocalCredentialSourceFactory } from "../../services/credential/Factory";
 import { type StoredCredential } from "../../services/credential/Types";
 import { KeychainCredentialStore } from "../../services/credential/KeychainCredentialStore";
+import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { EndpointRegistry } from "../endpoint";
+import { SqliteAccessStore } from "./store/SqliteStore";
 import {
   AccessRegistry,
   AccessRegistryValidationError,
@@ -230,6 +233,102 @@ describe("AccessRegistry", () => {
 
     registry.close();
   });
+
+  it("restores the previous credential when access update persistence fails", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedEndpoint(dbPath, {
+      id: "gateway",
+      label: "Gateway",
+      rootUrl: "https://gateway.example.test",
+      protocols: {
+        openai: {
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+
+    const registry = AccessRegistry.open(dbPath, credentialStore);
+    registry.add(
+      {
+        id: "gateway-team",
+        endpointId: "gateway",
+        label: "Gateway Team",
+        authMode: "api_key",
+      },
+      { kind: "api_key", apiKey: "original-secret" },
+    );
+    registry.close();
+
+    const database = SqliteDatabase.open(dbPath);
+    const failing = new AccessRegistry(
+      new ThrowingAccessStore(database, "update"),
+      credentialStore,
+      EndpointRegistry.fromDatabase(database),
+      new LocalCredentialSourceFactory(),
+      database,
+    );
+
+    expect(() =>
+      failing.update(
+        "gateway-team",
+        { label: "Gateway Shared" },
+        { kind: "api_key", apiKey: "fresh-secret" },
+      ),
+    ).toThrow("Injected update failure");
+    expect(credentialStore.records.get("access:gateway-team")).toEqual({
+      kind: "api_key",
+      apiKey: "original-secret",
+    });
+
+    failing.close();
+  });
+
+  it("restores the previous credential when access removal persistence fails", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedEndpoint(dbPath, {
+      id: "gateway",
+      label: "Gateway",
+      rootUrl: "https://gateway.example.test",
+      protocols: {
+        openai: {
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+
+    const registry = AccessRegistry.open(dbPath, credentialStore);
+    registry.add(
+      {
+        id: "gateway-team",
+        endpointId: "gateway",
+        label: "Gateway Team",
+        authMode: "api_key",
+      },
+      { kind: "api_key", apiKey: "original-secret" },
+    );
+    registry.close();
+
+    const database = SqliteDatabase.open(dbPath);
+    const failing = new AccessRegistry(
+      new ThrowingAccessStore(database, "remove"),
+      credentialStore,
+      EndpointRegistry.fromDatabase(database),
+      new LocalCredentialSourceFactory(),
+      database,
+    );
+
+    expect(() => failing.remove("gateway-team")).toThrow("Injected remove failure");
+    expect(credentialStore.records.get("access:gateway-team")).toEqual({
+      kind: "api_key",
+      apiKey: "original-secret",
+    });
+
+    failing.close();
+  });
 });
 
 function createTempDatabasePath(): string {
@@ -272,5 +371,28 @@ class StubCredentialStore extends KeychainCredentialStore {
 
   override remove(reference: string): void {
     this.records.delete(reference);
+  }
+}
+
+class ThrowingAccessStore extends SqliteAccessStore {
+  constructor(
+    database: SqliteDatabase,
+    private readonly failureMode: "update" | "remove",
+  ) {
+    super(database);
+  }
+
+  override update(record: Parameters<SqliteAccessStore["update"]>[0]): void {
+    if (this.failureMode === "update") {
+      throw new Error("Injected update failure");
+    }
+    super.update(record);
+  }
+
+  override remove(accessId: string): void {
+    if (this.failureMode === "remove") {
+      throw new Error("Injected remove failure");
+    }
+    super.remove(accessId);
   }
 }

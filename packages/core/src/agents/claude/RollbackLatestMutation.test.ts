@@ -13,6 +13,8 @@ import { MutationHistory } from "../../services/history/MutationHistory";
 import { NileLogger } from "../../services/NileLogger";
 import { AgentApplySupport } from "../../actions/use/ApplySupport";
 import { AgentAdapterContextSession } from "../../runtime-local/AgentAdapterContext";
+import { ApplyMutation } from "../ApplyMutation";
+import { RollbackLatest } from "../RollbackLatest";
 import { ApplySelection } from "./ApplySelection";
 import { CLAUDE_AGENT_ID } from "./types";
 import { ClaudeCredentialStore } from "./Store";
@@ -69,28 +71,34 @@ describe("RollbackLatestMutation", () => {
       secureSnapshotStore: setup.secureSnapshots,
       logger: NileLogger.silent(),
     });
+    const applySupport = new AgentApplySupport(
+      CLAUDE_AGENT_ID,
+      context.endpointRegistry,
+      context.accessRegistry,
+      context.agentSelection,
+      setup.credentialStore,
+      NileLogger.silent(),
+      (message: string) => new Error(message),
+    );
     const applySelection = new ApplySelection(
-      mutationHistory,
+      new ApplyMutation(
+        mutationHistory,
+        applySupport,
+        NileLogger.silent(),
+      ),
       new ClaudeSettingsStore(setup.claudeHome),
       new ClaudeCredentialStore(setup.claudeHome),
-      new AgentApplySupport(
-        CLAUDE_AGENT_ID,
-        context.endpointRegistry,
-        context.accessRegistry,
-        context.agentSelection,
-        setup.credentialStore,
-        NileLogger.silent(),
-        (message: string) => new Error(message),
-      ),
     );
 
     applySelection.apply("claude-team-connection");
 
     const rollback = new RollbackLatestMutation(
-      mutationHistory,
-      context.agentSelection,
-      { reconcileAgentSelection() { return null; }, close() {} } as any,
-      NileLogger.silent(),
+      new RollbackLatest(
+        mutationHistory,
+        context.agentSelection,
+        { reconcileAgentSelection() { return null; }, close() {} } as any,
+        NileLogger.silent(),
+      ),
     );
 
     rollback.rollback();

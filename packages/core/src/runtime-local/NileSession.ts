@@ -1,4 +1,3 @@
-import { LocalWorkspaceState } from "../application/local/WorkspaceState";
 import { LocalCredentialResolver } from "../application/local/LocalCredentialResolver";
 import type { CursorUsageSessionProbe } from "../application/local/CursorUsageSessionProbe";
 import {
@@ -6,7 +5,6 @@ import {
   type ImportDetectedSetupsResult,
   type ScanLocalSetupsResult,
 } from "../actions/scan-local";
-import { AgentAdapterRegistry } from "./AgentAdapterRegistry";
 import type {
   ApplyAgentSelectionResult,
   AgentAdapterCapabilities,
@@ -19,30 +17,20 @@ import type { AgentHomes } from "../models/agent/Homes";
 import { defaultAgentHomes, mergeAgentHomes } from "../models/agent/Homes";
 import type { AgentId } from "../models/agent/Types";
 import type { SavedConnectionSummary } from "../models/connection/SavedConnections";
-import { AgentSelection } from "../models/selection/Selection";
 import type { CredentialStore } from "../services/credential/Store";
 import type { StoredCredential } from "../services/credential/Types";
 import { SqliteDatabase } from "../services/database/SqliteDatabase";
-import { EnvironmentSource, type EnvironmentSource as EnvironmentSourceType } from "../services/EnvironmentSource";
-import { MutationHistory } from "../services/history/MutationHistory";
+import type { EnvironmentSource as EnvironmentSourceType } from "../services/EnvironmentSource";
 import type { MutationHistoryRecord } from "../services/history/MutationHistoryTypes";
 import type { SecureSnapshotStore } from "../services/history/SecureSnapshotStore";
 import type { NileLogger } from "../services/NileLogger";
-import { CodexSessionLogin } from "../agents/codex/CodexSessionLogin";
-import { SessionConnections } from "./Connections";
-import { SessionAgents } from "./Agents";
-import { SessionUsageAccess } from "./UsageAccess";
 import type { ConnectionUsageResult } from "../actions/usage/Result";
 import type { BindCursorUsageResult } from "../actions/usage/cursor/Binder";
 import type { CursorUsageAutoBindResult } from "../application/local/CursorUsageAutoBinder";
 import type { AgentStatusView } from "../actions/status/Status";
 import type { CreateLocalConnectionInput, RemoveConnectionResult, UpdateConnectionInput } from "./ConnectionTypes";
-
-type LocalEffectResult = {
-  id: string;
-  endpointFamily: string;
-  authMode: string;
-};
+import { NileSessionRuntime } from "./Runtime";
+import { NileSessionEffects } from "./Effects";
 
 export type NileSessionOpenOptions = {
   databasePath: string;
@@ -61,272 +49,144 @@ export type NileSessionOpenOptions = {
  */
 export class NileSession {
   static open(options: NileSessionOpenOptions): NileSession {
-    const database = SqliteDatabase.open(options.databasePath);
+    const runtime = new NileSessionRuntime({
+      databasePath: options.databasePath,
+      database: SqliteDatabase.open(options.databasePath),
+      credentialStore: options.credentialStore,
+      agentHomes: mergeAgentHomes(defaultAgentHomes(), options.agentHomes),
+      environment: options.environment,
+      secureSnapshotStore: options.secureSnapshotStore,
+      logger: options.logger,
+      cursorUsageSessionProbe: options.cursorUsageSessionProbe,
+    });
     return new NileSession(
-      options.databasePath,
-      database,
-      options.credentialStore,
-      mergeAgentHomes(defaultAgentHomes(), options.agentHomes),
-      {
-        environment: options.environment,
-        secureSnapshotStore: options.secureSnapshotStore,
-        logger: options.logger,
-        cursorUsageSessionProbe: options.cursorUsageSessionProbe,
-      },
+      runtime,
+      new NileSessionEffects(() => runtime.getUsageAccess(), runtime.getLogger()),
     );
   }
-
-  private workspaceState: LocalWorkspaceState | null = null;
-  private agentSelection: AgentSelection | null = null;
-  private adapterRegistry: AgentAdapterRegistry | null = null;
-  private history: MutationHistory | null = null;
-  private connections: SessionConnections | null = null;
-  private agents: SessionAgents | null = null;
-  private usageAccess: SessionUsageAccess | null = null;
 
   private constructor(
-    private readonly databasePath: string,
-    private readonly database: SqliteDatabase,
-    private readonly credentialStore: CredentialStore,
-    private readonly agentHomes: AgentHomes,
-    private readonly extras: {
-      environment?: EnvironmentSourceType;
-      secureSnapshotStore?: SecureSnapshotStore;
-      logger?: NileLogger;
-      cursorUsageSessionProbe?: CursorUsageSessionProbe;
-    },
+    private readonly runtime: NileSessionRuntime,
+    private readonly effects: NileSessionEffects,
   ) {}
 
-  private getWorkspaceState(): LocalWorkspaceState {
-    return (this.workspaceState ??= LocalWorkspaceState.fromDatabase(
-      this.database,
-      this.credentialStore,
-      undefined,
-      this.databasePath,
-    ));
-  }
-
-  private getAgentSelection(): AgentSelection {
-    return (this.agentSelection ??= AgentSelection.fromDatabase(this.database));
-  }
-
-  private getAgentAdapterRegistry(): AgentAdapterRegistry {
-    return (this.adapterRegistry ??= AgentAdapterRegistry.fromSharedContext(
-      this.getWorkspaceState().createSharedAgentAdapterContext(this.getAgentSelection()),
-      {
-        credentialStore: this.credentialStore,
-        environment: this.extras.environment,
-        secureSnapshotStore: this.extras.secureSnapshotStore,
-        logger: this.extras.logger,
-        agentHomes: this.agentHomes,
-      },
-    ));
-  }
-
-  private getConnections(): SessionConnections {
-    return (this.connections ??= new SessionConnections(
-      this.getWorkspaceState().createSavedConnections(this.getAgentSelection()),
-      this.getWorkspaceState().createConnectionCreator(),
-      () => this.createLocalCredentialResolver(),
-    ));
-  }
-
-  private getAgents(): SessionAgents {
-    if (this.agents) {
-      return this.agents;
-    }
-
-    const workspaceState = this.getWorkspaceState();
-    const agentAdapterRegistry = this.getAgentAdapterRegistry();
-    const agentActions = workspaceState.createAgentActions(agentAdapterRegistry);
-
-    this.agents = new SessionAgents(
-      agentAdapterRegistry,
-      agentActions.status,
-      agentActions.scanLocal,
-      agentActions.importDetectedSetups,
-      (scope) => this.getMutationHistory(scope),
-    );
-    return this.agents;
-  }
-
-  private getUsageAccess(): SessionUsageAccess {
-    return (this.usageAccess ??= new SessionUsageAccess(
-      this.getWorkspaceState(),
-      this.getWorkspaceState().createUsage(),
-      this.extras.cursorUsageSessionProbe,
-    ));
-  }
-
-  private getMutationHistory(scope?: string): MutationHistory {
-    if (!scope) {
-      return (this.history ??= this.createMutationHistory("mutation-history"));
-    }
-    return this.createMutationHistory(scope);
-  }
-
   listSavedConnections(): SavedConnectionSummary[] {
-    return this.getConnections().list();
+    return this.runtime.getConnections().list();
   }
 
   listSavedConnectionsForAgent(agentId: AgentId): SavedConnectionSummary[] {
-    return this.getConnections().listForAgent(agentId);
+    return this.runtime.getConnections().listForAgent(agentId);
   }
 
   readConnectionCredential(connectionId: string): StoredCredential {
-    return this.getConnections().readCredential(connectionId);
+    return this.runtime.getConnections().readCredential(connectionId);
   }
 
   removeConnection(connectionId: string): RemoveConnectionResult {
-    this.getUsageAccess().clearConnectionArtifacts(connectionId);
-    return this.getConnections().remove(connectionId);
+    this.runtime.getUsageAccess().clearConnectionArtifacts(connectionId);
+    return this.runtime.getConnections().remove(connectionId);
   }
 
   async updateConnection(input: UpdateConnectionInput): Promise<SavedConnectionSummary> {
-    return await this.getConnections().update(input, this.createLocalCredentialResolver());
+    return await this.runtime.getConnections().update(input, this.runtime.createLocalCredentialResolver());
   }
 
   useConnection(agentId: AgentId, connectionId: string): ApplyAgentSelectionResult {
-    return this.getAgents().useConnection(agentId, connectionId);
+    return this.runtime.getAgents().useConnection(agentId, connectionId);
   }
 
   getAgentStatus(agentId: AgentId): AgentStatusView {
-    return this.getAgents().getStatus(agentId);
+    return this.runtime.getAgents().getStatus(agentId);
   }
 
   listAgentStatuses(agentIds?: AgentId[]): AgentStatusView[] {
-    return this.getAgents().listStatuses(agentIds);
+    return this.runtime.getAgents().listStatuses(agentIds);
   }
 
   scanLocalSetups(agentIds?: AgentId[]): ScanLocalSetupsResult {
-    return this.getAgents().scanLocalSetups(agentIds);
+    return this.runtime.getAgents().scanLocalSetups(agentIds);
   }
 
   importDetectedSetups(input: ImportDetectedSetupsInput): ImportDetectedSetupsResult {
-    return this.getAgents().importDetected(input);
+    return this.runtime.getAgents().importDetected(input);
   }
 
   getConnectionUsage(connectionId: string): Promise<ConnectionUsageResult> {
-    return this.getUsageAccess().getConnectionUsage(connectionId);
+    return this.runtime.getUsageAccess().getConnectionUsage(connectionId);
   }
 
   bindCursorUsage(connectionId: string, sessionToken: string): BindCursorUsageResult {
-    return this.getUsageAccess().bindCursorUsage(connectionId, sessionToken);
+    return this.runtime.getUsageAccess().bindCursorUsage(connectionId, sessionToken);
   }
 
   autoBindCursorUsage(connectionId: string): CursorUsageAutoBindResult {
-    return this.getUsageAccess().autoBindCursorUsage(connectionId);
+    return this.runtime.getUsageAccess().autoBindCursorUsage(connectionId);
   }
 
   autoBindAllCursorUsage(): CursorUsageAutoBindResult[] {
-    return this.getUsageAccess().autoBindAllCursorUsage();
+    return this.runtime.getUsageAccess().autoBindAllCursorUsage();
   }
 
   async describeConnectionOnboarding(input: CreateConnectionInput): Promise<ConnectionOnboardingSuggestion> {
-    return await this.getConnections().describeOnboarding(input);
+    return await this.runtime.getConnections().describeOnboarding(input);
   }
 
   async createConnection(input: CreateConnectionInput): Promise<CreateConnectionResult> {
-    return await this.getConnections().create(input);
+    return await this.runtime.getConnections().create(input);
   }
 
   async createConnectionWithLocalEffects(input: CreateConnectionInput): Promise<CreateConnectionResult> {
-    return await this.applyLocalEffects(this.createConnection(input));
+    return await this.effects.applyLocalEffects(this.createConnection(input));
   }
 
   async createLocalConnection(
     input: CreateLocalConnectionInput,
-    localCredentialResolver: LocalCredentialResolver = this.createLocalCredentialResolver(),
+    localCredentialResolver: LocalCredentialResolver = this.runtime.createLocalCredentialResolver(),
   ): Promise<CreateConnectionResult> {
-    return await this.getConnections().createLocalWithResolver(input, localCredentialResolver);
+    return await this.runtime.getConnections().createLocalWithResolver(input, localCredentialResolver);
   }
 
   async createLocalConnectionWithLocalEffects(
     input: CreateLocalConnectionInput,
-    localCredentialResolver: LocalCredentialResolver = this.createLocalCredentialResolver(),
+    localCredentialResolver: LocalCredentialResolver = this.runtime.createLocalCredentialResolver(),
   ): Promise<CreateConnectionResult> {
-    return await this.applyLocalEffects(
+    return await this.effects.applyLocalEffects(
       this.createLocalConnection(input, localCredentialResolver),
     );
   }
 
   async describeLocalConnectionOnboarding(
     input: CreateLocalConnectionInput,
-    localCredentialResolver: LocalCredentialResolver = this.createLocalCredentialResolver(),
+    localCredentialResolver: LocalCredentialResolver = this.runtime.createLocalCredentialResolver(),
   ): Promise<ConnectionOnboardingSuggestion> {
-    return await this.getConnections().describeLocalOnboardingWithResolver(input, localCredentialResolver);
+    return await this.runtime.getConnections().describeLocalOnboardingWithResolver(input, localCredentialResolver);
   }
 
   importCurrentConnection(agentId: AgentId): ImportCurrentConnectionResult {
-    return this.getAgents().importCurrentConnection(agentId);
+    return this.runtime.getAgents().importCurrentConnection(agentId);
   }
 
   importCurrentConnectionWithLocalEffects(agentId: AgentId): ImportCurrentConnectionResult {
-    return this.applyResolvedLocalEffects(this.importCurrentConnection(agentId));
+    return this.effects.applyResolvedLocalEffects(this.importCurrentConnection(agentId));
   }
 
   rollbackLatestMutation(agentId: AgentId): RollbackLatestAgentResult {
-    return this.getAgents().rollbackLatestMutation(agentId);
+    return this.runtime.getAgents().rollbackLatestMutation(agentId);
   }
 
   listAgentCapabilities(): Array<{ agentId: AgentId; capabilities: AgentAdapterCapabilities }> {
-    return this.getAgents().listCapabilities();
+    return this.runtime.getAgents().listCapabilities();
   }
 
   getLatestRollbackableMutation(agentId: AgentId, scope?: string): MutationHistoryRecord | null {
-    return this.getMutationHistory(scope).findLatestRollbackCandidate(agentId);
+    return this.runtime.getAgents().getLatestRollbackableMutation(agentId, scope);
   }
 
   listMutationHistory(limit: number = 20, scope?: string): MutationHistoryRecord[] {
-    return this.getMutationHistory(scope).list(limit);
-  }
-
-  private createLocalCredentialResolver(
-    codexSessionLogin: CodexSessionLogin = new CodexSessionLogin(),
-  ): LocalCredentialResolver {
-    return new LocalCredentialResolver(
-      this.agentHomes,
-      this.extras.environment ?? EnvironmentSource.empty(),
-      codexSessionLogin,
-    );
-  }
-
-  private tryAutoBindCursorUsage(
-    connectionId: string,
-    endpointFamily: string,
-    authMode: string,
-  ): void {
-    if (endpointFamily !== "cursor" || authMode !== "cursor_session") {
-      return;
-    }
-
-    try {
-      this.autoBindCursorUsage(connectionId);
-    } catch (error) {
-      this.extras.logger?.warn("session.cursor_usage.auto_bind_failed", {
-        connectionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  private async applyLocalEffects<T extends LocalEffectResult>(result: Promise<T>): Promise<T> {
-    return this.applyResolvedLocalEffects(await result);
-  }
-
-  private applyResolvedLocalEffects<T extends LocalEffectResult>(result: T): T {
-    this.tryAutoBindCursorUsage(result.id, result.endpointFamily, result.authMode);
-    return result;
-  }
-
-  private createMutationHistory(scope?: string): MutationHistory {
-    return MutationHistory.fromDatabase(this.databasePath, this.database, {
-      secureSnapshotStore: this.extras.secureSnapshotStore,
-      logger: scope ? this.extras.logger?.child({ scope }) : this.extras.logger,
-    });
+    return this.runtime.getAgents().listMutationHistory(limit, scope);
   }
 
   close(): void {
-    this.database.close();
+    this.runtime.close();
   }
 }

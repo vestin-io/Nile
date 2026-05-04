@@ -9,6 +9,7 @@ import { SecureSnapshotStore } from "./SecureSnapshotStore";
 import { SqliteMutationHistoryStore } from "./SqliteMutationHistoryStore";
 import {
   type MutationAfterFileInput,
+  type MutationHistoryFileRecord,
   type MutationHistoryRecord,
   type RollbackLatestMutationResult,
   type StartMutationInput,
@@ -76,20 +77,10 @@ export class MutationHistory {
   start(input: StartMutationInput): MutationHistoryRecord {
     const mutationId = randomUUID();
     const startedAt = new Date().toISOString();
-    const record: MutationHistoryRecord = {
-      id: mutationId,
-      agentId: input.agentId,
-      type: input.type,
-      connectionId: input.connectionId,
-      connectionLabel: input.connectionLabel,
-      endpointLabel: input.endpointLabel,
-      accessLabel: input.accessLabel,
-      status: "started",
-      rollbackOfMutationId: input.rollbackOfMutationId ?? null,
-      startedAt,
-      completedAt: null,
-      errorMessage: null,
-      files: input.files.map((file, index) => {
+    const files: MutationHistoryFileRecord[] = [];
+
+    try {
+      files.push(...input.files.map((file, index): MutationHistoryFileRecord => {
         const snapshotRef = file.isSensitive
           ? `${mutationId}:secure:${index}`
           : `${mutationId}:${file.path}`;
@@ -104,18 +95,37 @@ export class MutationHistory {
           beforeChecksum: snapshot.checksum,
           afterChecksum: null,
         };
-      }),
-    };
+      }));
 
-    this.store.insert(record);
-    this.logger.info("history.start", {
-      mutationId: record.id,
-      agentId: record.agentId,
-      type: record.type,
-      connectionId: record.connectionId,
-      fileCount: record.files.length,
-    });
-    return record;
+      const record: MutationHistoryRecord = {
+        id: mutationId,
+        agentId: input.agentId,
+        type: input.type,
+        connectionId: input.connectionId,
+        connectionLabel: input.connectionLabel,
+        endpointLabel: input.endpointLabel,
+        accessLabel: input.accessLabel,
+        status: "started",
+        rollbackOfMutationId: input.rollbackOfMutationId ?? null,
+        startedAt,
+        completedAt: null,
+        errorMessage: null,
+        files,
+      };
+
+      this.store.insert(record);
+      this.logger.info("history.start", {
+        mutationId: record.id,
+        agentId: record.agentId,
+        type: record.type,
+        connectionId: record.connectionId,
+        fileCount: record.files.length,
+      });
+      return record;
+    } catch (error) {
+      this.cleanupSnapshots(mutationId, files);
+      throw error;
+    }
   }
 
   markApplied(mutationId: string, files: MutationAfterFileInput[]): MutationHistoryRecord {
@@ -232,10 +242,7 @@ export class MutationHistory {
         rolledBackEntry: appliedMutation,
       };
     } catch (error) {
-      this.markFailed(
-        rollbackEntry.id,
-        error instanceof Error ? error.message : String(error),
-      );
+      this.markFailedSafely(rollbackEntry.id, error, "history.rollback.mark_failed");
       throw error;
     }
   }
@@ -250,5 +257,34 @@ export class MutationHistory {
     }
 
     return readFileSync(targetPath, "utf8");
+  }
+
+  private cleanupSnapshots(mutationId: string, files: MutationHistoryFileRecord[]): void {
+    for (const file of files) {
+      try {
+        if (file.beforeSnapshotKind === "secure") {
+          this.secureSnapshots.removeSnapshot(file.beforeSnapshotRef);
+          continue;
+        }
+
+        this.fileSnapshots.removeSnapshot(file.beforeSnapshotRef);
+      } catch (error) {
+        this.logger.error("history.start.cleanup_failed", error, {
+          mutationId,
+          snapshotRef: file.beforeSnapshotRef,
+        });
+      }
+    }
+  }
+
+  private markFailedSafely(mutationId: string, error: unknown, event: string): void {
+    try {
+      this.markFailed(
+        mutationId,
+        error instanceof Error ? error.message : String(error),
+      );
+    } catch (historyError) {
+      this.logger.error(event, historyError, { mutationId });
+    }
   }
 }

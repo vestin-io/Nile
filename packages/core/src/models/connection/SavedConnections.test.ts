@@ -339,8 +339,8 @@ describe("SavedConnections", () => {
     );
     const accessRegistry = new AccessRegistry(
       new ThrowingAccessStore(database),
-      endpointRegistry,
       credentialStore,
+      endpointRegistry,
       new StaticCredentialSourceFactory(),
     );
     const connections = new SavedConnections(
@@ -362,6 +362,85 @@ describe("SavedConnections", () => {
     } finally {
       connections.close();
     }
+  });
+
+  test("preloads selections and endpoints when listing connections", () => {
+    const endpointRegistry = new CountingEndpointRegistry([
+      {
+        id: "openai",
+        label: "OpenAI",
+        rootUrl: "https://api.openai.com",
+        profile: "openai-official" as const,
+        protocols: {
+          openai: {
+            basePath: "/v1",
+            wireApis: ["responses"] as const,
+            authSchemes: ["bearer"] as const,
+          },
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    const accessRegistry = new StubListingAccessRegistry([
+      {
+        id: "primary",
+        endpointId: "openai",
+        label: "Primary",
+        authMode: "openai_session" as const,
+        enabledAgents: ["codex"] as const,
+        credentialSource: {
+          kind: "local" as const,
+          reference: "access:primary",
+          scope: "access" as const,
+          allowLocalMaterialization: true,
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "secondary",
+        endpointId: "openai",
+        label: "Secondary",
+        authMode: "openai_session" as const,
+        enabledAgents: ["codex"] as const,
+        credentialSource: {
+          kind: "local" as const,
+          reference: "access:secondary",
+          scope: "access" as const,
+          allowLocalMaterialization: true,
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    const selectionStore = new StubAgentSelection([
+      {
+        agentId: "codex",
+        connectionId: "primary",
+        endpointId: "openai",
+        accessId: "primary",
+        appliedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        agentId: "claude",
+        connectionId: "primary",
+        endpointId: "openai",
+        accessId: "primary",
+        appliedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    const connections = new SavedConnections(
+      null as unknown as SqliteDatabase,
+      endpointRegistry as unknown as EndpointRegistry,
+      accessRegistry as unknown as AccessRegistry,
+      selectionStore as unknown as AgentSelection,
+    );
+
+    expect(connections.list()).toHaveLength(2);
+    expect(endpointRegistry.listCalls).toBe(1);
+    expect(endpointRegistry.getCalls).toBe(0);
+    expect(selectionStore.listCalls).toBe(1);
   });
 });
 
@@ -466,5 +545,79 @@ class StaticCredentialSourceFactory {
       scope: "usage" as const,
       allowLocalMaterialization: true,
     };
+  }
+}
+
+class CountingEndpointRegistry {
+  listCalls = 0;
+  getCalls = 0;
+
+  constructor(private readonly endpoints: Array<{
+    id: string;
+    label: string;
+    rootUrl: string;
+    profile: "openai-official";
+    protocols: {
+      openai: {
+        basePath: "/v1";
+        wireApis: readonly ["responses"];
+        authSchemes: readonly ["bearer"];
+      };
+    };
+    createdAt: string;
+    updatedAt: string;
+  }>) {}
+
+  list() {
+    this.listCalls += 1;
+    return this.endpoints;
+  }
+
+  get(endpointId: string) {
+    this.getCalls += 1;
+    return this.endpoints.find((endpoint) => endpoint.id === endpointId) ?? null;
+  }
+}
+
+class StubListingAccessRegistry {
+  constructor(private readonly accesses: Array<{
+    id: string;
+    endpointId: string;
+    label: string;
+    authMode: "openai_session";
+    enabledAgents: readonly ["codex"];
+    credentialSource: {
+      kind: "local";
+      reference: string;
+      scope: "access";
+      allowLocalMaterialization: true;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }>) {}
+
+  list() {
+    return this.accesses;
+  }
+
+  readCredential(): never {
+    throw new Error("Unexpected credential read");
+  }
+}
+
+class StubAgentSelection {
+  listCalls = 0;
+
+  constructor(private readonly selections: Array<{
+    agentId: "codex" | "claude";
+    connectionId: string;
+    endpointId: string;
+    accessId: string;
+    appliedAt: string;
+  }>) {}
+
+  list() {
+    this.listCalls += 1;
+    return this.selections;
   }
 }

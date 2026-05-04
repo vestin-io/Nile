@@ -10,19 +10,21 @@
     "lib": ["ES2022", "DOM"],
     "baseUrl": ".",
     "paths": {
-      "@nile/core": ["packages/core/src/index.ts"],
-      "@nile/core/*": ["packages/core/src/*"],
-      "@nile/core/application": ["packages/core/src/application/index.ts"],
-      "@nile/core/application/*": ["packages/core/src/application/*/index.ts"],
-      "@nile/core/agents": ["packages/core/src/agents/index.ts"],
-      "@nile/core/models/*": ["packages/core/src/models/*/index.ts"],
+      "@nile/core": ["packages/core/dist/index.d.ts"],
+      "@nile/core/*": ["packages/core/dist/*"],
+      "@nile/core/application": ["packages/core/dist/application/index.d.ts"],
+      "@nile/core/application/*": ["packages/core/dist/application/*/index.d.ts"],
+      "@nile/core/agents": ["packages/core/dist/agents/index.d.ts"],
+      "@nile/core/models/*": ["packages/core/dist/models/*/index.d.ts"],
+      "@nile/core/models/agent/homes": ["packages/core/dist/models/agent/Homes.d.ts"],
+      "@nile/core/models/agent/types": ["packages/core/dist/models/agent/Types.d.ts"],
       "@nile/core/models/connection/enabled-agents-policy": [
-        "packages/core/src/models/connection/EnabledAgentsPolicy.ts"
+        "packages/core/dist/models/connection/EnabledAgentsPolicy.d.ts"
       ],
-      "@nile/core/runtime-local": ["packages/core/src/runtime-local/index.ts"],
-      "@nile/core/services/EnvironmentSource": ["packages/core/src/services/EnvironmentSource.ts"],
-      "@nile/core/services/NileLogger": ["packages/core/src/services/NileLogger.ts"],
-      "@nile/core/services/*": ["packages/core/src/services/*/index.ts"],
+      "@nile/core/runtime-local": ["packages/core/dist/runtime-local/index.d.ts"],
+      "@nile/core/services/EnvironmentSource": ["packages/core/dist/services/EnvironmentSource.d.ts"],
+      "@nile/core/services/NileLogger": ["packages/core/dist/services/NileLogger.d.ts"],
+      "@nile/core/services/*": ["packages/core/dist/services/*/index.d.ts"],
       "@nile/host-local": ["packages/host-local/src/index.ts"],
       "@nile/host-local/*": ["packages/host-local/src/*"]
     }

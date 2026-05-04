@@ -5,18 +5,19 @@
   "packageManager": "npm@10.9.4",
   "type": "module",
   "scripts": {
-    "postinstall": "npm install --prefix packages/core && npm install --prefix packages/host-local && npm install --prefix apps/cli && npm install --prefix apps/desktop",
-    "nile": "node --import tsx ./apps/cli/src/main.ts",
-    "start": "node --import tsx ./apps/cli/src/main.ts",
+    "postinstall": "npm install --prefix packages/core && npm install --prefix packages/host-local && npm install --prefix apps/cli && npm install --prefix apps/desktop && npm run build --prefix packages/core",
+    "build:core": "npm run build --prefix packages/core",
+    "nile": "npm run build:core && node --import tsx ./apps/cli/src/main.ts",
+    "start": "npm run build:core && node --import tsx ./apps/cli/src/main.ts",
     "desktop:build": "npm run build --prefix apps/desktop",
     "desktop:dev": "npm run dev --prefix apps/desktop",
     "desktop:start": "npm run start --prefix apps/desktop",
     "test:core": "vitest run packages/core/src",
-    "test:host-local": "vitest run packages/host-local/src",
-    "test:cli": "vitest run apps/cli/src",
-    "test:desktop": "vitest run apps/desktop/src",
+    "test:host-local": "npm run build:core && vitest run packages/host-local/src",
+    "test:cli": "npm run build:core && vitest run apps/cli/src",
+    "test:desktop": "npm run build:core && vitest run apps/desktop/src",
     "test": "npm run test:core && npm run test:host-local && npm run test:cli && npm run test:desktop",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "npm run build:core && tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "esbuild": "^0.25.11",

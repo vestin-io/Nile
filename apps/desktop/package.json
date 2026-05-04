@@ -7,6 +7,10 @@
   "main": "dist/electron/main.cjs",
   "dependencies": {},
   "scripts": {
+    "prebuild": "npm run build --prefix ../../packages/core",
+    "prebuild:release": "npm run build --prefix ../../packages/core",
+    "predev": "npm run build --prefix ../../packages/core",
+    "prestart": "npm run build --prefix ../../packages/core",
     "build": "node --import tsx ./build.ts",
     "build:release": "NILE_BUILD_RELEASE=1 node --import tsx ./build.ts",
     "clean:release": "node --import tsx ./clean-release.ts",

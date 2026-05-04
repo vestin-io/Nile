@@ -228,6 +228,114 @@ describe("Status", () => {
       endpointRegistry.close();
     }
   });
+
+  it("preloads accesses and endpoints when listing multiple agents", () => {
+    const endpointRegistry = new CountingStatusEndpointRegistry([
+      {
+        id: "openai",
+        label: "OpenAI",
+        rootUrl: "https://api.openai.com",
+        profile: "openai-official" as const,
+        protocols: {
+          openai: {
+            basePath: "/v1",
+            wireApis: ["responses"] as const,
+            authSchemes: ["bearer"] as const,
+          },
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    const accessRegistry = new CountingStatusAccessRegistry([
+      {
+        id: "work-connection",
+        endpointId: "openai",
+        label: "Work",
+        authMode: "api_key" as const,
+        apiKeySource: "direct" as const,
+        enabledAgents: ["codex"],
+        credentialSource: {
+          kind: "local" as const,
+          scope: "access" as const,
+          reference: "access:work-connection",
+          allowLocalMaterialization: true,
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+    ]);
+    const manager = new Status(
+      endpointRegistry as unknown as EndpointRegistry,
+      accessRegistry as unknown as AccessRegistry,
+      AgentAdapterRegistry.fromAdapters([
+        new StubStatusAdapter({
+          agentSelection: {
+            agentId: "codex",
+            connectionId: "work-connection",
+            endpointId: "openai",
+            accessId: "work-connection",
+            appliedAt: "2026-01-01T00:00:00.000Z",
+          },
+          detectedState: {
+            agentId: "codex",
+            validity: "valid_matched",
+            issues: [],
+            endpoint: {
+              endpointFamily: "openai",
+              endpointIdHint: "openai",
+              labelHint: "OpenAI",
+            },
+            access: {
+              authMode: "api_key",
+              labelHint: "Work",
+            },
+            matchedConnection: {
+              connectionId: "work-connection",
+              endpointId: "openai",
+              accessId: "work-connection",
+              matchesAgentSelection: true,
+            },
+          },
+        }),
+        new StubStatusAdapter({
+          agentSelection: {
+            agentId: "claude",
+            connectionId: "work-connection",
+            endpointId: "openai",
+            accessId: "work-connection",
+            appliedAt: "2026-01-01T00:00:00.000Z",
+          },
+          detectedState: {
+            agentId: "claude",
+            validity: "valid_matched",
+            issues: [],
+            endpoint: {
+              endpointFamily: "openai",
+              endpointIdHint: "openai",
+              labelHint: "OpenAI",
+            },
+            access: {
+              authMode: "api_key",
+              labelHint: "Work",
+            },
+            matchedConnection: {
+              connectionId: "work-connection",
+              endpointId: "openai",
+              accessId: "work-connection",
+              matchesAgentSelection: true,
+            },
+          },
+        }),
+      ]),
+    );
+
+    expect(manager.list(["codex", "claude"])).toHaveLength(2);
+    expect(accessRegistry.listCalls).toBe(1);
+    expect(accessRegistry.getCalls).toBe(0);
+    expect(endpointRegistry.listCalls).toBe(1);
+    expect(endpointRegistry.getCalls).toBe(0);
+  });
 });
 
 function createTempDatabasePath(): string {
@@ -260,8 +368,70 @@ class MemoryCredentialStore implements CredentialStore {
   }
 }
 
+class CountingStatusAccessRegistry {
+  listCalls = 0;
+  getCalls = 0;
+
+  constructor(private readonly accesses: Array<{
+    id: string;
+    endpointId: string;
+    label: string;
+    authMode: "api_key";
+    apiKeySource: "direct";
+    enabledAgents: string[];
+    credentialSource: {
+      kind: "local";
+      scope: "access";
+      reference: string;
+      allowLocalMaterialization: true;
+    };
+    createdAt: string;
+    updatedAt: string;
+  }>) {}
+
+  list() {
+    this.listCalls += 1;
+    return this.accesses;
+  }
+
+  get(accessId: string) {
+    this.getCalls += 1;
+    return this.accesses.find((access) => access.id === accessId) ?? null;
+  }
+}
+
+class CountingStatusEndpointRegistry {
+  listCalls = 0;
+  getCalls = 0;
+
+  constructor(private readonly endpoints: Array<{
+    id: string;
+    label: string;
+    rootUrl: string;
+    profile: "openai-official";
+    protocols: {
+      openai: {
+        basePath: "/v1";
+        wireApis: readonly ["responses"];
+        authSchemes: readonly ["bearer"];
+      };
+    };
+    createdAt: string;
+    updatedAt: string;
+  }>) {}
+
+  list() {
+    this.listCalls += 1;
+    return this.endpoints;
+  }
+
+  get(endpointId: string) {
+    this.getCalls += 1;
+    return this.endpoints.find((endpoint) => endpoint.id === endpointId) ?? null;
+  }
+}
+
 class StubStatusAdapter implements AgentAdapter {
-  readonly agentId = "codex" as const;
   readonly capabilities: AgentAdapterCapabilities = {
     detect: "yes",
     apply: "yes",
@@ -272,6 +442,10 @@ class StubStatusAdapter implements AgentAdapter {
   };
 
   constructor(private readonly detection: AgentDetectionResult) {}
+
+  get agentId() {
+    return this.detection.detectedState.agentId;
+  }
 
   detectCurrentState(): DetectedAgentState {
     return this.detection.detectedState;

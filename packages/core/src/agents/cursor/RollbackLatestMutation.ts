@@ -148,7 +148,13 @@ export class RollbackLatestMutation {
         rollbackMutationId: rollbackEntry.id,
       };
     } catch (error) {
-      this.mutationHistory.markFailed(rollbackEntry.id, error instanceof Error ? error.message : String(error));
+      try {
+        this.mutationHistory.markFailed(rollbackEntry.id, error instanceof Error ? error.message : String(error));
+      } catch (historyError) {
+        this.logger.error("cursor.rollback.history_mark_failed", historyError, {
+          rollbackMutationId: rollbackEntry.id,
+        });
+      }
       throw error;
     }
   }

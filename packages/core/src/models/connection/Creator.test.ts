@@ -30,8 +30,8 @@ describe("ConnectionCreator", () => {
     const endpointRegistry = EndpointRegistry.fromDatabase(database);
     const accessRegistry = new AccessRegistry(
       new ThrowingAccessStore(database),
-      endpointRegistry,
       credentialStore,
+      endpointRegistry,
       new StaticCredentialSourceFactory(),
       null,
     );

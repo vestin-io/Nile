@@ -1,5 +1,11 @@
-import type { AccessRegistry } from "../../models/access";
-import type { EndpointFamily, EndpointProfile, EndpointProtocols, EndpointRegistry } from "../../models/endpoint";
+import type { AccessRecord, AccessRegistry } from "../../models/access";
+import type {
+  EndpointFamily,
+  EndpointProfile,
+  EndpointProtocols,
+  EndpointRecord,
+  EndpointRegistry,
+} from "../../models/endpoint";
 import { EndpointShape } from "../../models/endpoint";
 import type { AgentId } from "../../models/agent/Types";
 import { AgentAdapterRegistry } from "../../runtime-local/AgentAdapterRegistry";
@@ -38,9 +44,32 @@ export class Status {
   ) {}
 
   get(agentId: AgentId): AgentStatusView {
+    return this.readStatus(agentId);
+  }
+
+  list(agentIds?: AgentId[]): AgentStatusView[] {
+    const ids = agentIds ?? this.agentAdapterRegistry.listAgents();
+    const accessById = new Map(this.accessRegistry.list().map((access) => [access.id, access]));
+    const endpointById = new Map(this.endpointRegistry.list().map((endpoint) => [endpoint.id, endpoint]));
+    return ids.map((agentId) => this.readStatus(agentId, accessById, endpointById));
+  }
+
+  private readStatus(
+    agentId: AgentId,
+    accessById?: Map<string, AccessRecord>,
+    endpointById?: Map<string, EndpointRecord>,
+  ): AgentStatusView {
     const detection = this.agentAdapterRegistry.get(agentId).detectAgentSelection();
-    const currentConnection = this.resolveCurrentConnection(detection.agentSelection);
-    const liveConnection = this.resolveLiveConnection(detection.detectedState);
+    const currentConnection = this.resolveCurrentConnection(
+      detection.agentSelection,
+      accessById,
+      endpointById,
+    );
+    const liveConnection = this.resolveLiveConnection(
+      detection.detectedState,
+      accessById,
+      endpointById,
+    );
     const payload: AgentStatusView = {
       agent: detection.agentSelection?.agentId ?? detection.detectedState.agentId,
       currentConnection: currentConnection.connection,
@@ -56,11 +85,6 @@ export class Status {
     return payload;
   }
 
-  list(agentIds?: AgentId[]): AgentStatusView[] {
-    const ids = agentIds ?? this.agentAdapterRegistry.listAgents();
-    return ids.map((agentId) => this.get(agentId));
-  }
-
   private resolveCurrentConnection(
     current: {
       agentId: string;
@@ -69,6 +93,8 @@ export class Status {
       accessId: string;
       appliedAt: string;
     } | null,
+    accessById?: Map<string, AccessRecord>,
+    endpointById?: Map<string, EndpointRecord>,
   ): {
     connection: AgentStatusConnection | null;
     state: AgentCurrentConnectionState;
@@ -80,9 +106,9 @@ export class Status {
       };
     }
 
-    const access = this.accessRegistry.get(current.connectionId);
+    const access = accessById?.get(current.connectionId) ?? this.accessRegistry.get(current.connectionId);
     if (!access) {
-      const endpoint = this.endpointRegistry.get(current.endpointId);
+      const endpoint = endpointById?.get(current.endpointId) ?? this.endpointRegistry.get(current.endpointId);
       return {
         connection: {
           id: current.connectionId,
@@ -97,7 +123,7 @@ export class Status {
       };
     }
 
-    const endpoint = this.endpointRegistry.get(access.endpointId);
+    const endpoint = endpointById?.get(access.endpointId) ?? this.endpointRegistry.get(access.endpointId);
     if (!endpoint) {
       return {
         connection: {
@@ -129,14 +155,18 @@ export class Status {
 
   private resolveLiveConnection(
     detectedState: DetectedAgentState,
+    accessById?: Map<string, AccessRecord>,
+    endpointById?: Map<string, EndpointRecord>,
   ): AgentStatusConnection | null {
     if (detectedState.validity === "invalid_structure") {
       return null;
     }
 
     if (detectedState.matchedConnection) {
-      const endpoint = this.endpointRegistry.get(detectedState.matchedConnection.endpointId);
-      const access = this.accessRegistry.get(detectedState.matchedConnection.accessId);
+      const endpoint = endpointById?.get(detectedState.matchedConnection.endpointId)
+        ?? this.endpointRegistry.get(detectedState.matchedConnection.endpointId);
+      const access = accessById?.get(detectedState.matchedConnection.accessId)
+        ?? this.accessRegistry.get(detectedState.matchedConnection.accessId);
       if (endpoint && access) {
         return {
           id: access.id,

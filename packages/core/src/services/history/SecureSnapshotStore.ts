@@ -3,6 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { SecurityCli } from "../credential/SecurityCli";
+import { SecuritySecretCodec } from "../credential/SecretCodec";
 
 export class SecureSnapshotStoreError extends Error {
   constructor(message: string) {
@@ -20,18 +21,18 @@ export class SecureSnapshotStore {
   constructor(
     private readonly securityCli: SecurityCli = new SecurityCli(),
     private readonly serviceName: string = "nile.switcher.history.snapshot",
+    private readonly secretCodec: SecuritySecretCodec = new SecuritySecretCodec(),
   ) {}
 
   writeBeforeSnapshot(snapshotRef: string, content: string | null): StoredSecureSnapshot {
-    const result = this.securityCli.run([
+    const result = this.securityCli.runWithSecretPrompt([
       "add-generic-password",
       "-a",
       snapshotRef,
       "-s",
       this.serviceName,
       "-w",
-      content ?? "",
-    ]);
+    ], this.secretCodec.encode(content ?? ""));
 
     if (result.exitCode !== 0) {
       throw new SecureSnapshotStoreError(
@@ -61,7 +62,7 @@ export class SecureSnapshotStore {
       );
     }
 
-    return result.stdout;
+    return this.secretCodec.decode(result.stdout);
   }
 
   removeSnapshot(snapshotRef: string): void {

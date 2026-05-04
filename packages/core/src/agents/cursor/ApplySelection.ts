@@ -14,6 +14,7 @@ import {
   AgentApplySupport,
   type PreparedAgentApplySelection,
 } from "../../actions/use/ApplySupport";
+import { ApplyMutation } from "../ApplyMutation";
 import type { CursorProjection } from "../../projection";
 import {
   AgentAdapterContextSession,
@@ -47,23 +48,26 @@ export class ApplySelection {
     const context = AgentAdapterContextSession.open(databasePath, credentialStore);
 
     return new ApplySelection(
-      new MutationHistory(
-        context.database,
-        new FileSnapshotStore(join(dirname(databasePath), "history")),
-        options?.secureSnapshotStore ?? new SecureSnapshotStore(),
-        logger.child({ scope: "mutation-history" }),
+      new ApplyMutation(
+        new MutationHistory(
+          context.database,
+          new FileSnapshotStore(join(dirname(databasePath), "history")),
+          options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+          logger.child({ scope: "mutation-history" }),
+        ),
+        new AgentApplySupport(
+          CURSOR_AGENT_ID,
+          context.endpointRegistry,
+          context.accessRegistry,
+          context.agentSelection,
+          credentialStore,
+          logger,
+          (message) => new ApplySelectionValidationError(message),
+        ),
+        logger,
       ),
       new CursorConfigStore(cursorHome),
       new CursorCredentialStore(),
-      new AgentApplySupport(
-        CURSOR_AGENT_ID,
-        context.endpointRegistry,
-        context.accessRegistry,
-        context.agentSelection,
-        credentialStore,
-        logger,
-        (message) => new ApplySelectionValidationError(message),
-      ),
       context,
     );
   }
@@ -82,47 +86,44 @@ export class ApplySelection {
     const logger = options?.logger ?? NileLogger.silent().child({ module: "cursor-apply-selection" });
 
     return new ApplySelection(
-      new MutationHistory(
-        context.database,
-        new FileSnapshotStore(join(dirname(context.databasePath), "history")),
-        options?.secureSnapshotStore ?? new SecureSnapshotStore(),
-        logger.child({ scope: "mutation-history" }),
+      new ApplyMutation(
+        new MutationHistory(
+          context.database,
+          new FileSnapshotStore(join(dirname(context.databasePath), "history")),
+          options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+          logger.child({ scope: "mutation-history" }),
+        ),
+        new AgentApplySupport(
+          CURSOR_AGENT_ID,
+          context.endpointRegistry,
+          context.accessRegistry,
+          context.agentSelection,
+          credentialStore,
+          logger,
+          (message) => new ApplySelectionValidationError(message),
+        ),
+        logger,
       ),
       new CursorConfigStore(cursorHome),
       new CursorCredentialStore(),
-      new AgentApplySupport(
-        CURSOR_AGENT_ID,
-        context.endpointRegistry,
-        context.accessRegistry,
-        context.agentSelection,
-        credentialStore,
-        logger,
-        (message) => new ApplySelectionValidationError(message),
-      ),
     );
   }
 
   constructor(
-    private readonly mutationHistory: MutationHistory,
+    private readonly applyMutation: ApplyMutation,
     private readonly configStore: CursorConfigStore,
     private readonly cursorCredentialStore: CursorCredentialStore,
-    private readonly applySupport: AgentApplySupport,
     private readonly ownedContext: AgentAdapterContextSession | null = null,
   ) {}
 
   apply(connectionId: string) {
-    const prepared = this.applySupport.prepare(connectionId);
-    const projection = this.requireCursorProjection(prepared.projection);
     const configSnapshot = this.configStore.snapshot();
     const credentialSnapshot = this.cursorCredentialStore.snapshot();
-    const mutation = this.mutationHistory.start({
+    return this.applyMutation.execute({
       agentId: CURSOR_AGENT_ID,
-      type: "apply_selection",
-      connectionId: prepared.connectionId,
-      connectionLabel: prepared.connection.label,
-      endpointLabel: prepared.endpoint.label,
-      accessLabel: prepared.access.label,
-      files: [
+      connectionId,
+      historyMarkFailedEvent: "cursor.apply.history_mark_failed",
+      buildFiles: () => [
         {
           path: this.configStore.configPath,
           content: configSnapshot,
@@ -130,34 +131,31 @@ export class ApplySelection {
         },
         ...CursorHistoryTargets.toTrackedEntries(credentialSnapshot),
       ],
-    });
+      apply: (prepared) => {
+        const projection = this.requireCursorProjection(prepared.projection);
+        if (prepared.access.authMode === "cursor_session") {
+          this.applyCursorSession(prepared.credential, projection.backendUrl);
+          return;
+        }
 
-    try {
-      if (prepared.access.authMode === "cursor_session") {
-        this.applyCursorSession(prepared.credential, projection.backendUrl);
-      } else {
         this.applyApiKey(prepared.credential, projection.backendUrl);
-      }
-      this.mutationHistory.markApplied(mutation.id, [
+      },
+      readAppliedFiles: () => [
         { path: this.configStore.configPath, content: this.configStore.snapshot() },
         ...CursorHistoryTargets.toTrackedEntries(this.cursorCredentialStore.snapshot()).map((entry) => ({
           path: entry.path,
           content: entry.content,
         })),
-      ]);
-    } catch (error) {
-      this.cursorCredentialStore.restore(credentialSnapshot);
-      this.configStore.restore(configSnapshot);
-      this.mutationHistory.markFailed(mutation.id, error instanceof Error ? error.message : String(error));
-      this.applySupport.logRollback(error, prepared);
-      throw error;
-    }
-
-    return this.applySupport.complete(prepared);
+      ],
+      restore: () => {
+        this.cursorCredentialStore.restore(credentialSnapshot);
+        this.configStore.restore(configSnapshot);
+      },
+    });
   }
 
   close(): void {
-    this.mutationHistory.close();
+    this.applyMutation.close();
     this.ownedContext?.close();
   }
 

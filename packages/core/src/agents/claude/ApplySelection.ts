@@ -11,6 +11,7 @@ import {
   AgentApplySupport,
   type PreparedAgentApplySelection,
 } from "../../actions/use/ApplySupport";
+import { ApplyMutation } from "../ApplyMutation";
 import type { ClaudeProjection } from "../../projection";
 import {
   AgentAdapterContextSession,
@@ -43,23 +44,26 @@ export class ApplySelection {
     const context = AgentAdapterContextSession.open(databasePath, credentialStore);
 
     return new ApplySelection(
-      new MutationHistory(
-        context.database,
-        new FileSnapshotStore(join(dirname(databasePath), "history")),
-        options?.secureSnapshotStore ?? new SecureSnapshotStore(),
-        logger.child({ scope: "mutation-history" }),
+      new ApplyMutation(
+        new MutationHistory(
+          context.database,
+          new FileSnapshotStore(join(dirname(databasePath), "history")),
+          options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+          logger.child({ scope: "mutation-history" }),
+        ),
+        new AgentApplySupport(
+          CLAUDE_AGENT_ID,
+          context.endpointRegistry,
+          context.accessRegistry,
+          context.agentSelection,
+          credentialStore,
+          logger,
+          (message) => new ApplySelectionValidationError(message),
+        ),
+        logger,
       ),
       new ClaudeSettingsStore(claudeHome),
       new ClaudeCredentialStore(claudeHome),
-      new AgentApplySupport(
-        CLAUDE_AGENT_ID,
-        context.endpointRegistry,
-        context.accessRegistry,
-        context.agentSelection,
-        credentialStore,
-        logger,
-        (message) => new ApplySelectionValidationError(message),
-      ),
       context,
     );
   }
@@ -78,47 +82,44 @@ export class ApplySelection {
     const logger = options?.logger ?? NileLogger.silent().child({ module: "claude-apply-selection" });
 
     return new ApplySelection(
-      new MutationHistory(
-        context.database,
-        new FileSnapshotStore(join(dirname(context.databasePath), "history")),
-        options?.secureSnapshotStore ?? new SecureSnapshotStore(),
-        logger.child({ scope: "mutation-history" }),
+      new ApplyMutation(
+        new MutationHistory(
+          context.database,
+          new FileSnapshotStore(join(dirname(context.databasePath), "history")),
+          options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+          logger.child({ scope: "mutation-history" }),
+        ),
+        new AgentApplySupport(
+          CLAUDE_AGENT_ID,
+          context.endpointRegistry,
+          context.accessRegistry,
+          context.agentSelection,
+          credentialStore,
+          logger,
+          (message) => new ApplySelectionValidationError(message),
+        ),
+        logger,
       ),
       new ClaudeSettingsStore(claudeHome),
       new ClaudeCredentialStore(claudeHome),
-      new AgentApplySupport(
-        CLAUDE_AGENT_ID,
-        context.endpointRegistry,
-        context.accessRegistry,
-        context.agentSelection,
-        credentialStore,
-        logger,
-        (message) => new ApplySelectionValidationError(message),
-      ),
     );
   }
 
   constructor(
-    private readonly mutationHistory: MutationHistory,
+    private readonly applyMutation: ApplyMutation,
     private readonly settingsStore: ClaudeSettingsStore,
     private readonly credentialStore: ClaudeCredentialStore,
-    private readonly applySupport: AgentApplySupport,
     private readonly ownedContext: AgentAdapterContextSession | null = null,
   ) {}
 
   apply(connectionId: string) {
-    const prepared = this.applySupport.prepare(connectionId);
-    const projection = this.requireClaudeProjection(prepared.projection);
     const settingsSnapshot = this.settingsStore.snapshot();
     const credentialSnapshot = this.credentialStore.snapshot();
-    const mutation = this.mutationHistory.start({
+    return this.applyMutation.execute({
       agentId: CLAUDE_AGENT_ID,
-      type: "apply_selection",
-      connectionId: prepared.connectionId,
-      connectionLabel: prepared.connection.label,
-      endpointLabel: prepared.endpoint.label,
-      accessLabel: prepared.access.label,
-      files: [
+      connectionId,
+      historyMarkFailedEvent: "claude.apply.history_mark_failed",
+      buildFiles: () => [
         {
           path: this.settingsStore.settingsPath,
           content: settingsSnapshot,
@@ -132,31 +133,28 @@ export class ApplySelection {
           isSensitive: true,
         },
       ],
-    });
+      apply: (prepared) => {
+        const projection = this.requireClaudeProjection(prepared.projection);
+        if (prepared.access.authMode === "claude_session") {
+          this.applySession(prepared.credential, projection.baseUrl);
+          return;
+        }
 
-    try {
-      if (prepared.access.authMode === "claude_session") {
-        this.applySession(prepared.credential, projection.baseUrl);
-      } else {
         this.applyApiKey(prepared.credential, projection.baseUrl, projection.envKey);
-      }
-      this.mutationHistory.markApplied(mutation.id, [
+      },
+      readAppliedFiles: () => [
         { path: this.settingsStore.settingsPath, content: this.settingsStore.snapshot() },
         { path: this.credentialStore.credentialsPath, content: this.credentialStore.snapshot() },
-      ]);
-    } catch (error) {
-      this.credentialStore.restore(credentialSnapshot);
-      this.settingsStore.restore(settingsSnapshot);
-      this.mutationHistory.markFailed(mutation.id, error instanceof Error ? error.message : String(error));
-      this.applySupport.logRollback(error, prepared);
-      throw error;
-    }
-
-    return this.applySupport.complete(prepared);
+      ],
+      restore: () => {
+        this.credentialStore.restore(credentialSnapshot);
+        this.settingsStore.restore(settingsSnapshot);
+      },
+    });
   }
 
   close(): void {
-    this.mutationHistory.close();
+    this.applyMutation.close();
     this.ownedContext?.close();
   }
 
