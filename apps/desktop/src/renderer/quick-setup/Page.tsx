@@ -1,0 +1,73 @@
+import type { AgentId } from "@nile/core/models/agent/types";
+import { ArrowRight } from "lucide-react";
+import nileMarkSvg from "../../../../../assets/icons/nile-mark.svg";
+
+import type { SettingsState } from "../shared/DesktopData";
+import type { Translator } from "../shared/I18n";
+import { QuickSetupAgentCard } from "./AgentCard";
+import { QuickSetupGuide } from "./Guide";
+import { Button } from "../ui/button";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
+
+type QuickSetupPageProps = {
+  canConfigureAgent(agentId: AgentId): boolean;
+  state: SettingsState;
+  t: Translator;
+  onConfigureAgent(agentId: AgentId): void;
+  onConfirmAgent(agentId: AgentId): Promise<void>;
+  onDone(): void;
+};
+
+export function QuickSetupPage({
+  canConfigureAgent,
+  state,
+  t,
+  onConfigureAgent,
+  onConfirmAgent,
+  onDone,
+}: QuickSetupPageProps) {
+  const detectedSetupsByAgent = new Map(
+    state.detectedSetups.items.map((item) => [item.agentId, item]),
+  );
+
+  return (
+    <div className="space-y-6">
+      <Empty className="gap-5">
+        <EmptyHeader>
+          <div
+            aria-hidden="true"
+            className="flex h-12 w-12 items-center justify-center text-foreground/85 [&_svg]:h-12 [&_svg]:w-12"
+            dangerouslySetInnerHTML={{ __html: nileMarkSvg }}
+          />
+          <EmptyTitle>{t("quickSetup.title")}</EmptyTitle>
+          <EmptyDescription>{t("quickSetup.description")}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+
+      <div className="space-y-5">
+        <QuickSetupGuide onboarding={state.detectedSetups} t={t} />
+
+        <div className="space-y-4">
+          {state.agents.map((agent) => (
+            <QuickSetupAgentCard
+              key={agent.agentId}
+              agent={agent}
+              canConfigure={canConfigureAgent(agent.agentId)}
+              detectedSetup={detectedSetupsByAgent.get(agent.agentId) ?? null}
+              t={t}
+              onConfirm={onConfirmAgent}
+              onConfigure={onConfigureAgent}
+            />
+          ))}
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <Button size="sm" onClick={onDone}>
+            {t("quickSetup.goToAgents")}
+            <ArrowRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

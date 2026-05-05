@@ -90,7 +90,7 @@ describe("NileSession", () => {
       expect(session.removeConnection("cursor-session")).toEqual({
         id: "cursor-session",
         removed: true,
-        orphanedAgents: [],
+        clearedAgents: [],
       });
     } finally {
       session.close();

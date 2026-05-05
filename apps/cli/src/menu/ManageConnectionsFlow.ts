@@ -1,6 +1,6 @@
 import type { AgentId } from "@nile/core/models/agent";
+import type { AgentCommands } from "../commands/AgentCommands";
 import type { ConnectionCommands } from "../commands/ConnectionCommands";
-import type { StatusCommands } from "../commands/StatusCommands";
 import type { ConnectionPresenter } from "../presenters/ConnectionPresenter";
 import type { StatusPresenter } from "../presenters/StatusPresenter";
 import type { InteractivePrompt } from "../InteractivePrompt";
@@ -15,7 +15,7 @@ type ManageSelection = AgentId | "import-detected";
 export class ManageConnectionsFlow {
   constructor(
     private readonly prompt: InteractivePrompt,
-    private readonly statusCommands: StatusCommands,
+    private readonly agentCommands: AgentCommands,
     private readonly connectionCommands: ConnectionCommands,
     private readonly connectionPresenter: ConnectionPresenter,
     private readonly statusPresenter: StatusPresenter,
@@ -25,7 +25,7 @@ export class ManageConnectionsFlow {
 
   async run(options: ResolvedCliOptions, actions: NavigationCallbacks): Promise<MenuNavigation> {
     while (true) {
-      const allStatuses = this.statusCommands.getStatuses(options);
+      const allStatuses = this.agentCommands.getStatuses(options);
       const scan = this.connectionCommands.scanLocalSetups(options);
 
       if (allStatuses.length === 0) {

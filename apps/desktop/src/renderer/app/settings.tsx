@@ -1,6 +1,6 @@
 import ReactDOM from "react-dom/client";
 
-import { SettingsApp } from "./SettingsApp";
+import { SettingsApp } from "./settings/App";
 
 const rootElement = document.getElementById("root");
 

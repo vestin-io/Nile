@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes } from "react";
 
-import { cn } from "../lib/cn";
+import { cn } from "./cn";
 import { Button } from "./button";
 
 type TextButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {

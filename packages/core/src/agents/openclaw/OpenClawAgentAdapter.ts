@@ -6,7 +6,6 @@ import { EnvironmentSource } from "../../services/EnvironmentSource";
 import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
 import type {
-  AgentAdapterCapabilities,
   RollbackLatestAgentResult,
 } from "../../runtime-local/AgentAdapterTypes";
 import { ManagedAgentAdapter } from "../../runtime-local/ManagedAgentAdapter";
@@ -29,81 +28,85 @@ export type OpenClawAgentAdapterOptions = {
 
 export class OpenClawAgentAdapter extends ManagedAgentAdapter {
   readonly agentId = OPENCLAW_AGENT_ID;
+  readonly rollbackSupport = "yes" as const;
 
-  readonly capabilities: AgentAdapterCapabilities = {
-    detect: "yes",
-    apply: "yes",
-    import: "yes",
-    history: "yes",
-    rollback: "yes",
-    desktopSupport: "partial",
-  };
-
-  private readonly databasePath: string;
-  private readonly openclawHome: string;
-  private readonly credentialStore: CredentialStore;
-  private readonly environment: EnvironmentSource;
-  private readonly secureSnapshotStore: SecureSnapshotStore | undefined;
-  private readonly logger: NileLogger;
-  private readonly sharedContext: SharedAgentAdapterContext | undefined;
+  private readonly openApplyOperation: () => ApplySelection;
+  private readonly openImportOperation: () => ImportCurrentConnection;
+  private readonly openRollbackOperation: () => RollbackLatestMutation;
+  private readonly openDetectOperation: () => CurrentStateDetector;
 
   constructor(options: OpenClawAgentAdapterOptions) {
     super();
-    this.databasePath = options.databasePath;
-    this.openclawHome = options.openclawHome ?? join(homedir(), ".openclaw");
-    this.credentialStore = options.credentialStore;
-    this.environment = options.environment ?? EnvironmentSource.from(process.env);
-    this.secureSnapshotStore = options.secureSnapshotStore;
-    this.logger = options.logger ?? NileLogger.silent().child({ module: "openclaw-agent-adapter" });
-    this.sharedContext = options.sharedContext;
+    const databasePath = options.databasePath;
+    const openclawHome = options.openclawHome ?? join(homedir(), ".openclaw");
+    const credentialStore = options.credentialStore;
+    const environment = options.environment ?? EnvironmentSource.from(process.env);
+    const secureSnapshotStore = options.secureSnapshotStore;
+    const logger = options.logger ?? NileLogger.silent().child({ module: "openclaw-agent-adapter" });
+    const sharedContext = options.sharedContext;
+
+    this.openApplyOperation = () => sharedContext
+      ? ApplySelection.fromContext(sharedContext, {
+          openclawHome,
+          credentialStore,
+          environment,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "apply-selection" }),
+        })
+      : ApplySelection.open(databasePath, {
+          openclawHome,
+          credentialStore,
+          environment,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "apply-selection" }),
+        });
+    this.openImportOperation = () => sharedContext
+      ? ImportCurrentConnection.fromContext(sharedContext, {
+          openclawHome,
+          credentialStore,
+          logger: logger.child({ scope: "import-current-connection" }),
+        })
+      : ImportCurrentConnection.open(databasePath, {
+          openclawHome,
+          credentialStore,
+          logger: logger.child({ scope: "import-current-connection" }),
+        });
+    this.openRollbackOperation = () => sharedContext
+      ? RollbackLatestMutation.fromContext(sharedContext, {
+          openclawHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "rollback-latest-mutation" }),
+        })
+      : RollbackLatestMutation.open(databasePath, {
+          openclawHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "rollback-latest-mutation" }),
+        });
+    this.openDetectOperation = () => sharedContext
+      ? CurrentStateDetector.fromContext(sharedContext, {
+          openclawHome,
+          credentialStore,
+          logger: logger.child({ scope: "current-state-detector" }),
+        })
+      : CurrentStateDetector.open(databasePath, {
+          openclawHome,
+          credentialStore,
+          logger: logger.child({ scope: "current-state-detector" }),
+        });
   }
 
   protected openApplySelection(): ApplySelection {
-    return this.sharedContext
-      ? ApplySelection.fromContext(this.sharedContext, {
-          openclawHome: this.openclawHome,
-          credentialStore: this.credentialStore,
-          environment: this.environment,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "apply-selection" }),
-        })
-      : ApplySelection.open(this.databasePath, {
-          openclawHome: this.openclawHome,
-          credentialStore: this.credentialStore,
-          environment: this.environment,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "apply-selection" }),
-        });
+    return this.openApplyOperation();
   }
 
   protected openImporter(): ImportCurrentConnection {
-    return this.sharedContext
-      ? ImportCurrentConnection.fromContext(this.sharedContext, {
-          openclawHome: this.openclawHome,
-          credentialStore: this.credentialStore,
-          logger: this.logger.child({ scope: "import-current-connection" }),
-        })
-      : ImportCurrentConnection.open(this.databasePath, {
-          openclawHome: this.openclawHome,
-          credentialStore: this.credentialStore,
-          logger: this.logger.child({ scope: "import-current-connection" }),
-        });
+    return this.openImportOperation();
   }
 
   rollbackLatestMutation(): RollbackLatestAgentResult {
-    const rollback = this.sharedContext
-      ? RollbackLatestMutation.fromContext(this.sharedContext, {
-          openclawHome: this.openclawHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "rollback-latest-mutation" }),
-        })
-      : RollbackLatestMutation.open(this.databasePath, {
-          openclawHome: this.openclawHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "rollback-latest-mutation" }),
-        });
+    const rollback = this.openRollbackOperation();
 
     try {
       const result = rollback.rollback();
@@ -118,16 +121,6 @@ export class OpenClawAgentAdapter extends ManagedAgentAdapter {
   }
 
   protected openDetector(): CurrentStateDetector {
-    return this.sharedContext
-      ? CurrentStateDetector.fromContext(this.sharedContext, {
-          openclawHome: this.openclawHome,
-          credentialStore: this.credentialStore,
-          logger: this.logger.child({ scope: "current-state-detector" }),
-        })
-      : CurrentStateDetector.open(this.databasePath, {
-          openclawHome: this.openclawHome,
-          credentialStore: this.credentialStore,
-          logger: this.logger.child({ scope: "current-state-detector" }),
-        });
+    return this.openDetectOperation();
   }
 }

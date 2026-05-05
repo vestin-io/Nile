@@ -1,8 +1,8 @@
 import { readFileSync, rmSync } from "node:fs";
-import { dirname, join } from "node:path";
-
+import { join } from "node:path";
 import { readOptionalTextFile } from "../../services/OptionalTextFile";
 import { writePrivateTextFile } from "../../services/PrivateTextFile";
+import { ClaudeGatewayModelCatalog } from "./GatewayModelCatalog";
 
 export type ClaudeSettingsEnv = {
   ANTHROPIC_API_KEY?: string;
@@ -27,11 +27,6 @@ type ClaudeSettingsDocument = {
   [key: string]: unknown;
 };
 
-type ClaudeGatewayModelCache = {
-  baseUrl?: unknown;
-  models?: unknown;
-};
-
 const DEFAULT_CLAUDE_BASE_URL = "https://api.anthropic.com";
 const CLAUDE_GATEWAY_BETA_DISABLE_ENV = "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS";
 
@@ -47,9 +42,11 @@ const CLAUDE_GATEWAY_BETA_DISABLE_ENV = "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS"
  */
 export class ClaudeSettingsStore {
   readonly settingsPath: string;
+  private readonly gatewayModels: ClaudeGatewayModelCatalog;
 
   constructor(claudeHome: string) {
     this.settingsPath = join(claudeHome, "settings.json");
+    this.gatewayModels = new ClaudeGatewayModelCatalog(this.settingsPath);
   }
 
   snapshot(): string | null {
@@ -180,7 +177,7 @@ export class ClaudeSettingsStore {
     document: ClaudeSettingsDocument,
     baseUrl?: string,
   ): void {
-    const availableModels = this.readGatewayModels(baseUrl);
+    const availableModels = this.gatewayModels.readModels(baseUrl);
     if (availableModels.length === 0) {
       this.clearManagedModelConflictSettings(document);
       return;
@@ -192,7 +189,7 @@ export class ClaudeSettingsStore {
       return;
     }
 
-    const preferredModel = this.selectPreferredGatewayModel(availableModels);
+    const preferredModel = this.gatewayModels.selectPreferredModel(availableModels);
     if (!preferredModel) {
       this.clearManagedModelConflictSettings(document);
       return;
@@ -203,96 +200,6 @@ export class ClaudeSettingsStore {
 
   private requiresManagedModelCleanup(baseUrl?: string): boolean {
     return Boolean(baseUrl && baseUrl !== DEFAULT_CLAUDE_BASE_URL);
-  }
-
-  private readGatewayModels(baseUrl?: string): string[] {
-    if (!baseUrl) {
-      return [];
-    }
-
-    const cache = this.readGatewayModelCache();
-    if (!cache) {
-      return [];
-    }
-
-    const cacheBaseUrl = typeof cache.baseUrl === "string" ? cache.baseUrl.trim() : "";
-    if (!cacheBaseUrl || this.normalizeUrl(cacheBaseUrl) !== this.normalizeUrl(baseUrl)) {
-      return [];
-    }
-
-    if (!Array.isArray(cache.models)) {
-      return [];
-    }
-
-    return cache.models.flatMap((model) => {
-      if (!model || typeof model !== "object" || Array.isArray(model)) {
-        return [];
-      }
-      const id = (model as Record<string, unknown>).id;
-      return typeof id === "string" && id.trim() ? [id.trim()] : [];
-    });
-  }
-
-  private readGatewayModelCache(): ClaudeGatewayModelCache | null {
-    const cachePath = join(dirname(this.settingsPath), "cache", "gateway-models.json");
-    const raw = readOptionalTextFile(cachePath, "Claude gateway model cache");
-    if (!raw?.trim()) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
-    }
-    return parsed as ClaudeGatewayModelCache;
-  }
-
-  private selectPreferredGatewayModel(models: string[]): string | null {
-    const ranked = models
-      .map((model) => ({ model, score: this.rankGatewayModel(model) }))
-      .filter((candidate): candidate is { model: string; score: number[] } => candidate.score !== null)
-      .sort((left, right) => this.compareGatewayModelRank(right.score, left.score));
-
-    return ranked[0]?.model ?? null;
-  }
-
-  private rankGatewayModel(model: string): number[] | null {
-    const match = /^claude-(sonnet|opus|haiku)-(.+)$/.exec(model);
-    if (!match) {
-      return null;
-    }
-
-    const family = match[1];
-    const version = match[2];
-    const familyWeight = family === "sonnet" ? 3 : family === "opus" ? 2 : 1;
-    const normalizedVersion = version.replace(/\./g, "-");
-    const parts = normalizedVersion.split("-").filter(Boolean);
-    const numericParts = parts
-      .filter((part) => /^\d+$/.test(part))
-      .map((part) => Number.parseInt(part, 10));
-    const hasDateSuffix = numericParts.length >= 3 && numericParts[numericParts.length - 1] > 10000000;
-    const date = hasDateSuffix ? numericParts.pop() ?? 0 : 0;
-    const major = numericParts[0] ?? 0;
-    const minor = numericParts[1] ?? 0;
-    const patch = numericParts[2] ?? 0;
-    const exactStyleWeight = version.includes(".") ? 0 : 1;
-
-    return [familyWeight, major, minor, patch, date, exactStyleWeight];
-  }
-
-  private compareGatewayModelRank(left: number[], right: number[]): number {
-    const length = Math.max(left.length, right.length);
-    for (let index = 0; index < length; index += 1) {
-      const delta = (left[index] ?? 0) - (right[index] ?? 0);
-      if (delta !== 0) {
-        return delta;
-      }
-    }
-    return 0;
-  }
-
-  private normalizeUrl(value: string): string {
-    return value.trim().replace(/\/+$/, "");
   }
 
   /** Preserve non-Anthropic env vars that Claude Code may set for other tools. */

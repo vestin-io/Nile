@@ -3,16 +3,22 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "main": "./dist/main.js",
+  "files": [
+    "dist"
+  ],
   "bin": {
-    "nile": "./src/main.ts"
+    "nile": "./dist/main.js"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
-    "@nile/core": "file:../../packages/core",
-    "@nile/host-local": "file:../../packages/host-local"
+    "@nile/core": "workspace:*",
+    "@nile/host-local": "workspace:*"
   },
   "scripts": {
-    "prestart": "npm run build --prefix ../../packages/core",
-    "start": "node --import tsx ./src/main.ts"
+    "prebuild": "npm --prefix ../.. run build:host-local",
+    "build": "node ./build.mjs",
+    "prestart": "npm run build",
+    "start": "node ./dist/main.js"
   }
 }

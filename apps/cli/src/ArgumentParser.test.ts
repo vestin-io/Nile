@@ -57,4 +57,12 @@ describe("ArgumentParser", () => {
     expect(parser.helpText()).toContain("nile reset [--json] [--db-path <path>]");
     expect(parser.helpText()).toContain("nile reset --yes --confirm-reset [--json] [--db-path <path>]");
   });
+
+  it("rejects unknown flags instead of silently accepting typos", () => {
+    const parser = new ArgumentParser({
+      databasePath: "/tmp/nile.sqlite",
+    });
+
+    expect(() => parser.parse(["status", "--jsno"])).toThrow("Unknown flag: --jsno");
+  });
 });

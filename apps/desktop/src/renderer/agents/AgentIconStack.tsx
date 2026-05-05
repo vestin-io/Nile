@@ -3,7 +3,7 @@ import type { AgentId } from "@nile/core/models/agent/types";
 
 import type { Translator } from "../shared/I18n";
 import { renderAgentIcon } from "./AgentIcons";
-import { formatAgentsList } from "../shared/Support";
+import { formatAgentsList } from "../shared/AgentSelection";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 
 type AgentIconStackProps = {

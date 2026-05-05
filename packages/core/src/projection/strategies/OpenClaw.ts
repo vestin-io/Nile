@@ -2,12 +2,10 @@ import type { AccessRecord } from "../../models/access";
 import type { EndpointRecord } from "../../models/endpoint";
 import type { StoredCredential } from "../../services/credential/Types";
 import { AgentProjectionError } from "../ProjectionError";
-import type { AgentProjectionStrategy, OpenClawProjection, ProjectionInput } from "../Types";
+import type { OpenClawProjection, ProjectionInput } from "../Types";
 import { joinEndpointUrl } from "../Url";
 
-export class OpenClawProjectionStrategy implements AgentProjectionStrategy {
-  readonly agentId = "openclaw" as const;
-
+export class OpenClawProjectionStrategy {
   resolve(input: ProjectionInput): OpenClawProjection {
     this.validateAccess(input.access, input.credential);
 
@@ -21,7 +19,7 @@ export class OpenClawProjectionStrategy implements AgentProjectionStrategy {
     if (input.endpoint.protocols.openai) {
       const protocol = input.endpoint.protocols.openai;
       return {
-        agentId: this.agentId,
+        agentId: "openclaw",
         protocol: "openai",
         endpointId: input.endpoint.id,
         endpointLabel: input.endpoint.label,
@@ -37,7 +35,7 @@ export class OpenClawProjectionStrategy implements AgentProjectionStrategy {
     if (input.endpoint.protocols.anthropic) {
       const protocol = input.endpoint.protocols.anthropic;
       return {
-        agentId: this.agentId,
+        agentId: "openclaw",
         protocol: "anthropic",
         endpointId: input.endpoint.id,
         endpointLabel: input.endpoint.label,

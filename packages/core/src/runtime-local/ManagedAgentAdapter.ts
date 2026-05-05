@@ -1,18 +1,16 @@
 import type {
   AgentAdapter,
-  AgentAdapterCapabilities,
   AgentDetectionResult,
   ApplyAgentSelectionResult,
-  DetectedAgentState,
   ImportCurrentConnectionResult,
   RollbackLatestAgentResult,
 } from "./AgentAdapterTypes";
+import type { AgentCapabilitySupport } from "./AgentAdapterTypes";
 import type { AgentId } from "../models/agent/Types";
 
 type Closable = { close(): void };
 
 type DetectorOperation = Closable & {
-  detect(): DetectedAgentState;
   detectAgentSelection(): AgentDetectionResult;
 };
 
@@ -26,16 +24,7 @@ type ImportOperation = Closable & {
 
 export abstract class ManagedAgentAdapter implements AgentAdapter {
   abstract readonly agentId: AgentId;
-  abstract readonly capabilities: AgentAdapterCapabilities;
-
-  detectCurrentState(): DetectedAgentState {
-    const detector = this.openDetector();
-    try {
-      return detector.detect();
-    } finally {
-      detector.close();
-    }
-  }
+  abstract readonly rollbackSupport: AgentCapabilitySupport;
 
   detectAgentSelection(): AgentDetectionResult {
     const detector = this.openDetector();

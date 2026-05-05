@@ -51,7 +51,7 @@ export class DesktopPreferencesStore {
         agentOrder: normalizeAgentOrder(parsed.agentOrder),
         language: normalizeLanguagePreference(parsed.language),
         quickSetupDismissed: parsed.quickSetupDismissed === true,
-        theme: parsed.theme === "system" || parsed.theme === "dark" ? parsed.theme : "light",
+        theme: normalizeThemePreference(parsed.theme),
       };
     } catch {
       return fallback;
@@ -92,6 +92,12 @@ function normalizeLanguagePreference(value: unknown): LanguagePreference {
   return typeof value === "string" && SUPPORTED_LANGUAGES.includes(value as LanguagePreference)
     ? (value as LanguagePreference)
     : "en";
+}
+
+function normalizeThemePreference(value: unknown): ThemePreference {
+  return value === "system" || value === "light" || value === "dark"
+    ? value
+    : "system";
 }
 
 function normalizeAgentOrder(value: unknown): AgentOrderPreference {

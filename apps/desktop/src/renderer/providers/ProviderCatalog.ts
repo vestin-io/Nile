@@ -110,8 +110,8 @@ export class ProviderCatalog {
   private static readUrl(input: unknown, label: string): string {
     const value = this.readString(input, label);
     const parsed = new URL(value);
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      throw new Error(`${label} must use http or https.`);
+    if (parsed.protocol !== "https:") {
+      throw new Error(`${label} must use https.`);
     }
 
     return parsed.toString();

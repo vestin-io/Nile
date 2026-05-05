@@ -1,6 +1,6 @@
 import { useId, type ReactNode } from "react";
 
-import type { DesktopAgentState } from "../../DesktopTypes";
+import type { DesktopAgentState } from "../../state/Types";
 import { renderAgentIcon } from "./AgentIcons";
 
 type AgentCardHeaderProps = {

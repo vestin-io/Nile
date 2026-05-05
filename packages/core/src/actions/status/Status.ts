@@ -7,9 +7,12 @@ import type {
   EndpointRegistry,
 } from "../../models/endpoint";
 import { EndpointShape } from "../../models/endpoint";
-import type { AgentId } from "../../models/agent/Types";
-import { AgentAdapterRegistry } from "../../runtime-local/AgentAdapterRegistry";
-import type { DetectedAgentState, AgentLiveStateValidity } from "../../runtime-local/AgentAdapterTypes";
+import type {
+  AgentAdapterLookup,
+  AgentId,
+  DetectedAgentState,
+  AgentLiveStateValidity,
+} from "../../models/agent";
 
 export type AgentStatusConnection = {
   id?: string;
@@ -40,7 +43,7 @@ export class Status {
   constructor(
     private readonly endpointRegistry: EndpointRegistry,
     private readonly accessRegistry: AccessRegistry,
-    private readonly agentAdapterRegistry: AgentAdapterRegistry,
+    private readonly agentAdapterRegistry: AgentAdapterLookup,
   ) {}
 
   get(agentId: AgentId): AgentStatusView {

@@ -58,8 +58,3 @@ export type AgentProjection =
   | ClaudeProjection
   | CursorProjection
   | OpenClawProjection;
-
-export interface AgentProjectionStrategy {
-  readonly agentId: AgentId;
-  resolve(input: ProjectionInput): AgentProjection;
-}

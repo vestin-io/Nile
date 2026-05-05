@@ -29,8 +29,8 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<OpenClawDet
       new OpenClawConfigStore(options?.openclawHome ?? join(homedir(), ".openclaw")),
     );
     const matcher = new AgentStateMatcher(
-      context.endpointRegistry,
-      context.accessRegistry,
+      context.sharedContext.endpointRegistry,
+      context.sharedContext.accessRegistry,
       context.agentSelection,
       OPENCLAW_AGENT_ID,
     );

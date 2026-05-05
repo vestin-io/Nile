@@ -1,7 +1,7 @@
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import type { HTMLAttributes } from "react";
 
-import { cn } from "../lib/cn";
+import { cn } from "./cn";
 
 export const Dialog = DialogPrimitive.Root;
 

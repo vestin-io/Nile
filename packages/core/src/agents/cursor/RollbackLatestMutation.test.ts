@@ -68,14 +68,14 @@ describe("RollbackLatestMutation", () => {
     });
 
     const context = AgentAdapterContextSession.open(setup.dbPath, setup.credentialStore);
-    const mutationHistory = MutationHistory.fromDatabase(setup.dbPath, context.database, {
+    const mutationHistory = MutationHistory.fromDatabase(setup.dbPath, context.workspaceState.database, {
       secureSnapshotStore: setup.secureSnapshots,
       logger: NileLogger.silent(),
     });
     const applySupport = new AgentApplySupport(
       CURSOR_AGENT_ID,
-      context.endpointRegistry,
-      context.accessRegistry,
+      context.sharedContext.endpointRegistry,
+      context.sharedContext.accessRegistry,
       context.agentSelection,
       setup.credentialStore,
       NileLogger.silent(),

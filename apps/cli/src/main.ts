@@ -1,5 +1,3 @@
-#!/usr/bin/env -S node --import tsx
-
 import { homedir } from "node:os";
 import { join } from "node:path";
 

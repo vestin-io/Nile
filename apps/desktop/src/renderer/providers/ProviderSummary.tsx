@@ -25,7 +25,7 @@ export function ProviderSummary({ language, providerKey, t }: ProviderSummaryPro
           <span>{provider.description}</span>
           <TextButton
             className="ml-2 inline-flex items-center gap-1 align-baseline"
-            onClick={() => void window.nileDesktop.openExternalUrl(provider.officialLink)}
+            onClick={() => void window.nileDesktop.app.openExternalUrl(provider.officialLink)}
           >
             <ExternalLink className="h-3.5 w-3.5" />
             {t("providers.openOfficialSite")}

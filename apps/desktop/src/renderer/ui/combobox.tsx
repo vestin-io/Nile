@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
 
-import { cn } from "../lib/cn";
+import { cn } from "./cn";
 import { Button } from "./button";
 import { Card } from "./card";
 import { Input } from "./input";

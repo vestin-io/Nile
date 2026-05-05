@@ -1,10 +1,8 @@
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { isAgentId, type AgentId } from "../agent/Types";
 import type { AccessRecord } from "../access/Types";
-import type { AccessStore } from "../access/store/Store";
-import { SqliteAccessStore } from "../access/store/SqliteStore";
-import { type SelectionStore } from "./store/SelectionStore";
-import { SqliteAgentSelectionStore } from "./store/SqliteAgentSelectionStore";
+import { SqliteAccessStore } from "../access/SqliteAccessStore";
+import { SqliteAgentSelectionStore } from "./SqliteAgentSelectionStore";
 import { type AgentSelectionRecord } from "./Types";
 
 export class AgentSelectionValidationError extends Error {
@@ -33,8 +31,8 @@ export class AgentSelection {
   }
 
   constructor(
-    private readonly accessStore: AccessStore,
-    private readonly agentSelectionStore: SelectionStore,
+    private readonly accessStore: SqliteAccessStore,
+    private readonly agentSelectionStore: SqliteAgentSelectionStore,
     private readonly ownedDatabase: SqliteDatabase | null = null,
   ) {}
 

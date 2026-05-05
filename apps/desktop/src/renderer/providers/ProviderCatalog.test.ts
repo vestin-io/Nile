@@ -49,7 +49,7 @@ describe("ProviderCatalog", () => {
     expect(ProviderCatalog.shared.findByKey("gateway", "en")).toBeNull();
   });
 
-  it("rejects entries with a non-http official link", () => {
+  it("rejects entries without an https official link", () => {
     expect(() =>
       ProviderCatalog.fromUnknown({
         providers: [
@@ -65,6 +65,6 @@ describe("ProviderCatalog", () => {
           },
         ],
       }),
-    ).toThrow("providers[0].officialLink must use http or https.");
+    ).toThrow("providers[0].officialLink must use https.");
   });
 });

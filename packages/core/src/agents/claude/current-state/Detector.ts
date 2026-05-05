@@ -34,8 +34,8 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<ClaudeDetec
       new ClaudeCredentialStore(claudeHome),
     );
     const matcher = new AgentStateMatcher(
-      context.endpointRegistry,
-      context.accessRegistry,
+      context.sharedContext.endpointRegistry,
+      context.sharedContext.accessRegistry,
       context.agentSelection,
       CLAUDE_AGENT_ID,
     );

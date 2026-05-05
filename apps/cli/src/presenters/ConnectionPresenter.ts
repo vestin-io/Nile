@@ -11,14 +11,17 @@ import type {
   HistoryListEntry,
 } from "../types";
 import { formatAgentLabel } from "../formatters";
+import { EndpointLabelFormatter } from "./EndpointLabelFormatter";
 
 export class ConnectionPresenter {
+  private readonly endpointLabels = new EndpointLabelFormatter();
+
   formatConnectionSummary(connection: AddConnectionResult): string {
     const heading = connection.reused ? "Reused existing connection" : "Connection created";
     return [
       heading,
-      `endpoint: ${this.formatEndpointLabel(connection.endpointLabel)}`,
-      `label: ${this.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)}`,
+      `endpoint: ${this.endpointLabels.formatEndpointLabel(connection.endpointLabel)}`,
+      `label: ${this.endpointLabels.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)}`,
       `id: ${connection.id}`,
     ].join("\n");
   }
@@ -27,8 +30,8 @@ export class ConnectionPresenter {
     const heading = connection.reused ? "Reused existing connection" : "Imported current connection";
     return [
       heading,
-      `endpoint: ${this.formatEndpointLabel(connection.endpointLabel)}`,
-      `label: ${this.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)}`,
+      `endpoint: ${this.endpointLabels.formatEndpointLabel(connection.endpointLabel)}`,
+      `label: ${this.endpointLabels.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)}`,
       `id: ${connection.id}`,
     ].join("\n");
   }
@@ -53,20 +56,20 @@ export class ConnectionPresenter {
       `${agentLabel} connection updated`,
       `connection: ${result.label}`,
       `id: ${result.id}`,
-      `endpoint: ${this.formatEndpointLabel(result.endpointLabel)}`,
+      `endpoint: ${this.endpointLabels.formatEndpointLabel(result.endpointLabel)}`,
       `applied at: ${result.appliedAt}`,
     ].join("\n");
   }
 
-  formatRemoveSummary(result: { id: string; removed: true; orphanedAgents: string[] }): string {
+  formatRemoveSummary(result: { id: string; removed: true; clearedAgents: string[] }): string {
     const lines = [
       "Connection removed",
       `id: ${result.id}`,
     ];
 
-    if (result.orphanedAgents.length > 0) {
+    if (result.clearedAgents.length > 0) {
       lines.push(
-        `note: ${result.orphanedAgents.map((agentId) => formatAgentLabel(agentId)).join(", ")} still points at the removed connection locally until you switch or import again.`,
+        `note: Nile cleared the saved local selection for ${result.clearedAgents.map((agentId) => formatAgentLabel(agentId)).join(", ")} because this connection was removed.`,
       );
     }
 
@@ -75,13 +78,13 @@ export class ConnectionPresenter {
 
   formatConnectionChoice(connection: SavedConnectionSummary): string {
     const suffix: string[] = [
-      this.formatEndpointLabel(connection.endpointLabel),
+      this.endpointLabels.formatEndpointLabel(connection.endpointLabel),
       this.formatAuthMode(connection.authMode),
     ];
     if (connection.selectedByAgents.length > 0) {
       suffix.unshift(`selected by ${connection.selectedByAgents.join(", ")}`);
     }
-    return `${this.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)} (${suffix.join(" • ")})`;
+    return `${this.endpointLabels.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)} (${suffix.join(" • ")})`;
   }
 
   formatConnectionList(connections: SavedConnectionSummary[]): string {
@@ -91,7 +94,7 @@ export class ConnectionPresenter {
 
     const divider = "────────────────────────────────────────";
     const blocks = connections.map((connection) => {
-      const lines = [this.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)];
+      const lines = [this.endpointLabels.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)];
       lines.push(this.formatConnectionMeta(connection));
       return lines.join("\n");
     });
@@ -109,7 +112,7 @@ export class ConnectionPresenter {
 
     const divider = "────────────────────────────────────────";
     const blocks = connections.map((connection) => {
-      const lines = [this.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)];
+      const lines = [this.endpointLabels.formatConnectionLabel(connection.endpointLabel, connection.label, connection.authMode)];
       lines.push(this.formatConnectionMeta(connection));
 
       const usage = usageByConnectionId.get(connection.id);
@@ -132,7 +135,7 @@ export class ConnectionPresenter {
     const divider = "────────────────────────────────────────";
     const blocks = entries.map((entry) => [
       `- ${entry.startedAt.replace("T", " ").replace(".000Z", "Z")}`,
-      `  Endpoint: ${this.formatEndpointLabel(entry.endpointLabel)}`,
+      `  Endpoint: ${this.endpointLabels.formatEndpointLabel(entry.endpointLabel)}`,
       `  Connection: ${entry.connectionLabel}`,
       `  Status: ${entry.status}`,
       `  Files: ${this.formatHistoryFiles(entry)}`,
@@ -151,7 +154,7 @@ export class ConnectionPresenter {
     const lines = [
       "Connection usage",
       `connection: ${result.connectionLabel}`,
-      `endpoint: ${this.formatEndpointLabel(result.endpointLabel)}`,
+      `endpoint: ${this.endpointLabels.formatEndpointLabel(result.endpointLabel)}`,
     ];
 
     if (result.planLabel) {
@@ -192,7 +195,7 @@ export class ConnectionPresenter {
       "Cursor usage binding saved",
       `connection: ${result.connectionLabel}`,
       `id: ${result.connectionId}`,
-      `endpoint: ${this.formatEndpointLabel(result.endpointLabel)}`,
+      `endpoint: ${this.endpointLabels.formatEndpointLabel(result.endpointLabel)}`,
       `workos user: ${result.workosUserId}`,
       `verified at: ${result.boundAt}`,
     ].join("\n");
@@ -312,39 +315,6 @@ export class ConnectionPresenter {
     return "invalid";
   }
 
-  private formatEndpointLabel(label: string): string {
-    const match = label.match(/^Azure OpenAI \((.+)\)$/);
-    if (!match) {
-      return label;
-    }
-
-    const resource = this.readAzureResourceName(match[1]);
-    return resource ? `Azure OpenAI (${resource})` : label;
-  }
-
-  private formatConnectionLabel(endpointLabel: string, label: string, authMode: string): string {
-    if (authMode === "api_key" && label === `${endpointLabel} API Key`) {
-      return "API Key";
-    }
-
-    const match = label.match(/^Azure OpenAI \((.+)\) API Key$/);
-    if (!match) {
-      return label;
-    }
-
-    const resource = this.readAzureResourceName(match[1]);
-    return resource ? `${resource} API Key` : label;
-  }
-
-  private readAzureResourceName(host: string): string | null {
-    const azureSuffix = ".cognitiveservices.azure.com";
-    if (host.endsWith(azureSuffix)) {
-      return host.slice(0, -azureSuffix.length) || null;
-    }
-
-    return host.split(".")[0] || null;
-  }
-
   private formatSelectedBy(agentLabel: string): string {
     const text = `selected by: ${agentLabel}`;
     if (!process.stdout.isTTY || process.env.NO_COLOR) {
@@ -355,7 +325,7 @@ export class ConnectionPresenter {
   }
 
   private formatConnectionMeta(connection: SavedConnectionSummary): string {
-    const segments = [this.formatEndpointLabel(connection.endpointLabel), this.formatAuthMode(connection.authMode)];
+    const segments = [this.endpointLabels.formatEndpointLabel(connection.endpointLabel), this.formatAuthMode(connection.authMode)];
     if (connection.selectedByAgents.length > 0) {
       segments.push(this.formatSelectedBy(connection.selectedByAgents.join(", ")));
     }

@@ -6,7 +6,6 @@ import { EnvironmentSource } from "../../services/EnvironmentSource";
 import { NileLogger } from "../../services/NileLogger";
 import type {
   RollbackLatestAgentResult,
-  AgentAdapterCapabilities,
 } from "../../runtime-local/AgentAdapterTypes";
 import { ManagedAgentAdapter } from "../../runtime-local/ManagedAgentAdapter";
 import type { SharedAgentAdapterContext } from "../../runtime-local/AgentAdapterContext";
@@ -28,81 +27,87 @@ export type CursorAgentAdapterOptions = {
 
 export class CursorAgentAdapter extends ManagedAgentAdapter {
   readonly agentId = CURSOR_AGENT_ID;
+  readonly rollbackSupport = "yes" as const;
 
-  readonly capabilities: AgentAdapterCapabilities = {
-    detect: "yes",
-    apply: "yes",
-    import: "yes",
-    history: "yes",
-    rollback: "yes",
-    desktopSupport: "no",
-  };
-
-  private readonly databasePath: string;
-  private readonly cursorHome: string;
-  private readonly credentialStore: CredentialStore;
-  private readonly environment: EnvironmentSource;
-  private readonly secureSnapshotStore: CursorAgentAdapterOptions["secureSnapshotStore"];
-  private readonly logger: NileLogger;
-  private readonly sharedContext: SharedAgentAdapterContext | undefined;
+  private readonly openApplyOperation: () => ApplySelection;
+  private readonly openImportOperation: () => ImportCurrentConnection;
+  private readonly openRollbackOperation: () => RollbackLatestMutation;
+  private readonly openDetectOperation: () => CurrentStateDetector;
 
   constructor(options: CursorAgentAdapterOptions) {
     super();
-    this.databasePath = options.databasePath;
-    this.cursorHome = options.cursorHome ?? join(homedir(), ".cursor");
-    this.credentialStore = options.credentialStore;
-    this.environment = options.environment ?? EnvironmentSource.from(process.env);
-    this.secureSnapshotStore = options.secureSnapshotStore;
-    this.logger = options.logger ?? NileLogger.silent().child({ module: "cursor-agent-adapter" });
-    this.sharedContext = options.sharedContext;
+    const databasePath = options.databasePath;
+    const cursorHome = options.cursorHome ?? join(homedir(), ".cursor");
+    const credentialStore = options.credentialStore;
+    const environment = options.environment ?? EnvironmentSource.from(process.env);
+    const secureSnapshotStore = options.secureSnapshotStore;
+    const logger = options.logger ?? NileLogger.silent().child({ module: "cursor-agent-adapter" });
+    const sharedContext = options.sharedContext;
+
+    this.openApplyOperation = () => sharedContext
+      ? ApplySelection.fromContext(sharedContext, {
+          cursorHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "apply-selection" }),
+        })
+      : ApplySelection.open(databasePath, {
+          cursorHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "apply-selection" }),
+        });
+    this.openImportOperation = () => sharedContext
+      ? ImportCurrentConnection.fromContext(sharedContext, {
+          cursorHome,
+          credentialStore,
+          environment,
+          logger: logger.child({ scope: "import-current-connection" }),
+        })
+      : ImportCurrentConnection.open(databasePath, {
+          cursorHome,
+          credentialStore,
+          environment,
+          logger: logger.child({ scope: "import-current-connection" }),
+        });
+    this.openRollbackOperation = () => sharedContext
+      ? RollbackLatestMutation.fromContext(sharedContext, {
+          cursorHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "rollback-latest-mutation" }),
+        })
+      : RollbackLatestMutation.open(databasePath, {
+          cursorHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "rollback-latest-mutation" }),
+        });
+    this.openDetectOperation = () => sharedContext
+      ? CurrentStateDetector.fromContext(sharedContext, {
+          cursorHome,
+          credentialStore,
+          environment,
+          logger: logger.child({ scope: "current-state-detector" }),
+        })
+      : CurrentStateDetector.open(databasePath, {
+          cursorHome,
+          credentialStore,
+          environment,
+          logger: logger.child({ scope: "current-state-detector" }),
+        });
   }
 
   protected openApplySelection(): ApplySelection {
-    return this.sharedContext
-      ? ApplySelection.fromContext(this.sharedContext, {
-          cursorHome: this.cursorHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "apply-selection" }),
-        })
-      : ApplySelection.open(this.databasePath, {
-          cursorHome: this.cursorHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "apply-selection" }),
-        });
+    return this.openApplyOperation();
   }
 
   protected openImporter(): ImportCurrentConnection {
-    return this.sharedContext
-      ? ImportCurrentConnection.fromContext(this.sharedContext, {
-          cursorHome: this.cursorHome,
-          credentialStore: this.credentialStore,
-          environment: this.environment,
-          logger: this.logger.child({ scope: "import-current-connection" }),
-        })
-      : ImportCurrentConnection.open(this.databasePath, {
-          cursorHome: this.cursorHome,
-          credentialStore: this.credentialStore,
-          environment: this.environment,
-          logger: this.logger.child({ scope: "import-current-connection" }),
-        });
+    return this.openImportOperation();
   }
 
   rollbackLatestMutation(): RollbackLatestAgentResult {
-    const rollback = this.sharedContext
-      ? RollbackLatestMutation.fromContext(this.sharedContext, {
-          cursorHome: this.cursorHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "rollback-latest-mutation" }),
-        })
-      : RollbackLatestMutation.open(this.databasePath, {
-          cursorHome: this.cursorHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "rollback-latest-mutation" }),
-        });
+    const rollback = this.openRollbackOperation();
     try {
       return {
         agentId: this.agentId,
@@ -114,19 +119,6 @@ export class CursorAgentAdapter extends ManagedAgentAdapter {
   }
 
   protected openDetector(): CurrentStateDetector {
-    if (this.sharedContext) {
-      return CurrentStateDetector.fromContext(this.sharedContext, {
-        cursorHome: this.cursorHome,
-        credentialStore: this.credentialStore,
-        environment: this.environment,
-        logger: this.logger.child({ scope: "current-state-detector" }),
-      });
-    }
-    return CurrentStateDetector.open(this.databasePath, {
-      cursorHome: this.cursorHome,
-      credentialStore: this.credentialStore,
-      environment: this.environment,
-      logger: this.logger.child({ scope: "current-state-detector" }),
-    });
+    return this.openDetectOperation();
   }
 }

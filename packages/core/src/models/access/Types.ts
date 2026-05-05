@@ -20,6 +20,13 @@ export type AccessRegistryUpdate = {
   enabledAgents?: AgentId[];
 };
 
+export type AccessCredentialSyncState =
+  | "ready"
+  | "pending_write"
+  | "write_failed"
+  | "pending_delete"
+  | "delete_failed";
+
 export type AccessRecord = {
   id: string;
   endpointId: string;
@@ -31,6 +38,8 @@ export type AccessRecord = {
   envKey?: string;
   enabledAgents: AgentId[];
   credentialSource: CredentialSource;
+  credentialSyncIssue?: string;
+  credentialSyncState?: AccessCredentialSyncState;
   createdAt: string;
   updatedAt: string;
 };

@@ -2,6 +2,438 @@
 
 ## 2026-05-05
 
+### Step 59: Re-group add-connection renderer code by workflow
+
+- Added `architecture-target.md` at the repo root to define the human-oriented target structure for future migrations.
+- Re-grouped desktop add-connection renderer code into `renderer/connections/add/` so the full add workflow closes inside one local directory:
+  - `Page`
+  - `Header`
+  - `GatewayPreparation`
+  - `PostPreparation`
+  - `PresetCard`
+  - `Types`
+  - `useForm`
+  - `useOnboardingState`
+  - `usePageState`
+- Kept truly shared connection files at `renderer/connections/`:
+  - `ConnectionFormParts.tsx`
+  - `AuthJsonPath.ts`
+- Updated settings-surface imports to consume the new add-workflow paths directly.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 60: Re-group edit-connection renderer code by workflow
+
+- Re-grouped the desktop edit-connection flow into `renderer/connections/edit/`:
+  - `Page`
+  - `useEditState`
+  - `useGatewayState`
+- Kept the connection list and shared form primitives outside the workflow directory:
+  - `ConnectionsPage.tsx`
+  - `ConnectionFormParts.tsx`
+  - `AuthJsonPath.ts`
+- Updated the connections list to enter the edit workflow through the new local path instead of sharing one flat `connections/` namespace for every page and hook.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 61: Re-group connection-detail renderer code by workflow
+
+- Re-grouped the connection-detail page into `renderer/connections/detail/`:
+  - `Page`
+  - `ActionGroup`
+- Kept truly shared connection display helpers outside the detail workflow:
+  - `ConnectionQuotaSection.tsx` because the agent detail surface also uses it
+  - `ProviderDisplay.tsx` because the table and toolbar both use it
+- Updated the connections list to route detail rendering through the new workflow-local page path.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 62: Re-group connections-list renderer code by workflow
+
+- Re-grouped the main saved-connections list into `renderer/connections/list/`:
+  - `Page`
+  - `Table`
+- Kept `ConnectionsToolbar.tsx` at the `connections/` root because the agent detail surface also uses it.
+- Updated settings-page routing so the connections surface enters through the new workflow-local list page path.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 63: Re-group connection dialogs under a local workflow cluster
+
+- Moved connection-specific dialogs into `renderer/connections/dialogs/`:
+  - `RepairUsage`
+  - `Reused`
+- Kept `SettingsDialogs.tsx` as the app-level orchestration surface, but stopped it from importing those dialog implementations from a flat `connections/` namespace.
+- Updated `architecture-target.md` so the target desktop renderer structure now explicitly includes `connections/dialogs/`.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 64: Re-group settings page and dialogs by local workflow
+
+- Moved the main settings surface into `renderer/settings/general/`:
+  - `Page`
+  - `Section`
+  - `UpdateSection`
+- Moved settings-owned dialogs into `renderer/settings/dialogs/`:
+  - `Nile`
+  - `ResetState`
+- Updated the app shell to depend on those workflow-local settings paths instead of a flat `settings/` namespace.
+- Updated `architecture-target.md` so the target renderer structure now explicitly includes:
+  - `settings/general/`
+  - `settings/dialogs/`
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 65: Re-group agent detail files by workflow
+
+- Moved the agent detail flow into `renderer/agents/detail/`:
+  - `Page`
+  - `ConnectionsSection`
+  - `HistorySection`
+  - `HomeSection`
+- Updated all agent detail type imports so the app shell, list view, and cards read `AgentDetailTab` from the new detail entry point.
+- Updated `architecture-target.md` so the target renderer structure now explicitly includes `agents/detail/`.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 66: Re-group agent list files by workflow
+
+- Moved agent list-only files into `renderer/agents/list/`:
+  - `View`
+  - `Card`
+  - `Toolbar`
+- Kept agent-wide shared primitives at the `agents/` root:
+  - `AgentCardHeader.tsx`
+  - `AgentIconStack.tsx`
+  - `AgentIcons.ts`
+- Updated the agent page to route list rendering through the new workflow-local list view path.
+- Updated `architecture-target.md` so the target renderer structure now explicitly includes `agents/list/`.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 67: Re-group settings-surface app shell files
+
+- Moved settings-surface app orchestration into `renderer/app/settings/`:
+  - `App`
+  - `Chrome`
+  - `Dialogs`
+  - `PageContent`
+  - `SidebarNav`
+  - `useData`
+  - `usePreferences`
+  - `useReleaseInfo`
+  - `useConnectionActions`
+  - `useNavigation`
+  - `useSidebarState`
+- Kept renderer app root for actual entry files and frame assets:
+  - `settings.tsx`
+  - `menubar.ts`
+  - `settings.html`
+  - `menubar.html`
+  - `styles.css`
+- Updated `architecture-target.md` so the target renderer structure now explicitly includes `app/settings/`.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 68: Re-group Electron main-process files by runtime responsibility
+
+- Re-grouped `renderer`-clean main-process code under `src/electron/` by stable runtime boundary:
+  - `ipc/`
+  - `shell/`
+  - `state/`
+  - `connections/`
+  - `updates/`
+- Kept Electron entry and bridge root files at the `electron/` top level:
+  - `main.ts`
+  - `preload.ts`
+  - `types.ts`
+- Removed the stray `apps/desktop/src/electron/Untitled` file because it was dead workspace residue, not source code.
+- Updated `architecture-target.md` so the target desktop structure now explicitly includes the Electron runtime grouping.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 58: Shrink SettingsApp orchestration
+
+- Extracted desktop release-info polling into `useDesktopReleaseInfo`.
+- Extracted settings connection command orchestration into `useSettingsConnectionActions`, including:
+  - add/save prepared connection completion flow
+  - import/use/remove/rollback/update wiring
+  - connection-detail navigation handoff
+- Reduced `SettingsApp.tsx` from 388 lines to 286 lines so the app shell is closer to navigation/layout composition and less of an orchestration bucket.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Desktop shared-support and auto-update helper split
+
+- Split shared renderer formatting helpers out of `renderer/shared/Support.ts`:
+  - `OpenClawIssueFormatter`
+  - `TimeFormatter`
+- Kept `Support.ts` focused on:
+  - definition filtering/order helpers
+  - connection/agent display helpers
+  - history/sync label selection
+- Split updater-library support helpers out of `AutoUpdateManager` into `AutoUpdateSupport`:
+  - update-availability detection
+  - update-electron-app logger adapter
+  - release version extraction
+  - fallback release status selection
+- Reduced the remaining desktop support hotspots to:
+  - `Support.ts` -> 170 lines
+  - `AutoUpdateManager.ts` -> 263 lines
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Desktop add-connection page section split
+
+- Split the large `AddConnectionPage` conditional render surface into focused section components:
+  - `AddConnectionGatewayPreparation`
+  - `AddConnectionPostPreparation`
+- Kept `AddConnectionPage` focused on:
+  - page-level orchestration
+  - state hook wiring
+  - method selector
+  - top-level submit-mode branching
+- Reduced the renderer hotspot sizes to:
+  - `AddConnectionPage.tsx` -> 302 lines
+  - `AddConnectionGatewayPreparation.tsx` -> 86 lines
+  - `AddConnectionPostPreparation.tsx` -> 157 lines
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Desktop prepared-draft store split
+
+- Split prepared connection draft lifecycle out of `DesktopConnectionManager` into `DesktopPreparedDraftStore`.
+- Moved these draft-only responsibilities out of the command manager:
+  - TTL expiry
+  - capacity eviction
+  - timeout scheduling
+  - read/discard/clear lifecycle
+- Kept `DesktopConnectionManager` focused on:
+  - add/update command execution
+  - onboarding description
+  - credential request resolution
+  - connection summary mapping
+- Reduced the desktop hotspot sizes to:
+  - `DesktopConnectionManager.ts` -> 304 lines
+  - `DesktopPreparedDraftStore.ts` -> 85 lines
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 57: Split add-connection page shell and onboarding state machine
+
+- Split renderer add-connection shared types into `connections/AddConnectionTypes.ts` so the page, settings content, and hooks no longer import those DTOs from the state hook file.
+- Split `AddConnectionPage` into a thinner page shell plus focused presentational pieces:
+  - `AddConnectionHeader`
+  - `AddConnectionPresetCard`
+- Reduced `AddConnectionPage.tsx` from 504 lines to 434 lines, bringing it back under the repo 500-line limit.
+- Extracted gateway probing and onboarding capability resolution from `useAddConnectionPageState` into `useAddConnectionOnboardingState`.
+- Reduced `useAddConnectionPageState.ts` from 410 lines to 246 lines so it now focuses on draft/auth-json/submit flow instead of carrying the full onboarding state machine.
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 55: Add explicit desktop data error state and retry UI
+
+- Updated `useDesktopData()` so renderer IPC reads no longer surface as unhandled promise rejections.
+- Added explicit `error` and `isLoading` state for desktop settings data reads.
+- Added two UI paths in `SettingsApp`:
+  - full-screen retry state when initial desktop state load fails
+  - inline destructive alert with refresh action when background refresh fails but stale data is still renderable
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
+### Desktop quick-setup and shared-text cleanup
+
+- Renamed the `renderer/quick-setup/` files to short local names so that workflow now reads as one coherent cluster instead of repeating `QuickSetup*` in every file:
+  - `Page`
+  - `Guide`
+  - `AgentCard`
+  - `DetectedSetup`
+- Removed the catch-all `renderer/shared/Support.ts` bucket and split it into focused shared files:
+  - `DesktopData`
+  - `Definitions`
+  - `AgentSelection`
+  - `DisplayText`
+- Updated renderer imports so state aliases, definition helpers, agent-selection helpers, and display formatting no longer travel through one mixed helper module.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
+### Step 54: Split workspace watching out of DesktopMain
+
+- Extracted `DesktopWorkspaceWatcher` so file-watch lifecycle, relevance filtering, debounce, and ignore windows no longer live inside `DesktopMain`.
+- Rewired `DesktopMain` to delegate workspace watch start/stop and refresh suppression to the new watcher.
+- Reduced `DesktopMain.ts` from 511 lines to 463 lines, bringing it back under the repo's 500-line limit.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
+### Step 53: Stop swallowing desktop refresh failures
+
+- Extracted `DesktopStateRefresher` so desktop refresh policy is testable outside `DesktopMain`.
+- Replaced the `Promise.allSettled()`-based refresh path with strict `Promise.all(...)` orchestration for full desktop refreshes.
+- Kept the standalone menubar-usage refresh tolerant for startup/background use, but stopped that tolerance from leaking into the main `refreshDesktopState()` path.
+- Added focused tests covering:
+  - renderer notification only after successful strict refresh
+  - no renderer notification on failed menubar state refresh
+  - no renderer notification on failed usage refresh during strict refresh
+  - tolerant standalone usage refresh remaining non-fatal
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
+### Step 52: Bound prepared desktop drafts and clear abandoned secrets
+
+- Added TTL-backed prepared draft expiry in `DesktopConnectionManager` so onboarding drafts do not keep credentials in Electron main-process memory indefinitely.
+- Added an explicit prepared-draft capacity limit so repeated draft creation cannot grow the cache without bound.
+- Added `clearPreparedConnectionDrafts()` and wired it into desktop window dismiss and app quit so abandoned drafts are scrubbed when the desktop surface is closed.
+- Added focused regression tests for:
+  - explicit draft discard
+  - ttl expiry
+  - capacity eviction
+  - window-dismiss style bulk cleanup
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
+### Step 51: Remove leftover renderer single-file directory
+
+- Moved `renderer/lib/cn.ts` into `renderer/ui/cn.ts` so the classless utility lives beside the UI primitives that consume it.
+- Removed the now-empty `renderer/lib/` source directory instead of carrying a one-file directory shell.
+- Repointed renderer UI imports to the new local path.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:core`
+- `npm run test:cli`
+- `npm run test:desktop`
+- `git diff --check -- . ':(exclude)error.log'`
+
+### Step 50: Split desktop draft workflows from session command gateway
+
+- Added `DesktopConnectionGateway` for direct session commands that do not own desktop-specific draft/onboarding rules:
+  - import current connection
+  - remove connection
+  - bind Cursor usage
+  - auto-bind all missing Cursor usage sessions
+- Kept `DesktopConnectionManager` focused on:
+  - add/update connection flows
+  - onboarding capability detection
+  - prepared draft lifecycle
+- Rewired `DesktopStateStore` to depend on both:
+  - `DesktopConnectionManager` for draft-aware workflows
+  - `DesktopConnectionGateway` for plain session commands
+- Updated the desktop binding regression test to assert against the new gateway instead of the draft manager.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:core`
+- `npm run test:cli`
+- `npm run test:desktop`
+
+### Step 49: Split desktop IPC and presentation responsibilities
+
+- Split `DesktopIpcController.register()` into state, connection, update, and app route groups so each IPC route class receives only the dependencies it needs.
+- Split desktop bridge typing into state, update, connection, and app bridge capabilities while preserving the existing `window.nileDesktop.*` renderer API.
+- Extracted shared desktop connection credential input fields to remove repeated auth/session fields across add/update/onboarding IPC payload types.
+- Extracted `DesktopConnectionPresenter` from `DesktopSurface` for connection DTO projection, selected-agent display, live/current connection resolution, and agent label formatting.
+- Extracted `DesktopUsageCache` from `DesktopSurface` for usage TTL, refresh batching, and read-failure fallback behavior.
+- Removed the pure connection-definition forwarding method from `DesktopConnectionManager`; IPC routes now read the shared catalog directly.
+- Removed the unused single-connection desktop auto-bind forwarding method; desktop only uses explicit bind and background auto-bind-all.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:core`
+- `npm run test:cli`
+- `npm run test:desktop`
+
+### Step 48: Harden desktop IPC boundaries and state-cache invalidation
+
+- Added a dedicated `DesktopIpcInputValidator` for Electron main-process IPC inputs.
+- Moved desktop IPC registration into `DesktopIpcController` so `DesktopMain` stays focused on app composition and Electron lifecycle.
+- Moved macOS menu and About panel setup into `DesktopApplicationMenu`, bringing `DesktopMain` back under the 500-line source-file limit.
+- Routed connection onboarding and draft IPC directly to `DesktopConnectionManager` instead of passing through `DesktopStateStore`, keeping the state store focused on cached state and mutations that invalidate it.
+- Routed static connection definitions directly to `DesktopConnectionManager` and removed the unnecessary `DesktopStateStore` cache entry for catalog data.
+- Changed desktop mutation IPC handlers to accept `unknown` at the boundary and validate before calling state/application services.
+- Covered the high-risk IPC inputs:
+  - add/update connection payloads
+  - prepared connection draft save/discard payloads
+  - selected agent IDs
+  - connection IDs
+  - Cursor usage binding tokens
+  - agent-home update paths
+- Tightened external-link handling so desktop only opens HTTPS URLs from renderer-triggered flows.
+- Tightened provider catalog official links to require HTTPS at load time.
+- Wired desktop reset through the `CredentialStore` already owned by `DesktopMain`, avoiding accidental reset against a different credential backend.
+- Fixed `DesktopStateStore` cache invalidation with per-cache versioning so stale in-flight refreshes cannot mark newly invalidated state as clean.
+- Added focused regression tests for:
+  - IPC payload validation
+  - provider HTTPS enforcement
+  - stale in-flight state refresh invalidation
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
 ### Step 47: Make desktop release notes explicit and versioned
 
 - Replaced GitHub's generated release-note fallback with a repository-owned source of truth under `release-notes/`.
@@ -657,6 +1089,34 @@
 - `npm run typecheck`
 - `npm run test:desktop`
 
+### Desktop command-chain cleanup
+
+- Deleted `DesktopIpcController` and registered IPC route groups directly from `DesktopMain`, so route dependencies stay scoped to their own capability group instead of flowing through one wide controller options bag.
+- Kept desktop query and mutation concerns more separate:
+  - `DesktopSurface` remains the query-facing state reader
+  - `DesktopConnectionGateway` now owns more command-side session mutations such as switch/import-detected/rollback/bind/remove/import-current
+- Added shared mutation helpers in `DesktopStateStore`:
+  - `runMutation`
+  - `runAsyncMutation`
+- This removed repeated dirty-marking boilerplate from:
+  - switch
+  - rollback
+  - add
+  - update
+  - save prepared connection
+  - import detected setups
+  - import current connection
+  - remove
+  - bind
+  - reset
+- Moved renderer `cn` helper into `renderer/ui/cn.ts` and removed the single-file `renderer/lib/` directory.
+- Broke `SettingsState` into reusable section DTO types while keeping the existing renderer payload shape stable.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
 ## 2026-04-29
 
 ### Step 3: Settings Shell
@@ -1231,6 +1691,109 @@
 
 - `npm run typecheck`
 - `npm run build --prefix apps/desktop`
+- `npm run test:desktop`
+
+### Desktop state-surface regrouping
+
+- Moved the desktop state-surface cluster out of `apps/desktop/src/` root into `apps/desktop/src/state/`:
+  - `Surface`
+  - `Types`
+  - `ConnectionPresenter`
+  - `UsageCache`
+  - `UsageSummary`
+  - `HistoryQuery`
+  - `MenubarQuery`
+  - `SettingsQuery`
+- Moved the matching state-surface tests with that cluster:
+  - `Surface.test.ts`
+  - `UsageSummary.test.ts`
+- Kept `DesktopLauncher.test.ts` at `src/` root because it verifies the top-level app launcher, not the desktop state surface.
+- Updated renderer and Electron imports to point at the new `state/` home so `src/` root no longer acts as a mixed bucket for state, presentation, and shell concerns.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
+### Desktop connection-edit support split
+
+- Split gateway capability probing and trust/agent reconciliation out of `useConnectionEditState` into `useGatewaySupportState`.
+- Kept `useConnectionEditState` focused on:
+  - editable field state
+  - auth update intent
+  - auth.json picker lifecycle
+  - submit payload assembly and confirmation
+- Reduced the edit-state hotspot sizes to:
+  - `useConnectionEditState.ts` -> 308 lines
+  - `useGatewaySupportState.ts` -> 167 lines
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Desktop main-process shell split
+
+- Split Electron shell concerns out of `DesktopMain` into `DesktopShell`:
+  - settings window lifecycle
+  - tray creation and refresh
+  - open-file dialog
+  - external link / GitHub / support-email helpers
+  - app icon and package-version lookup
+- Kept `DesktopMain` focused on composition, lifecycle wiring, and IPC route registration.
+- Reduced the remaining main-process hotspot sizes to:
+  - `DesktopMain.ts` -> 307 lines
+  - `DesktopShell.ts` -> 175 lines
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+- `git diff --check -- . ':(exclude)error.log'`
+
+## 2026-05-05
+
+### Step 56: Split desktop i18n resources and settings composition
+
+- Replaced the monolithic renderer translation table with per-language resource modules under `renderer/shared/i18n/`.
+- Added a shared catalog validator so every supported language must match the English keyset exactly at runtime/test time.
+- Tightened translator fallback behavior: missing keys no longer silently fall back to English copy.
+- Normalized persisted theme preferences so invalid stored theme values now resolve to `system` consistently.
+- Split `SettingsApp` into smaller orchestration slices:
+  - `SettingsChrome`
+  - `SettingsPageContent`
+  - `SettingsDialogs`
+- Added focused renderer tests for:
+  - translation catalog completeness
+  - theme fallback normalization
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
+### Desktop state-surface and preload boundary cleanup
+
+- Split `DesktopSurface` query responsibilities into focused classes:
+  - `MenubarStateQuery`
+  - `SettingsStateQuery`
+  - `HistoryStateQuery`
+- Reduced `DesktopSurface` itself to session orchestration plus a small number of explicit commands:
+  - `switchConnection`
+  - `rollbackLatestMutation`
+  - `importDetectedSetups`
+  - cached menubar usage refresh
+- Reshaped the preload bridge from one flat API bag into grouped renderer-safe capability objects:
+  - `window.nileDesktop.state`
+  - `window.nileDesktop.connections`
+  - `window.nileDesktop.updates`
+  - `window.nileDesktop.app`
+- Updated renderer callers to use the grouped bridge so future Electron capabilities land in a narrower, more task-oriented preload surface.
+- Tightened `DesktopConnection.authMode` from a loose `string` to `AuthMode | "unknown"` so renderer DTOs align better with core domain types.
+
+### Verification
+
+- `npm run typecheck`
 - `npm run test:desktop`
 
 ### Desktop effective-current selection alignment

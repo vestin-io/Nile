@@ -1,6 +1,5 @@
-import type { HistoryCommands } from "../commands/HistoryCommands";
+import type { AgentCommands } from "../commands/AgentCommands";
 import type { ResetCommands } from "../commands/ResetCommands";
-import type { StatusCommands } from "../commands/StatusCommands";
 import type { ConnectionCommands } from "../commands/ConnectionCommands";
 import type { UsageCommands } from "../commands/UsageCommands";
 import type { ConnectionPresenter } from "../presenters/ConnectionPresenter";
@@ -22,11 +21,10 @@ export class InteractiveMenu {
 
   constructor(
     private readonly prompt: InteractivePrompt,
-    statusCommands: StatusCommands,
+    agentCommands: AgentCommands,
     private readonly connectionCommands: ConnectionCommands,
     private readonly resetCommands: ResetCommands,
     private readonly usageCommands: UsageCommands,
-    historyCommands: HistoryCommands,
     private readonly connectionPresenter: ConnectionPresenter,
     private readonly resetPresenter: ResetPresenter,
     statusPresenter: StatusPresenter,
@@ -39,7 +37,7 @@ export class InteractiveMenu {
     );
     this.manageConnectionsFlow = new ManageConnectionsFlow(
       prompt,
-      statusCommands,
+      agentCommands,
       connectionCommands,
       connectionPresenter,
       statusPresenter,
@@ -48,8 +46,7 @@ export class InteractiveMenu {
     );
     this.historyFlow = new HistoryFlow(
       prompt,
-      statusCommands,
-      historyCommands,
+      agentCommands,
       connectionPresenter,
       this.infoPanel,
     );

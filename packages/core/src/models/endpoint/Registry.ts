@@ -12,8 +12,7 @@ import {
   type EndpointRegistryInput,
   type EndpointRegistryUpdate,
 } from "./Types";
-import { SqliteEndpointStore } from "./store/SqliteStore";
-import type { EndpointStore } from "./store/Store";
+import { SqliteEndpointStore } from "./SqliteEndpointStore";
 
 export class EndpointRegistryValidationError extends Error {
   constructor(message: string) {
@@ -53,7 +52,7 @@ export class EndpointRegistry {
   }
 
   constructor(
-    private readonly endpointStore: EndpointStore,
+    private readonly endpointStore: SqliteEndpointStore,
     private readonly ownedDatabase: SqliteDatabase | null = null,
   ) {}
 

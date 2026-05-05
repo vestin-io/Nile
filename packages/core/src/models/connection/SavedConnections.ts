@@ -103,26 +103,27 @@ export class SavedConnections {
     return this.buildSummary(updated, endpoint, selectedByAgents);
   }
 
-  remove(connectionId: string): { id: string; removed: true; orphanedAgents: AgentId[] } {
-    return this.database.transaction(() => {
-      const access = this.accessRegistry.get(connectionId);
-      if (!access) {
-        throw new Error(`Connection not found: ${connectionId}`);
-      }
-      const orphanedAgents = this.agentSelection
-        .list()
-        .filter((selection) => selection.connectionId === access.id)
-        .map((selection) => selection.agentId as AgentId);
-      this.accessRegistry.remove(connectionId);
-      if (this.accessRegistry.list().every((candidate) => candidate.endpointId !== access.endpointId)) {
-        this.endpointRegistry.remove(access.endpointId);
-      }
-      return {
-        id: connectionId,
-        removed: true,
-        orphanedAgents,
-      };
-    });
+  remove(connectionId: string): { id: string; removed: true; clearedAgents: AgentId[] } {
+    const access = this.accessRegistry.get(connectionId);
+    if (!access) {
+      throw new Error(`Connection not found: ${connectionId}`);
+    }
+    const clearedAgents = this.agentSelection
+      .list()
+      .filter((selection) => selection.connectionId === access.id)
+      .map((selection) => selection.agentId as AgentId);
+    for (const agentId of clearedAgents) {
+      this.agentSelection.clear(agentId);
+    }
+    this.accessRegistry.remove(connectionId);
+    if (this.accessRegistry.list().every((candidate) => candidate.endpointId !== access.endpointId)) {
+      this.endpointRegistry.remove(access.endpointId);
+    }
+    return {
+      id: connectionId,
+      removed: true,
+      clearedAgents,
+    };
   }
 
   close(): void {

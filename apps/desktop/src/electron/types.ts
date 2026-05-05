@@ -10,19 +10,22 @@ import type {
   RemoveConnectionResult,
 } from "@nile/core/runtime-local";
 
-export type DesktopAddConnectionInput = {
-  preset: ConnectionPresetFamily;
-  authMode: AuthMode;
-  label?: string;
-  endpointUrl?: string;
-  enabledAgents?: AgentId[];
-  allowUndetectedGateway?: boolean;
+export type DesktopConnectionCredentialInput = {
   apiKeySource?: "direct" | "env_key";
   apiKey?: string;
   envKey?: string;
   openAiSessionSource?: "login" | "current_codex";
   openAiAuthJsonPath?: string;
   claudeSessionSource?: "login" | "current_claude";
+};
+
+export type DesktopAddConnectionInput = DesktopConnectionCredentialInput & {
+  preset: ConnectionPresetFamily;
+  authMode: AuthMode;
+  label?: string;
+  endpointUrl?: string;
+  enabledAgents?: AgentId[];
+  allowUndetectedGateway?: boolean;
 };
 
 export type DesktopConnectionSummary = {
@@ -57,35 +60,34 @@ export type DesktopDiscardPreparedConnectionDraftInput = {
   draftId: string;
 };
 
-export type DesktopUpdateConnectionInput = {
+export type DesktopUpdateConnectionInput = DesktopConnectionCredentialInput & {
   connectionId: string;
   label?: string;
   enabledAgents?: AgentId[];
   endpointUrl?: string;
-  apiKeySource?: "direct" | "env_key";
-  apiKey?: string;
-  envKey?: string;
-  openAiSessionSource?: "login" | "current_codex";
-  openAiAuthJsonPath?: string;
-  claudeSessionSource?: "login" | "current_claude";
   syncSelectedAgents?: boolean;
 };
 
-export type DesktopDescribeSavedConnectionOnboardingInput = {
+export type DesktopDescribeSavedConnectionOnboardingInput = DesktopConnectionCredentialInput & {
   connectionId: string;
   endpointUrl?: string;
-  apiKeySource?: "direct" | "env_key";
-  apiKey?: string;
-  envKey?: string;
 };
 
-export type DesktopBridge = {
-  getMenubarState(): Promise<import("../DesktopTypes").MenubarState>;
-  getSettingsState(): Promise<import("../DesktopTypes").SettingsState>;
-  getHistoryState(): Promise<import("../DesktopTypes").HistoryState>;
-  getReleaseInfo(): Promise<import("../DesktopTypes").DesktopReleaseInfo>;
-  checkForUpdates(): Promise<import("../DesktopTypes").DesktopUpdateCheckResult>;
-  installUpdate(): Promise<import("../DesktopTypes").DesktopInstallUpdateResult>;
+export type DesktopStateBridge = {
+  getMenubarState(): Promise<import("../state/Types").MenubarState>;
+  getSettingsState(): Promise<import("../state/Types").SettingsState>;
+  getHistoryState(): Promise<import("../state/Types").HistoryState>;
+  refreshSettings(): Promise<void>;
+  refreshMenubar(): Promise<void>;
+};
+
+export type DesktopUpdateBridge = {
+  getReleaseInfo(): Promise<import("../state/Types").DesktopReleaseInfo>;
+  checkForUpdates(): Promise<import("../state/Types").DesktopUpdateCheckResult>;
+  installUpdate(): Promise<import("../state/Types").DesktopInstallUpdateResult>;
+};
+
+export type DesktopConnectionBridge = {
   listConnectionDefinitions(): Promise<import("@nile/core/models/connection").ConnectionDefinition[]>;
   chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null>;
   describeConnectionOnboarding(input: DesktopAddConnectionInput): Promise<ConnectionOnboardingSuggestion>;
@@ -93,7 +95,7 @@ export type DesktopBridge = {
   prepareConnectionDraft(input: DesktopAddConnectionInput): Promise<DesktopPreparedConnectionDraft>;
   savePreparedConnection(input: DesktopSavePreparedConnectionInput): Promise<DesktopConnectionSummary>;
   discardPreparedConnectionDraft(input: DesktopDiscardPreparedConnectionDraftInput): Promise<void>;
-  switchConnection(agentId: AgentId, connectionId: string): Promise<import("../DesktopTypes").DesktopConnection>;
+  switchConnection(agentId: AgentId, connectionId: string): Promise<import("../state/Types").DesktopConnection>;
   rollbackLatestMutation(agentId: AgentId): Promise<import("@nile/core/runtime-local").RollbackLatestAgentResult>;
   addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary>;
   updateConnection(input: DesktopUpdateConnectionInput): Promise<DesktopConnectionSummary>;
@@ -102,11 +104,19 @@ export type DesktopBridge = {
   removeConnection(connectionId: string): Promise<RemoveConnectionResult>;
   bindCursorUsage(connectionId: string, sessionToken: string): Promise<BindCursorUsageResult>;
   resetState(): Promise<ResetStateResult>;
+};
+
+export type DesktopAppBridge = {
   openGitHubIssues(): Promise<void>;
   openExternalUrl(url: string): Promise<void>;
   openSettings(): Promise<void>;
   openSupportEmail(): Promise<void>;
-  refreshSettings(): Promise<void>;
-  refreshMenubar(): Promise<void>;
   updateAgentHome(agentId: AgentId, path: string | null): Promise<void>;
+};
+
+export type DesktopBridge = {
+  app: DesktopAppBridge;
+  connections: DesktopConnectionBridge;
+  state: DesktopStateBridge;
+  updates: DesktopUpdateBridge;
 };

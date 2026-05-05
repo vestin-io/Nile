@@ -4,7 +4,7 @@ import azureAiSvg from "../../../node_modules/@lobehub/icons-static-svg/icons/az
 import claudeSvg from "../../../node_modules/@lobehub/icons-static-svg/icons/claude.svg";
 
 import type { Translator } from "../shared/I18n";
-import type { DesktopConnection } from "../../DesktopTypes";
+import type { DesktopConnection } from "../../state/Types";
 
 export function readProviderLabel(
   provider: DesktopConnection["endpointFamily"],

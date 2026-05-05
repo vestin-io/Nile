@@ -26,7 +26,6 @@
     "./models/*": "./dist/models/*/index.js",
     "./projection": "./dist/projection/index.js",
     "./runtime-local": "./dist/runtime-local/index.js",
-    "./usage/cursor": "./dist/usage/cursor.js",
     "./services/EnvironmentSource": "./dist/services/EnvironmentSource.js",
     "./services/NileLogger": "./dist/services/NileLogger.js",
     "./services/*": "./dist/services/*/index.js",

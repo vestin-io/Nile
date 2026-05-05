@@ -1,6 +1,5 @@
 export type {
   AgentProjection,
-  AgentProjectionStrategy,
   ClaudeProjection,
   CodexProjection,
   CursorProjection,

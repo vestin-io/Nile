@@ -46,15 +46,15 @@ export class ApplySelection {
     return new ApplySelection(
       new ApplyMutation(
         new MutationHistory(
-          context.database,
+          context.workspaceState.database,
           new FileSnapshotStore(join(dirname(databasePath), "history")),
           options?.secureSnapshotStore ?? new SecureSnapshotStore(),
           logger.child({ scope: "mutation-history" }),
         ),
         new AgentApplySupport(
           CLAUDE_AGENT_ID,
-          context.endpointRegistry,
-          context.accessRegistry,
+          context.sharedContext.endpointRegistry,
+          context.sharedContext.accessRegistry,
           context.agentSelection,
           credentialStore,
           logger,

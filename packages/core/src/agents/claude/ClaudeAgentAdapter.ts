@@ -5,7 +5,6 @@ import type { CredentialStore } from "../../services/credential/Store";
 import { NileLogger } from "../../services/NileLogger";
 import type {
   RollbackLatestAgentResult,
-  AgentAdapterCapabilities,
 } from "../../runtime-local/AgentAdapterTypes";
 import { ManagedAgentAdapter } from "../../runtime-local/ManagedAgentAdapter";
 import type { SharedAgentAdapterContext } from "../../runtime-local/AgentAdapterContext";
@@ -26,77 +25,82 @@ export type ClaudeAgentAdapterOptions = {
 
 export class ClaudeAgentAdapter extends ManagedAgentAdapter {
   readonly agentId = CLAUDE_AGENT_ID;
+  readonly rollbackSupport = "yes" as const;
 
-  readonly capabilities: AgentAdapterCapabilities = {
-    detect: "yes",
-    apply: "yes",
-    import: "yes",
-    history: "yes",
-    rollback: "yes",
-    desktopSupport: "partial",
-  };
-
-  private readonly databasePath: string;
-  private readonly claudeHome: string;
-  private readonly credentialStore: CredentialStore;
-  private readonly secureSnapshotStore: ClaudeAgentAdapterOptions["secureSnapshotStore"];
-  private readonly logger: NileLogger;
-  private readonly sharedContext: SharedAgentAdapterContext | undefined;
+  private readonly openApplyOperation: () => ApplySelection;
+  private readonly openImportOperation: () => ImportCurrentConnection;
+  private readonly openRollbackOperation: () => RollbackLatestMutation;
+  private readonly openDetectOperation: () => CurrentStateDetector;
 
   constructor(options: ClaudeAgentAdapterOptions) {
     super();
-    this.databasePath = options.databasePath;
-    this.claudeHome = options.claudeHome ?? join(homedir(), ".claude");
-    this.credentialStore = options.credentialStore;
-    this.secureSnapshotStore = options.secureSnapshotStore;
-    this.logger = options.logger ?? NileLogger.silent().child({ module: "claude-agent-adapter" });
-    this.sharedContext = options.sharedContext;
+    const databasePath = options.databasePath;
+    const claudeHome = options.claudeHome ?? join(homedir(), ".claude");
+    const credentialStore = options.credentialStore;
+    const secureSnapshotStore = options.secureSnapshotStore;
+    const logger = options.logger ?? NileLogger.silent().child({ module: "claude-agent-adapter" });
+    const sharedContext = options.sharedContext;
+
+    this.openApplyOperation = () => sharedContext
+      ? ApplySelection.fromContext(sharedContext, {
+          claudeHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "apply-selection" }),
+        })
+      : ApplySelection.open(databasePath, {
+          claudeHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "apply-selection" }),
+        });
+    this.openImportOperation = () => sharedContext
+      ? ImportCurrentConnection.fromContext(sharedContext, {
+          claudeHome,
+          credentialStore,
+          logger: logger.child({ scope: "import-current-connection" }),
+        })
+      : ImportCurrentConnection.open(databasePath, {
+          claudeHome,
+          credentialStore,
+          logger: logger.child({ scope: "import-current-connection" }),
+        });
+    this.openRollbackOperation = () => sharedContext
+      ? RollbackLatestMutation.fromContext(sharedContext, {
+          claudeHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "rollback-latest-mutation" }),
+        })
+      : RollbackLatestMutation.open(databasePath, {
+          claudeHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "rollback-latest-mutation" }),
+        });
+    this.openDetectOperation = () => sharedContext
+      ? CurrentStateDetector.fromContext(sharedContext, {
+          claudeHome,
+          credentialStore,
+          logger: logger.child({ scope: "current-state-detector" }),
+        })
+      : CurrentStateDetector.open(databasePath, {
+          claudeHome,
+          credentialStore,
+          logger: logger.child({ scope: "current-state-detector" }),
+        });
   }
 
   protected openApplySelection(): ApplySelection {
-    return this.sharedContext
-      ? ApplySelection.fromContext(this.sharedContext, {
-          claudeHome: this.claudeHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "apply-selection" }),
-        })
-      : ApplySelection.open(this.databasePath, {
-          claudeHome: this.claudeHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "apply-selection" }),
-        });
+    return this.openApplyOperation();
   }
 
   protected openImporter(): ImportCurrentConnection {
-    return this.sharedContext
-      ? ImportCurrentConnection.fromContext(this.sharedContext, {
-          claudeHome: this.claudeHome,
-          credentialStore: this.credentialStore,
-          logger: this.logger.child({ scope: "import-current-connection" }),
-        })
-      : ImportCurrentConnection.open(this.databasePath, {
-          claudeHome: this.claudeHome,
-          credentialStore: this.credentialStore,
-          logger: this.logger.child({ scope: "import-current-connection" }),
-        });
+    return this.openImportOperation();
   }
 
   rollbackLatestMutation(): RollbackLatestAgentResult {
-    const rollback = this.sharedContext
-      ? RollbackLatestMutation.fromContext(this.sharedContext, {
-          claudeHome: this.claudeHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "rollback-latest-mutation" }),
-        })
-      : RollbackLatestMutation.open(this.databasePath, {
-          claudeHome: this.claudeHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "rollback-latest-mutation" }),
-        });
+    const rollback = this.openRollbackOperation();
     try {
       return {
         agentId: this.agentId,
@@ -108,17 +112,6 @@ export class ClaudeAgentAdapter extends ManagedAgentAdapter {
   }
 
   protected openDetector(): CurrentStateDetector {
-    if (this.sharedContext) {
-      return CurrentStateDetector.fromContext(this.sharedContext, {
-        claudeHome: this.claudeHome,
-        credentialStore: this.credentialStore,
-        logger: this.logger.child({ scope: "current-state-detector" }),
-      });
-    }
-    return CurrentStateDetector.open(this.databasePath, {
-      claudeHome: this.claudeHome,
-      credentialStore: this.credentialStore,
-      logger: this.logger.child({ scope: "current-state-detector" }),
-    });
+    return this.openDetectOperation();
   }
 }

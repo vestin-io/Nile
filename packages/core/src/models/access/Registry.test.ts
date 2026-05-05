@@ -8,9 +8,10 @@ import { type StoredCredential } from "../../services/credential/Types";
 import { KeychainCredentialStore } from "../../services/credential/KeychainCredentialStore";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { EndpointRegistry } from "../endpoint";
-import { SqliteAccessStore } from "./store/SqliteStore";
+import { SqliteAccessStore } from "./SqliteAccessStore";
 import {
   AccessRegistry,
+  AccessRegistryConsistencyError,
   AccessRegistryValidationError,
   DuplicateAccessIdError,
 } from "./index";
@@ -285,7 +286,7 @@ describe("AccessRegistry", () => {
     failing.close();
   });
 
-  it("restores the previous credential when access removal persistence fails", () => {
+  it("marks access removal as failed when sqlite delete fails after credential removal", () => {
     const dbPath = createTempDatabasePath();
     const credentialStore = new StubCredentialStore();
     seedEndpoint(dbPath, {
@@ -322,12 +323,54 @@ describe("AccessRegistry", () => {
     );
 
     expect(() => failing.remove("gateway-team")).toThrow("Injected remove failure");
-    expect(credentialStore.records.get("access:gateway-team")).toEqual({
-      kind: "api_key",
-      apiKey: "original-secret",
-    });
+    expect(credentialStore.has("access:gateway-team")).toBe(false);
+    expect(failing.get("gateway-team")).toEqual(
+      expect.objectContaining({
+        credentialSyncState: "delete_failed",
+        credentialSyncIssue: "Injected remove failure",
+      }),
+    );
+    expect(() => failing.readCredential("gateway-team")).toThrow(AccessRegistryConsistencyError);
 
     failing.close();
+  });
+
+  it("persists write failure state when credential sync fails after access create", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new FailingCredentialStore("create");
+    seedEndpoint(dbPath, {
+      id: "gateway",
+      label: "Gateway",
+      rootUrl: "https://gateway.example.test",
+      protocols: {
+        openai: {
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+
+    const registry = AccessRegistry.open(dbPath, credentialStore);
+
+    expect(() => registry.add(
+      {
+        id: "gateway-team",
+        endpointId: "gateway",
+        label: "Gateway Team",
+        authMode: "api_key",
+      },
+      { kind: "api_key", apiKey: "secret" },
+    )).toThrow(AccessRegistryConsistencyError);
+
+    expect(registry.get("gateway-team")).toEqual(
+      expect.objectContaining({
+        credentialSyncState: "write_failed",
+        credentialSyncIssue: "Injected credential create failure",
+      }),
+    );
+    expect(() => registry.readCredential("gateway-team")).toThrow(AccessRegistryConsistencyError);
+
+    registry.close();
   });
 });
 
@@ -371,6 +414,26 @@ class StubCredentialStore extends KeychainCredentialStore {
 
   override remove(reference: string): void {
     this.records.delete(reference);
+  }
+}
+
+class FailingCredentialStore extends StubCredentialStore {
+  constructor(private readonly failureMode: "create" | "update") {
+    super();
+  }
+
+  override create(reference: string, credential: StoredCredential): void {
+    if (this.failureMode === "create") {
+      throw new Error("Injected credential create failure");
+    }
+    super.create(reference, credential);
+  }
+
+  override update(reference: string, credential: StoredCredential): void {
+    if (this.failureMode === "update") {
+      throw new Error("Injected credential update failure");
+    }
+    super.update(reference, credential);
   }
 }
 

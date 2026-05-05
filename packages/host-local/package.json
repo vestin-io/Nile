@@ -3,10 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "dependencies": {
-    "@nile/core": "file:../core"
+    "@nile/core": "workspace:*"
+  },
+  "scripts": {
+    "prebuild": "npm --prefix ../.. run build:core",
+    "build": "node ./build.mjs && tsc -p ./tsconfig.build.json"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   }
 }

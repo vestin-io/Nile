@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import { DesktopMain } from "./DesktopMain";
+import { DesktopMain } from "./shell/DesktopMain";
 
 const desktop = new DesktopMain({
   databasePath: join(homedir(), ".nile-switcher", "switcher.sqlite"),

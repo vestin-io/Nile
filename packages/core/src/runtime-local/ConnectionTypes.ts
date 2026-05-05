@@ -15,7 +15,7 @@ export type CreateLocalConnectionInput = {
 export type RemoveConnectionResult = {
   id: string;
   removed: true;
-  orphanedAgents: AgentId[];
+  clearedAgents: AgentId[];
 };
 
 export type UpdateConnectionInput = {

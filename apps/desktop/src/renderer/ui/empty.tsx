@@ -1,6 +1,6 @@
 import type { HTMLAttributes } from "react";
 
-import { cn } from "../lib/cn";
+import { cn } from "./cn";
 
 export function Empty({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("flex w-full flex-col gap-6", className)} {...props} />;

@@ -1,4 +1,3 @@
-import type { WorkspaceState } from "../WorkspaceState";
 import { ImportDetectedSetups, ScanLocalSetups } from "../../actions/scan-local";
 import { Status } from "../../actions/status/Status";
 import { Usage } from "../../actions/usage/Usage";
@@ -6,12 +5,12 @@ import { CursorUsageBinder, CursorUsageBindingRegistry, CursorUsageSnapshotStore
 import { CursorUsageAutoBinder } from "./CursorUsageAutoBinder";
 import type { CursorUsageSessionProbe } from "./CursorUsageSessionProbe";
 import { AccessRegistry } from "../../models/access";
+import type { AgentAdapterLookup } from "../../models/agent";
 import { ConnectionCreator } from "../../models/connection/Creator";
 import { SavedConnections } from "../../models/connection/SavedConnections";
 import { EndpointRegistry } from "../../models/endpoint";
 import { AgentSelection } from "../../models/selection/Selection";
-import type { SharedAgentAdapterContext } from "../../runtime-local/AgentAdapterContext";
-import { AgentAdapterRegistry } from "../../runtime-local/AgentAdapterRegistry";
+import type { SharedAgentAdapterContext } from "./AgentAdapterContext";
 import type { CredentialStore } from "../../services/credential/Store";
 import {
   LocalCredentialSourceFactory,
@@ -25,7 +24,7 @@ export type LocalAgentActions = {
   importDetectedSetups: ImportDetectedSetups;
 };
 
-export class LocalWorkspaceState implements WorkspaceState {
+export class LocalWorkspaceState {
   private cursorUsageBindingRegistry: CursorUsageBindingRegistry | null = null;
   private cursorUsageSnapshotStore: CursorUsageSnapshotStore | null = null;
 
@@ -93,7 +92,7 @@ export class LocalWorkspaceState implements WorkspaceState {
     );
   }
 
-  createAgentActions(agentAdapterRegistry: AgentAdapterRegistry): LocalAgentActions {
+  createAgentActions(agentAdapterRegistry: AgentAdapterLookup): LocalAgentActions {
     const status = new Status(
       this.endpointRegistry,
       this.accessRegistry,

@@ -46,16 +46,16 @@ export class ImportCurrentConnection {
       new AgentImportSupport(
         CURSOR_AGENT_ID,
         "Cursor",
-        context.endpointRegistry,
-        context.accessRegistry,
+        context.sharedContext.endpointRegistry,
+        context.sharedContext.accessRegistry,
         context.agentSelection,
         logger,
       ),
       new CurrentStateDetector(
         reader,
         new AgentStateMatcher(
-          context.endpointRegistry,
-          context.accessRegistry,
+          context.sharedContext.endpointRegistry,
+          context.sharedContext.accessRegistry,
           context.agentSelection,
           CURSOR_AGENT_ID,
         ),

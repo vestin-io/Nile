@@ -1,6 +1,6 @@
-import type { DesktopUsageState } from "../../UsageSummary";
+import type { DesktopUsageState } from "../../state/UsageSummary";
 import type { Translator } from "./I18n";
-import { formatUsageResetAt } from "./Support";
+import { formatUsageResetAt } from "./DisplayText";
 import { QuotaMeter } from "./QuotaMeter";
 import { Skeleton } from "../ui/skeleton";
 

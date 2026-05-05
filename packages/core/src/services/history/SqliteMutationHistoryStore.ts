@@ -6,35 +6,17 @@ import {
   type MutationType,
 } from "./MutationHistoryTypes";
 import type { AgentId } from "../../models/agent/Types";
-
-type MutationHistoryRow = {
-  id: string;
-  agent_id: string;
-  type: string;
-  connection_id: string;
-  connection_label: string | null;
-  endpoint_label: string;
-  access_label: string;
-  status: string;
-  rollback_of_mutation_id: string | null;
-  started_at: string;
-  completed_at: string | null;
-  error_message: string | null;
-};
-
-type MutationHistoryFileRow = {
-  mutation_id: string;
-  path: string;
-  before_snapshot_kind: string;
-  before_snapshot_ref: string;
-  existed_before: number;
-  before_checksum: string | null;
-  after_checksum: string | null;
-};
+import { initializeSqliteMutationHistorySchema } from "./SqliteMutationHistorySchema";
+import {
+  mapMutationHistoryFiles,
+  mapMutationHistoryRecord,
+  type MutationHistoryFileRow,
+  type MutationHistoryRow,
+} from "./SqliteMutationHistoryRows";
 
 export class SqliteMutationHistoryStore {
   constructor(private readonly database: SqliteDatabase) {
-    this.initialize();
+    initializeSqliteMutationHistorySchema(this.database);
   }
 
   insert(record: MutationHistoryRecord): void {
@@ -118,7 +100,7 @@ export class SqliteMutationHistoryStore {
       )
       .get(mutationId);
 
-    return row ? this.mapRecord(row) : null;
+    return row ? mapMutationHistoryRecord(row, this.readFiles(mutationId)) : null;
   }
 
   list(limit: number): MutationHistoryRecord[] {
@@ -146,7 +128,7 @@ export class SqliteMutationHistoryStore {
       .all(limit);
 
     const filesByMutationId = this.readFilesForMutations(rows.map((row) => row.id));
-    return rows.map((row) => this.mapRecord(row, filesByMutationId.get(row.id) ?? []));
+    return rows.map((row) => mapMutationHistoryRecord(row, filesByMutationId.get(row.id) ?? []));
   }
 
   markAppliedChecksums(
@@ -238,7 +220,7 @@ export class SqliteMutationHistoryStore {
       )
       .get(agentId);
 
-    return row ? this.mapRecord(row) : null;
+    return row ? mapMutationHistoryRecord(row, this.readFiles(row.id)) : null;
   }
 
   private getOrThrow(mutationId: string): MutationHistoryRecord {
@@ -247,27 +229,6 @@ export class SqliteMutationHistoryStore {
       throw new Error(`Mutation history entry not found after write: ${mutationId}`);
     }
     return record;
-  }
-
-  private mapRecord(
-    row: MutationHistoryRow,
-    files: MutationHistoryFileRecord[] = this.readFiles(row.id),
-  ): MutationHistoryRecord {
-    return {
-      id: row.id,
-      agentId: row.agent_id as AgentId,
-      type: row.type as MutationType,
-      connectionId: row.connection_id,
-      connectionLabel: row.connection_label ?? row.access_label,
-      endpointLabel: row.endpoint_label,
-      accessLabel: row.access_label,
-      status: row.status as MutationStatus,
-      rollbackOfMutationId: row.rollback_of_mutation_id,
-      startedAt: row.started_at,
-      completedAt: row.completed_at,
-      errorMessage: row.error_message,
-      files,
-    };
   }
 
   private readFilesForMutations(
@@ -299,14 +260,7 @@ export class SqliteMutationHistoryStore {
     const filesByMutationId = new Map<string, MutationHistoryFileRecord[]>();
     for (const row of rows) {
       const files = filesByMutationId.get(row.mutation_id) ?? [];
-      files.push({
-        path: row.path,
-        beforeSnapshotKind: row.before_snapshot_kind as "file" | "secure",
-        beforeSnapshotRef: row.before_snapshot_ref,
-        existedBefore: row.existed_before === 1,
-        beforeChecksum: row.before_checksum,
-        afterChecksum: row.after_checksum,
-      });
+      files.push(...mapMutationHistoryFiles([row]));
       filesByMutationId.set(row.mutation_id, files);
     }
 
@@ -332,64 +286,6 @@ export class SqliteMutationHistoryStore {
       )
       .all(mutationId);
 
-    return rows.map((row) => ({
-      path: row.path,
-      beforeSnapshotKind: row.before_snapshot_kind as "file" | "secure",
-      beforeSnapshotRef: row.before_snapshot_ref,
-      existedBefore: row.existed_before === 1,
-      beforeChecksum: row.before_checksum,
-      afterChecksum: row.after_checksum,
-    }));
-  }
-
-  private initialize(): void {
-    this.database.exec(`
-      CREATE TABLE IF NOT EXISTS mutation_history (
-        id TEXT PRIMARY KEY,
-        agent_id TEXT NOT NULL,
-        type TEXT NOT NULL,
-        connection_id TEXT NOT NULL,
-        connection_label TEXT,
-        endpoint_label TEXT NOT NULL,
-        access_label TEXT NOT NULL,
-        status TEXT NOT NULL,
-        rollback_of_mutation_id TEXT,
-        started_at TEXT NOT NULL,
-        completed_at TEXT,
-        error_message TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS mutation_history_files (
-        mutation_id TEXT NOT NULL,
-        path TEXT NOT NULL,
-        before_snapshot_kind TEXT NOT NULL,
-        before_snapshot_ref TEXT NOT NULL,
-        existed_before INTEGER NOT NULL,
-        before_checksum TEXT,
-        after_checksum TEXT,
-        PRIMARY KEY (mutation_id, path)
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_mutation_history_started_at_id
-      ON mutation_history (started_at, id);
-
-      CREATE INDEX IF NOT EXISTS idx_mutation_history_latest_apply
-      ON mutation_history (agent_id, type, status, completed_at, id);
-
-      CREATE INDEX IF NOT EXISTS idx_mutation_history_rollback_lookup
-      ON mutation_history (type, status, agent_id, rollback_of_mutation_id);
-    `);
-
-    const columns = this.database
-      .query<{ name: string }, []>("PRAGMA table_info(mutation_history)")
-      .all();
-    if (!columns.some((column) => column.name === "connection_label")) {
-      this.database.exec("ALTER TABLE mutation_history ADD COLUMN connection_label TEXT");
-    }
-    this.database.exec(`
-      UPDATE mutation_history
-      SET connection_label = access_label
-      WHERE connection_label IS NULL OR connection_label = ''
-    `);
+    return mapMutationHistoryFiles(rows);
   }
 }

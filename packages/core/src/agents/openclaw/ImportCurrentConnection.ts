@@ -35,16 +35,16 @@ export class ImportCurrentConnection {
       new AgentImportSupport(
         OPENCLAW_AGENT_ID,
         "OpenClaw",
-        context.endpointRegistry,
-        context.accessRegistry,
+        context.sharedContext.endpointRegistry,
+        context.sharedContext.accessRegistry,
         context.agentSelection,
         logger,
       ),
       new CurrentStateDetector(
         reader,
         new AgentStateMatcher(
-          context.endpointRegistry,
-          context.accessRegistry,
+          context.sharedContext.endpointRegistry,
+          context.sharedContext.accessRegistry,
           context.agentSelection,
           OPENCLAW_AGENT_ID,
         ),

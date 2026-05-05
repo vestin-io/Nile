@@ -9,6 +9,8 @@ import { CursorUsageBindingRegistry, CursorUsageSnapshotStore } from "./cursor";
 import { Usage } from "./Usage";
 
 const tempDirs: string[] = [];
+type FetchInput = Parameters<typeof fetch>[0];
+type FetchInit = Parameters<typeof fetch>[1];
 
 afterEach(() => {
   while (tempDirs.length > 0) {
@@ -169,8 +171,8 @@ describe("Usage", () => {
     const setup = createSetup();
     const { accessRegistry, endpointRegistry } = seedClaudeConnection(setup.dbPath, setup.credentialStore);
     globalThis.fetch = (async (
-      input: RequestInfo | URL,
-      init?: RequestInit,
+      input: FetchInput,
+      init?: FetchInit,
     ) => {
       const url = String(input);
       if (url === "https://api.anthropic.com/api/oauth/usage") {
@@ -246,7 +248,7 @@ describe("Usage", () => {
     );
     bindingRegistry.close();
 
-    globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    globalThis.fetch = (async (_input: FetchInput, init?: FetchInit) => {
       const cookieHeader = new Headers(init?.headers).get("cookie") ?? "";
       expect(cookieHeader).toContain("workos_id=user_01K03K41CNGRCADY5VT0JPH69Y");
       expect(cookieHeader).toContain(`WorkosCursorSessionToken=${encodeURIComponent(CURSOR_WEB_SESSION_TOKEN)}`);

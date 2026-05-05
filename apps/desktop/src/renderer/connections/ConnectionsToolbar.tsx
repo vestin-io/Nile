@@ -1,7 +1,7 @@
 import { Plus, Search } from "lucide-react";
 
 import type { Translator } from "../shared/I18n";
-import type { DesktopConnection } from "../../DesktopTypes";
+import type { DesktopConnection } from "../../state/Types";
 import { readProviderIconNode, readProviderLabel } from "./ProviderDisplay";
 import { RefreshButton } from "../shared/RefreshButton";
 import { Button } from "../ui/button";

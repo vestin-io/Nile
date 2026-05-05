@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { AccessRegistry } from "../access";
-import { SqliteAccessStore } from "../access/store/SqliteStore";
+import { SqliteAccessStore } from "../access/SqliteAccessStore";
 import { KeychainCredentialStore } from "../../services/credential/KeychainCredentialStore";
 import type { StoredCredential } from "../../services/credential/Types";
 import { EndpointRegistry } from "../endpoint";
-import { SqliteEndpointStore } from "../endpoint/store/SqliteStore";
+import { SqliteEndpointStore } from "../endpoint/SqliteEndpointStore";
 import { AgentSelection } from "../selection/Selection";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { SUPPORTED_AGENT_IDS } from "../agent";
@@ -159,7 +159,7 @@ describe("SavedConnections", () => {
     }
   });
 
-  test("removes saved connections and keeps agent selections as orphaned runtime facts", () => {
+  test("removes saved connections and clears saved agent selections that pointed at them", () => {
     const dbPath = createTempDatabasePath();
     const credentialStore = new StubCredentialStore();
     seedConnection(dbPath, credentialStore, {
@@ -184,7 +184,7 @@ describe("SavedConnections", () => {
       expect(connections.remove("azure-key")).toEqual({
         id: "azure-key",
         removed: true,
-        orphanedAgents: ["codex"],
+        clearedAgents: ["codex"],
       });
     } finally {
       connections.close();
@@ -192,14 +192,7 @@ describe("SavedConnections", () => {
 
     const agentSelection = AgentSelection.open(dbPath);
     try {
-      expect(agentSelection.get("codex")).toEqual(
-        expect.objectContaining({
-          agentId: "codex",
-          connectionId: "azure-key",
-          endpointId: "azure",
-          accessId: "azure-key",
-        }),
-      );
+      expect(agentSelection.get("codex")).toBeNull();
     } finally {
       agentSelection.close();
     }
@@ -300,7 +293,7 @@ describe("SavedConnections", () => {
       expect(connections.remove("shared-session")).toEqual({
         id: "shared-session",
         removed: true,
-        orphanedAgents: [],
+        clearedAgents: [],
       });
     } finally {
       connections.close();
@@ -316,7 +309,7 @@ describe("SavedConnections", () => {
     }
   });
 
-  test("rolls back the access delete when access cleanup fails", () => {
+  test("preserves explicit delete failure state when access cleanup fails", () => {
     const dbPath = createTempDatabasePath();
     const credentialStore = new StubCredentialStore();
     seedConnection(dbPath, credentialStore, {
@@ -356,9 +349,11 @@ describe("SavedConnections", () => {
       expect(accessRegistry.get("azure-key")).toEqual(
         expect.objectContaining({
           id: "azure-key",
+          credentialSyncIssue: "Injected access remove failure",
+          credentialSyncState: "delete_failed",
         }),
       );
-      expect(credentialStore.has("access:azure-key")).toBe(true);
+      expect(credentialStore.has("access:azure-key")).toBe(false);
     } finally {
       connections.close();
     }

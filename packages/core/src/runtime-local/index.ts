@@ -1,4 +1,5 @@
 export * from "./NileSession";
+export * from "./SessionWork";
 export type { CreateLocalConnectionInput, RemoveConnectionResult, UpdateConnectionInput } from "./ConnectionTypes";
 export * from "./AgentAdapterRegistry";
 export * from "./AgentAdapterTypes";

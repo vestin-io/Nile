@@ -106,6 +106,7 @@ export class AccessRecordBuilder {
       ...(credentialMetadata?.envKey ? { envKey: credentialMetadata.envKey } : {}),
       enabledAgents,
       credentialSource: this.credentialSourceFactory.createAccessSource({ accessId: id }),
+      credentialSyncState: "ready",
       createdAt,
       updatedAt: createdAt,
     };

@@ -2,7 +2,9 @@ import { type ReactNode } from "react";
 import type { AgentId } from "@nile/core/models/agent/types";
 
 import type { Translator } from "../shared/I18n";
-import { authModeLabel, formatAgentLabel, formatAgentsList, orderSupportedAuthModes, type Definition } from "../shared/Support";
+import { orderSupportedAuthModes, type Definition } from "../shared/Definitions";
+import { authModeLabel } from "../shared/DisplayText";
+import { formatAgentLabel, formatAgentsList } from "../shared/AgentSelection";
 import { ChoiceCard } from "../ui/choice-card";
 import { Checkbox } from "../ui/checkbox";
 import { Label } from "../ui/label";

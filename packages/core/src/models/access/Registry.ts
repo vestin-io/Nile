@@ -15,8 +15,7 @@ import {
   AccessRegistryValidationError,
   DuplicateAccessIdError,
 } from "./Errors";
-import { SqliteAccessStore } from "./store/SqliteStore";
-import type { AccessStore } from "./store/Store";
+import { SqliteAccessStore } from "./SqliteAccessStore";
 import type { AccessRecord, AccessRegistryInput, AccessRegistryUpdate } from "./Types";
 export { AccessRegistryConsistencyError } from "./Errors";
 export { AccessRegistryValidationError } from "./Errors";
@@ -57,8 +56,8 @@ export class AccessRegistry {
   }
 
   constructor(
-    private readonly accessStore: AccessStore,
-    private readonly credentialStore: CredentialStore,
+    private readonly accessStore: SqliteAccessStore,
+    credentialStore: CredentialStore,
     endpointRegistry: EndpointRegistry,
     credentialSourceFactory: CredentialSourceFactory,
     private readonly ownedDatabase: SqliteDatabase | null = null,
@@ -73,18 +72,22 @@ export class AccessRegistry {
       credential,
       new Date().toISOString(),
     );
-
-    this.credentials.create(record, credential);
+    const pendingRecord = {
+      ...record,
+      credentialSyncIssue: undefined,
+      credentialSyncState: "pending_write" as const,
+    };
 
     try {
-      this.accessStore.insert(record);
+      this.accessStore.insert(pendingRecord);
     } catch (error) {
-      this.credentials.rollbackCreate(record.credentialSource);
       if (this.isUniqueConstraintError(error)) {
         throw new DuplicateAccessIdError(record.id);
       }
       throw error;
     }
+
+    this.credentials.syncCreated(pendingRecord, credential);
 
     return this.getOrThrow(record.id);
   }
@@ -95,11 +98,16 @@ export class AccessRegistry {
     const updatedRecord = {
       ...nextRecord,
       credentialSource: current.credentialSource,
+      credentialSyncIssue: credential === undefined ? current.credentialSyncIssue : undefined,
+      credentialSyncState: credential === undefined
+        ? (current.credentialSyncState ?? "ready")
+        : "pending_write",
       updatedAt: new Date().toISOString(),
     };
 
     if (credential !== undefined) {
-      this.credentials.update(current, credential, () => this.accessStore.update(updatedRecord));
+      this.accessStore.update(updatedRecord);
+      this.credentials.syncUpdated(updatedRecord, credential);
     } else {
       this.accessStore.update(updatedRecord);
     }
@@ -113,7 +121,7 @@ export class AccessRegistry {
 
   readCredential(accessId: string): StoredCredential {
     const record = this.getOrThrow(accessId);
-    return this.credentialStore.get(record.credentialSource.reference);
+    return this.credentials.read(record);
   }
 
   list(): AccessRecord[] {
@@ -122,7 +130,20 @@ export class AccessRegistry {
 
   remove(accessId: string): void {
     const current = this.getOrThrow(accessId);
-    this.credentials.remove(current, () => this.accessStore.remove(accessId));
+    this.credentials.markDeletePending(current);
+    this.credentials.syncRemoved(current);
+
+    try {
+      this.accessStore.remove(accessId);
+    } catch (error) {
+      this.accessStore.setCredentialSyncState(
+        accessId,
+        "delete_failed",
+        error instanceof Error ? error.message : String(error),
+        new Date().toISOString(),
+      );
+      throw error;
+    }
   }
 
   close(): void {

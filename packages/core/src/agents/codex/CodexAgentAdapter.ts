@@ -7,7 +7,6 @@ import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore"
 import { NileLogger } from "../../services/NileLogger";
 import type {
   RollbackLatestAgentResult,
-  AgentAdapterCapabilities,
 } from "../../runtime-local/AgentAdapterTypes";
 import { ManagedAgentAdapter } from "../../runtime-local/ManagedAgentAdapter";
 import type { SharedAgentAdapterContext } from "../../runtime-local/AgentAdapterContext";
@@ -29,81 +28,87 @@ export type CodexAgentAdapterOptions = {
 
 export class CodexAgentAdapter extends ManagedAgentAdapter {
   readonly agentId = CODEX_AGENT_ID;
+  readonly rollbackSupport = "yes" as const;
 
-  readonly capabilities: AgentAdapterCapabilities = {
-    detect: "yes",
-    apply: "yes",
-    import: "yes",
-    history: "yes",
-    rollback: "yes",
-    desktopSupport: "partial",
-  };
-
-  private readonly databasePath: string;
-  private readonly codexHome: string;
-  private readonly credentialStore: CredentialStore;
-  private readonly environment: EnvironmentSource;
-  private readonly secureSnapshotStore: SecureSnapshotStore | undefined;
-  private readonly logger: NileLogger;
-  private readonly sharedContext: SharedAgentAdapterContext | undefined;
+  private readonly openApplyOperation: () => ApplySelection;
+  private readonly openImportOperation: () => ImportCurrentConnection;
+  private readonly openRollbackOperation: () => RollbackLatestMutation;
+  private readonly openDetectOperation: () => CurrentStateDetector;
 
   constructor(options: CodexAgentAdapterOptions) {
     super();
-    this.databasePath = options.databasePath;
-    this.codexHome = options.codexHome ?? join(homedir(), ".codex");
-    this.credentialStore = options.credentialStore;
-    this.environment = options.environment ?? EnvironmentSource.from(process.env);
-    this.secureSnapshotStore = options.secureSnapshotStore;
-    this.logger = options.logger ?? NileLogger.silent().child({ module: "codex-agent-adapter" });
-    this.sharedContext = options.sharedContext;
+    const databasePath = options.databasePath;
+    const codexHome = options.codexHome ?? join(homedir(), ".codex");
+    const credentialStore = options.credentialStore;
+    const environment = options.environment ?? EnvironmentSource.from(process.env);
+    const secureSnapshotStore = options.secureSnapshotStore;
+    const logger = options.logger ?? NileLogger.silent().child({ module: "codex-agent-adapter" });
+    const sharedContext = options.sharedContext;
+
+    this.openApplyOperation = () => sharedContext
+      ? ApplySelection.fromContext(sharedContext, {
+          codexHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "apply-selection" }),
+        })
+      : ApplySelection.open(databasePath, {
+          codexHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "apply-selection" }),
+        });
+    this.openImportOperation = () => sharedContext
+      ? ImportCurrentConnection.fromContext(sharedContext, {
+          codexHome,
+          credentialStore,
+          environment,
+          logger: logger.child({ scope: "import-current-connection" }),
+        })
+      : ImportCurrentConnection.open(databasePath, {
+          codexHome,
+          credentialStore,
+          environment,
+          logger: logger.child({ scope: "import-current-connection" }),
+        });
+    this.openRollbackOperation = () => sharedContext
+      ? RollbackLatestMutation.fromContext(sharedContext, {
+          codexHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "rollback-latest-mutation" }),
+        })
+      : RollbackLatestMutation.open(databasePath, {
+          codexHome,
+          credentialStore,
+          secureSnapshotStore,
+          logger: logger.child({ scope: "rollback-latest-mutation" }),
+        });
+    this.openDetectOperation = () => sharedContext
+      ? CurrentStateDetector.fromContext(sharedContext, {
+          codexHome,
+          credentialStore,
+          environment,
+          logger: logger.child({ scope: "current-state-detector" }),
+        })
+      : CurrentStateDetector.open(databasePath, {
+          codexHome,
+          credentialStore,
+          environment,
+          logger: logger.child({ scope: "current-state-detector" }),
+        });
   }
 
   protected openApplySelection(): ApplySelection {
-    return this.sharedContext
-      ? ApplySelection.fromContext(this.sharedContext, {
-          codexHome: this.codexHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "apply-selection" }),
-        })
-      : ApplySelection.open(this.databasePath, {
-          codexHome: this.codexHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "apply-selection" }),
-        });
+    return this.openApplyOperation();
   }
 
   protected openImporter(): ImportCurrentConnection {
-    return this.sharedContext
-      ? ImportCurrentConnection.fromContext(this.sharedContext, {
-          codexHome: this.codexHome,
-          credentialStore: this.credentialStore,
-          environment: this.environment,
-          logger: this.logger.child({ scope: "import-current-connection" }),
-        })
-      : ImportCurrentConnection.open(this.databasePath, {
-          codexHome: this.codexHome,
-          credentialStore: this.credentialStore,
-          environment: this.environment,
-          logger: this.logger.child({ scope: "import-current-connection" }),
-        });
+    return this.openImportOperation();
   }
 
   rollbackLatestMutation(): RollbackLatestAgentResult {
-    const rollback = this.sharedContext
-      ? RollbackLatestMutation.fromContext(this.sharedContext, {
-          codexHome: this.codexHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "rollback-latest-mutation" }),
-        })
-      : RollbackLatestMutation.open(this.databasePath, {
-          codexHome: this.codexHome,
-          credentialStore: this.credentialStore,
-          secureSnapshotStore: this.secureSnapshotStore,
-          logger: this.logger.child({ scope: "rollback-latest-mutation" }),
-        });
+    const rollback = this.openRollbackOperation();
 
     try {
       const result = rollback.rollback();
@@ -118,19 +123,6 @@ export class CodexAgentAdapter extends ManagedAgentAdapter {
   }
 
   protected openDetector(): CurrentStateDetector {
-    if (this.sharedContext) {
-      return CurrentStateDetector.fromContext(this.sharedContext, {
-        codexHome: this.codexHome,
-        credentialStore: this.credentialStore,
-        environment: this.environment,
-        logger: this.logger.child({ scope: "current-state-detector" }),
-      });
-    }
-    return CurrentStateDetector.open(this.databasePath, {
-      codexHome: this.codexHome,
-      credentialStore: this.credentialStore,
-      environment: this.environment,
-      logger: this.logger.child({ scope: "current-state-detector" }),
-    });
+    return this.openDetectOperation();
   }
 }

@@ -8,11 +8,9 @@ import type {
   CreateConnectionInput,
   CreateConnectionResult,
 } from "../models/connection/Creator";
-import type { SavedConnectionSummary } from "../models/connection/SavedConnections";
-import type { AgentId } from "../models/agent/Types";
 import type { ConnectionCreator } from "../models/connection/Creator";
-import type { SavedConnections } from "../models/connection/SavedConnections";
-import type { CreateLocalConnectionInput, RemoveConnectionResult, UpdateConnectionInput } from "./ConnectionTypes";
+import type { SavedConnections, SavedConnectionSummary } from "../models/connection/SavedConnections";
+import type { CreateLocalConnectionInput, UpdateConnectionInput } from "./ConnectionTypes";
 
 export class SessionConnections {
   constructor(
@@ -20,22 +18,6 @@ export class SessionConnections {
     private readonly connectionCreator: ConnectionCreator,
     private readonly createLocalCredentialResolver: () => LocalCredentialResolver,
   ) {}
-
-  list(): SavedConnectionSummary[] {
-    return this.savedConnections.list();
-  }
-
-  listForAgent(agentId: AgentId): SavedConnectionSummary[] {
-    return this.savedConnections.listForAgent(agentId);
-  }
-
-  readCredential(connectionId: string): StoredCredential {
-    return this.savedConnections.readCredential(connectionId);
-  }
-
-  remove(connectionId: string): RemoveConnectionResult {
-    return this.savedConnections.remove(connectionId);
-  }
 
   async update(
     input: UpdateConnectionInput,
@@ -60,18 +42,6 @@ export class SessionConnections {
     });
   }
 
-  async describeOnboarding(input: CreateConnectionInput): Promise<ConnectionOnboardingSuggestion> {
-    return await this.connectionCreator.describeOnboarding(input);
-  }
-
-  async create(input: CreateConnectionInput): Promise<CreateConnectionResult> {
-    return await this.connectionCreator.create(input);
-  }
-
-  async createLocal(input: CreateLocalConnectionInput): Promise<CreateConnectionResult> {
-    return await this.createLocalWithResolver(input, this.createLocalCredentialResolver());
-  }
-
   async createLocalWithResolver(
     input: CreateLocalConnectionInput,
     localCredentialResolver: LocalCredentialResolver,
@@ -79,10 +49,6 @@ export class SessionConnections {
     return await this.connectionCreator.create(
       this.buildCreateConnectionInput(input, localCredentialResolver, input.enabledAgents),
     );
-  }
-
-  async describeLocalOnboarding(input: CreateLocalConnectionInput): Promise<ConnectionOnboardingSuggestion> {
-    return await this.describeLocalOnboardingWithResolver(input, this.createLocalCredentialResolver());
   }
 
   async describeLocalOnboardingWithResolver(

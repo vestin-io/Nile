@@ -74,33 +74,31 @@ export class ConnectionUpdater {
       ? this.identityKeyResolver.resolve(current.authMode, nextCredential)
       : undefined;
 
-    return this.database.transaction(() => {
-      const currentAccess = this.requireAccess(input.connectionId);
-      const endpoint = prepared
-        ? this.resolveEndpointForUpdate(currentAccess, currentEndpoint, prepared.endpointCandidate)
-        : this.requireEndpoint(currentAccess.endpointId);
-      const updated = this.accessRegistry.update(
-        currentAccess.id,
-        {
-          endpointId: endpoint.id,
-          label: input.label ?? currentAccess.label,
-          identityKey: nextIdentityKey === undefined ? undefined : nextIdentityKey,
-          openclawModelId:
-            input.openclawModelId === undefined
-              ? currentAccess.openclawModelId
-              : input.openclawModelId,
-          enabledAgents: nextEnabledAgents,
-        },
-        nextCredential,
-      );
+    const currentAccess = this.requireAccess(input.connectionId);
+    const endpoint = prepared
+      ? this.resolveEndpointForUpdate(currentAccess, currentEndpoint, prepared.endpointCandidate)
+      : this.requireEndpoint(currentAccess.endpointId);
+    const updated = this.accessRegistry.update(
+      currentAccess.id,
+      {
+        endpointId: endpoint.id,
+        label: input.label ?? currentAccess.label,
+        identityKey: nextIdentityKey === undefined ? undefined : nextIdentityKey,
+        openclawModelId:
+          input.openclawModelId === undefined
+            ? currentAccess.openclawModelId
+            : input.openclawModelId,
+        enabledAgents: nextEnabledAgents,
+      },
+      nextCredential,
+    );
 
-      if (currentAccess.endpointId !== endpoint.id) {
-        this.refreshSelectedAgents(selectedRecords, updated.id);
-        this.removeEndpointIfOrphaned(currentAccess.endpointId);
-      }
+    if (currentAccess.endpointId !== endpoint.id) {
+      this.refreshSelectedAgents(selectedRecords, updated.id);
+      this.removeEndpointIfOrphaned(currentAccess.endpointId);
+    }
 
-      return updated;
-    });
+    return updated;
   }
 
   private async prepareEndpointUpdate(

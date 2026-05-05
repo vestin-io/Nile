@@ -41,16 +41,16 @@ export class ImportCurrentConnection {
       new AgentImportSupport(
         CLAUDE_AGENT_ID,
         "Claude",
-        context.endpointRegistry,
-        context.accessRegistry,
+        context.sharedContext.endpointRegistry,
+        context.sharedContext.accessRegistry,
         context.agentSelection,
         logger,
       ),
       new CurrentStateDetector(
         reader,
         new AgentStateMatcher(
-          context.endpointRegistry,
-          context.accessRegistry,
+          context.sharedContext.endpointRegistry,
+          context.sharedContext.accessRegistry,
           context.agentSelection,
           CLAUDE_AGENT_ID,
         ),

@@ -1,7 +1,5 @@
-import type { AgentId } from "../../models/agent/Types";
+import { formatAgentLabel, type AgentAdapterLookup, type AgentDetectionResult, type AgentId } from "../../models/agent";
 import type { AccessRegistry } from "../../models/access";
-import { AgentAdapterRegistry } from "../../runtime-local/AgentAdapterRegistry";
-import type { AgentDetectionResult } from "../../runtime-local/AgentAdapterTypes";
 import {
   type AgentStatusConnection,
   type AgentStatusView,
@@ -13,7 +11,7 @@ export class ScanLocalSetups {
   constructor(
     private readonly status: Status,
     private readonly accessRegistry: AccessRegistry,
-    private readonly agentAdapterRegistry: AgentAdapterRegistry,
+    private readonly agentAdapterRegistry: AgentAdapterLookup,
   ) {}
 
   run(agentIds?: AgentId[]): ScanLocalSetupsResult {
@@ -53,10 +51,6 @@ export class ScanLocalSetups {
     detection: AgentDetectionResult,
     status: AgentStatusView,
   ): ScanItemState {
-    if (this.agentAdapterRegistry.get(detection.detectedState.agentId).capabilities.import !== "yes") {
-      return "unsupported";
-    }
-
     if (detection.detectedState.validity === "valid_matched") {
       return "already_saved";
     }
@@ -74,9 +68,9 @@ export class ScanLocalSetups {
 
   private resolveTitle(agentId: AgentId, liveConnection: AgentStatusConnection | null): string {
     if (liveConnection) {
-      return `${this.formatAgentLabel(agentId)} · ${liveConnection.label}`;
+      return `${formatAgentLabel(agentId)} · ${liveConnection.label}`;
     }
-    return `${this.formatAgentLabel(agentId)} · No local setup`;
+    return `${formatAgentLabel(agentId)} · No local setup`;
   }
 
   private resolveSubtitle(
@@ -89,9 +83,5 @@ export class ScanLocalSetups {
 
     const firstIssue = detection.detectedState.issues[0];
     return firstIssue ?? "No readable local setup detected";
-  }
-
-  private formatAgentLabel(agentId: AgentId): string {
-    return agentId.charAt(0).toUpperCase() + agentId.slice(1);
   }
 }

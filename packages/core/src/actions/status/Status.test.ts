@@ -12,11 +12,9 @@ import { AgentAdapterRegistry } from "../../runtime-local/AgentAdapterRegistry";
 import { Status } from "./Status";
 import type {
   ApplyAgentSelectionResult,
-  DetectedAgentState,
   ImportCurrentConnectionResult,
   RollbackLatestAgentResult,
   AgentAdapter,
-  AgentAdapterCapabilities,
   AgentDetectionResult,
 } from "../../runtime-local/AgentAdapterTypes";
 
@@ -432,14 +430,7 @@ class CountingStatusEndpointRegistry {
 }
 
 class StubStatusAdapter implements AgentAdapter {
-  readonly capabilities: AgentAdapterCapabilities = {
-    detect: "yes",
-    apply: "yes",
-    import: "yes",
-    history: "no",
-    rollback: "yes",
-    desktopSupport: "no",
-  };
+  readonly rollbackSupport = "yes" as const;
 
   constructor(private readonly detection: AgentDetectionResult) {}
 
@@ -447,9 +438,6 @@ class StubStatusAdapter implements AgentAdapter {
     return this.detection.detectedState.agentId;
   }
 
-  detectCurrentState(): DetectedAgentState {
-    return this.detection.detectedState;
-  }
   detectAgentSelection(): AgentDetectionResult {
     return this.detection;
   }

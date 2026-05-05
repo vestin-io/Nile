@@ -42,8 +42,8 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<CodexDetect
       environment,
     );
     const matcher = new AgentStateMatcher(
-      context.endpointRegistry,
-      context.accessRegistry,
+      context.sharedContext.endpointRegistry,
+      context.sharedContext.accessRegistry,
       context.agentSelection,
       CODEX_AGENT_ID,
     );

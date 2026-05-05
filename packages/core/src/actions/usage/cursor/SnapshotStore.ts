@@ -1,4 +1,4 @@
-import { SqliteDatabase } from "../../../services/database/SqliteDatabase";
+import { SchemaMigrations, SqliteDatabase } from "../../../services/database";
 import type { CursorUsageSnapshotFreshness, CursorUsageSnapshotInput, CursorUsageSnapshotRecord } from "./Types";
 
 type SnapshotRow = {
@@ -172,23 +172,30 @@ export class CursorUsageSnapshotStore {
   }
 
   private initialize(): void {
-    this.database.exec(`
-      CREATE TABLE IF NOT EXISTS cursor_usage_snapshots (
-        connection_id TEXT PRIMARY KEY,
-        auth_id TEXT NOT NULL,
-        workos_user_id TEXT NOT NULL,
-        email TEXT,
-        total_percent_used REAL NOT NULL,
-        auto_percent_used REAL NOT NULL,
-        api_percent_used REAL NOT NULL,
-        billing_cycle_start TEXT NOT NULL,
-        billing_cycle_end TEXT NOT NULL,
-        fetched_at TEXT NOT NULL,
-        freshness TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-    `);
+    new SchemaMigrations(this.database).apply("actions.cursor_usage_snapshots", [
+      {
+        version: 1,
+        statements: [
+          `
+            CREATE TABLE IF NOT EXISTS cursor_usage_snapshots (
+              connection_id TEXT PRIMARY KEY,
+              auth_id TEXT NOT NULL,
+              workos_user_id TEXT NOT NULL,
+              email TEXT,
+              total_percent_used REAL NOT NULL,
+              auto_percent_used REAL NOT NULL,
+              api_percent_used REAL NOT NULL,
+              billing_cycle_start TEXT NOT NULL,
+              billing_cycle_end TEXT NOT NULL,
+              fetched_at TEXT NOT NULL,
+              freshness TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            );
+          `,
+        ],
+      },
+    ]);
   }
 
   private normalizeInput(

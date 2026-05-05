@@ -57,27 +57,29 @@ export class ConnectionCreator {
       credential: input.probeCredential ?? input.credential,
     });
     const onboarding = this.onboardingPolicy.suggest(input.preset, endpointCandidate);
-    return this.database.transaction(() => {
-      const endpoint = this.ensureEndpoint(endpointCandidate);
-      const label = input.label?.trim() || this.suggestAccessLabel(input);
-      const identityKey = this.identityKeyResolver.resolve(input.authMode, input.credential);
-      const existing = this.findExistingAccess(endpoint.id, input, identityKey);
+    const ensuredEndpoint = this.ensureEndpoint(endpointCandidate);
+    const endpoint = ensuredEndpoint.record;
+    const label = input.label?.trim() || this.suggestAccessLabel(input);
+    const identityKey = this.identityKeyResolver.resolve(input.authMode, input.credential);
+    const existing = this.findExistingAccess(endpoint.id, input, identityKey);
 
-      if (existing) {
-        const updated = this.accessRegistry.update(
-          existing.id,
-          {
-            label,
-            identityKey: identityKey ?? null,
-            openclawModelId: input.openclawModelId ?? null,
-            enabledAgents: input.enabledAgents ?? onboarding.defaultEnabledAgents,
-          },
-          input.credential,
-        );
-        return this.toResult(endpoint, updated, true);
-      }
+    if (existing) {
+      const updated = this.accessRegistry.update(
+        existing.id,
+        {
+          label,
+          identityKey: identityKey ?? null,
+          openclawModelId: input.openclawModelId ?? null,
+          enabledAgents: input.enabledAgents ?? onboarding.defaultEnabledAgents,
+        },
+        input.credential,
+      );
+      return this.toResult(endpoint, updated, true);
+    }
 
-      const access = this.accessRegistry.add(
+    let access;
+    try {
+      access = this.accessRegistry.add(
         {
           id: this.resolveAccessId(input.id, label),
           endpointId: endpoint.id,
@@ -89,8 +91,13 @@ export class ConnectionCreator {
         },
         input.credential,
       );
-      return this.toResult(endpoint, access);
-    });
+    } catch (error) {
+      if (ensuredEndpoint.created) {
+        this.removeEndpointIfOrphaned(endpoint.id);
+      }
+      throw error;
+    }
+    return this.toResult(endpoint, access);
   }
 
   async describeOnboarding(input: CreateConnectionInput): Promise<ConnectionOnboardingSuggestion> {
@@ -101,36 +108,45 @@ export class ConnectionCreator {
     return this.onboardingPolicy.suggest(input.preset, endpointCandidate);
   }
 
-  private ensureEndpoint(candidate: EndpointRegistryInput): EndpointRecord {
+  private ensureEndpoint(candidate: EndpointRegistryInput): { created: boolean; record: EndpointRecord } {
     const hinted = this.endpointRegistry.get(candidate.id);
     if (hinted && this.matchesEndpointIdentity(hinted, candidate)) {
-      return this.endpointRegistry.update(hinted.id, {
-        label: candidate.label,
-        rootUrl: candidate.rootUrl,
-        profile: candidate.profile ?? null,
-        protocols: this.mergeProtocols(hinted.protocols, candidate.protocols),
-      });
+      return {
+        created: false,
+        record: this.endpointRegistry.update(hinted.id, {
+          label: candidate.label,
+          rootUrl: candidate.rootUrl,
+          profile: candidate.profile ?? null,
+          protocols: this.mergeProtocols(hinted.protocols, candidate.protocols),
+        }),
+      };
     }
 
     const existingEquivalent = this.endpointRegistry
       .list()
       .find((endpoint) => EndpointShape.matchesRecord(endpoint, candidate));
     if (existingEquivalent) {
-      return this.endpointRegistry.update(existingEquivalent.id, {
-        label: candidate.label,
-        rootUrl: candidate.rootUrl,
-        profile: candidate.profile ?? null,
-        protocols: candidate.protocols,
-      });
+      return {
+        created: false,
+        record: this.endpointRegistry.update(existingEquivalent.id, {
+          label: candidate.label,
+          rootUrl: candidate.rootUrl,
+          profile: candidate.profile ?? null,
+          protocols: candidate.protocols,
+        }),
+      };
     }
 
     const endpointId = hinted
       ? ConnectionNaming.createUniqueId(candidate.id, this.endpointRegistry.list().map((entry) => entry.id))
       : candidate.id;
-    return this.endpointRegistry.add({
-      ...candidate,
-      id: endpointId,
-    });
+    return {
+      created: true,
+      record: this.endpointRegistry.add({
+        ...candidate,
+        id: endpointId,
+      }),
+    };
   }
 
   private matchesEndpointIdentity(
@@ -159,6 +175,13 @@ export class ConnectionCreator {
       .list()
       .filter((access) => access.endpointId === endpointId && access.authMode === input.authMode)
       .find((access) => this.matchesCredential(access, input.credential, identityKey, input.openclawModelId)) ?? null;
+  }
+
+  private removeEndpointIfOrphaned(endpointId: string): void {
+    const stillReferenced = this.accessRegistry.list().some((access) => access.endpointId === endpointId);
+    if (!stillReferenced) {
+      this.endpointRegistry.remove(endpointId);
+    }
   }
 
   private matchesCredential(

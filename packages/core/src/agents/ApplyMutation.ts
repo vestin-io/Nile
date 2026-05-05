@@ -32,7 +32,7 @@ export class ApplyMutation {
       agentId: input.agentId,
       type: "apply_selection",
       connectionId: prepared.connectionId,
-      connectionLabel: prepared.connection.label,
+      connectionLabel: prepared.access.label,
       endpointLabel: prepared.endpoint.label,
       accessLabel: prepared.access.label,
       files: input.buildFiles(prepared),

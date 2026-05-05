@@ -36,7 +36,7 @@ export class RollbackLatestMutation {
     const cursorHome = options?.cursorHome ?? join(homedir(), ".cursor");
     return new RollbackLatestMutation(
       new MutationHistory(
-        context.database,
+        context.workspaceState.database,
         new FileSnapshotStore(join(dirname(databasePath), "history")),
         options?.secureSnapshotStore ?? new SecureSnapshotStore(),
         logger.child({ scope: "mutation-history" }),
@@ -44,7 +44,7 @@ export class RollbackLatestMutation {
       new FileSnapshotStore(join(dirname(databasePath), "history")),
       options?.secureSnapshotStore ?? new SecureSnapshotStore(),
       context.agentSelection,
-      CurrentStateDetector.fromContext(context, {
+      CurrentStateDetector.fromContext(context.sharedContext, {
         cursorHome,
         credentialStore: options.credentialStore,
         logger: logger.child({ scope: "cursor-current-state-detector" }),

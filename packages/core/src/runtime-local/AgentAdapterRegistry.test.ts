@@ -34,44 +34,16 @@ describe("AgentAdapterRegistry", () => {
     const openclawAdapter = registry.get("openclaw");
 
     expect(codexAdapter.agentId).toBe("codex");
-    expect(codexAdapter.capabilities).toEqual({
-      detect: "yes",
-      apply: "yes",
-      import: "yes",
-      history: "yes",
-      rollback: "yes",
-      desktopSupport: "partial",
-    });
+    expect(codexAdapter.rollbackSupport).toBe("yes");
 
     expect(cursorAdapter.agentId).toBe("cursor");
-    expect(cursorAdapter.capabilities).toEqual({
-      detect: "yes",
-      apply: "yes",
-      import: "yes",
-      history: "yes",
-      rollback: "yes",
-      desktopSupport: "no",
-    });
+    expect(cursorAdapter.rollbackSupport).toBe("yes");
 
     expect(claudeAdapter.agentId).toBe("claude");
-    expect(claudeAdapter.capabilities).toEqual({
-      detect: "yes",
-      apply: "yes",
-      import: "yes",
-      history: "yes",
-      rollback: "yes",
-      desktopSupport: "partial",
-    });
+    expect(claudeAdapter.rollbackSupport).toBe("yes");
 
     expect(openclawAdapter.agentId).toBe("openclaw");
-    expect(openclawAdapter.capabilities).toEqual({
-      detect: "yes",
-      apply: "yes",
-      import: "yes",
-      history: "yes",
-      rollback: "yes",
-      desktopSupport: "partial",
-    });
+    expect(openclawAdapter.rollbackSupport).toBe("yes");
   });
 
   it("throws for an unimplemented agent", () => {
@@ -92,17 +64,7 @@ describe("AgentAdapterRegistry", () => {
   it("throws when duplicate agent adapters are registered", () => {
     const adapter = {
       agentId: "codex",
-      capabilities: {
-        detect: "yes",
-        apply: "yes",
-        import: "yes",
-        history: "no",
-        rollback: "no",
-        desktopSupport: "no",
-      },
-      detectCurrentState() {
-        throw new Error("not used");
-      },
+      rollbackSupport: "no",
       detectAgentSelection() {
         throw new Error("not used");
       },

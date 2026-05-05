@@ -1,8 +1,8 @@
 import { createTranslator } from "../shared/I18n";
 import { DesktopPreferencesStore } from "../settings/Preferences";
-import { authModeLabel } from "../shared/Support";
+import { authModeLabel } from "../shared/DisplayText";
 
-type MenubarState = Awaited<ReturnType<typeof window.nileDesktop.getMenubarState>>;
+type MenubarState = Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarState>>;
 
 const preferencesStore = new DesktopPreferencesStore(window.localStorage, document.documentElement);
 const currentElement = document.getElementById("menubar-current");
@@ -37,7 +37,7 @@ function applyFramePreferences() {
 async function render(): Promise<void> {
   const preferences = preferencesStore.load();
   const t = createTranslator(preferences.language);
-  const state = await window.nileDesktop.getMenubarState();
+  const state = await window.nileDesktop.state.getMenubarState();
   const codex = state.agents.find((agent) => agent.agentId === "codex") ?? state.agents[0] ?? null;
   renderCurrent(codex, t);
   renderConnections(codex, t);
@@ -87,7 +87,7 @@ function renderConnections(
       button.textContent = connection.isCurrent ? t("common.current") : t("common.use");
       button.disabled = connection.isCurrent;
       button.addEventListener("click", async () => {
-        await window.nileDesktop.switchConnection(agent.agentId, connection.id);
+        await window.nileDesktop.connections.switchConnection(agent.agentId, connection.id);
         await render();
       });
 
@@ -105,11 +105,11 @@ function escapeHtml(value: string): string {
 }
 
 settingsButton?.addEventListener("click", async () => {
-  await window.nileDesktop.openSettings();
+  await window.nileDesktop.app.openSettings();
 });
 
 refreshButton?.addEventListener("click", async () => {
-  await window.nileDesktop.refreshMenubar();
+  await window.nileDesktop.state.refreshMenubar();
   await render();
 });
 

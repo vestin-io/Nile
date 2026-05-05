@@ -1,5 +1,4 @@
-import type { AgentId } from "../../models/agent/Types";
-import { AgentAdapterRegistry } from "../../runtime-local/AgentAdapterRegistry";
+import type { AgentAdapterLookup, AgentId } from "../../models/agent";
 import {
   type ImportDetectedSetupsInput,
   type ImportDetectedSetupsResult,
@@ -10,7 +9,7 @@ import { ScanLocalSetups } from "./ScanLocalSetups";
 export class ImportDetectedSetups {
   constructor(
     private readonly scanner: ScanLocalSetups,
-    private readonly agentAdapterRegistry: AgentAdapterRegistry,
+    private readonly agentAdapterRegistry: AgentAdapterLookup,
   ) {}
 
   run(input: ImportDetectedSetupsInput): ImportDetectedSetupsResult {

@@ -3,67 +3,94 @@ import {
   CredentialAlreadyExistsError,
   CredentialNotFoundError,
 } from "../../services/credential/Store";
-import type { CredentialSource } from "../../services/credential/Source";
 import type { StoredCredential } from "../../services/credential/Types";
-import { AccessRegistryConsistencyError, DuplicateAccessIdError } from "./Errors";
-import type { AccessRecord } from "./Types";
-import type { AccessStore } from "./store/Store";
+import { AccessRegistryConsistencyError } from "./Errors";
+import type { AccessCredentialSyncState, AccessRecord } from "./Types";
+import { SqliteAccessStore } from "./SqliteAccessStore";
 
 export class AccessCredentials {
   constructor(
-    private readonly accessStore: AccessStore,
+    private readonly accessStore: SqliteAccessStore,
     private readonly credentialStore: CredentialStore,
   ) {}
 
-  create(record: AccessRecord, credential: StoredCredential): void {
+  syncCreated(record: AccessRecord, credential: StoredCredential): void {
+    try {
+      this.createOrUpdate(record, credential);
+      this.markReady(record);
+    } catch (error) {
+      this.markFailure(record, "write_failed", error);
+      throw this.buildConsistencyError(
+        `Credential sync failed after access create for ${record.id}`,
+        error,
+      );
+    }
+  }
+
+  syncUpdated(record: AccessRecord, credential: StoredCredential): void {
+    try {
+      this.credentialStore.update(record.credentialSource.reference, credential);
+      this.markReady(record);
+    } catch (error) {
+      this.markFailure(record, "write_failed", error);
+      throw this.buildConsistencyError(
+        `Credential sync failed after access update for ${record.id}`,
+        error,
+      );
+    }
+  }
+
+  syncRemoved(record: AccessRecord): void {
+    try {
+      this.removeIfPresent(record);
+    } catch (error) {
+      this.markFailure(record, "delete_failed", error);
+      throw this.buildConsistencyError(
+        `Credential removal failed for access ${record.id}`,
+        error,
+      );
+    }
+  }
+
+  read(record: AccessRecord): StoredCredential {
+    const state = record.credentialSyncState ?? "ready";
+    if (state !== "ready") {
+      throw new AccessRegistryConsistencyError(
+        `Credential for access ${record.id} is not synchronized (${state})`,
+      );
+    }
+
+    try {
+      return this.credentialStore.get(record.credentialSource.reference);
+    } catch (error) {
+      if (error instanceof CredentialNotFoundError) {
+        this.markFailure(record, "write_failed", error);
+        throw new AccessRegistryConsistencyError(
+          `Credential for access ${record.id} is missing from the credential store`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  markDeletePending(record: AccessRecord): void {
+    this.writeState(record, "pending_delete", null);
+  }
+
+  private createOrUpdate(record: AccessRecord, credential: StoredCredential): void {
     try {
       this.credentialStore.create(record.credentialSource.reference, credential);
-      return;
     } catch (error) {
       if (!(error instanceof CredentialAlreadyExistsError)) {
         throw error;
       }
-    }
-
-    if (this.accessStore.get(record.id)) {
-      throw new DuplicateAccessIdError(record.id);
-    }
-
-    this.credentialStore.update(record.credentialSource.reference, credential);
-  }
-
-  update(
-    current: AccessRecord,
-    credential: StoredCredential,
-    writeRecord: () => void,
-  ): void {
-    const previousCredential = this.credentialStore.get(current.credentialSource.reference);
-    this.credentialStore.update(current.credentialSource.reference, credential);
-
-    try {
-      writeRecord();
-    } catch (error) {
-      this.rollbackUpdate(current.credentialSource, previousCredential, error);
+      this.credentialStore.update(record.credentialSource.reference, credential);
     }
   }
 
-  remove(
-    record: AccessRecord,
-    removeRecord: () => void,
-  ): void {
-    const previousCredential = this.credentialStore.get(record.credentialSource.reference);
-    this.credentialStore.remove(record.credentialSource.reference);
-
+  private removeIfPresent(record: AccessRecord): void {
     try {
-      removeRecord();
-    } catch (error) {
-      this.restoreAfterRemove(record.credentialSource, previousCredential, error);
-    }
-  }
-
-  rollbackCreate(credentialSource: CredentialSource): void {
-    try {
-      this.credentialStore.remove(credentialSource.reference);
+      this.credentialStore.remove(record.credentialSource.reference);
     } catch (error) {
       if (error instanceof CredentialNotFoundError) {
         return;
@@ -72,35 +99,44 @@ export class AccessCredentials {
     }
   }
 
-  private rollbackUpdate(
-    credentialSource: CredentialSource,
-    previousCredential: StoredCredential,
-    cause: unknown,
-  ): never {
-    try {
-      this.credentialStore.update(credentialSource.reference, previousCredential);
-    } catch (rollbackError) {
-      const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
-      throw new AccessRegistryConsistencyError(
-        `Failed to restore credential after access update error: ${rollbackMessage}`,
-      );
-    }
-    throw cause;
+  private markReady(record: AccessRecord): void {
+    this.writeState(record, "ready", null);
   }
 
-  private restoreAfterRemove(
-    credentialSource: CredentialSource,
-    previousCredential: StoredCredential,
-    cause: unknown,
-  ): never {
+  private markFailure(
+    record: AccessRecord,
+    state: "write_failed" | "delete_failed",
+    error: unknown,
+  ): void {
+    this.writeState(record, state, this.describeIssue(error));
+  }
+
+  private writeState(
+    record: AccessRecord,
+    state: AccessCredentialSyncState,
+    issue: string | null,
+  ): void {
     try {
-      this.credentialStore.create(credentialSource.reference, previousCredential);
-    } catch (rollbackError) {
-      const rollbackMessage = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
-      throw new AccessRegistryConsistencyError(
-        `Failed to restore credential after access removal error: ${rollbackMessage}`,
+      this.accessStore.setCredentialSyncState(
+        record.id,
+        state,
+        issue,
+        new Date().toISOString(),
+      );
+    } catch (error) {
+      throw this.buildConsistencyError(
+        `Failed to persist credential sync state for access ${record.id}`,
+        error,
       );
     }
-    throw cause;
+  }
+
+  private describeIssue(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
+
+  private buildConsistencyError(message: string, cause: unknown): AccessRegistryConsistencyError {
+    const detail = cause instanceof Error ? cause.message : String(cause);
+    return new AccessRegistryConsistencyError(`${message}: ${detail}`);
   }
 }

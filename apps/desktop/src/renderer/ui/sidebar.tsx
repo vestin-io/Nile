@@ -1,7 +1,7 @@
 import * as React from "react";
 import { PanelLeft } from "lucide-react";
 
-import { cn } from "../lib/cn";
+import { cn } from "./cn";
 import { Button } from "./button";
 
 type SidebarContextValue = {

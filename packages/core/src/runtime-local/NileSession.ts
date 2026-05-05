@@ -7,7 +7,7 @@ import {
 } from "../actions/scan-local";
 import type {
   ApplyAgentSelectionResult,
-  AgentAdapterCapabilities,
+  AgentCapabilitySupport,
   ImportCurrentConnectionResult,
   RollbackLatestAgentResult,
 } from "./AgentAdapterTypes";
@@ -61,7 +61,7 @@ export class NileSession {
     });
     return new NileSession(
       runtime,
-      new NileSessionEffects(() => runtime.getUsageAccess(), runtime.getLogger()),
+      new NileSessionEffects((connectionId) => runtime.autoBindCursorUsage(connectionId), runtime.getLogger()),
     );
   }
 
@@ -71,68 +71,68 @@ export class NileSession {
   ) {}
 
   listSavedConnections(): SavedConnectionSummary[] {
-    return this.runtime.getConnections().list();
+    return this.runtime.getSavedConnections().list();
   }
 
   listSavedConnectionsForAgent(agentId: AgentId): SavedConnectionSummary[] {
-    return this.runtime.getConnections().listForAgent(agentId);
+    return this.runtime.getSavedConnections().listForAgent(agentId);
   }
 
   readConnectionCredential(connectionId: string): StoredCredential {
-    return this.runtime.getConnections().readCredential(connectionId);
+    return this.runtime.getSavedConnections().readCredential(connectionId);
   }
 
   removeConnection(connectionId: string): RemoveConnectionResult {
-    this.runtime.getUsageAccess().clearConnectionArtifacts(connectionId);
-    return this.runtime.getConnections().remove(connectionId);
+    this.runtime.clearConnectionArtifacts(connectionId);
+    return this.runtime.getSavedConnections().remove(connectionId);
   }
 
   async updateConnection(input: UpdateConnectionInput): Promise<SavedConnectionSummary> {
-    return await this.runtime.getConnections().update(input, this.runtime.createLocalCredentialResolver());
+    return await this.runtime.getConnectionWorkflows().update(input, this.runtime.createLocalCredentialResolver());
   }
 
   useConnection(agentId: AgentId, connectionId: string): ApplyAgentSelectionResult {
-    return this.runtime.getAgents().useConnection(agentId, connectionId);
+    return this.runtime.useConnection(agentId, connectionId);
   }
 
   getAgentStatus(agentId: AgentId): AgentStatusView {
-    return this.runtime.getAgents().getStatus(agentId);
+    return this.runtime.getAgentStatus(agentId);
   }
 
   listAgentStatuses(agentIds?: AgentId[]): AgentStatusView[] {
-    return this.runtime.getAgents().listStatuses(agentIds);
+    return this.runtime.listAgentStatuses(agentIds);
   }
 
   scanLocalSetups(agentIds?: AgentId[]): ScanLocalSetupsResult {
-    return this.runtime.getAgents().scanLocalSetups(agentIds);
+    return this.runtime.scanLocalSetups(agentIds);
   }
 
   importDetectedSetups(input: ImportDetectedSetupsInput): ImportDetectedSetupsResult {
-    return this.runtime.getAgents().importDetected(input);
+    return this.runtime.importDetectedSetups(input);
   }
 
   getConnectionUsage(connectionId: string): Promise<ConnectionUsageResult> {
-    return this.runtime.getUsageAccess().getConnectionUsage(connectionId);
+    return this.runtime.getConnectionUsage(connectionId);
   }
 
   bindCursorUsage(connectionId: string, sessionToken: string): BindCursorUsageResult {
-    return this.runtime.getUsageAccess().bindCursorUsage(connectionId, sessionToken);
+    return this.runtime.bindCursorUsage(connectionId, sessionToken);
   }
 
   autoBindCursorUsage(connectionId: string): CursorUsageAutoBindResult {
-    return this.runtime.getUsageAccess().autoBindCursorUsage(connectionId);
+    return this.runtime.autoBindCursorUsage(connectionId);
   }
 
   autoBindAllCursorUsage(): CursorUsageAutoBindResult[] {
-    return this.runtime.getUsageAccess().autoBindAllCursorUsage();
+    return this.runtime.autoBindAllCursorUsage();
   }
 
   async describeConnectionOnboarding(input: CreateConnectionInput): Promise<ConnectionOnboardingSuggestion> {
-    return await this.runtime.getConnections().describeOnboarding(input);
+    return await this.runtime.getConnectionCreator().describeOnboarding(input);
   }
 
   async createConnection(input: CreateConnectionInput): Promise<CreateConnectionResult> {
-    return await this.runtime.getConnections().create(input);
+    return await this.runtime.getConnectionCreator().create(input);
   }
 
   async createConnectionWithLocalEffects(input: CreateConnectionInput): Promise<CreateConnectionResult> {
@@ -143,7 +143,7 @@ export class NileSession {
     input: CreateLocalConnectionInput,
     localCredentialResolver: LocalCredentialResolver = this.runtime.createLocalCredentialResolver(),
   ): Promise<CreateConnectionResult> {
-    return await this.runtime.getConnections().createLocalWithResolver(input, localCredentialResolver);
+    return await this.runtime.getConnectionWorkflows().createLocalWithResolver(input, localCredentialResolver);
   }
 
   async createLocalConnectionWithLocalEffects(
@@ -159,11 +159,11 @@ export class NileSession {
     input: CreateLocalConnectionInput,
     localCredentialResolver: LocalCredentialResolver = this.runtime.createLocalCredentialResolver(),
   ): Promise<ConnectionOnboardingSuggestion> {
-    return await this.runtime.getConnections().describeLocalOnboardingWithResolver(input, localCredentialResolver);
+    return await this.runtime.getConnectionWorkflows().describeLocalOnboardingWithResolver(input, localCredentialResolver);
   }
 
   importCurrentConnection(agentId: AgentId): ImportCurrentConnectionResult {
-    return this.runtime.getAgents().importCurrentConnection(agentId);
+    return this.runtime.importCurrentConnection(agentId);
   }
 
   importCurrentConnectionWithLocalEffects(agentId: AgentId): ImportCurrentConnectionResult {
@@ -171,19 +171,19 @@ export class NileSession {
   }
 
   rollbackLatestMutation(agentId: AgentId): RollbackLatestAgentResult {
-    return this.runtime.getAgents().rollbackLatestMutation(agentId);
+    return this.runtime.rollbackLatestMutation(agentId);
   }
 
-  listAgentCapabilities(): Array<{ agentId: AgentId; capabilities: AgentAdapterCapabilities }> {
-    return this.runtime.getAgents().listCapabilities();
+  listAgentRollbackSupport(): Array<{ agentId: AgentId; rollback: AgentCapabilitySupport }> {
+    return this.runtime.listAgentRollbackSupport();
   }
 
   getLatestRollbackableMutation(agentId: AgentId, scope?: string): MutationHistoryRecord | null {
-    return this.runtime.getAgents().getLatestRollbackableMutation(agentId, scope);
+    return this.runtime.getLatestRollbackableMutation(agentId, scope);
   }
 
   listMutationHistory(limit: number = 20, scope?: string): MutationHistoryRecord[] {
-    return this.runtime.getAgents().listMutationHistory(limit, scope);
+    return this.runtime.listMutationHistory(limit, scope);
   }
 
   close(): void {

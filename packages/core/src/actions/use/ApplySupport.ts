@@ -14,7 +14,6 @@ import {
 } from "../../projection";
 
 export type PreparedAgentApplySelection = {
-  connection: AccessRecord;
   connectionId: string;
   endpoint: EndpointRecord;
   access: AccessRecord;
@@ -54,7 +53,6 @@ export class AgentApplySupport {
     }
 
     const prepared: PreparedAgentApplySelection = {
-      connection: access,
       connectionId,
       endpoint,
       access,
@@ -73,7 +71,7 @@ export class AgentApplySupport {
   }
 
   complete(prepared: PreparedAgentApplySelection): ApplyAgentSelectionResult {
-      this.agentSelection.setApplied(
+    this.agentSelection.setApplied(
       this.agentId,
       prepared.connectionId,
       prepared.appliedAt,
@@ -87,7 +85,7 @@ export class AgentApplySupport {
     return {
       agentId: this.agentId,
       connectionId: prepared.connectionId,
-      connectionLabel: prepared.connection.label,
+      connectionLabel: prepared.access.label,
       endpointId: prepared.endpoint.id,
       endpointLabel: prepared.endpoint.label,
       accessId: prepared.access.id,

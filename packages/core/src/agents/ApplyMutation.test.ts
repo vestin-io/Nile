@@ -88,21 +88,6 @@ describe("ApplyMutation", () => {
 
 function createPrepared(): PreparedAgentApplySelection {
   return {
-    connection: {
-      id: "work",
-      endpointId: "openai",
-      label: "Work",
-      authMode: "api_key",
-      enabledAgents: ["codex"],
-      credentialSource: {
-        kind: "local",
-        scope: "access",
-        reference: "access:work",
-        allowLocalMaterialization: true,
-      },
-      createdAt: "2026-01-01T00:00:00.000Z",
-      updatedAt: "2026-01-01T00:00:00.000Z",
-    },
     connectionId: "work",
     endpoint: {
       id: "openai",
@@ -155,7 +140,7 @@ class StubApplySupport {
     this.completeResult = {
       agentId: prepared.projection.agentId as AgentId,
       connectionId: prepared.connectionId,
-      connectionLabel: prepared.connection.label,
+      connectionLabel: prepared.access.label,
       endpointId: prepared.endpoint.id,
       endpointLabel: prepared.endpoint.label,
       accessId: prepared.access.id,

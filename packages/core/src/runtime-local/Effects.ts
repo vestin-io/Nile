@@ -1,6 +1,4 @@
 import type { NileLogger } from "../services/NileLogger";
-import type { SessionUsageAccess } from "./UsageAccess";
-
 export type LocalEffectResult = {
   id: string;
   endpointFamily: string;
@@ -9,7 +7,7 @@ export type LocalEffectResult = {
 
 export class NileSessionEffects {
   constructor(
-    private readonly getUsageAccess: () => SessionUsageAccess,
+    private readonly autoBindCursorUsage: (connectionId: string) => void,
     private readonly logger?: NileLogger,
   ) {}
 
@@ -32,7 +30,7 @@ export class NileSessionEffects {
     }
 
     try {
-      this.getUsageAccess().autoBindCursorUsage(connectionId);
+      this.autoBindCursorUsage(connectionId);
     } catch (error) {
       this.logger?.warn("session.cursor_usage.auto_bind_failed", {
         connectionId,

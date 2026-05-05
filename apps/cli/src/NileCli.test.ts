@@ -1409,15 +1409,14 @@ describe("NileCli", () => {
 
     expect(removal.exitCode).toBe(0);
     expect(removal.stdout).toContain(
-      "note: Codex still points at the removed connection locally until you switch or import again.",
+      "note: Nile cleared the saved local selection for Codex because this connection was removed.",
     );
     expect(status.exitCode).toBe(0);
     expect(status.stdout).toContain("- Codex");
     expect(status.stdout).toContain("State: new connection detected");
     expect(status.stdout).toContain(
-      "Last applied Codex connection was removed from Nile. Select \"Change Codex connection\" to repair the saved state.",
+      "Hint: Current Codex setup is valid but not yet saved in Nile. Run: nile codex import",
     );
-    expect(status.stdout).toContain("Current Codex setup is still valid and can be saved again with nile codex import.");
   });
 });
 

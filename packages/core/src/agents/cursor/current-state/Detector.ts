@@ -37,8 +37,8 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<CursorDetec
       options?.environment ?? EnvironmentSource.from(process.env),
     );
     const matcher = new AgentStateMatcher(
-      context.endpointRegistry,
-      context.accessRegistry,
+      context.sharedContext.endpointRegistry,
+      context.sharedContext.accessRegistry,
       context.agentSelection,
       CURSOR_AGENT_ID,
     );

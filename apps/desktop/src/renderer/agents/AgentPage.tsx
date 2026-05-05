@@ -7,11 +7,11 @@ import type {
   DesktopAgentState,
   DesktopOnboardingState,
   HistoryState,
-} from "../../DesktopTypes";
-import { AgentDetailPage } from "./AgentDetailPage";
-import type { AgentDetailTab } from "./AgentDetailPage";
+} from "../../state/Types";
+import { AgentDetailPage } from "./detail/Page";
+import type { AgentDetailTab } from "./detail/Page";
 import type { Translator } from "../shared/I18n";
-import { AgentListView } from "./AgentListView";
+import { AgentListView } from "./list/View";
 
 const AGENT_LIST_ORDER: AgentId[] = ["codex", "claude", "cursor", "openclaw"];
 const AGENT_LIST_ORDER_INDEX = new Map(

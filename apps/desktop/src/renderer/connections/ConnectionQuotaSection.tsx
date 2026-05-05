@@ -1,4 +1,4 @@
-import type { DesktopConnection } from "../../DesktopTypes";
+import type { DesktopConnection } from "../../state/Types";
 import type { Translator } from "../shared/I18n";
 import { UsagePanel } from "../shared/UsagePanel";
 

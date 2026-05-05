@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 export type SqliteBinding = string | number | bigint | Uint8Array | null;
+type NonPromiseResult<T> = T extends PromiseLike<unknown> ? never : T;
 
 class SqliteQuery<Row> {
   private statement: StatementSync | null = null;
@@ -51,7 +52,7 @@ export class SqliteDatabase {
     this.connection.exec(sql);
   }
 
-  transaction<TResult>(work: () => TResult): TResult {
+  transaction<TResult>(work: () => TResult): NonPromiseResult<TResult> {
     this.transactionDepth += 1;
     const depth = this.transactionDepth;
     const savepoint = `nile_tx_${depth}`;
@@ -64,12 +65,15 @@ export class SqliteDatabase {
 
     try {
       const result = work();
+      if (this.isPromiseLike(result)) {
+        throw new Error("SqliteDatabase.transaction() does not support async callbacks");
+      }
       if (depth === 1) {
         this.exec("COMMIT");
       } else {
         this.exec(`RELEASE SAVEPOINT ${savepoint}`);
       }
-      return result;
+      return result as NonPromiseResult<TResult>;
     } catch (error) {
       if (depth === 1) {
         this.exec("ROLLBACK");
@@ -97,5 +101,12 @@ export class SqliteDatabase {
     const statement = this.connection.prepare(sql);
     this.statements.set(sql, statement);
     return statement;
+  }
+
+  private isPromiseLike(value: unknown): value is PromiseLike<unknown> {
+    return typeof value === "object"
+      && value !== null
+      && "then" in value
+      && typeof (value as { then?: unknown }).then === "function";
   }
 }

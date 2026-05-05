@@ -1,4 +1,4 @@
-import { SqliteDatabase } from "../../../services/database/SqliteDatabase";
+import { SchemaMigrations, SqliteDatabase } from "../../../services/database";
 import type { CredentialSource } from "../../../services/credential/Source";
 import type { CursorUsageBindingRecord } from "./Types";
 
@@ -100,20 +100,27 @@ export class SqliteBindingStore {
   }
 
   private initialize(): void {
-    this.database.exec(`
-      CREATE TABLE IF NOT EXISTS cursor_usage_bindings (
-        connection_id TEXT PRIMARY KEY,
-        auth_id TEXT NOT NULL,
-        workos_user_id TEXT NOT NULL,
-        email TEXT,
-        credential_source_kind TEXT NOT NULL,
-        credential_source_ref TEXT NOT NULL,
-        observed_at TEXT NOT NULL,
-        last_verified_at TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-    `);
+    new SchemaMigrations(this.database).apply("actions.cursor_usage_bindings", [
+      {
+        version: 1,
+        statements: [
+          `
+            CREATE TABLE IF NOT EXISTS cursor_usage_bindings (
+              connection_id TEXT PRIMARY KEY,
+              auth_id TEXT NOT NULL,
+              workos_user_id TEXT NOT NULL,
+              email TEXT,
+              credential_source_kind TEXT NOT NULL,
+              credential_source_ref TEXT NOT NULL,
+              observed_at TEXT NOT NULL,
+              last_verified_at TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL
+            );
+          `,
+        ],
+      },
+    ]);
   }
 
   private mapRow(row: BindingRow): CursorUsageBindingRecord {

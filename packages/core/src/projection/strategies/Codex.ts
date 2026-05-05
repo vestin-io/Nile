@@ -2,12 +2,10 @@ import type { AccessRecord } from "../../models/access";
 import type { EndpointOpenAiProtocol, EndpointRecord } from "../../models/endpoint";
 import { isEnvKeyApiKeyCredential, type StoredCredential } from "../../services/credential/Types";
 import { AgentProjectionError } from "../ProjectionError";
-import type { AgentProjectionStrategy, CodexProjection, ProjectionInput } from "../Types";
+import type { CodexProjection, ProjectionInput } from "../Types";
 import { joinEndpointUrl } from "../Url";
 
-export class CodexProjectionStrategy implements AgentProjectionStrategy {
-  readonly agentId = "codex" as const;
-
+export class CodexProjectionStrategy {
   resolve(input: ProjectionInput): CodexProjection {
     const protocol = input.endpoint.protocols.openai;
     if (!protocol) {
@@ -21,7 +19,7 @@ export class CodexProjectionStrategy implements AgentProjectionStrategy {
       : undefined;
 
     return {
-      agentId: this.agentId,
+      agentId: "codex",
       protocol: "openai",
       endpointId: input.endpoint.id,
       endpointLabel: input.endpoint.label,

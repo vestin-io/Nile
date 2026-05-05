@@ -1,12 +1,10 @@
 import type { AccessRecord } from "../../models/access";
 import type { StoredCredential } from "../../services/credential/Types";
 import { AgentProjectionError } from "../ProjectionError";
-import type { AgentProjectionStrategy, CursorProjection, ProjectionInput } from "../Types";
+import type { CursorProjection, ProjectionInput } from "../Types";
 import { joinEndpointUrl } from "../Url";
 
-export class CursorProjectionStrategy implements AgentProjectionStrategy {
-  readonly agentId = "cursor" as const;
-
+export class CursorProjectionStrategy {
   resolve(input: ProjectionInput): CursorProjection {
     const protocol = input.endpoint.protocols.cursor;
     if (!protocol) {
@@ -16,7 +14,7 @@ export class CursorProjectionStrategy implements AgentProjectionStrategy {
     this.validateAccess(input.access, input.credential);
 
     return {
-      agentId: this.agentId,
+      agentId: "cursor",
       protocol: "cursor",
       endpointId: input.endpoint.id,
       endpointLabel: input.endpoint.label,

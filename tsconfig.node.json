@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022"]
+  },
+  "include": [
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "packages/**/*.d.ts",
+    "apps/cli/**/*.ts",
+    "apps/cli/**/*.tsx",
+    "apps/cli/**/*.d.ts",
+    "apps/desktop/src/*.ts",
+    "apps/desktop/src/*.d.ts",
+    "apps/desktop/src/electron/**/*.ts",
+    "apps/desktop/src/electron/**/*.tsx",
+    "apps/desktop/src/electron/**/*.d.ts"
+  ]
+}

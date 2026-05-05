@@ -1,5 +1,6 @@
 import { defaultAgentHomes, isAgentId, mergeAgentHomes, type AgentId } from "@nile/core/models/agent";
 
+import { buildCliHelpLines, KNOWN_FLAGS } from "./CliCatalog";
 import type { CliOptions, ParsedArguments, ResolvedCliOptions } from "./types";
 
 export class ArgumentParser {
@@ -32,6 +33,9 @@ export class ArgumentParser {
       }
       if (token.startsWith("--")) {
         const name = token.slice(2);
+        if (!KNOWN_FLAGS.has(name)) {
+          throw new Error(`Unknown flag: --${name}`);
+        }
         const next = argv[index + 1];
         if (next && !next.startsWith("--")) {
           flags.set(name, next);
@@ -48,35 +52,7 @@ export class ArgumentParser {
   }
 
   helpText(): string {
-    return [
-      "Usage:",
-      "  nile",
-      "  nile status [--json] [--db-path <path>] [--home <agent>=<path>]",
-      "  nile openclaw status [--json] [--db-path <path>] [--home openclaw=<path>]",
-      "  nile cursor status [--json] [--db-path <path>] [--home cursor=<path>]",
-      "  nile claude status [--json] [--db-path <path>] [--home claude=<path>]",
-      "  nile list [--json] [--db-path <path>]",
-      "  nile usage <connectionId> [--json] [--db-path <path>]",
-      "  nile cursor usage bind <connectionId> --session-token <token> [--json] [--db-path <path>] [--home cursor=<path>]",
-      "  nile cursor usage auto-bind <connectionId> [--json] [--db-path <path>] [--home cursor=<path>]",
-      "  nile history [--json] [--db-path <path>]",
-      "  nile reset [--json] [--db-path <path>]",
-      "  nile reset --yes --confirm-reset [--json] [--db-path <path>]",
-      "  nile add [--preset <preset>] [--auth-mode <mode>] [--id <id>] [--label <label>] [--endpoint-url <url>] [--login] [--api-key <key>] [--openclaw-model-id <model>] [--from-codex-current] [--from-claude-current] [--from-cursor-current] [--db-path <path>] [--home <agent>=<path>]",
-      "  nile cursor import [--db-path <path>] [--home cursor=<path>]",
-      "  nile codex import [--db-path <path>] [--home codex=<path>]",
-      "  nile claude import [--db-path <path>] [--home claude=<path>]",
-      "  nile openclaw import [--db-path <path>] [--home openclaw=<path>]",
-      "  nile codex use <connectionId> [--db-path <path>] [--home codex=<path>]",
-      "  nile cursor use <connectionId> [--db-path <path>] [--home cursor=<path>]",
-      "  nile claude use <connectionId> [--db-path <path>] [--home claude=<path>]",
-      "  nile openclaw use <connectionId> [--db-path <path>] [--home openclaw=<path>]",
-      "  nile remove <connectionId> [--db-path <path>]",
-      "  nile cursor rollback [--db-path <path>] [--home cursor=<path>]",
-      "  nile codex rollback [--db-path <path>] [--home codex=<path>]",
-      "  nile claude rollback [--db-path <path>] [--home claude=<path>]",
-      "  nile openclaw rollback [--db-path <path>] [--home openclaw=<path>]",
-    ].join("\n");
+    return buildCliHelpLines().join("\n");
   }
 
   private requireFlagValue(flag: string, value: string | undefined): string {

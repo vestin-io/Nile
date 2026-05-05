@@ -10,7 +10,7 @@ import { ClaudeAgentAdapter } from "../agents/claude/ClaudeAgentAdapter";
 import { CodexAgentAdapter } from "../agents/codex/CodexAgentAdapter";
 import { CursorAgentAdapter } from "../agents/cursor/CursorAgentAdapter";
 import { OpenClawAgentAdapter } from "../agents/openclaw/OpenClawAgentAdapter";
-import type { AgentAdapter, AgentAdapterCapabilities } from "./AgentAdapterTypes";
+import type { AgentAdapter, AgentCapabilitySupport } from "./AgentAdapterTypes";
 
 export class AgentAdapterRegistryError extends Error {
   constructor(message: string) {
@@ -24,21 +24,13 @@ export type SharedAdapterOptions = {
   environment?: EnvironmentSource;
   secureSnapshotStore?: SecureSnapshotStore;
   logger?: NileLogger;
+  agentHomes?: AgentHomes;
 };
 
 export class AgentAdapterRegistry {
-  /**
-   * Convenience factory that wires all built-in adapters.
-   *
-   * Adding a new agent means implementing an AgentAdapter and registering it here.
-   * The class itself (get, listAgents, listCapabilities) never changes — this
-   * factory is the intentional composition root.
-   */
   static open(
     databasePath: string,
-    options: SharedAdapterOptions & {
-      agentHomes?: AgentHomes;
-    },
+    options: SharedAdapterOptions,
   ): AgentAdapterRegistry {
     return AgentAdapterRegistry.fromAdapters(
       AgentAdapterRegistry.buildBuiltInAdapters(databasePath, options),
@@ -47,9 +39,7 @@ export class AgentAdapterRegistry {
 
   static fromSharedContext(
     context: SharedAgentAdapterContext,
-    options: SharedAdapterOptions & {
-      agentHomes?: AgentHomes;
-    },
+    options: SharedAdapterOptions,
   ): AgentAdapterRegistry {
     return AgentAdapterRegistry.fromAdapters(
       AgentAdapterRegistry.buildBuiltInAdapters(context.databasePath, options, context),
@@ -58,9 +48,7 @@ export class AgentAdapterRegistry {
 
   private static buildBuiltInAdapters(
     databasePath: string,
-    options: SharedAdapterOptions & {
-      agentHomes?: AgentHomes;
-    },
+    options: SharedAdapterOptions,
     sharedContext?: SharedAgentAdapterContext,
   ): AgentAdapter[] {
     const homes = options.agentHomes;
@@ -103,7 +91,6 @@ export class AgentAdapterRegistry {
     ];
   }
 
-  /** Build a registry from an explicit adapter list — use this to extend without modifying open(). */
   static fromAdapters(adapters: AgentAdapter[]): AgentAdapterRegistry {
     const seen = new Set<AgentId>();
     for (const adapter of adapters) {
@@ -127,10 +114,10 @@ export class AgentAdapterRegistry {
     return adapter;
   }
 
-  listCapabilities(): Array<{ agentId: AgentId; capabilities: AgentAdapterCapabilities }> {
+  listRollbackSupport(): Array<{ agentId: AgentId; rollback: AgentCapabilitySupport }> {
     return Array.from(this.adapters.values()).map((adapter) => ({
       agentId: adapter.agentId,
-      capabilities: adapter.capabilities,
+      rollback: adapter.rollbackSupport,
     }));
   }
 

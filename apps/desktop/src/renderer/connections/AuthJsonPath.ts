@@ -1,4 +1,4 @@
-import type { DesktopAdvancedState } from "../../DesktopTypes";
+import type { DesktopAdvancedState } from "../../state/Types";
 
 export function readCodexAuthJsonPath(
   agentHomes: DesktopAdvancedState["agentHomes"] | undefined,

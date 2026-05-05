@@ -34,13 +34,13 @@ export class RollbackLatestMutation {
     return new RollbackLatestMutation(
       new RollbackLatest(
         new MutationHistory(
-          context.database,
+          context.workspaceState.database,
           new FileSnapshotStore(join(dirname(databasePath), "history")),
           options?.secureSnapshotStore ?? new SecureSnapshotStore(),
           logger.child({ scope: "mutation-history" }),
         ),
         context.agentSelection,
-        CurrentStateDetector.fromContext(context, {
+        CurrentStateDetector.fromContext(context.sharedContext, {
           claudeHome: options?.claudeHome ?? join(homedir(), ".claude"),
           credentialStore: options.credentialStore,
           logger: logger.child({ scope: "claude-current-state-detector" }),

@@ -8,8 +8,7 @@ import { KeychainCredentialStore } from "../../services/credential/KeychainCrede
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { AccessRegistry } from "../access";
 import type { AccessRecord } from "../access";
-import { SqliteAccessStore } from "../access/store/SqliteStore";
-import type { AccessStore } from "../access/store/Store";
+import { SqliteAccessStore } from "../access/SqliteAccessStore";
 import { EndpointRegistry } from "../endpoint";
 import { ConnectionCreator } from "./Creator";
 import type { GatewayProbeResult } from "./GatewayProbe";
@@ -23,7 +22,7 @@ describe("ConnectionCreator", () => {
     }
   });
 
-  test("rolls back endpoint and access writes when access insert fails", async () => {
+  test("preserves pending access state when access insert fails after the row is written", async () => {
     const dbPath = createTempDatabasePath();
     const database = SqliteDatabase.open(dbPath);
     const credentialStore = new StubCredentialStore();
@@ -52,8 +51,17 @@ describe("ConnectionCreator", () => {
         },
       })).rejects.toThrow("Injected connection insert failure");
 
-      expect(endpointRegistry.list()).toEqual([]);
-      expect(accessRegistry.list()).toEqual([]);
+      expect(endpointRegistry.list()).toEqual([
+        expect.objectContaining({
+          id: "openai",
+        }),
+      ]);
+      expect(accessRegistry.list()).toEqual([
+        expect.objectContaining({
+          id: "work-key",
+          credentialSyncState: "pending_write",
+        }),
+      ]);
       expect(credentialStore.has("access:work-key")).toBe(false);
     } finally {
       database.close();
@@ -120,6 +128,7 @@ describe("ConnectionCreator", () => {
           scope: "access",
           allowLocalMaterialization: true,
         },
+        credentialSyncState: "ready",
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       });
@@ -575,7 +584,7 @@ class StubCredentialStore extends KeychainCredentialStore {
   }
 }
 
-class ThrowingAccessStore extends SqliteAccessStore implements AccessStore {
+class ThrowingAccessStore extends SqliteAccessStore {
   constructor(database: SqliteDatabase) {
     super(database);
   }

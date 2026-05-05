@@ -2,14 +2,12 @@ import type { AccessRecord } from "../../models/access";
 import type { EndpointAnthropicProtocol } from "../../models/endpoint";
 import { isEnvKeyApiKeyCredential, type StoredCredential } from "../../services/credential/Types";
 import { AgentProjectionError } from "../ProjectionError";
-import type { AgentProjectionStrategy, ClaudeProjection, ProjectionInput } from "../Types";
+import type { ClaudeProjection, ProjectionInput } from "../Types";
 import { joinEndpointUrl } from "../Url";
 
 const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
 
-export class ClaudeProjectionStrategy implements AgentProjectionStrategy {
-  readonly agentId = "claude" as const;
-
+export class ClaudeProjectionStrategy {
   resolve(input: ProjectionInput): ClaudeProjection {
     const protocol = input.endpoint.protocols.anthropic;
     if (!protocol) {
@@ -24,7 +22,7 @@ export class ClaudeProjectionStrategy implements AgentProjectionStrategy {
       : undefined;
 
     return {
-      agentId: this.agentId,
+      agentId: "claude",
       protocol: "anthropic",
       endpointId: input.endpoint.id,
       endpointLabel: input.endpoint.label,

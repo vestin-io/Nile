@@ -1,27 +1,29 @@
 import type { AgentId } from "../models/agent/Types";
-import type { AgentProjectionStrategy, AgentProjection, ProjectionInput } from "./Types";
+import type { AgentProjection, ProjectionInput } from "./Types";
 import { CodexProjectionStrategy } from "./strategies/Codex";
 import { ClaudeProjectionStrategy } from "./strategies/Claude";
 import { CursorProjectionStrategy } from "./strategies/Cursor";
 import { OpenClawProjectionStrategy } from "./strategies/OpenClaw";
 import { AgentProjectionError } from "./ProjectionError";
 
-const DEFAULT_STRATEGIES: AgentProjectionStrategy[] = [
-  new CodexProjectionStrategy(),
-  new ClaudeProjectionStrategy(),
-  new CursorProjectionStrategy(),
-  new OpenClawProjectionStrategy(),
-];
-
 export class AgentProjectionResolver {
-  constructor(private readonly strategies: AgentProjectionStrategy[] = DEFAULT_STRATEGIES) {}
+  private readonly codex = new CodexProjectionStrategy();
+  private readonly claude = new ClaudeProjectionStrategy();
+  private readonly cursor = new CursorProjectionStrategy();
+  private readonly openclaw = new OpenClawProjectionStrategy();
 
   resolve(agentId: AgentId, input: ProjectionInput): AgentProjection {
-    const strategy = this.strategies.find((candidate) => candidate.agentId === agentId);
-    if (!strategy) {
-      throw new AgentProjectionError(`No projection strategy is registered for ${agentId}`);
+    switch (agentId) {
+      case "codex":
+        return this.codex.resolve(input);
+      case "claude":
+        return this.claude.resolve(input);
+      case "cursor":
+        return this.cursor.resolve(input);
+      case "openclaw":
+        return this.openclaw.resolve(input);
+      default:
+        throw new AgentProjectionError(`No projection strategy is registered for ${agentId}`);
     }
-
-    return strategy.resolve(input);
   }
 }

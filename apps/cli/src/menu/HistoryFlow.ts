@@ -1,6 +1,5 @@
 import type { AgentId } from "@nile/core/models/agent";
-import type { HistoryCommands } from "../commands/HistoryCommands";
-import type { StatusCommands } from "../commands/StatusCommands";
+import type { AgentCommands } from "../commands/AgentCommands";
 import type { ConnectionPresenter } from "../presenters/ConnectionPresenter";
 import type { InteractivePrompt } from "../InteractivePrompt";
 import type { ResolvedCliOptions } from "../types";
@@ -11,8 +10,7 @@ import { formatAgentLabel } from "../formatters";
 export class HistoryFlow {
   constructor(
     private readonly prompt: InteractivePrompt,
-    private readonly statusCommands: StatusCommands,
-    private readonly historyCommands: HistoryCommands,
+    private readonly agentCommands: AgentCommands,
     private readonly connectionPresenter: ConnectionPresenter,
     private readonly infoPanel: InfoPanel,
   ) {}
@@ -38,7 +36,7 @@ export class HistoryFlow {
         return "menu";
       }
       if (selection.value === "history") {
-        const body = this.connectionPresenter.formatHistory(this.historyCommands.listHistory(options));
+        const body = this.connectionPresenter.formatHistory(this.agentCommands.listHistory(options));
         const next = await this.infoPanel.run("Change history", body);
         if (next === "exit") {
           return "exit";
@@ -50,7 +48,7 @@ export class HistoryFlow {
       return this.infoPanel.runResult(
         "Change result",
         this.connectionPresenter.formatRollbackSummary(
-          this.historyCommands.rollbackLatest(options, agentId),
+          this.agentCommands.rollbackLatest(options, agentId),
         ),
       );
     }
@@ -60,7 +58,7 @@ export class HistoryFlow {
     options: ResolvedCliOptions,
     buildCancelledError: () => Error,
   ): Promise<AgentId> {
-    const statuses = this.statusCommands.getStatuses(options);
+    const statuses = this.agentCommands.getStatuses(options);
     const selection = await this.prompt.select(
       "Choose an agent to roll back",
       statuses.map((status) => ({
