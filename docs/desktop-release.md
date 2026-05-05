@@ -24,21 +24,35 @@ Flow:
 2. Load signing and notarization secrets from GitHub Actions secrets.
 3. Validate that all required secrets are present.
 4. Derive the release version from the tag.
-5. Run `npm ci`.
-6. Run `npm run typecheck`.
-7. Run `npm test`.
-8. Stamp `apps/desktop/package.json` with the tag-derived version.
-9. Run `npm run build:app --prefix apps/desktop` to produce signed desktop artifacts.
-10. Find the generated `dmg` and `zip` files under `apps/desktop/release/`.
-11. Create the matching GitHub Release if it does not already exist.
-12. Upload the artifacts to that GitHub Release with `gh release upload --clobber`.
+5. Require a matching `release-notes/<tag>.md` file.
+6. Run `npm ci`.
+7. Run `npm run typecheck`.
+8. Run `npm test`.
+9. Stamp `apps/desktop/package.json` with the tag-derived version.
+10. Run `npm run build:app --prefix apps/desktop` to produce signed desktop artifacts.
+11. Find the generated `dmg` and `zip` files under `apps/desktop/release/`.
+12. Create or update the matching GitHub Release using `release-notes/<tag>.md` as the release body.
+13. Upload the artifacts to that GitHub Release with `gh release upload --clobber`.
 
 Pre-release tags are inferred from semver prerelease suffixes such as `v0.1.0-beta.1`.
 Those releases remain marked as GitHub prereleases, so Nile's in-app auto-update flow only follows stable releases.
 
 Release packaging currently emits separate `arm64` and `x64` macOS artifacts by default instead of one `universal` app. This keeps each downloadable artifact materially smaller and avoids shipping both architectures inside the same bundle.
 
-GitHub Release entries are created with generated notes when a matching tag does not already have a release.
+## Release Notes Source of Truth
+
+Desktop release notes now live under `release-notes/` and are versioned by tag:
+
+- `release-notes/v<semver>.md`
+
+Examples:
+
+- `release-notes/v0.15.0.md`
+- `release-notes/v0.16.0-beta.1.md`
+
+The release workflow fails early if the matching file does not exist. This keeps desktop releases from shipping with auto-generated or empty notes.
+
+Use `release-notes/TEMPLATE.md` as the starting point for a new version note. Keep the content user-facing and scoped to the packaged desktop app.
 
 ## Required GitHub Secrets
 
@@ -59,19 +73,21 @@ For new repositories, prefer the canonical `NILE_DESKTOP_*` names. Existing repo
 Use a pushed git tag as the normal release entrypoint:
 
 ```bash
+cp release-notes/TEMPLATE.md release-notes/v0.1.0.md
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
 The workflow will:
 
-1. Validate secrets.
-2. Run `npm run typecheck`.
-3. Run `npm test`.
-4. Build signed `arm64` and `x64` desktop artifacts.
-5. Submit both artifacts for notarization.
-6. Create or update the matching GitHub Release.
-7. Upload the generated `dmg` and `zip` files.
+1. Require `release-notes/v0.1.0.md`.
+2. Validate secrets.
+3. Run `npm run typecheck`.
+4. Run `npm test`.
+5. Build signed `arm64` and `x64` desktop artifacts.
+6. Submit both artifacts for notarization.
+7. Create or update the matching GitHub Release body from `release-notes/v0.1.0.md`.
+8. Upload the generated `dmg` and `zip` files.
 
 Expected uploaded artifacts:
 

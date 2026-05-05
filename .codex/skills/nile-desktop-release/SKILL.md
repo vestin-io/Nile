@@ -14,11 +14,13 @@ Use this skill for Nile desktop release work only.
 - GitHub Actions desktop release workflow changes
 - Release tag creation and publish readiness checks
 - GitHub Release asset validation
+- Release note drafting and validation for desktop tags
 
 ## Primary Files
 
 - `.github/workflows/desktop-release.yml`
 - `docs/desktop-release.md`
+- `release-notes/`
 - `apps/desktop/package.json`
 - `apps/desktop/.env.release.example`
 - `.vestin/plans/desktop-v2/build.md`
@@ -32,6 +34,7 @@ Use this skill for Nile desktop release work only.
 2. Check `git status --short --branch` before tagging.
 3. Do not create a release tag from a dirty worktree unless the user explicitly wants the tag to point at the current committed HEAD anyway.
 4. For signed builds, confirm the signing identity resolves to `Developer ID Application`, not `Apple Development`.
+5. Confirm `release-notes/<tag>.md` exists before pushing a desktop release tag.
 
 ## Secret Mapping
 
@@ -47,7 +50,8 @@ The workflow accepts either canonical GitHub secret names or short-name fallback
 
 1. Review `docs/desktop-release.md` and the workflow together.
 2. Verify the worktree state.
-3. If the task is local verification, load `apps/desktop/.env.release` and run:
+3. Draft or review `release-notes/<tag>.md` using `release-notes/TEMPLATE.md` as the starting point.
+4. If the task is local verification, load `apps/desktop/.env.release` and run:
 
 ```bash
 set -a
@@ -56,19 +60,32 @@ set +a
 npm run build:app --prefix apps/desktop
 ```
 
-4. If the task is a GitHub release, prefer a pushed tag:
+5. If the task is a GitHub release, prefer a pushed tag:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-5. Confirm the workflow completes:
+6. Confirm the workflow completes:
    - `npm run typecheck`
    - `npm test`
+   - release note resolution for `release-notes/<tag>.md`
    - notarization for `arm64`
    - notarization for `x64`
    - upload of `dmg` and `zip` artifacts
+
+## Release Notes Expectations
+
+- File path must match the release tag exactly:
+  - `release-notes/v0.1.0.md`
+  - `release-notes/v0.1.0-beta.1.md`
+- Write notes for users, not for git history.
+- Prefer:
+  - a short highlights section
+  - a concrete included-changes section
+  - upgrade notes only when needed
+- Do not rely on GitHub auto-generated notes for desktop releases.
 
 ## Manual Dispatch
 
@@ -86,5 +103,6 @@ git push origin v0.1.0
 ## Failure Patterns
 
 - Missing secrets: the `Validate signing secrets` step fails early.
+- Missing release notes: the `Resolve release notes` step fails before packaging.
 - Wrong certificate type: notarization fails with "not signed with a valid Developer ID certificate."
 - Dirty worktree before tag: the release tag does not include the intended changes.

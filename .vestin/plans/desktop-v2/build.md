@@ -2,6 +2,20 @@
 
 ## 2026-05-05
 
+### Step 47: Make desktop release notes explicit and versioned
+
+- Replaced GitHub's generated release-note fallback with a repository-owned source of truth under `release-notes/`.
+- The desktop release workflow now requires a matching `release-notes/<tag>.md` file before it will package or publish a desktop release.
+- GitHub Release creation and reruns both now use that file as the release body, so the published notes stay stable and reviewable instead of drifting across manual reruns.
+- Added:
+  - `release-notes/README.md` to define the convention
+  - `release-notes/TEMPLATE.md` as the drafting starting point for each new version
+- Extended the `nile-desktop-release` skill so desktop release work now includes release-note drafting and validation as a first-class part of the flow.
+
+### Verification
+
+- `git diff --check -- . ':(exclude)error.log'`
+
 ### Step 46: Add local pre-push verification for release-safe pushes
 
 - Added `husky` at the repo root and installed a `pre-push` hook.

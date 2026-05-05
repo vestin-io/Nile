@@ -88,6 +88,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve release notes
+        id: notes
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          notes_file="release-notes/${RELEASE_TAG}.md"
+
+          if [[ ! -f "${notes_file}" ]]; then
+            printf 'Missing required desktop release notes: %s\n' "${notes_file}" >&2
+            exit 1
+          fi
+
+          printf 'path=%s\n' "${notes_file}" >> "${GITHUB_OUTPUT}"
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -112,6 +126,7 @@ jobs:
 
       - name: Upload release assets
         env:
+          RELEASE_NOTES_FILE: ${{ steps.notes.outputs.path }}
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
         run: |
@@ -133,8 +148,12 @@ jobs:
           if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
             gh release create "${RELEASE_TAG}" \
               --title "Nile Desktop ${RELEASE_TAG}" \
-              --generate-notes \
+              --notes-file "${RELEASE_NOTES_FILE}" \
               "${prerelease_args[@]}"
+          else
+            gh release edit "${RELEASE_TAG}" \
+              --title "Nile Desktop ${RELEASE_TAG}" \
+              --notes-file "${RELEASE_NOTES_FILE}"
           fi
 
           gh release upload "${RELEASE_TAG}" "${artifacts[@]}" --clobber
