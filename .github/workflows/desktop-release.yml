@@ -108,17 +108,23 @@ jobs:
       - name: Run full test suite
         run: npm test
 
-      - name: Stamp desktop package version
+      - name: Validate desktop package version
         env:
           DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: |
           node --input-type=module <<'EOF'
-          import { readFileSync, writeFileSync } from "node:fs";
+          import { readFileSync } from "node:fs";
 
           const packageJsonPath = "apps/desktop/package.json";
           const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
-          packageJson.version = process.env.DESKTOP_VERSION;
-          writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+          const expectedVersion = process.env.DESKTOP_VERSION;
+
+          if (packageJson.version !== expectedVersion) {
+            console.error(
+              `apps/desktop/package.json version must match release tag version. Expected ${expectedVersion}, got ${packageJson.version}`,
+            );
+            process.exit(1);
+          }
           EOF
 
       - name: Build signed macOS release

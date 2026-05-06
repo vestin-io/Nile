@@ -2,6 +2,7 @@ import { app, Menu } from "electron";
 
 type DesktopApplicationMenuOptions = {
   appIconPath: string;
+  isPackaged: boolean;
   openSettings(): void;
   platform: NodeJS.Platform;
   version: string;
@@ -16,10 +17,11 @@ export class DesktopApplicationMenu {
     }
 
     const version = this.options.version;
+    const applicationVersion = this.options.isPackaged ? version : "Development build";
     app.setAboutPanelOptions({
       applicationName: "Nile",
-      applicationVersion: version === "0.0.0" ? "Development build" : version,
-      version: version === "0.0.0" ? "" : version,
+      applicationVersion,
+      version: this.options.isPackaged ? version : "",
       iconPath: this.options.appIconPath,
     });
   }

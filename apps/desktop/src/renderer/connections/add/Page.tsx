@@ -203,6 +203,7 @@ export function AddConnectionPage({
               <AddConnectionPostPreparation
                 apiKey={formState.apiKey}
                 apiKeySource={formState.apiKeySource}
+                authMode={formState.authMode}
                 authJsonPath={formState.authJsonPath}
                 configurableAgents={configurableAgents}
                 displayedEnabledAgents={displayedEnabledAgents}

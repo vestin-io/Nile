@@ -19,7 +19,7 @@ export function UpdateSection({
   onInstall,
   t,
 }: UpdateSectionProps) {
-  const versionLabel = info && info.version !== "0.0.0"
+  const versionLabel = info && info.updateAvailability !== "development"
     ? info.version
     : t("settings.updates.developmentVersion");
   const canCheckForUpdates = info?.updateAvailability === "available";

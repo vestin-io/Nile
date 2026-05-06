@@ -28,7 +28,7 @@ Flow:
 6. Run `npm ci`.
 7. Run `npm run typecheck`.
 8. Run `npm test`.
-9. Stamp `apps/desktop/package.json` with the tag-derived version.
+9. Validate that `apps/desktop/package.json` already matches the tag-derived version.
 10. Run `npm run build:app --prefix apps/desktop` to produce signed desktop artifacts.
 11. Find the generated `dmg` and `zip` files under `apps/desktop/release/`.
 12. Create or update the matching GitHub Release using `release-notes/<tag>.md` as the release body.
@@ -73,6 +73,7 @@ For new repositories, prefer the canonical `NILE_DESKTOP_*` names. Existing repo
 Use a pushed git tag as the normal release entrypoint:
 
 ```bash
+node -e 'const fs=require("fs");const p="apps/desktop/package.json";const j=JSON.parse(fs.readFileSync(p,"utf8"));j.version="0.1.0";fs.writeFileSync(p,JSON.stringify(j,null,2)+"\n")'
 cp release-notes/TEMPLATE.md release-notes/v0.1.0.md
 git tag v0.1.0
 git push origin v0.1.0
@@ -81,13 +82,14 @@ git push origin v0.1.0
 The workflow will:
 
 1. Require `release-notes/v0.1.0.md`.
-2. Validate secrets.
-3. Run `npm run typecheck`.
-4. Run `npm test`.
-5. Build signed `arm64` and `x64` desktop artifacts.
-6. Submit both artifacts for notarization.
-7. Create or update the matching GitHub Release body from `release-notes/v0.1.0.md`.
-8. Upload the generated `dmg` and `zip` files.
+2. Validate that `apps/desktop/package.json` is already `0.1.0`.
+3. Validate secrets.
+4. Run `npm run typecheck`.
+5. Run `npm test`.
+6. Build signed `arm64` and `x64` desktop artifacts.
+7. Submit both artifacts for notarization.
+8. Create or update the matching GitHub Release body from `release-notes/v0.1.0.md`.
+9. Upload the generated `dmg` and `zip` files.
 
 Expected uploaded artifacts:
 
@@ -117,6 +119,9 @@ Requirements for the in-app updater to work:
 The updater checks for new releases when the packaged app starts and continues polling in the background on Electron's default interval.
 
 ## Local Signed Build
+
+Local signed builds now use the checked-in desktop version from `apps/desktop/package.json`.
+Keep that file in sync with the latest intended desktop release version before packaging if you want the built app to report a real version instead of an older one.
 
 Copy the example env file and load it into the shell:
 

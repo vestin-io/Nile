@@ -2,6 +2,48 @@
 
 ## 2026-05-06
 
+### Step 78: Align desktop source versioning with released builds
+
+- Updated `apps/desktop/package.json` and `apps/desktop/package-lock.json` to `0.15.1` so the checked-in desktop package version now matches the latest shipped desktop release instead of staying on the long-lived `0.0.0` placeholder.
+- Changed the desktop release workflow to validate version alignment instead of mutating it in CI:
+  - `.github/workflows/desktop-release.yml` now fails if `apps/desktop/package.json` does not already match the pushed `v<semver>` tag.
+- Updated desktop version presentation so development state depends on packaging mode instead of the old placeholder version:
+  - `DesktopApplicationMenu` now shows `Development build` only for unpackaged dev runs
+  - `UpdateSection` now shows the real checked-in version for packaged builds
+  - auto-update availability now keys off `isPackaged` rather than `0.0.0`
+- Updated `docs/desktop-release.md` to reflect the new release discipline:
+  - bump `apps/desktop/package.json` before tagging
+  - keep source version and release tag aligned
+  - local signed builds now use the checked-in desktop version directly
+- Result:
+  - local signed test builds can report a real desktop version
+  - release builds and source state now use one consistent version contract
+  - the workflow no longer hides version drift by silently rewriting package metadata in CI
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+- `git diff --check -- . ':(exclude)error.log'`
+
+### Step 77: Hide static API key fields for auth.json imports
+
+- Tightened `renderer/connections/add/PostPreparation.tsx` so static credential inputs only render for `api_key` auth mode.
+- Kept the `auth.json` import path field visible for session imports, but removed the unrelated API key / env key inputs from that flow.
+- Passed the selected auth mode from `renderer/connections/add/Page.tsx` into the post-preparation renderer so the UI now follows the actual connection method instead of always showing credential fields.
+- Added `PostPreparation.test.ts` to lock the visibility rule:
+  - `api_key` shows static credential fields
+  - `openai_session` hides them
+  - `claude_session` hides them
+- Result:
+  - importing `auth.json` no longer suggests that an API key is also required
+  - the add-connection form now reflects the real credential model for session-based flows
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
 ### Step 76: Refresh the desktop state-performance plan to the grouped desktop structure
 
 - Updated `.vestin/plans/desktop-state-performance.md` with a current-status section so the document now clearly distinguishes:

@@ -12,10 +12,10 @@ const supportedPlatforms = new Set<NodeJS.Platform>(["darwin", "win32"]);
 
 export function readDesktopUpdateAvailability(
   isPackaged: boolean,
-  version: string,
+  _version: string,
   platform: NodeJS.Platform,
 ): DesktopUpdateAvailability {
-  if (!isPackaged || version === "0.0.0") {
+  if (!isPackaged) {
     return "development";
   }
 

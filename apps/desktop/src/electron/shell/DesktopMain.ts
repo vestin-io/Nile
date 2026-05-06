@@ -142,6 +142,7 @@ export class DesktopMain {
     });
     this.applicationMenu = new DesktopApplicationMenu({
       appIconPath: this.shell.readRuntimeAppIconPath(),
+      isPackaged: app.isPackaged,
       openSettings: () => this.shell.showSettings(),
       platform: process.platform,
       version: this.shell.readDesktopPackageVersion(),

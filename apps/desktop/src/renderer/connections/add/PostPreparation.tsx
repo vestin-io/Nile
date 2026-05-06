@@ -16,6 +16,7 @@ import type { Definition } from "../../shared/Definitions";
 type AddConnectionPostPreparationProps = {
   apiKey: string;
   apiKeySource: "direct" | "env_key";
+  authMode: string;
   authJsonPath: string;
   configurableAgents: AgentId[];
   displayedEnabledAgents: AgentId[];
@@ -43,6 +44,7 @@ type AddConnectionPostPreparationProps = {
 export function AddConnectionPostPreparation({
   apiKey,
   apiKeySource,
+  authMode,
   authJsonPath,
   configurableAgents,
   displayedEnabledAgents,
@@ -66,6 +68,8 @@ export function AddConnectionPostPreparation({
   onEndpointUrlChange,
   onEnvKeyChange,
 }: AddConnectionPostPreparationProps) {
+  const showStaticCredentialFields = shouldShowStaticCredentialFields(authMode);
+
   return (
     <>
       {gatewayProbeError ? (
@@ -126,38 +130,42 @@ export function AddConnectionPostPreparation({
         </div>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        {selectedDefinition?.requiresEndpointUrl ? (
-          <FormField label={t("dialog.endpointUrl")}>
-            <Input
-              type="url"
-              value={endpointUrl}
-              onChange={(event) => onEndpointUrlChange(event.target.value)}
-              placeholder={t("dialog.endpointUrlPlaceholder")}
-            />
-          </FormField>
-        ) : null}
+      {selectedDefinition?.requiresEndpointUrl || showStaticCredentialFields ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          {selectedDefinition?.requiresEndpointUrl ? (
+            <FormField label={t("dialog.endpointUrl")}>
+              <Input
+                type="url"
+                value={endpointUrl}
+                onChange={(event) => onEndpointUrlChange(event.target.value)}
+                placeholder={t("dialog.endpointUrlPlaceholder")}
+              />
+            </FormField>
+          ) : null}
 
-        {apiKeySource === "env_key" ? (
-          <FormField label={t("dialog.envKey")}>
-            <Input
-              type="text"
-              value={envKey}
-              onChange={(event) => onEnvKeyChange(event.target.value)}
-              placeholder={t("dialog.envKeyPlaceholder")}
-            />
-          </FormField>
-        ) : (
-          <FormField label={t("dialog.apiKey")}>
-            <Input
-              type="password"
-              value={apiKey}
-              onChange={(event) => onApiKeyChange(event.target.value)}
-              placeholder={t("dialog.apiKeyPlaceholder")}
-            />
-          </FormField>
-        )}
-      </div>
+          {showStaticCredentialFields ? (
+            apiKeySource === "env_key" ? (
+              <FormField label={t("dialog.envKey")}>
+                <Input
+                  type="text"
+                  value={envKey}
+                  onChange={(event) => onEnvKeyChange(event.target.value)}
+                  placeholder={t("dialog.envKeyPlaceholder")}
+                />
+              </FormField>
+            ) : (
+              <FormField label={t("dialog.apiKey")}>
+                <Input
+                  type="password"
+                  value={apiKey}
+                  onChange={(event) => onApiKeyChange(event.target.value)}
+                  placeholder={t("dialog.apiKeyPlaceholder")}
+                />
+              </FormField>
+            )
+          ) : null}
+        </div>
+      ) : null}
 
       <ConnectionCapabilityField
         configurableAgents={configurableAgents}
@@ -171,4 +179,8 @@ export function AddConnectionPostPreparation({
       />
     </>
   );
+}
+
+export function shouldShowStaticCredentialFields(authMode: string): boolean {
+  return authMode === "api_key";
 }
