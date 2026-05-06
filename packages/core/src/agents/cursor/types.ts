@@ -1,6 +1,6 @@
 import type { AgentId } from "../../models/agent/Types";
 import type { EndpointFamily } from "../../models/endpoint";
-import type { MatchedAgentConnection, AgentLiveStateValidity } from "../../runtime-local/AgentAdapterTypes";
+import type { AgentLiveStateValidity, MatchedAgentConnection } from "../../models/agent";
 
 export const CURSOR_AGENT_ID: AgentId = "cursor";
 

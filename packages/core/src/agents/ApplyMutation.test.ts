@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { ApplyMutation } from "./ApplyMutation";
-import type { PreparedAgentApplySelection } from "../actions/use/ApplySupport";
+import type { PreparedAgentApplySelection } from "../actions/apply/Support";
+import type { ApplyAgentSelectionResult } from "../models/agent";
 import type { AgentId } from "../models/agent/Types";
-import type { ApplyAgentSelectionResult } from "../runtime-local/AgentAdapterTypes";
 import type {
   MutationAfterFileInput,
   MutationTrackedFileInput,

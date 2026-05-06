@@ -66,7 +66,6 @@
     { "module": "surfaces", "feature": "cursor-usage-surface", "state": "built" },
     { "module": "surfaces", "feature": "openclaw-agent-surface", "state": "built" },
     { "module": "surfaces", "feature": "app-boundary-cleanup", "state": "built" },
-    { "module": "docs", "feature": "terminology-glossary", "state": "built" },
-    { "module": "docs", "feature": "openclaw-switching-research", "state": "built" }
+    { "module": "docs", "feature": "terminology-glossary", "state": "built" }
   ]
 }

@@ -1,13 +1,9 @@
 import { useMemo, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/types";
 
 import { readCodexAuthJsonPath } from "../../connections/AuthJsonPath";
 import type { AgentDetailTab } from "../../agents/detail/Page";
 import { useDesktopPreferences } from "./usePreferences";
-import {
-  readReturnPage,
-  useSettingsNavigation,
-} from "./useNavigation";
+import { useSettingsNavigation } from "./useNavigation";
 import { useDesktopData } from "./useData";
 import { useSidebarState } from "./useSidebarState";
 import { SettingsChrome } from "./Chrome";
@@ -15,6 +11,7 @@ import { SettingsDialogs } from "./Dialogs";
 import { SettingsPageContent } from "./PageContent";
 import { useDesktopReleaseInfo } from "./useReleaseInfo";
 import { useSettingsConnectionActions } from "./useConnectionActions";
+import { useSettingsFlow } from "./useFlow";
 import { Button } from "../../ui/button";
 import { Alert, AlertDescription, AlertTitle } from "../../ui/alert";
 
@@ -58,9 +55,21 @@ export function SettingsApp() {
   });
   const [nileDialogOpen, setNileDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
   const [selectedAgentDetailTab, setSelectedAgentDetailTab] = useState<AgentDetailTab>("connections");
   const releaseInfo = useDesktopReleaseInfo();
+  const {
+    closeAddConnectionPage,
+    completeQuickSetup,
+    isResetting,
+    openQuickSetup,
+    resetDesktopState,
+  } = useSettingsFlow({
+    addConnectionReturnTarget,
+    hasSavedConnections,
+    refresh,
+    setCurrentPage,
+    setPreferences,
+  });
 
   const addConnectionDefinitions = useMemo(
     () => readDefinitionsForAgent(addConnectionTargetAgentId),
@@ -83,8 +92,13 @@ export function SettingsApp() {
     return (
       <ErrorShell
         description={error}
+        isResetting={isResetting}
+        resetLabel={t("settings.reset.action")}
         retryLabel={t("common.refresh")}
         title={t("common.configurationError")}
+        onReset={() => {
+          void resetDesktopState();
+        }}
         onRetry={() => {
           void refresh();
         }}
@@ -96,22 +110,10 @@ export function SettingsApp() {
     return <LoadingShell label={t("loading.desktop")} />;
   }
 
-  const closeAddConnectionPage = () => {
-    setCurrentPage(readReturnPage(addConnectionReturnTarget));
-  };
-
-  const completeQuickSetup = () => {
-    setPreferences((current) => ({ ...current, quickSetupDismissed: true }));
-    setCurrentPage(hasSavedConnections ? "agents" : "quick-setup");
-  };
-
-  const openQuickSetup = () => {
-    setPreferences((current) => ({ ...current, quickSetupDismissed: false }));
-    setCurrentPage("quick-setup");
-  };
   const {
     addConnection,
     bindCursorUsage,
+    continueReusedConnection,
     importCurrentConnection,
     openConnection,
     prepareConnectionDraft,
@@ -124,6 +126,7 @@ export function SettingsApp() {
     addConnectionReturnTarget,
     addConnectionTargetAgentId,
     refresh,
+    reusedConnectionDialog,
     settingsState,
     setCurrentPage,
     setRepairUsageConnectionId,
@@ -228,22 +231,12 @@ export function SettingsApp() {
           await window.nileDesktop.app.openSupportEmail();
         }}
         onRefresh={refresh}
+        onContinueReusedConnection={continueReusedConnection}
         onResetConfirm={async () => {
-          setIsResetting(true);
-          try {
-            await window.nileDesktop.connections.resetState();
-            setPreferences((current) => ({ ...current, quickSetupDismissed: false }));
-            setResetDialogOpen(false);
-            await refresh();
-          } finally {
-            setIsResetting(false);
-          }
+          await resetDesktopState(() => setResetDialogOpen(false));
         }}
-        onSetCurrentPage={setCurrentPage}
         onSetNileDialogOpen={setNileDialogOpen}
         onSetResetDialogOpen={setResetDialogOpen}
-        onSetReusedConnectionDialog={setReusedConnectionDialog}
-        onSetSelectedConnectionId={setSelectedConnectionId}
       />
     </SettingsChrome>
   );
@@ -261,13 +254,19 @@ function LoadingShell({ label }: { label: string }) {
 
 function ErrorShell({
   description,
+  isResetting,
+  resetLabel,
   retryLabel,
   title,
+  onReset,
   onRetry,
 }: {
   description: string;
+  isResetting: boolean;
+  resetLabel: string;
   retryLabel: string;
   title: string;
+  onReset(): void;
   onRetry(): void;
 }) {
   return (
@@ -277,7 +276,10 @@ function ErrorShell({
           <AlertTitle>{title}</AlertTitle>
           <AlertDescription>{description}</AlertDescription>
         </Alert>
-        <div className="mt-4 flex justify-end">
+        <div className="mt-4 flex justify-end gap-3">
+          <Button variant="outline" disabled={isResetting} onClick={onReset}>
+            {isResetting ? `${resetLabel}...` : resetLabel}
+          </Button>
           <Button onClick={onRetry}>{retryLabel}</Button>
         </div>
       </div>

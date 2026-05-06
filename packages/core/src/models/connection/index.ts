@@ -1,5 +1,5 @@
-export type { ConnectionPresetFamily } from "./PresetTypes";
-export { SUPPORTED_CONNECTION_PRESET_FAMILIES } from "./PresetTypes";
+export type { ConnectionPresetFamily } from "./setup/PresetTypes";
+export { SUPPORTED_CONNECTION_PRESET_FAMILIES } from "./setup/PresetTypes";
 export type { ConnectionDefinition } from "./Catalog";
 export { ConnectionCatalog } from "./Catalog";
 export { SHARED_CONNECTION_CATALOG } from "./Catalog";
@@ -14,6 +14,6 @@ export { ConnectionUpdater } from "./Updater";
 export { ConnectionNaming } from "./Naming";
 export type { CreateConnectionInput, CreateConnectionResult } from "./Creator";
 export type { UpdateConnectionInput } from "./Updater";
-export type { ConnectionOnboardingSuggestion } from "./OnboardingPolicy";
+export type { ConnectionOnboardingSuggestion } from "./setup/OnboardingPolicy";
 export { SavedConnections } from "./SavedConnections";
 export type { SavedConnectionSummary } from "./SavedConnections";

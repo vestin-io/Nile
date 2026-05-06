@@ -7,13 +7,13 @@ import { FileSnapshotStore } from "../../services/history/FileSnapshotStore";
 import { MutationHistory } from "../../services/history/MutationHistory";
 import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
-import { AgentApplySupport, type PreparedAgentApplySelection } from "../../actions/use/ApplySupport";
+import { AgentApplySupport, type PreparedAgentApplySelection } from "../../actions/apply/Support";
 import { ApplyMutation } from "../ApplyMutation";
 import type { OpenClawProjection } from "../../projection";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { OPENCLAW_AGENT_ID } from "./types";
 import { OpenClawConfigStore } from "./OpenClawConfigStore";
 
@@ -40,7 +40,7 @@ export class ApplySelection {
     const environment = options.environment ?? EnvironmentSource.from(process.env);
     const logger = options?.logger ?? NileLogger.silent().child({ module: "openclaw-apply-selection" });
     const historyRoot = join(dirname(databasePath), "history");
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
 
     return new ApplySelection(
       new ApplyMutation(
@@ -66,7 +66,7 @@ export class ApplySelection {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       openclawHome?: string;
       credentialStore: CredentialStore;
@@ -107,7 +107,7 @@ export class ApplySelection {
     private readonly applyMutation: ApplyMutation,
     private readonly configStore: OpenClawConfigStore,
     private readonly environment: EnvironmentSource,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   apply(connectionId: string) {
@@ -182,9 +182,9 @@ export class ApplySelection {
   }
 
   private static createApplySupport(
-    endpointRegistry: SharedAgentAdapterContext["endpointRegistry"],
-    accessRegistry: SharedAgentAdapterContext["accessRegistry"],
-    agentSelection: SharedAgentAdapterContext["agentSelection"],
+    endpointRegistry: AgentWorkspaceContext["endpointRegistry"],
+    accessRegistry: AgentWorkspaceContext["accessRegistry"],
+    agentSelection: AgentWorkspaceContext["agentSelection"],
     logger: NileLogger,
     credentialStore: CredentialStore,
   ): AgentApplySupport {

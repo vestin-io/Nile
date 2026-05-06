@@ -3,11 +3,8 @@ import { join } from "node:path";
 
 import type { CredentialStore } from "../../services/credential/Store";
 import { NileLogger } from "../../services/NileLogger";
-import type {
-  RollbackLatestAgentResult,
-} from "../../runtime-local/AgentAdapterTypes";
-import { ManagedAgentAdapter } from "../../runtime-local/ManagedAgentAdapter";
-import type { SharedAgentAdapterContext } from "../../runtime-local/AgentAdapterContext";
+import type { AgentAdapter, RollbackLatestAgentResult } from "../../models/agent";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { ApplySelection } from "./ApplySelection";
 import { CurrentStateDetector } from "./current-state/Detector";
 import { ImportCurrentConnection } from "./ImportCurrentConnection";
@@ -20,10 +17,10 @@ export type ClaudeAgentAdapterOptions = {
   credentialStore: CredentialStore;
   secureSnapshotStore?: import("../../services/history/SecureSnapshotStore").SecureSnapshotStore;
   logger?: NileLogger;
-  sharedContext?: SharedAgentAdapterContext;
+  sharedContext?: AgentWorkspaceContext;
 };
 
-export class ClaudeAgentAdapter extends ManagedAgentAdapter {
+export class ClaudeAgentAdapter implements AgentAdapter {
   readonly agentId = CLAUDE_AGENT_ID;
   readonly rollbackSupport = "yes" as const;
 
@@ -33,7 +30,6 @@ export class ClaudeAgentAdapter extends ManagedAgentAdapter {
   private readonly openDetectOperation: () => CurrentStateDetector;
 
   constructor(options: ClaudeAgentAdapterOptions) {
-    super();
     const databasePath = options.databasePath;
     const claudeHome = options.claudeHome ?? join(homedir(), ".claude");
     const credentialStore = options.credentialStore;
@@ -91,12 +87,31 @@ export class ClaudeAgentAdapter extends ManagedAgentAdapter {
         });
   }
 
-  protected openApplySelection(): ApplySelection {
-    return this.openApplyOperation();
+  detectAgentSelection() {
+    const detector = this.openDetectOperation();
+    try {
+      return detector.detectAgentSelection();
+    } finally {
+      detector.close();
+    }
   }
 
-  protected openImporter(): ImportCurrentConnection {
-    return this.openImportOperation();
+  applySelection(connectionId: string) {
+    const applySelection = this.openApplyOperation();
+    try {
+      return applySelection.apply(connectionId);
+    } finally {
+      applySelection.close();
+    }
+  }
+
+  importCurrentConnection() {
+    const importer = this.openImportOperation();
+    try {
+      return importer.importCurrent();
+    } finally {
+      importer.close();
+    }
   }
 
   rollbackLatestMutation(): RollbackLatestAgentResult {
@@ -109,9 +124,5 @@ export class ClaudeAgentAdapter extends ManagedAgentAdapter {
     } finally {
       rollback.close();
     }
-  }
-
-  protected openDetector(): CurrentStateDetector {
-    return this.openDetectOperation();
   }
 }

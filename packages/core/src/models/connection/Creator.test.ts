@@ -11,7 +11,7 @@ import type { AccessRecord } from "../access";
 import { SqliteAccessStore } from "../access/SqliteAccessStore";
 import { EndpointRegistry } from "../endpoint";
 import { ConnectionCreator } from "./Creator";
-import type { GatewayProbeResult } from "./GatewayProbe";
+import type { GatewayProbeResult } from "./setup/GatewayProbe";
 
 const tempRoots: string[] = [];
 

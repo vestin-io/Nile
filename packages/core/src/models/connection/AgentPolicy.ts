@@ -1,8 +1,8 @@
 import { SUPPORTED_AGENT_IDS, type AgentId } from "../agent";
 import type { AuthMode } from "../access";
 import type { EndpointFamily, EndpointProtocols, EndpointRegistryInput } from "../endpoint";
-import type { ConnectionPresetFamily } from "./PresetTypes";
-import type { ConnectionOnboardingSuggestion } from "./OnboardingPolicy";
+import type { ConnectionPresetFamily } from "./setup/PresetTypes";
+import type { ConnectionOnboardingSuggestion } from "./setup/OnboardingPolicy";
 
 export type ConnectionAgentConfig = {
   configurableAgents: AgentId[];

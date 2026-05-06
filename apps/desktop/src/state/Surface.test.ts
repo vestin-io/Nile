@@ -57,7 +57,7 @@ describe("DesktopSurface", () => {
     );
 
     const surface = createSurface(setup);
-    await surface.switchConnection("codex", "work");
+    applySavedConnection(setup, "codex", "work");
 
     expect(await surface.getMenubarState()).toEqual({
       agents: [
@@ -281,7 +281,7 @@ describe("DesktopSurface", () => {
     );
 
     const surface = createSurface(setup);
-    await surface.switchConnection("codex", "openai-work");
+    applySavedConnection(setup, "codex", "openai-work");
 
     const session = NileSession.open({
       databasePath: setup.dbPath,
@@ -634,10 +634,10 @@ describe("DesktopSurface", () => {
       { kind: "api_key", apiKey: "router-secret" },
     );
 
-    const surface = createSurface(setup);
-    const current = await surface.switchConnection("codex", "router-account");
+    applySavedConnection(setup, "codex", "router-account");
 
-    expect(current.id).toBe("router-account");
+    const state = await createSurface(setup).getSettingsState();
+    expect(state.currentConnection?.id).toBe("router-account");
     expect(readFile(setup.codexHome, "auth.json")).toContain("router-secret");
     expect(readFile(setup.codexHome, "config.toml")).toContain('model_provider = "router"');
   });
@@ -666,7 +666,7 @@ describe("DesktopSurface", () => {
     );
 
     const surface = createSurface(setup);
-    await surface.switchConnection("codex", "router-account");
+    applySavedConnection(setup, "codex", "router-account");
 
     const history = await surface.getHistoryState();
     expect(history.agents.find((agent) => agent.agentId === "codex")?.latestRollbackableMutationId).toBeTruthy();
@@ -714,7 +714,7 @@ describe("DesktopSurface", () => {
       }), { status: 200 })) as unknown as typeof fetch;
 
     const surface = createSurface(setup);
-    await surface.switchConnection("codex", "personal");
+    applySavedConnection(setup, "codex", "personal");
     await surface.refreshMenubarUsage();
 
     const state = await surface.getMenubarState();
@@ -728,86 +728,6 @@ describe("DesktopSurface", () => {
       windowLabel: "weekly",
       remainingPercent: 30,
       text: "weekly 30% left",
-    });
-  });
-
-  it("refreshes usage for both the previous and new current connection when switching", async () => {
-    const setup = createSetup();
-    seedProvider(setup.dbPath, {
-      id: "openai-official",
-      label: "OpenAI Official",
-      endpointFamily: "openai",
-      supportedAuthModes: ["openai_session"],
-    });
-    seedBinding(
-      setup.dbPath,
-      setup.credentialStore,
-      {
-        id: "personal",
-        endpointId: "openai-official",
-        label: "Personal",
-        authMode: "openai_session",
-      },
-      openAiSessionCredential(),
-    );
-    seedBinding(
-      setup.dbPath,
-      setup.credentialStore,
-      {
-        id: "team",
-        endpointId: "openai-official",
-        label: "Team",
-        authMode: "openai_session",
-      },
-      openAiSessionCredential(),
-    );
-
-    let usageFetchCount = 0;
-    const responses = [
-      {
-        primary_window: { used_percent: 15, limit_window_seconds: 18_000, reset_at: 1_770_000_000 },
-        secondary_window: { used_percent: 10, limit_window_seconds: 604_800, reset_at: 1_770_500_000 },
-      },
-      {
-        primary_window: { used_percent: 20, limit_window_seconds: 18_000, reset_at: 1_770_100_000 },
-        secondary_window: { used_percent: 15, limit_window_seconds: 604_800, reset_at: 1_770_600_000 },
-      },
-      {
-        primary_window: { used_percent: 60, limit_window_seconds: 18_000, reset_at: 1_770_200_000 },
-        secondary_window: { used_percent: 40, limit_window_seconds: 604_800, reset_at: 1_770_700_000 },
-      },
-    ];
-    globalThis.fetch = (async () => {
-      usageFetchCount += 1;
-      const rateLimit = responses.shift();
-      if (!rateLimit) {
-        throw new Error("Unexpected usage fetch");
-      }
-      return new Response(JSON.stringify({
-        plan_type: "plus",
-        rate_limit: rateLimit,
-      }), { status: 200 });
-    }) as unknown as typeof fetch;
-
-    const surface = createSurface(setup);
-    await surface.switchConnection("codex", "personal");
-    expect(usageFetchCount).toBe(1);
-
-    await surface.switchConnection("codex", "team");
-    expect(usageFetchCount).toBe(3);
-
-    const state = await surface.getMenubarState();
-    expect(state.agents[0]?.currentConnection?.id).toBe("team");
-    expect(state.agents[0]?.currentUsage).toEqual({
-      status: "available",
-      planLabel: "Plus",
-      windows: [
-        { label: "5h", remainingPercent: 40, resetsAt: "2026-02-04T10:13:20.000Z" },
-        { label: "weekly", remainingPercent: 60, resetsAt: "2026-02-10T05:06:40.000Z" },
-      ],
-      windowLabel: "5h",
-      remainingPercent: 40,
-      text: "5h 40% left",
     });
   });
 
@@ -1061,6 +981,38 @@ function createSurface(setup: {
     secureSnapshotStore: setup.secureSnapshots,
     logger: NileLogger.silent(),
   });
+}
+
+function applySavedConnection(
+  setup: {
+    dbPath: string;
+    codexHome: string;
+    cursorHome: string;
+    claudeHome: string;
+    openclawHome: string;
+    credentialStore: StubCredentialStore;
+    secureSnapshots: MemorySecureSnapshotStore;
+  },
+  agentId: "codex" | "cursor" | "claude" | "openclaw",
+  connectionId: string,
+): void {
+  const session = NileSession.open({
+    databasePath: setup.dbPath,
+    credentialStore: setup.credentialStore,
+    secureSnapshotStore: setup.secureSnapshots,
+    logger: NileLogger.silent().child({ module: "desktop-surface-test" }),
+    agentHomes: {
+      codex: setup.codexHome,
+      cursor: setup.cursorHome,
+      claude: setup.claudeHome,
+      openclaw: setup.openclawHome,
+    },
+  });
+  try {
+    session.useConnection(agentId, connectionId);
+  } finally {
+    session.close();
+  }
 }
 
 function seedProvider(

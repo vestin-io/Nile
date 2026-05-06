@@ -5,10 +5,10 @@ import type { CredentialStore } from "../../../services/credential/Store";
 import { NileLogger } from "../../../services/NileLogger";
 import { AbstractAgentStateDetector } from "../../../runtime-local/AbstractAgentStateDetector";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../../runtime-local/AgentAdapterContext";
-import { AgentStateMatcher } from "../../../actions/import/StateMatcher";
+  AgentWorkspaceSession,
+} from "../../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../../runtime-local/AgentWorkspaceContext";
+import { CurrentStateMatcher } from "../../../actions/current-state/Matcher";
 import { OpenClawConfigStore } from "../OpenClawConfigStore";
 import { OPENCLAW_AGENT_ID, type OpenClawDetectedAccess, type OpenClawDetectedCurrentState, type OpenClawDetectedEndpoint } from "../types";
 import type { ReadCurrentStateResult } from "./Internal";
@@ -24,11 +24,11 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<OpenClawDet
     },
   ): CurrentStateDetector {
     const logger = options?.logger ?? NileLogger.silent().child({ module: "openclaw-current-state-detector" });
-    const context = AgentAdapterContextSession.open(databasePath, options.credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, options.credentialStore);
     const reader = new CurrentStateReader(
       new OpenClawConfigStore(options?.openclawHome ?? join(homedir(), ".openclaw")),
     );
-    const matcher = new AgentStateMatcher(
+    const matcher = new CurrentStateMatcher(
       context.sharedContext.endpointRegistry,
       context.sharedContext.accessRegistry,
       context.agentSelection,
@@ -38,7 +38,7 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<OpenClawDet
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       openclawHome?: string;
       credentialStore: CredentialStore;
@@ -49,7 +49,7 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<OpenClawDet
     const reader = new CurrentStateReader(
       new OpenClawConfigStore(options?.openclawHome ?? join(homedir(), ".openclaw")),
     );
-    const matcher = new AgentStateMatcher(
+    const matcher = new CurrentStateMatcher(
       context.endpointRegistry,
       context.accessRegistry,
       context.agentSelection,
@@ -60,9 +60,9 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<OpenClawDet
 
   constructor(
     private readonly reader: CurrentStateReader,
-    matcher: AgentStateMatcher,
+    matcher: CurrentStateMatcher,
     logger: NileLogger,
-    ownedContext: AgentAdapterContextSession | null = null,
+    ownedContext: AgentWorkspaceSession | null = null,
   ) {
     super(matcher, logger, ownedContext);
   }

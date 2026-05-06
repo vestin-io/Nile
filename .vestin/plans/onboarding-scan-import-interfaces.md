@@ -34,7 +34,7 @@ This draft does not cover:
 
 Add a new action-oriented module:
 
-- `packages/core/src/actions/scan-local/`
+- `packages/core/src/actions/local-state/`
 
 Suggested first-version files:
 

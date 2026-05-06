@@ -27,10 +27,11 @@ apps/
   desktop/    Electron surface
 
 packages/core/
-  actions/        product actions
+  actions/        product action clusters
   agents/         agent-specific adapters
-  application/    local workspace composition
+  application/    local workflows and local-only support
   models/         persistent domain model
+  projection/     agent-facing status projection strategies
   runtime-local/  local session and adapter wiring
   services/       database, credential, history, logging, environment
 ```
@@ -64,10 +65,10 @@ Own:
 
 The main product actions are grouped under `packages/core/src/actions/` and the runtime-local session layer:
 
-- `scan-local`
-- `status`
+- `local-state`
+- `current-state`
 - `usage`
-- `use`
+- `apply`
 - `runtime-local/NileSession` methods for create, import, remove, and rollback
 
 Usage remains connection-scoped shared core logic.
@@ -105,6 +106,21 @@ The desktop surface needs one additional layer that the CLI does not:
 
 This layer belongs in `apps/desktop`, not `packages/core`.
 
+Current implementation shape:
+
+- `apps/desktop/src/state/`
+  - desktop read surface and query helpers
+- `apps/desktop/src/electron/ipc/`
+  - explicit preload-to-main contracts
+- `apps/desktop/src/electron/shell/`
+  - Electron lifecycle, tray, menu, and window orchestration
+- `apps/desktop/src/electron/connections/`
+  - desktop-owned connection command orchestration
+- `apps/desktop/src/electron/state/`
+  - long-lived main-process cache, invalidation, and refresh policy
+- `apps/desktop/src/renderer/...`
+  - workflow-oriented UI by feature
+
 It owns:
 
 - cached desktop snapshots for menubar and settings
@@ -135,6 +151,7 @@ Current adapters:
 - `codex`
 - `cursor`
 - `claude`
+- `openclaw`
 
 ## Current Core Model
 

@@ -5,17 +5,17 @@ import type { CredentialStore } from "../../../services/credential/Store";
 import { EnvironmentSource } from "../../../services/EnvironmentSource";
 import { NileLogger } from "../../../services/NileLogger";
 import {
-  AgentImportSupport,
+  CurrentStateImportSupport,
   requireResolvedImportCandidate,
-} from "../../../actions/import/ImportSupport";
+} from "../../../actions/current-state/Import";
 import { CodexAuthStore } from "../stores/CodexAuthStore";
 import { CodexConfigStore } from "../stores/CodexConfigStore";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../../runtime-local/AgentWorkspaceContext";
 import { CODEX_AGENT_ID } from "../types";
-import { AgentStateMatcher } from "../../../actions/import/StateMatcher";
+import { CurrentStateMatcher } from "../../../actions/current-state/Matcher";
 import { CurrentStateReader } from "../current-state/Reader";
 import { CurrentStateDetector } from "../current-state/Detector";
 
@@ -33,13 +33,13 @@ export class ImportCurrentConnection {
     const credentialStore = options.credentialStore;
     const environment = options?.environment ?? EnvironmentSource.from(process.env);
     const logger = options?.logger ?? NileLogger.silent().child({ module: "codex-import-current-connection" });
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
     const authStore = new CodexAuthStore({ codexHome });
     const configStore = new CodexConfigStore(codexHome);
     const reader = new CurrentStateReader(authStore, configStore, environment);
 
     return new ImportCurrentConnection(
-      new AgentImportSupport(
+      new CurrentStateImportSupport(
         CODEX_AGENT_ID,
         "Codex",
         context.sharedContext.endpointRegistry,
@@ -49,7 +49,7 @@ export class ImportCurrentConnection {
       ),
       new CurrentStateDetector(
         reader,
-        new AgentStateMatcher(
+        new CurrentStateMatcher(
           context.sharedContext.endpointRegistry,
           context.sharedContext.accessRegistry,
           context.agentSelection,
@@ -63,7 +63,7 @@ export class ImportCurrentConnection {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       codexHome?: string;
       credentialStore: CredentialStore;
@@ -82,7 +82,7 @@ export class ImportCurrentConnection {
     );
 
     return new ImportCurrentConnection(
-      new AgentImportSupport(
+      new CurrentStateImportSupport(
         CODEX_AGENT_ID,
         "Codex",
         context.endpointRegistry,
@@ -101,10 +101,10 @@ export class ImportCurrentConnection {
   }
 
   constructor(
-    private readonly importSupport: AgentImportSupport,
+    private readonly importSupport: CurrentStateImportSupport,
     private readonly detector: CurrentStateDetector,
     private readonly reader: CurrentStateReader,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   importCurrent() {

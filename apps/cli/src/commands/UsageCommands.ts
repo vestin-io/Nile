@@ -1,11 +1,9 @@
 import type { CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { CursorUsageSessionSourceProbe } from "@nile/host-local";
-import type {
-  BindCursorUsageResult,
-  ConnectionUsageResult,
-  CursorUsageAutoBindResult,
-} from "@nile/core/runtime-local";
+import type { CursorUsageAutoBindResult } from "@nile/core/application/local";
+import type { ConnectionUsageResult } from "@nile/core/actions/usage";
+import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 
 import type { ResolvedCliOptions } from "../types";
 import { SessionRunner } from "./SessionRunner";

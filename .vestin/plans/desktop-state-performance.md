@@ -10,6 +10,21 @@ The main target is:
 - settings window reads and updates cached desktop state instead of full refresh loops
 - heavy state detection and usage refresh become explicit background refresh work
 
+## Current Status
+
+Most of this plan is now implemented.
+
+The current desktop structure that owns this behavior is:
+
+- `apps/desktop/src/electron/shell/`
+- `apps/desktop/src/electron/state/`
+- `apps/desktop/src/electron/connections/`
+- `apps/desktop/src/state/`
+- `apps/desktop/src/renderer/app/settings/`
+
+The research findings below capture the original request-oriented baseline that motivated the refactor.
+They remain useful as design context, but they do not describe the current grouped file layout.
+
 ## Why This Is Needed
 
 The current desktop surface is correct but request-oriented.
@@ -39,9 +54,9 @@ Result:
 
 Relevant files:
 
-- `apps/desktop/src/electron/DesktopMain.ts`
-- `apps/desktop/src/DesktopSurface.ts`
-- `packages/core/src/actions/status/Status.ts`
+- `apps/desktop/src/electron/shell/DesktopMain.ts`
+- `apps/desktop/src/state/Surface.ts`
+- `packages/core/src/actions/local-state/Status.ts`
 
 ### Agent status detection is synchronous and can be expensive
 
@@ -53,13 +68,13 @@ This is especially expensive for Cursor because it reads macOS keychain values t
 
 Relevant files:
 
-- `packages/core/src/runtime-local/ManagedAgentAdapter.ts`
+- `packages/core/src/runtime-local/NileSession.ts`
 - `packages/core/src/agents/cursor/stores/CursorCredentialStore.ts`
 - `packages/core/src/services/credential/SecurityCli.ts`
 
 ### Settings currently uses full refresh loops
 
-`SettingsApp` currently:
+The settings surface originally:
 
 - calls `getSettingsState()` and `listConnectionDefinitions()` on startup
 - listens for `desktop:state-changed`
@@ -69,13 +84,13 @@ This keeps behavior simple, but it couples renderer responsiveness to full state
 
 Relevant files:
 
-- `apps/desktop/src/renderer/SettingsApp.tsx`
+- `apps/desktop/src/renderer/app/settings/App.tsx`
 - `apps/desktop/src/electron/preload.ts`
-- `apps/desktop/src/electron/DesktopMain.ts`
+- `apps/desktop/src/electron/shell/DesktopMain.ts`
 
 ### Usage caching exists, but only as a partial optimization
 
-There is already a `usageCache` in `DesktopSurface`, and connection switching now proactively refreshes the previous and new current connection usage.
+There is already a dedicated usage cache path in the desktop state layer, and connection switching proactively refreshes the previous and new current connection usage.
 
 This is useful, but it is still not a full desktop state model:
 
@@ -107,11 +122,11 @@ Add a desktop-only main-process state layer above `NileSession`.
 
 ### New main-process component
 
-Add one class in `apps/desktop/src/electron/`:
+Add one class in `apps/desktop/src/electron/state/`:
 
 - `DesktopStateStore`
 
-This class should be process-lifetime, owned by `DesktopMain`.
+This class should be process-lifetime, owned by `shell/DesktopMain`.
 
 It should stay deliberately small.
 Do not introduce a state framework, generic cache abstraction, or many slice classes in the first pass.

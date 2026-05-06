@@ -1,4 +1,4 @@
-import type { AgentStatusView } from "@nile/core/runtime-local";
+import type { AgentStatusView } from "@nile/core/actions/local-state";
 import { formatAgentLabel } from "../formatters";
 
 export class StatusPresenter {

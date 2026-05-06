@@ -1,7 +1,7 @@
-import type { PreparedAgentApplySelection } from "../actions/use/ApplySupport";
-import { AgentApplySupport } from "../actions/use/ApplySupport";
+import type { PreparedAgentApplySelection } from "../actions/apply/Support";
+import { AgentApplySupport } from "../actions/apply/Support";
 import type { AgentId } from "../models/agent/Types";
-import type { ApplyAgentSelectionResult } from "../runtime-local/AgentAdapterTypes";
+import type { ApplyAgentSelectionResult } from "../models/agent";
 import { MutationHistory } from "../services/history/MutationHistory";
 import type {
   MutationAfterFileInput,

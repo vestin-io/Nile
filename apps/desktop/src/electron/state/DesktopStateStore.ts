@@ -1,12 +1,7 @@
-import type { AgentId } from "@nile/core/models/agent";
-import { StateReset, type ResetStateResult } from "@nile/core/application/local";
-import type {
-  BindCursorUsageResult,
-  CursorUsageAutoBindResult,
-  ImportDetectedSetupsResult,
-  RemoveConnectionResult,
-  RollbackLatestAgentResult,
-} from "@nile/core/runtime-local";
+import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent";
+import { StateReset, type CursorUsageAutoBindResult, type RemoveConnectionResult, type ResetStateResult } from "@nile/core/application/local";
+import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-state";
+import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 
 import { DesktopSurface } from "../../state/Surface";
 import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";

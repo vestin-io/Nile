@@ -9,10 +9,10 @@ import { CURSOR_AGENT_ID } from "../types";
 import type { ReadCurrentStateResult } from "./Internal";
 import { AbstractAgentStateDetector } from "../../../runtime-local/AbstractAgentStateDetector";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../../runtime-local/AgentAdapterContext";
-import { AgentStateMatcher } from "../../../actions/import/StateMatcher";
+  AgentWorkspaceSession,
+} from "../../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../../runtime-local/AgentWorkspaceContext";
+import { CurrentStateMatcher } from "../../../actions/current-state/Matcher";
 import { CurrentStateReader } from "./Reader";
 import { CursorConfigStore } from "../stores/CursorConfigStore";
 import { CursorCredentialStore } from "../stores/CursorCredentialStore";
@@ -29,14 +29,14 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<CursorDetec
   ): CurrentStateDetector {
     const cursorHome = options?.cursorHome ?? join(homedir(), ".cursor");
     const credentialStore = options.credentialStore;
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
 
     const reader = new CurrentStateReader(
       new CursorConfigStore(cursorHome),
       new CursorCredentialStore(),
       options?.environment ?? EnvironmentSource.from(process.env),
     );
-    const matcher = new AgentStateMatcher(
+    const matcher = new CurrentStateMatcher(
       context.sharedContext.endpointRegistry,
       context.sharedContext.accessRegistry,
       context.agentSelection,
@@ -51,7 +51,7 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<CursorDetec
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       cursorHome?: string;
       credentialStore: CredentialStore;
@@ -66,7 +66,7 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<CursorDetec
       new CursorCredentialStore(),
       options?.environment ?? EnvironmentSource.from(process.env),
     );
-    const matcher = new AgentStateMatcher(
+    const matcher = new CurrentStateMatcher(
       context.endpointRegistry,
       context.accessRegistry,
       context.agentSelection,
@@ -81,9 +81,9 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<CursorDetec
 
   constructor(
     private readonly reader: CurrentStateReader,
-    matcher: AgentStateMatcher,
+    matcher: CurrentStateMatcher,
     logger: NileLogger,
-    ownedContext: AgentAdapterContextSession | null = null,
+    ownedContext: AgentWorkspaceSession | null = null,
   ) {
     super(matcher, logger, ownedContext);
   }

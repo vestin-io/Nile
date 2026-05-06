@@ -1,7 +1,7 @@
 import type { AccessRegistryInput } from "../../../models/access";
 import type { EndpointFamily, EndpointRegistryInput } from "../../../models/endpoint";
 import type { AuthMode } from "../../../models/access";
-import type { MatchedAgentConnection } from "../../../runtime-local/AgentAdapterTypes";
+import type { MatchedAgentConnection } from "../../../models/agent";
 import { type CodexDetectedAccess, type CodexDetectedEndpoint } from "../types";
 import type {
   ApiKeyCredential,

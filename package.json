@@ -24,8 +24,9 @@
     "test:cli": "npm run build:host-local && vitest run apps/cli/src",
     "test:desktop": "npm run build:host-local && vitest run apps/desktop/src",
     "test": "npm run test:core && npm run test:host-local && npm run test:cli && npm run test:desktop",
+    "verify:structure": "node ./scripts/check-structure.mjs",
     "typecheck": "npm run build:host-local && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.renderer.json --noEmit",
-    "verify:pre-push": "npm run typecheck && npm test && npm run desktop:build"
+    "verify:pre-push": "npm run verify:structure && npm run typecheck && npm test && npm run desktop:build"
   },
   "devDependencies": {
     "esbuild": "^0.25.11",

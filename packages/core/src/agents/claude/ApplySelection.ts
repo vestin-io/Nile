@@ -10,13 +10,13 @@ import { NileLogger } from "../../services/NileLogger";
 import {
   AgentApplySupport,
   type PreparedAgentApplySelection,
-} from "../../actions/use/ApplySupport";
+} from "../../actions/apply/Support";
 import { ApplyMutation } from "../ApplyMutation";
 import type { ClaudeProjection } from "../../projection";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { CLAUDE_AGENT_ID } from "./types";
 import { ClaudeCredentialStore } from "./Store";
 import { ClaudeSettingsStore } from "./SettingsStore";
@@ -41,7 +41,7 @@ export class ApplySelection {
     const claudeHome = options?.claudeHome ?? join(homedir(), ".claude");
     const credentialStore = options.credentialStore;
     const logger = options?.logger ?? NileLogger.silent().child({ module: "claude-apply-selection" });
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
 
     return new ApplySelection(
       new ApplyMutation(
@@ -69,7 +69,7 @@ export class ApplySelection {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       claudeHome?: string;
       credentialStore: CredentialStore;
@@ -109,7 +109,7 @@ export class ApplySelection {
     private readonly applyMutation: ApplyMutation,
     private readonly settingsStore: ClaudeSettingsStore,
     private readonly credentialStore: ClaudeCredentialStore,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   apply(connectionId: string) {

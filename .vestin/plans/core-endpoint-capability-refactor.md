@@ -529,13 +529,14 @@ Expected initial behavior:
 
 ## Recommended Core Modules
 
-Suggested new module layout:
+Current-aligned module layout:
 
 - `packages/core/src/models/endpoint`
 - `packages/core/src/models/access`
 - `packages/core/src/projection`
-- `packages/core/src/detection`
-- `packages/core/src/actions/use`
+- `packages/core/src/actions/current-state`
+- `packages/core/src/actions/local-state`
+- `packages/core/src/actions/apply`
 
 Suggested main classes:
 
@@ -546,8 +547,11 @@ Suggested main classes:
 - `CodexProjectionStrategy`
 - `ClaudeProjectionStrategy`
 - `CursorProjectionStrategy`
+- `OpenClawProjectionStrategy`
 - `EndpointMatchResolver`
 - `CurrentStateClassifier`
+
+The old `actions/use` naming has since been replaced by the concrete `actions/apply` cluster so the core structure reads more like the actual saved-connection apply use case.
 
 ## What To Remove
 

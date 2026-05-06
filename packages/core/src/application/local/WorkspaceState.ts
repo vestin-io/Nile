@@ -1,28 +1,18 @@
-import { ImportDetectedSetups, ScanLocalSetups } from "../../actions/scan-local";
-import { Status } from "../../actions/status/Status";
 import { Usage } from "../../actions/usage/Usage";
 import { CursorUsageBinder, CursorUsageBindingRegistry, CursorUsageSnapshotStore } from "../../actions/usage/cursor";
 import { CursorUsageAutoBinder } from "./CursorUsageAutoBinder";
 import type { CursorUsageSessionProbe } from "./CursorUsageSessionProbe";
 import { AccessRegistry } from "../../models/access";
-import type { AgentAdapterLookup } from "../../models/agent";
 import { ConnectionCreator } from "../../models/connection/Creator";
 import { SavedConnections } from "../../models/connection/SavedConnections";
 import { EndpointRegistry } from "../../models/endpoint";
 import { AgentSelection } from "../../models/selection/Selection";
-import type { SharedAgentAdapterContext } from "./AgentAdapterContext";
 import type { CredentialStore } from "../../services/credential/Store";
 import {
   LocalCredentialSourceFactory,
   type CredentialSourceFactory,
 } from "../../services/credential/Factory";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
-
-export type LocalAgentActions = {
-  status: Status;
-  scanLocal: ScanLocalSetups;
-  importDetectedSetups: ImportDetectedSetups;
-};
 
 export class LocalWorkspaceState {
   private cursorUsageBindingRegistry: CursorUsageBindingRegistry | null = null;
@@ -65,16 +55,6 @@ export class LocalWorkspaceState {
     private readonly ownedDatabase: SqliteDatabase | null,
   ) {}
 
-  createSharedAgentAdapterContext(agentSelection: AgentSelection): SharedAgentAdapterContext {
-    return {
-      databasePath: this.databasePath,
-      database: this.database,
-      endpointRegistry: this.endpointRegistry,
-      accessRegistry: this.accessRegistry,
-      agentSelection,
-    };
-  }
-
   createSavedConnections(agentSelection: AgentSelection): SavedConnections {
     return new SavedConnections(
       this.database,
@@ -90,28 +70,6 @@ export class LocalWorkspaceState {
       this.endpointRegistry,
       this.accessRegistry,
     );
-  }
-
-  createAgentActions(agentAdapterRegistry: AgentAdapterLookup): LocalAgentActions {
-    const status = new Status(
-      this.endpointRegistry,
-      this.accessRegistry,
-      agentAdapterRegistry,
-    );
-    const scanLocal = new ScanLocalSetups(
-      status,
-      this.accessRegistry,
-      agentAdapterRegistry,
-    );
-
-    return {
-      status,
-      scanLocal,
-      importDetectedSetups: new ImportDetectedSetups(
-        scanLocal,
-        agentAdapterRegistry,
-      ),
-    };
   }
 
   createUsage(): Usage {
@@ -138,6 +96,14 @@ export class LocalWorkspaceState {
       this.getCursorUsageBindingRegistry(),
       sessionProbe,
     );
+  }
+
+  getEndpointRegistry(): EndpointRegistry {
+    return this.endpointRegistry;
+  }
+
+  getAccessRegistry(): AccessRegistry {
+    return this.accessRegistry;
   }
 
   clearCursorUsageArtifacts(connectionId: string): void {

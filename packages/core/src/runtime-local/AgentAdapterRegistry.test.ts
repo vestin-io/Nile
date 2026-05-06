@@ -4,8 +4,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import type { StoredCredential } from "../services/credential/Types";
+import type { AgentAdapter } from "../models/agent";
+import { BuiltInAgentAdapters } from "./BuiltInAdapters";
 import { AgentAdapterRegistry, AgentAdapterRegistryError } from "./AgentAdapterRegistry";
-import type { AgentAdapter } from "./AgentAdapterTypes";
 
 const tempDirs: string[] = [];
 
@@ -18,15 +19,17 @@ afterEach(() => {
 describe("AgentAdapterRegistry", () => {
   it("registers codex, cursor, claude, and openclaw with the shared adapter contract", () => {
     const setup = createSetup();
-    const registry = AgentAdapterRegistry.open(setup.dbPath, {
-      agentHomes: {
-        codex: setup.codexHome,
-        cursor: setup.cursorHome,
-        claude: setup.claudeHome,
-        openclaw: setup.openclawHome,
-      },
-      credentialStore: new StubCredentialStore(),
-    });
+    const registry = AgentAdapterRegistry.fromAdapters(
+      BuiltInAgentAdapters.create(setup.dbPath, {
+        agentHomes: {
+          codex: setup.codexHome,
+          cursor: setup.cursorHome,
+          claude: setup.claudeHome,
+          openclaw: setup.openclawHome,
+        },
+        credentialStore: new StubCredentialStore(),
+      }),
+    );
 
     const codexAdapter = registry.get("codex");
     const cursorAdapter = registry.get("cursor");
@@ -48,15 +51,17 @@ describe("AgentAdapterRegistry", () => {
 
   it("throws for an unimplemented agent", () => {
     const setup = createSetup();
-    const registry = AgentAdapterRegistry.open(setup.dbPath, {
-      agentHomes: {
-        codex: setup.codexHome,
-        cursor: setup.cursorHome,
-        claude: setup.claudeHome,
-        openclaw: setup.openclawHome,
-      },
-      credentialStore: new StubCredentialStore(),
-    });
+    const registry = AgentAdapterRegistry.fromAdapters(
+      BuiltInAgentAdapters.create(setup.dbPath, {
+        agentHomes: {
+          codex: setup.codexHome,
+          cursor: setup.cursorHome,
+          claude: setup.claudeHome,
+          openclaw: setup.openclawHome,
+        },
+        credentialStore: new StubCredentialStore(),
+      }),
+    );
 
     expect(() => registry.get("unknown-agent" as "codex")).toThrow(AgentAdapterRegistryError);
   });

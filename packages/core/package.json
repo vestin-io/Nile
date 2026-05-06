@@ -16,19 +16,73 @@
     "build": "node ./build.mjs && tsc -p ./tsconfig.build.json"
   },
   "exports": {
-    ".": "./dist/index.js",
-    "./application": "./dist/application/index.js",
-    "./application/local": "./dist/application/local/index.js",
-    "./models/agent": "./dist/models/agent/index.js",
-    "./models/agent/homes": "./dist/models/agent/Homes.js",
-    "./models/agent/types": "./dist/models/agent/Types.js",
-    "./models/connection/enabled-agents-policy": "./dist/models/connection/EnabledAgentsPolicy.js",
-    "./models/*": "./dist/models/*/index.js",
-    "./projection": "./dist/projection/index.js",
-    "./runtime-local": "./dist/runtime-local/index.js",
-    "./services/EnvironmentSource": "./dist/services/EnvironmentSource.js",
-    "./services/NileLogger": "./dist/services/NileLogger.js",
-    "./services/*": "./dist/services/*/index.js",
-    "./agents": "./dist/agents/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./application": {
+      "types": "./dist/application/index.d.ts",
+      "default": "./dist/application/index.js"
+    },
+    "./application/local": {
+      "types": "./dist/application/local/index.d.ts",
+      "default": "./dist/application/local/index.js"
+    },
+    "./actions/local-state": {
+      "types": "./dist/actions/local-state/index.d.ts",
+      "default": "./dist/actions/local-state/index.js"
+    },
+    "./actions/usage": {
+      "types": "./dist/actions/usage/index.d.ts",
+      "default": "./dist/actions/usage/index.js"
+    },
+    "./actions/usage/cursor": {
+      "types": "./dist/actions/usage/cursor/index.d.ts",
+      "default": "./dist/actions/usage/cursor/index.js"
+    },
+    "./models/agent": {
+      "types": "./dist/models/agent/index.d.ts",
+      "default": "./dist/models/agent/index.js"
+    },
+    "./models/agent/homes": {
+      "types": "./dist/models/agent/Homes.d.ts",
+      "default": "./dist/models/agent/Homes.js"
+    },
+    "./models/agent/types": {
+      "types": "./dist/models/agent/Types.d.ts",
+      "default": "./dist/models/agent/Types.js"
+    },
+    "./models/connection/enabled-agents-policy": {
+      "types": "./dist/models/connection/EnabledAgentsPolicy.d.ts",
+      "default": "./dist/models/connection/EnabledAgentsPolicy.js"
+    },
+    "./models/*": {
+      "types": "./dist/models/*/index.d.ts",
+      "default": "./dist/models/*/index.js"
+    },
+    "./projection": {
+      "types": "./dist/projection/index.d.ts",
+      "default": "./dist/projection/index.js"
+    },
+    "./runtime-local": {
+      "types": "./dist/runtime-local/index.d.ts",
+      "default": "./dist/runtime-local/index.js"
+    },
+    "./services/EnvironmentSource": {
+      "types": "./dist/services/EnvironmentSource.d.ts",
+      "default": "./dist/services/EnvironmentSource.js"
+    },
+    "./services/NileLogger": {
+      "types": "./dist/services/NileLogger.d.ts",
+      "default": "./dist/services/NileLogger.js"
+    },
+    "./services/*": {
+      "types": "./dist/services/*/index.d.ts",
+      "default": "./dist/services/*/index.js"
+    },
+    "./agents": {
+      "types": "./dist/agents/index.d.ts",
+      "default": "./dist/agents/index.js"
+    }
   }
 }

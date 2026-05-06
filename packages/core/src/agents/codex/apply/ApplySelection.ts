@@ -6,14 +6,14 @@ import { FileSnapshotStore } from "../../../services/history/FileSnapshotStore";
 import { MutationHistory } from "../../../services/history/MutationHistory";
 import { SecureSnapshotStore } from "../../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../../services/NileLogger";
-import { AgentApplySupport } from "../../../actions/use/ApplySupport";
-import type { PreparedAgentApplySelection } from "../../../actions/use/ApplySupport";
+import { AgentApplySupport } from "../../../actions/apply/Support";
+import type { PreparedAgentApplySelection } from "../../../actions/apply/Support";
 import { ApplyMutation } from "../../ApplyMutation";
 import type { CodexProjection } from "../../../projection";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../../runtime-local/AgentWorkspaceContext";
 import { CODEX_AGENT_ID } from "../types";
 import { CodexAuthStore } from "../stores/CodexAuthStore";
 import { CodexConfigStore } from "../stores/CodexConfigStore";
@@ -39,7 +39,7 @@ export class ApplySelection {
     const credentialStore = options.credentialStore;
     const logger = options?.logger ?? NileLogger.silent().child({ module: "codex-apply-selection" });
     const historyRoot = join(dirname(databasePath), "history");
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
 
     return new ApplySelection(
       new ApplyMutation(
@@ -65,7 +65,7 @@ export class ApplySelection {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       codexHome?: string;
       credentialStore: CredentialStore;
@@ -104,7 +104,7 @@ export class ApplySelection {
     private readonly applyMutation: ApplyMutation,
     private readonly authStore: CodexAuthStore,
     private readonly configStore: CodexConfigStore,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   apply(connectionId: string) {
@@ -160,9 +160,9 @@ export class ApplySelection {
 }
 
 function createApplySupport(
-  endpointRegistry: SharedAgentAdapterContext["endpointRegistry"],
-  accessRegistry: SharedAgentAdapterContext["accessRegistry"],
-  agentSelection: SharedAgentAdapterContext["agentSelection"],
+  endpointRegistry: AgentWorkspaceContext["endpointRegistry"],
+  accessRegistry: AgentWorkspaceContext["accessRegistry"],
+  agentSelection: AgentWorkspaceContext["agentSelection"],
   logger: NileLogger,
   credentialStore: CredentialStore,
 ): AgentApplySupport {

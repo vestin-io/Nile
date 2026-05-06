@@ -8,9 +8,9 @@ import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore"
 import { NileLogger } from "../../services/NileLogger";
 import { RollbackLatest } from "../RollbackLatest";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { OPENCLAW_AGENT_ID } from "./types";
 import { CurrentStateDetector } from "./current-state/Detector";
 
@@ -30,7 +30,7 @@ export class RollbackLatestMutation {
     },
   ): RollbackLatestMutation {
     const logger = options?.logger ?? NileLogger.silent().child({ module: "openclaw-rollback-latest" });
-    const context = AgentAdapterContextSession.open(databasePath, options.credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, options.credentialStore);
     return new RollbackLatestMutation(
       new RollbackLatest(
         new MutationHistory(
@@ -52,7 +52,7 @@ export class RollbackLatestMutation {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       openclawHome?: string;
       credentialStore: CredentialStore;
@@ -82,7 +82,7 @@ export class RollbackLatestMutation {
 
   constructor(
     private readonly rollbackLatest: RollbackLatest,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   rollback(): RollbackLatestResult {

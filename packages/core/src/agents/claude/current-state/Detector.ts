@@ -8,10 +8,10 @@ import { CLAUDE_AGENT_ID } from "../types";
 import type { ReadCurrentStateResult } from "./Internal";
 import { AbstractAgentStateDetector } from "../../../runtime-local/AbstractAgentStateDetector";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../../runtime-local/AgentAdapterContext";
-import { AgentStateMatcher } from "../../../actions/import/StateMatcher";
+  AgentWorkspaceSession,
+} from "../../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../../runtime-local/AgentWorkspaceContext";
+import { CurrentStateMatcher } from "../../../actions/current-state/Matcher";
 import { CurrentStateReader } from "./Reader";
 import { ClaudeCredentialStore } from "../Store";
 import { ClaudeSettingsStore } from "../SettingsStore";
@@ -27,13 +27,13 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<ClaudeDetec
   ): CurrentStateDetector {
     const claudeHome = options?.claudeHome ?? join(homedir(), ".claude");
     const credentialStore = options.credentialStore;
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
 
     const reader = new CurrentStateReader(
       new ClaudeSettingsStore(claudeHome),
       new ClaudeCredentialStore(claudeHome),
     );
-    const matcher = new AgentStateMatcher(
+    const matcher = new CurrentStateMatcher(
       context.sharedContext.endpointRegistry,
       context.sharedContext.accessRegistry,
       context.agentSelection,
@@ -48,7 +48,7 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<ClaudeDetec
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       claudeHome?: string;
       credentialStore: CredentialStore;
@@ -61,7 +61,7 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<ClaudeDetec
       new ClaudeSettingsStore(claudeHome),
       new ClaudeCredentialStore(claudeHome),
     );
-    const matcher = new AgentStateMatcher(
+    const matcher = new CurrentStateMatcher(
       context.endpointRegistry,
       context.accessRegistry,
       context.agentSelection,
@@ -76,9 +76,9 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<ClaudeDetec
 
   constructor(
     private readonly reader: CurrentStateReader,
-    matcher: AgentStateMatcher,
+    matcher: CurrentStateMatcher,
     logger: NileLogger,
-    ownedContext: AgentAdapterContextSession | null = null,
+    ownedContext: AgentWorkspaceSession | null = null,
   ) {
     super(matcher, logger, ownedContext);
   }

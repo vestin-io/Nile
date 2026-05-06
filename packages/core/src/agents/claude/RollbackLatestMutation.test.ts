@@ -11,8 +11,8 @@ import { KeychainCredentialStore } from "../../services/credential/KeychainCrede
 import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
 import { MutationHistory } from "../../services/history/MutationHistory";
 import { NileLogger } from "../../services/NileLogger";
-import { AgentApplySupport } from "../../actions/use/ApplySupport";
-import { AgentAdapterContextSession } from "../../runtime-local/AgentAdapterContext";
+import { AgentApplySupport } from "../../actions/apply/Support";
+import { AgentWorkspaceSession } from "../../runtime-local/AgentWorkspaceSession";
 import { ApplyMutation } from "../ApplyMutation";
 import { RollbackLatest } from "../RollbackLatest";
 import { ApplySelection } from "./ApplySelection";
@@ -66,7 +66,7 @@ describe("RollbackLatestMutation", () => {
       authMode: "claude_session",
     });
 
-    const context = AgentAdapterContextSession.open(setup.dbPath, setup.credentialStore);
+    const context = AgentWorkspaceSession.open(setup.dbPath, setup.credentialStore);
     const mutationHistory = MutationHistory.fromDatabase(setup.dbPath, context.workspaceState.database, {
       secureSnapshotStore: setup.secureSnapshots,
       logger: NileLogger.silent(),

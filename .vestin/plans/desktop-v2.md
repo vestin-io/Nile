@@ -1,5 +1,32 @@
 # Desktop V2 Plan
 
+## Current Implementation Shape
+
+The desktop surface is now organized around explicit process and workflow boundaries:
+
+- `apps/desktop/src/electron/ipc/`
+  - explicit main-process route groups for app, state, connection, and update tasks
+- `apps/desktop/src/electron/shell/`
+  - Electron lifecycle, tray, menu, and window orchestration
+- `apps/desktop/src/electron/state/`
+  - long-lived desktop cache, refresh policy, and invalidation
+- `apps/desktop/src/electron/connections/`
+  - desktop-owned connection command orchestration
+- `apps/desktop/src/electron/updates/`
+  - auto-update integration
+- `apps/desktop/src/state/`
+  - session-safe desktop query surface
+- `apps/desktop/src/renderer/app/settings/`
+  - settings shell and navigation
+- `apps/desktop/src/renderer/connections/`
+  - add, edit, detail, list, and dialog workflows
+- `apps/desktop/src/renderer/agents/`
+  - list and detail workflows
+- `apps/desktop/src/renderer/settings/`
+  - general settings and settings dialogs
+
+This plan now serves as the durable intent for those boundaries rather than a step-by-step backlog for the original flat implementation.
+
 ## Goal
 
 Build the desktop surface in two phases:
@@ -162,6 +189,13 @@ Preferred wording for OpenAI session:
 - source:
   - `Sign in with OpenAI`
   - `Import current Codex auth`
+
+## Structural Rules
+
+- Menubar switching stays in the Electron shell and desktop state layer.
+- Shared connection rules stay in `packages/core`.
+- Renderer code stays workflow-oriented and must not grow a flat page bucket again.
+- Main-process caches and refresh policy stay in `apps/desktop/src/electron/state/`.
 
 ## Implementation Order
 

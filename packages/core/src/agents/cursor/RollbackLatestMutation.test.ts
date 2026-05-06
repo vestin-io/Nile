@@ -12,8 +12,8 @@ import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore"
 import { MutationHistory } from "../../services/history/MutationHistory";
 import { FileSnapshotStore } from "../../services/history/FileSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
-import { AgentApplySupport } from "../../actions/use/ApplySupport";
-import { AgentAdapterContextSession } from "../../runtime-local/AgentAdapterContext";
+import { AgentApplySupport } from "../../actions/apply/Support";
+import { AgentWorkspaceSession } from "../../runtime-local/AgentWorkspaceSession";
 import { ApplyMutation } from "../ApplyMutation";
 import { ApplySelection } from "./ApplySelection";
 import { CURSOR_AGENT_ID, type CursorLiveCredentialSnapshot } from "./types";
@@ -67,7 +67,7 @@ describe("RollbackLatestMutation", () => {
       authMode: "cursor_session",
     });
 
-    const context = AgentAdapterContextSession.open(setup.dbPath, setup.credentialStore);
+    const context = AgentWorkspaceSession.open(setup.dbPath, setup.credentialStore);
     const mutationHistory = MutationHistory.fromDatabase(setup.dbPath, context.workspaceState.database, {
       secureSnapshotStore: setup.secureSnapshots,
       logger: NileLogger.silent(),

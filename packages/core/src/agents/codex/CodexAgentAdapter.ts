@@ -5,11 +5,8 @@ import type { CredentialStore } from "../../services/credential/Store";
 import { EnvironmentSource } from "../../services/EnvironmentSource";
 import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
-import type {
-  RollbackLatestAgentResult,
-} from "../../runtime-local/AgentAdapterTypes";
-import { ManagedAgentAdapter } from "../../runtime-local/ManagedAgentAdapter";
-import type { SharedAgentAdapterContext } from "../../runtime-local/AgentAdapterContext";
+import type { AgentAdapter, RollbackLatestAgentResult } from "../../models/agent";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { ApplySelection } from "./apply/ApplySelection";
 import { CurrentStateDetector } from "./current-state/Detector";
 import { ImportCurrentConnection } from "./import/ImportCurrentConnection";
@@ -23,10 +20,10 @@ export type CodexAgentAdapterOptions = {
   environment?: EnvironmentSource;
   secureSnapshotStore?: SecureSnapshotStore;
   logger?: NileLogger;
-  sharedContext?: SharedAgentAdapterContext;
+  sharedContext?: AgentWorkspaceContext;
 };
 
-export class CodexAgentAdapter extends ManagedAgentAdapter {
+export class CodexAgentAdapter implements AgentAdapter {
   readonly agentId = CODEX_AGENT_ID;
   readonly rollbackSupport = "yes" as const;
 
@@ -36,7 +33,6 @@ export class CodexAgentAdapter extends ManagedAgentAdapter {
   private readonly openDetectOperation: () => CurrentStateDetector;
 
   constructor(options: CodexAgentAdapterOptions) {
-    super();
     const databasePath = options.databasePath;
     const codexHome = options.codexHome ?? join(homedir(), ".codex");
     const credentialStore = options.credentialStore;
@@ -99,12 +95,31 @@ export class CodexAgentAdapter extends ManagedAgentAdapter {
         });
   }
 
-  protected openApplySelection(): ApplySelection {
-    return this.openApplyOperation();
+  detectAgentSelection() {
+    const detector = this.openDetectOperation();
+    try {
+      return detector.detectAgentSelection();
+    } finally {
+      detector.close();
+    }
   }
 
-  protected openImporter(): ImportCurrentConnection {
-    return this.openImportOperation();
+  applySelection(connectionId: string) {
+    const applySelection = this.openApplyOperation();
+    try {
+      return applySelection.apply(connectionId);
+    } finally {
+      applySelection.close();
+    }
+  }
+
+  importCurrentConnection() {
+    const importer = this.openImportOperation();
+    try {
+      return importer.importCurrent();
+    } finally {
+      importer.close();
+    }
   }
 
   rollbackLatestMutation(): RollbackLatestAgentResult {
@@ -120,9 +135,5 @@ export class CodexAgentAdapter extends ManagedAgentAdapter {
     } finally {
       rollback.close();
     }
-  }
-
-  protected openDetector(): CurrentStateDetector {
-    return this.openDetectOperation();
   }
 }

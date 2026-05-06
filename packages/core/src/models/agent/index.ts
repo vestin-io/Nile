@@ -7,8 +7,11 @@ export type {
   AgentDetectionResult,
   AgentLiveStateValidity,
   ApplyAgentSelectionResult,
+  DetectedAgentAccess,
+  DetectedAgentEndpoint,
   DetectedAgentState,
   ImportCurrentConnectionResult,
+  MatchedAgentConnection,
   RollbackLatestAgentResult,
 } from "./Adapter";
 export {

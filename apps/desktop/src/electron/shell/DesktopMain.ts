@@ -1,4 +1,4 @@
-import { app, type MenuItemConstructorOptions } from "electron";
+import { app } from "electron";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -14,7 +14,6 @@ import { NileLogger } from "@nile/core/services/NileLogger";
 import { ShellEnvironment } from "@nile/host-local";
 
 import { DesktopSurface } from "../../state/Surface";
-import type { MenubarAgentState } from "../../state/Types";
 import { DesktopApplicationMenu } from "./DesktopApplicationMenu";
 import { AgentHomesStore } from "../state/AgentHomesStore";
 import { AutoUpdateManager } from "../updates/AutoUpdateManager";
@@ -26,6 +25,7 @@ import { DesktopIpcInputValidator } from "../ipc/DesktopIpcInputValidator";
 import { DesktopIpcStateRoutes } from "../ipc/DesktopIpcStateRoutes";
 import { DesktopIpcUpdateRoutes } from "../ipc/DesktopIpcUpdateRoutes";
 import { DesktopShell } from "./DesktopShell";
+import { DesktopTrayMenu } from "./TrayMenu";
 import { DesktopStateRefresher } from "../state/DesktopStateRefresher";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 import { DesktopWorkspaceWatcher } from "./DesktopWorkspaceWatcher";
@@ -54,6 +54,7 @@ export class DesktopMain {
   private readonly stateRefresher: DesktopStateRefresher;
   private readonly workspaceWatcher: DesktopWorkspaceWatcher;
   private readonly shell: DesktopShell;
+  private readonly trayMenu: DesktopTrayMenu;
   private readonly autoUpdateManager: AutoUpdateManager;
   private readonly applicationMenu: DesktopApplicationMenu;
   private readonly inputs = new DesktopIpcInputValidator();
@@ -96,8 +97,19 @@ export class DesktopMain {
       onSettingsClose: () => {
         this.connectionManager.clearPreparedConnectionDrafts();
       },
-      onTrayMenuRequested: async () => await this.readTrayTemplate(),
+      onTrayMenuRequested: async () => await this.trayMenu.readTemplate(),
       shouldHideOnClose: () => !this.isQuitting,
+    });
+    this.trayMenu = new DesktopTrayMenu({
+      logger: this.logger,
+      peekState: () => this.stateStore.peekMenubarState(),
+      refreshState: async () => await this.stateStore.refreshMenubarState(),
+      showSettings: () => this.shell.showSettings(),
+      quitApp: () => app.quit(),
+      switchConnection: async (agentId, connectionId) => {
+        await this.stateStore.switchConnection(agentId, connectionId);
+        this.reloadAll();
+      },
     });
     this.stateRefresher = new DesktopStateRefresher({
       logger: this.logger,
@@ -221,81 +233,6 @@ export class DesktopMain {
       }
     } catch (error) {
       this.logger.warn("desktop.cursor_usage.auto_bind_failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  private async readTrayTemplate(): Promise<MenuItemConstructorOptions[]> {
-    const state = await this.stateStore.refreshMenubarState().catch((error) => {
-      this.logger.warn("desktop.menubar_state_refresh_failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return this.stateStore.peekMenubarState();
-    });
-    return this.buildTrayTemplate(state);
-  }
-
-  private buildTrayTemplate(state: Awaited<ReturnType<DesktopStateStore["peekMenubarState"]>>): MenuItemConstructorOptions[] {
-    if (!state) {
-      return [
-        { label: "Open Main Window", click: () => this.shell.showSettings() },
-        { type: "separator" },
-        { label: "Loading connections…", enabled: false },
-        { type: "separator" },
-        { label: "Quit", click: () => app.quit() },
-      ];
-    }
-
-    return [
-      { label: "Open Main Window", click: () => this.shell.showSettings() },
-      { type: "separator" },
-      ...state.agents.map((agent) => this.buildAgentSubmenu(agent)),
-      { type: "separator" },
-      { label: "Quit", click: () => app.quit() },
-    ];
-  }
-
-  private buildAgentSubmenu(agent: MenubarAgentState): MenuItemConstructorOptions {
-    if (agent.connections.length === 0) {
-      return {
-        label: agent.agentLabel,
-        submenu: [{ label: "No saved connections", enabled: false }],
-      };
-    }
-
-    const submenu: MenuItemConstructorOptions[] = [];
-    if (agent.currentUsage?.status === "available") {
-      submenu.push({ label: `Quota · ${agent.currentUsage.text}`, enabled: false });
-      submenu.push({ type: "separator" });
-    }
-
-    submenu.push(...agent.connections.map<MenuItemConstructorOptions>((connection) => ({
-      label: connection.label,
-      type: "checkbox",
-      checked: connection.isCurrent,
-      click: () => {
-        if (connection.isCurrent) {
-          return;
-        }
-        void this.switchConnectionFromTray(agent.agentId, connection.id);
-      },
-    })));
-
-    return {
-      label: agent.agentLabel,
-      submenu,
-    };
-  }
-
-  private async switchConnectionFromTray(agentId: AgentId, connectionId: string): Promise<void> {
-    try {
-      await this.stateStore.switchConnection(agentId, connectionId);
-      this.reloadAll();
-    } catch (error) {
-      this.logger.warn("desktop.tray.switch_failed", {
-        agentId,
-        connectionId,
         error: error instanceof Error ? error.message : String(error),
       });
     }

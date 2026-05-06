@@ -1,11 +1,11 @@
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type {
-  BindCursorUsageResult,
-  ConnectionUsageResult,
-  CursorUsageAutoBindResult,
   ImportDetectedSetupsResult,
   ScanLocalSetupsResult,
-} from "@nile/core/runtime-local";
+} from "@nile/core/actions/local-state";
+import type { CursorUsageAutoBindResult } from "@nile/core/application/local";
+import type { ConnectionUsageResult } from "@nile/core/actions/usage";
+import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 import type {
   AddConnectionResult,
   HistoryListEntry,

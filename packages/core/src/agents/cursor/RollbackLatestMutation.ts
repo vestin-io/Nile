@@ -7,9 +7,9 @@ import { MutationHistory, MutationHistoryError } from "../../services/history/Mu
 import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { CURSOR_AGENT_ID } from "./types";
 import { CursorHistoryTargets } from "./HistoryTargets";
 import { CurrentStateDetector } from "./current-state/Detector";
@@ -32,7 +32,7 @@ export class RollbackLatestMutation {
     },
   ): RollbackLatestMutation {
     const logger = options?.logger ?? NileLogger.silent().child({ module: "cursor-rollback-latest" });
-    const context = AgentAdapterContextSession.open(databasePath, options.credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, options.credentialStore);
     const cursorHome = options?.cursorHome ?? join(homedir(), ".cursor");
     return new RollbackLatestMutation(
       new MutationHistory(
@@ -57,7 +57,7 @@ export class RollbackLatestMutation {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       cursorHome?: string;
       credentialStore: CredentialStore;
@@ -92,12 +92,12 @@ export class RollbackLatestMutation {
     private readonly mutationHistory: MutationHistory,
     private readonly fileSnapshots: FileSnapshotStore,
     private readonly secureSnapshots: SecureSnapshotStore,
-    private readonly agentSelection: SharedAgentAdapterContext["agentSelection"],
+    private readonly agentSelection: AgentWorkspaceContext["agentSelection"],
     private readonly currentStateDetector: CurrentStateDetector,
     private readonly configStore: CursorConfigStore,
     private readonly credentialStore: CursorCredentialStore,
     private readonly logger: NileLogger,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   rollback(): RollbackLatestResult {

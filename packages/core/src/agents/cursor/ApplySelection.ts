@@ -13,13 +13,13 @@ import { NileLogger } from "../../services/NileLogger";
 import {
   AgentApplySupport,
   type PreparedAgentApplySelection,
-} from "../../actions/use/ApplySupport";
+} from "../../actions/apply/Support";
 import { ApplyMutation } from "../ApplyMutation";
 import type { CursorProjection } from "../../projection";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { CURSOR_AGENT_ID } from "./types";
 import { CursorHistoryTargets } from "./HistoryTargets";
 import { CursorConfigStore } from "./stores/CursorConfigStore";
@@ -45,7 +45,7 @@ export class ApplySelection {
     const cursorHome = options?.cursorHome ?? join(homedir(), ".cursor");
     const credentialStore = options.credentialStore;
     const logger = options?.logger ?? NileLogger.silent().child({ module: "cursor-apply-selection" });
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
 
     return new ApplySelection(
       new ApplyMutation(
@@ -73,7 +73,7 @@ export class ApplySelection {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       cursorHome?: string;
       credentialStore: CredentialStore;
@@ -113,7 +113,7 @@ export class ApplySelection {
     private readonly applyMutation: ApplyMutation,
     private readonly configStore: CursorConfigStore,
     private readonly cursorCredentialStore: CursorCredentialStore,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   apply(connectionId: string) {

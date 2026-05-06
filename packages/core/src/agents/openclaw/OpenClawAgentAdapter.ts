@@ -5,11 +5,8 @@ import type { CredentialStore } from "../../services/credential/Store";
 import { EnvironmentSource } from "../../services/EnvironmentSource";
 import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
-import type {
-  RollbackLatestAgentResult,
-} from "../../runtime-local/AgentAdapterTypes";
-import { ManagedAgentAdapter } from "../../runtime-local/ManagedAgentAdapter";
-import type { SharedAgentAdapterContext } from "../../runtime-local/AgentAdapterContext";
+import type { AgentAdapter, RollbackLatestAgentResult } from "../../models/agent";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { ApplySelection } from "./ApplySelection";
 import { CurrentStateDetector } from "./current-state/Detector";
 import { ImportCurrentConnection } from "./ImportCurrentConnection";
@@ -23,10 +20,10 @@ export type OpenClawAgentAdapterOptions = {
   environment?: EnvironmentSource;
   secureSnapshotStore?: SecureSnapshotStore;
   logger?: NileLogger;
-  sharedContext?: SharedAgentAdapterContext;
+  sharedContext?: AgentWorkspaceContext;
 };
 
-export class OpenClawAgentAdapter extends ManagedAgentAdapter {
+export class OpenClawAgentAdapter implements AgentAdapter {
   readonly agentId = OPENCLAW_AGENT_ID;
   readonly rollbackSupport = "yes" as const;
 
@@ -36,7 +33,6 @@ export class OpenClawAgentAdapter extends ManagedAgentAdapter {
   private readonly openDetectOperation: () => CurrentStateDetector;
 
   constructor(options: OpenClawAgentAdapterOptions) {
-    super();
     const databasePath = options.databasePath;
     const openclawHome = options.openclawHome ?? join(homedir(), ".openclaw");
     const credentialStore = options.credentialStore;
@@ -97,12 +93,31 @@ export class OpenClawAgentAdapter extends ManagedAgentAdapter {
         });
   }
 
-  protected openApplySelection(): ApplySelection {
-    return this.openApplyOperation();
+  detectAgentSelection() {
+    const detector = this.openDetectOperation();
+    try {
+      return detector.detectAgentSelection();
+    } finally {
+      detector.close();
+    }
   }
 
-  protected openImporter(): ImportCurrentConnection {
-    return this.openImportOperation();
+  applySelection(connectionId: string) {
+    const applySelection = this.openApplyOperation();
+    try {
+      return applySelection.apply(connectionId);
+    } finally {
+      applySelection.close();
+    }
+  }
+
+  importCurrentConnection() {
+    const importer = this.openImportOperation();
+    try {
+      return importer.importCurrent();
+    } finally {
+      importer.close();
+    }
   }
 
   rollbackLatestMutation(): RollbackLatestAgentResult {
@@ -118,9 +133,5 @@ export class OpenClawAgentAdapter extends ManagedAgentAdapter {
     } finally {
       rollback.close();
     }
-  }
-
-  protected openDetector(): CurrentStateDetector {
-    return this.openDetectOperation();
   }
 }

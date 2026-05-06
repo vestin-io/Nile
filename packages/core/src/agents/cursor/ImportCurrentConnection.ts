@@ -5,16 +5,16 @@ import type { CredentialStore } from "../../services/credential/Store";
 import { EnvironmentSource } from "../../services/EnvironmentSource";
 import { NileLogger } from "../../services/NileLogger";
 import {
-  AgentImportSupport,
+  CurrentStateImportSupport,
   requireResolvedImportCandidate,
-} from "../../actions/import/ImportSupport";
+} from "../../actions/current-state/Import";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { CurrentStateDetector } from "./current-state/Detector";
 import { CURSOR_AGENT_ID } from "./types";
-import { AgentStateMatcher } from "../../actions/import/StateMatcher";
+import { CurrentStateMatcher } from "../../actions/current-state/Matcher";
 import { CurrentStateReader } from "./current-state/Reader";
 import { CursorConfigStore } from "./stores/CursorConfigStore";
 import { CursorCredentialStore } from "./stores/CursorCredentialStore";
@@ -33,7 +33,7 @@ export class ImportCurrentConnection {
     const credentialStore = options.credentialStore;
     const environment = options?.environment ?? EnvironmentSource.from(process.env);
     const logger = options?.logger ?? NileLogger.silent().child({ module: "cursor-import-current-connection" });
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
     const configStore = new CursorConfigStore(cursorHome);
     const cursorCredentialStore = new CursorCredentialStore();
     const reader = new CurrentStateReader(
@@ -43,7 +43,7 @@ export class ImportCurrentConnection {
     );
 
     return new ImportCurrentConnection(
-      new AgentImportSupport(
+      new CurrentStateImportSupport(
         CURSOR_AGENT_ID,
         "Cursor",
         context.sharedContext.endpointRegistry,
@@ -53,7 +53,7 @@ export class ImportCurrentConnection {
       ),
       new CurrentStateDetector(
         reader,
-        new AgentStateMatcher(
+        new CurrentStateMatcher(
           context.sharedContext.endpointRegistry,
           context.sharedContext.accessRegistry,
           context.agentSelection,
@@ -67,7 +67,7 @@ export class ImportCurrentConnection {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       cursorHome?: string;
       credentialStore: CredentialStore;
@@ -86,7 +86,7 @@ export class ImportCurrentConnection {
     );
 
     return new ImportCurrentConnection(
-      new AgentImportSupport(
+      new CurrentStateImportSupport(
         CURSOR_AGENT_ID,
         "Cursor",
         context.endpointRegistry,
@@ -105,10 +105,10 @@ export class ImportCurrentConnection {
   }
 
   constructor(
-    private readonly importSupport: AgentImportSupport,
+    private readonly importSupport: CurrentStateImportSupport,
     private readonly detector: CurrentStateDetector,
     private readonly reader: CurrentStateReader,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   importCurrent() {

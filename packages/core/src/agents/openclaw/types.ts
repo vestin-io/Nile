@@ -1,9 +1,6 @@
 import type { AgentId } from "../../models/agent/Types";
 import type { EndpointFamily } from "../../models/endpoint";
-import type {
-  AgentLiveStateValidity,
-  MatchedAgentConnection,
-} from "../../runtime-local/AgentAdapterTypes";
+import type { AgentLiveStateValidity, MatchedAgentConnection } from "../../models/agent";
 
 export const OPENCLAW_AGENT_ID: AgentId = "openclaw";
 

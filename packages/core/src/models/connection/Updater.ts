@@ -4,12 +4,12 @@ import type { AccessRecord, AccessRegistry } from "../access";
 import type { AgentId } from "../agent";
 import { EndpointShape, type EndpointRecord, type EndpointRegistry, type EndpointRegistryInput } from "../endpoint";
 import { AgentSelection } from "../selection/Selection";
-import { ConnectionEndpointBuilder } from "./EndpointBuilder";
-import { GatewayProbe, type GatewayCapabilityProbe } from "./GatewayProbe";
-import { ConnectionIdentityKeyResolver } from "./IdentityKeyResolver";
+import { ConnectionEndpointBuilder } from "./setup/EndpointBuilder";
+import { GatewayProbe, type GatewayCapabilityProbe } from "./setup/GatewayProbe";
+import { ConnectionIdentityKeyResolver } from "./setup/IdentityKeyResolver";
 import { ConnectionNaming } from "./Naming";
-import { ConnectionOnboardingPolicy } from "./OnboardingPolicy";
-import type { ConnectionPresetFamily } from "./PresetTypes";
+import { ConnectionOnboardingPolicy } from "./setup/OnboardingPolicy";
+import type { ConnectionPresetFamily } from "./setup/PresetTypes";
 
 export type UpdateConnectionInput = {
   connectionId: string;

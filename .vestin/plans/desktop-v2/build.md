@@ -1,5 +1,152 @@
 # Desktop V2 Build Log
 
+## 2026-05-06
+
+### Step 76: Refresh the desktop state-performance plan to the grouped desktop structure
+
+- Updated `.vestin/plans/desktop-state-performance.md` with a current-status section so the document now clearly distinguishes:
+  - the original request-oriented baseline
+  - the current grouped desktop implementation
+- Repointed stale file references to the current desktop paths:
+  - `electron/shell/DesktopMain.ts`
+  - `state/Surface.ts`
+  - `renderer/app/settings/App.tsx`
+  - `actions/local-state/Status.ts`
+- Updated the state-layer notes so they now reference the current desktop ownership boundaries under:
+  - `electron/state`
+  - `shell/DesktopMain`
+- Result:
+  - the desktop performance plan remains useful design context without pretending the old flat file layout still exists
+
+### Verification
+
+- `git diff --check -- . ':(exclude)error.log'`
+
+### Step 75: Sync the desktop V2 plan to the current grouped desktop structure
+
+- Updated `.vestin/architect.md` and `.vestin/plans/desktop-v2.md` so the durable desktop architecture docs now describe the current grouped implementation:
+  - `electron/ipc`
+  - `electron/shell`
+  - `electron/state`
+  - `electron/connections`
+  - `electron/updates`
+  - `state/`
+  - workflow-oriented renderer directories
+- Added explicit structural rules to the desktop V2 plan so future desktop work preserves:
+  - Electron process separation
+  - desktop-owned state caching in `apps/desktop`
+  - shared-core ownership of business rules
+  - workflow-oriented renderer organization
+- Result:
+  - `.vestin` no longer presents the original flat desktop structure as if it were still current
+  - the desktop plan now reads as a durable boundary document instead of only an early backlog
+
+### Verification
+
+- `git diff --check -- . ':(exclude)error.log'`
+
+### Step 71: Split tray menu orchestration out of DesktopMain
+
+- Added `shell/TrayMenu.ts` so tray-specific behavior now closes inside one shell-local collaborator:
+  - menubar state refresh with stale-cache fallback
+  - tray menu template building
+  - tray-triggered connection switching
+- Removed tray menu presentation and switching behavior from `shell/DesktopMain.ts`, leaving `DesktopMain` focused on lifecycle wiring and process orchestration.
+- Result:
+  - `DesktopMain` no longer mixes lifecycle composition with tray menu rendering
+  - the tray menu now has one obvious place to evolve without re-growing the main shell entrypoint
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 72: Pull settings-page flow state out of the app shell
+
+- Added `renderer/app/settings/useFlow.ts` to own settings-surface flow state for:
+  - desktop reset
+  - quick-setup completion/dismissal
+  - add-connection return-page routing
+- Removed those flow handlers from `renderer/app/settings/App.tsx` so the app shell goes back to composition and wiring.
+- Result:
+  - `SettingsApp` no longer mixes page composition with reset and quick-setup flow bookkeeping
+  - page-level flow state now has one local hook instead of growing ad hoc inside the shell component
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 73: Split switch and error policy out of DesktopSurface
+
+- Added `state/ConnectionSwitcher.ts` so the desktop state surface no longer owns connection-switch follow-up behavior:
+  - switch apply
+  - current connection resolution
+  - usage refresh for previous and new current connections
+- Added `state/ErrorNormalizer.ts` so stale-schema reset guidance no longer lives inline inside `Surface.ts`.
+- Kept `Surface.ts` as the session/query boundary, but removed command detail and error-policy detail from it.
+- Result:
+  - `DesktopSurface` is closer to a pure state/session entrypoint
+  - switch follow-up and stale-schema error policy now each have one explicit owner
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 74: Remove stale desktop leftovers after the workflow split
+
+- Deleted `createDefaultDesktopSurface()` from `state/Surface.ts` because nothing in the desktop app uses that old convenience entrypoint anymore.
+- Removed `DesktopSurface.switchConnection()` and the now-unreachable `state/ConnectionSwitcher.ts` path:
+  - production switching already goes through `electron/state/DesktopStateStore` -> `electron/connections/DesktopConnectionGateway`
+  - the old surface-level command path was only being kept alive by tests
+- Moved reused-connection continuation routing out of `renderer/app/settings/Dialogs.tsx`:
+  - dialog composition no longer applies add-connection return targets directly
+  - `useConnectionActions` now owns the reused-connection continue flow
+- Updated desktop state tests to seed current connection through direct session setup instead of the removed surface command path.
+- Result:
+  - one dead desktop surface export removed
+  - one stale parallel switch path removed
+  - dialog layer no longer carries page-routing policy left over from earlier flow structure
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 70: Expose reset from the fatal desktop error shell
+
+- Kept core schema migration behavior strict instead of adding duplicate-column compatibility for damaged local databases.
+- Updated the settings app fatal error shell so users can still trigger desktop state reset even when:
+  - `getSettingsState()`
+  - `getHistoryState()`
+  fail during initial load.
+- Reused the existing `desktop:reset-state` IPC path, but surfaced it directly from the error shell instead of requiring the normal settings page and reset dialog to load first.
+- Result:
+  - a broken local database no longer traps users in a retry-only screen
+  - users can self-recover without manually deleting the SQLite file
+
+### Verification
+
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 69: Fix renderer asset path regressions and browser-safe core imports
+
+- Replaced repeated direct `nile-mark.svg` imports with one renderer-local shared module:
+  - `renderer/shared/NileMark.ts`
+- Updated the settings and quick-setup surfaces to use that shared asset module so workflow directory moves no longer break long relative asset paths.
+- Fixed the renderer-side agent label helper to import from the browser-safe `@nile/core/models/agent/types` entry instead of the wider `@nile/core/models/agent` barrel.
+- Result:
+  - desktop renderer build no longer fails on missing `nile-mark.svg`
+  - browser bundling no longer pulls `models/agent/Homes` and its `node:fs` dependency into the settings bundle
+
+### Verification
+
+- `npm run build -w @nile/desktop`
+- `npm run test:desktop`
+- `npm run typecheck`
+
 ## 2026-05-05
 
 ### Step 59: Re-group add-connection renderer code by workflow

@@ -10,7 +10,7 @@ export { CURSOR_AGENT_ID } from "./types";
 export { ApplySelection, ApplySelectionValidationError } from "./ApplySelection";
 export { CurrentCredentialReader } from "./current-state/CredentialReader";
 export { CurrentStateDetector } from "./current-state/Detector";
-export { AgentStateMatcher } from "../../actions/import/StateMatcher";
+export { CurrentStateMatcher } from "../../actions/current-state/Matcher";
 export { CurrentStateReader } from "./current-state/Reader";
 export { ImportCurrentConnection } from "./ImportCurrentConnection";
 export { RollbackLatestMutation } from "./RollbackLatestMutation";

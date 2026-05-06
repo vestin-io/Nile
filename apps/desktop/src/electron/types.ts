@@ -1,14 +1,11 @@
-import type { AgentId } from "@nile/core/models/agent";
+import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent";
 import type { ResetStateResult } from "@nile/core/application/local";
 import type { AuthMode } from "@nile/core/models/access";
-import type { ConnectionPresetFamily } from "@nile/core/models/connection";
+import type { ConnectionOnboardingSuggestion, ConnectionPresetFamily } from "@nile/core/models/connection";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
-import type {
-  BindCursorUsageResult,
-  ConnectionOnboardingSuggestion,
-  ImportDetectedSetupsResult,
-  RemoveConnectionResult,
-} from "@nile/core/runtime-local";
+import type { RemoveConnectionResult } from "@nile/core/application/local";
+import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-state";
+import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 
 export type DesktopConnectionCredentialInput = {
   apiKeySource?: "direct" | "env_key";
@@ -96,7 +93,7 @@ export type DesktopConnectionBridge = {
   savePreparedConnection(input: DesktopSavePreparedConnectionInput): Promise<DesktopConnectionSummary>;
   discardPreparedConnectionDraft(input: DesktopDiscardPreparedConnectionDraftInput): Promise<void>;
   switchConnection(agentId: AgentId, connectionId: string): Promise<import("../state/Types").DesktopConnection>;
-  rollbackLatestMutation(agentId: AgentId): Promise<import("@nile/core/runtime-local").RollbackLatestAgentResult>;
+  rollbackLatestMutation(agentId: AgentId): Promise<RollbackLatestAgentResult>;
   addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary>;
   updateConnection(input: DesktopUpdateConnectionInput): Promise<DesktopConnectionSummary>;
   importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult>;

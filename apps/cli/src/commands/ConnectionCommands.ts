@@ -1,6 +1,11 @@
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { AgentId } from "@nile/core/models/agent";
-import type { ImportDetectedSetupsInput, ImportDetectedSetupsResult, RemoveConnectionResult, ScanLocalSetupsResult } from "@nile/core/runtime-local";
+import type { RemoveConnectionResult } from "@nile/core/application/local";
+import type {
+  ImportDetectedSetupsInput,
+  ImportDetectedSetupsResult,
+  ScanLocalSetupsResult,
+} from "@nile/core/actions/local-state";
 import type { CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { CodexSessionLogin } from "@nile/core/agents";

@@ -17,13 +17,17 @@ The core module owns shared state, shared actions, and agent-facing orchestratio
 ## Current Structure
 
 - `actions/`
-  - user-facing product actions such as `scan-local`, `status`, `usage`, and `use`
+  - user-facing product action clusters:
+    - `local-state`
+    - `current-state`
+    - `usage`
+    - `apply`
 - `models/`
   - endpoint, access, connection, and selection storage plus rules
 - `application/local/`
-  - local workspace-state composition
+  - local workflows, state reset, and local credential support
 - `runtime-local/`
-  - local session, connection orchestration, and adapter registry wiring
+  - local session, runtime resource ownership, and adapter registry wiring
 - `services/`
   - database, credential, environment, history, and logging
 

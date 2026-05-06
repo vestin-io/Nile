@@ -1,6 +1,5 @@
-import nileMarkSvg from "../../../../../assets/icons/nile-mark.svg";
-
 import type { Translator } from "../../shared/I18n";
+import { nileMarkSvg } from "../../shared/NileMark";
 import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../ui/dialog";
 

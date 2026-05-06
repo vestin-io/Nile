@@ -4,14 +4,14 @@ import { join } from "node:path";
 import type { CredentialStore } from "../../services/credential/Store";
 import { NileLogger } from "../../services/NileLogger";
 import {
-  AgentImportSupport,
+  CurrentStateImportSupport,
   requireResolvedImportCandidate,
-} from "../../actions/import/ImportSupport";
-import { AgentStateMatcher } from "../../actions/import/StateMatcher";
+} from "../../actions/current-state/Import";
+import { CurrentStateMatcher } from "../../actions/current-state/Matcher";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { OPENCLAW_AGENT_ID } from "./types";
 import { OpenClawConfigStore } from "./OpenClawConfigStore";
 import { CurrentStateDetector } from "./current-state/Detector";
@@ -28,11 +28,11 @@ export class ImportCurrentConnection {
   ): ImportCurrentConnection {
     const openclawHome = options?.openclawHome ?? join(homedir(), ".openclaw");
     const logger = options?.logger ?? NileLogger.silent().child({ module: "openclaw-import-current-connection" });
-    const context = AgentAdapterContextSession.open(databasePath, options.credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, options.credentialStore);
     const reader = new CurrentStateReader(new OpenClawConfigStore(openclawHome));
 
     return new ImportCurrentConnection(
-      new AgentImportSupport(
+      new CurrentStateImportSupport(
         OPENCLAW_AGENT_ID,
         "OpenClaw",
         context.sharedContext.endpointRegistry,
@@ -42,7 +42,7 @@ export class ImportCurrentConnection {
       ),
       new CurrentStateDetector(
         reader,
-        new AgentStateMatcher(
+        new CurrentStateMatcher(
           context.sharedContext.endpointRegistry,
           context.sharedContext.accessRegistry,
           context.agentSelection,
@@ -56,7 +56,7 @@ export class ImportCurrentConnection {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       openclawHome?: string;
       credentialStore: CredentialStore;
@@ -68,7 +68,7 @@ export class ImportCurrentConnection {
     const reader = new CurrentStateReader(new OpenClawConfigStore(openclawHome));
 
     return new ImportCurrentConnection(
-      new AgentImportSupport(
+      new CurrentStateImportSupport(
         OPENCLAW_AGENT_ID,
         "OpenClaw",
         context.endpointRegistry,
@@ -86,10 +86,10 @@ export class ImportCurrentConnection {
   }
 
   constructor(
-    private readonly importSupport: AgentImportSupport,
+    private readonly importSupport: CurrentStateImportSupport,
     private readonly detector: CurrentStateDetector,
     private readonly reader: CurrentStateReader,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   importCurrent() {

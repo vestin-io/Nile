@@ -1,9 +1,4 @@
-import {
-  applyAddConnectionCompletionTarget,
-  type AddConnectionReturnTarget,
-  type PageId,
-  type ReusedConnectionDialogState,
-} from "./useNavigation";
+import type { ReusedConnectionDialogState } from "./useNavigation";
 import { CursorUsageRepairDialog } from "../../connections/dialogs/RepairUsage";
 import { ResetStateDialog } from "../../settings/dialogs/ResetState";
 import { ReusedConnectionDialog } from "../../connections/dialogs/Reused";
@@ -24,11 +19,9 @@ type SettingsDialogsProps = {
   onOpenSupport(): Promise<void>;
   onRefresh(): Promise<void>;
   onResetConfirm(): Promise<void>;
-  onSetCurrentPage(page: PageId): void;
+  onContinueReusedConnection(): void;
   onSetNileDialogOpen(open: boolean): void;
   onSetResetDialogOpen(open: boolean): void;
-  onSetSelectedConnectionId(connectionId: string | null): void;
-  onSetReusedConnectionDialog(value: ReusedConnectionDialogState): void;
 };
 
 export function SettingsDialogs({
@@ -44,11 +37,9 @@ export function SettingsDialogs({
   onOpenSupport,
   onRefresh,
   onResetConfirm,
-  onSetCurrentPage,
+  onContinueReusedConnection,
   onSetNileDialogOpen,
   onSetResetDialogOpen,
-  onSetSelectedConnectionId,
-  onSetReusedConnectionDialog,
 }: SettingsDialogsProps) {
   return (
     <>
@@ -78,19 +69,7 @@ export function SettingsDialogs({
       <ReusedConnectionDialog
         open={reusedConnectionDialog !== null}
         t={t}
-        onContinue={() => {
-          if (!reusedConnectionDialog) {
-            return;
-          }
-          const { connectionId, target } = reusedConnectionDialog;
-          onSetReusedConnectionDialog(null);
-          applyAddConnectionCompletionTarget(
-            target as AddConnectionReturnTarget,
-            connectionId,
-            onSetCurrentPage,
-            onSetSelectedConnectionId,
-          );
-        }}
+        onContinue={onContinueReusedConnection}
       />
 
       <NileDialog

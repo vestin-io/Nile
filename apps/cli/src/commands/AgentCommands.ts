@@ -1,5 +1,5 @@
 import type { AgentId } from "@nile/core/models/agent";
-import type { AgentStatusView } from "@nile/core/runtime-local";
+import type { AgentStatusView } from "@nile/core/actions/local-state";
 import type { CredentialStore } from "@nile/core/services/credential";
 import type { MutationHistoryRecord } from "@nile/core/services/history";
 import { NileLogger } from "@nile/core/services/NileLogger";

@@ -1,6 +1,6 @@
 import type { StoredCredential } from "../../services/credential/Types";
 import type { AuthMode } from "../access";
-import type { ConnectionPresetFamily } from "./PresetTypes";
+import type { ConnectionPresetFamily } from "./setup/PresetTypes";
 import { ConnectionNaming } from "./Naming";
 
 export type ConnectionLabelerInput = {

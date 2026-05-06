@@ -5,13 +5,13 @@ import type { AccessRecord, AccessRegistryInput, AuthMode } from "../access";
 import type { AgentId } from "../agent";
 import type { EndpointRegistry } from "../endpoint";
 import { EndpointShape, type EndpointFamily, type EndpointRecord, type EndpointRegistryInput } from "../endpoint";
-import type { ConnectionPresetFamily } from "./PresetTypes";
 import { ConnectionLabeler } from "./Labeler";
 import { ConnectionNaming } from "./Naming";
-import { GatewayProbe, type GatewayCapabilityProbe } from "./GatewayProbe";
-import { ConnectionEndpointBuilder } from "./EndpointBuilder";
-import { ConnectionIdentityKeyResolver } from "./IdentityKeyResolver";
-import { ConnectionOnboardingPolicy, type ConnectionOnboardingSuggestion } from "./OnboardingPolicy";
+import { ConnectionEndpointBuilder } from "./setup/EndpointBuilder";
+import { GatewayProbe, type GatewayCapabilityProbe } from "./setup/GatewayProbe";
+import { ConnectionIdentityKeyResolver } from "./setup/IdentityKeyResolver";
+import { ConnectionOnboardingPolicy, type ConnectionOnboardingSuggestion } from "./setup/OnboardingPolicy";
+import type { ConnectionPresetFamily } from "./setup/PresetTypes";
 
 export type CreateConnectionInput = {
   preset: ConnectionPresetFamily;

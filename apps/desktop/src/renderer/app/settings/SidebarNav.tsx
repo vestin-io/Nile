@@ -1,7 +1,7 @@
 import { Bot, Building2, Link2, Settings2, type LucideIcon } from "lucide-react";
-import nileMarkSvg from "../../../../../assets/icons/nile-mark.svg";
 
 import type { Translator } from "../../shared/I18n";
+import { nileMarkSvg } from "../../shared/NileMark";
 import type { PageId } from "./useNavigation";
 import {
   Sidebar,

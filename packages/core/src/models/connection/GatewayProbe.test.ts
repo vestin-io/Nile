@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { GatewayProbe } from "./GatewayProbe";
+import { GatewayProbe } from "./setup/GatewayProbe";
 
 describe("GatewayProbe", () => {
   test("does not report OpenAI support when semantic probes fail", async () => {

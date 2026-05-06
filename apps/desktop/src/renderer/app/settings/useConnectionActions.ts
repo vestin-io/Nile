@@ -18,6 +18,7 @@ type UseSettingsConnectionActionsOptions = {
   addConnectionReturnTarget: AddConnectionReturnTarget;
   addConnectionTargetAgentId: AgentId | null;
   refresh(): Promise<void>;
+  reusedConnectionDialog: ReusedConnectionDialogState;
   settingsState: SettingsState;
   setCurrentPage(page: PageId): void;
   setRepairUsageConnectionId(connectionId: string | null): void;
@@ -31,6 +32,7 @@ export function useSettingsConnectionActions({
   addConnectionReturnTarget,
   addConnectionTargetAgentId,
   refresh,
+  reusedConnectionDialog,
   settingsState,
   setCurrentPage,
   setRepairUsageConnectionId,
@@ -127,6 +129,15 @@ export function useSettingsConnectionActions({
     await window.nileDesktop.connections.switchConnection(agentId, connectionId);
   };
 
+  const continueReusedConnection = () => {
+    if (!reusedConnectionDialog) {
+      return;
+    }
+    const { connectionId, target } = reusedConnectionDialog;
+    setReusedConnectionDialog(null);
+    applyAddConnectionCompletionTarget(target, connectionId, setCurrentPage, setSelectedConnectionId);
+  };
+
   const completeConnectionMutation = async (connectionId: string, reused: boolean) => {
     const targetAgentId = addConnectionTargetAgentId;
     if (targetAgentId) {
@@ -152,6 +163,7 @@ export function useSettingsConnectionActions({
     removeConnection,
     rollbackAgent,
     savePreparedConnection,
+    continueReusedConnection,
     updateConnection,
     useConnection,
   };

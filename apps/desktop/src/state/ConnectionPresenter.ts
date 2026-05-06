@@ -1,6 +1,6 @@
 import { formatAgentLabel as readAgentLabel, type AgentId } from "@nile/core/models/agent";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
-import type { AgentStatusConnection, AgentStatusView } from "@nile/core/runtime-local";
+import type { AgentStatusConnection, AgentStatusView } from "@nile/core/actions/local-state";
 
 import type { DesktopConnection, SettingsState } from "./Types";
 import type { DesktopUsageState } from "./UsageSummary";

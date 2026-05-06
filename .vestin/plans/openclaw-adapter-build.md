@@ -9,7 +9,7 @@
   - `models.providers[providerId]`
   - `agents.defaults.model.primary = "providerId/modelId"`
 - Confirmed that `cc-switch` treats OpenClaw config as JSON5 and preserves the shared config document instead of owning the whole file.
-- Wrote the findings to [`docs/openclaw-switching-research.md`](/Users/jiatwork/Works/nile/docs/openclaw-switching-research.md).
+- Wrote the findings to a temporary OpenClaw switching research note under `docs/` during implementation.
 
 ### Step 2: Add Core OpenClaw Adapter Support
 

@@ -1,6 +1,8 @@
-export * from "./CursorUsageSessionProbe";
-export * from "./CursorUsageAutoBinder";
-export * from "./LocalCredentialRequestBuilder";
-export * from "./LocalCredentialResolver";
-export * from "./StateReset";
-export * from "./WorkspaceState";
+export type { CreateLocalConnectionInput, RemoveConnectionResult, UpdateConnectionInput } from "./ConnectionInputs";
+export type { CursorUsageAutoBindResult } from "./CursorUsageAutoBinder";
+export type { CursorUsageSessionCandidate, CursorUsageSessionProbe } from "./CursorUsageSessionProbe";
+export { LocalCredentialRequestBuilder } from "./LocalCredentialRequestBuilder";
+export type { LocalCredentialRequest } from "./LocalCredentialResolver";
+export { LocalCredentialResolver } from "./LocalCredentialResolver";
+export type { ResetStateResult } from "./StateReset";
+export { StateReset } from "./StateReset";

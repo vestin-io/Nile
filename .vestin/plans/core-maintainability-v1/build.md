@@ -1,5 +1,376 @@
 # Core Maintainability V1 Build Log
 
+## 2026-05-06
+
+### Step 28: Refresh remaining active core plan docs to match the current core structure
+
+- Updated `.vestin/plans/core-endpoint-capability-refactor.md` so its recommended module layout now points at the live core clusters:
+  - `actions/current-state`
+  - `actions/local-state`
+  - `actions/apply`
+  - `projection`
+- Added `openclaw` to the projection-strategy list in that architecture plan.
+- Updated `.vestin/plans/core-maintainability-v1/plan.md` with a current-status section so it now reads as:
+  - largely implemented
+  - backed by the build log for detailed history
+  - focused on preventing structural regrowth instead of broad rescue work
+- Result:
+  - active core plan docs no longer present the pre-refactor action layout as if it were still current
+  - maintainers can distinguish historical intent from the current core shape more quickly
+
+### Verification
+
+- `git diff --check -- . ':(exclude)error.log'`
+
+### Step 27: Sync .vestin core architecture docs to the post-refactor structure
+
+- Updated `.vestin/architect.md` so the shared-core architecture summary now reflects the current core shape:
+  - `actions/local-state`
+  - `actions/current-state`
+  - `actions/usage`
+  - `actions/apply`
+  - `projection/`
+  - `openclaw` as a first-class adapter
+- Updated `.vestin/specs/core/module.md` so the core module doc no longer describes the old `scan-local` / `use` action layout.
+- Updated `.vestin/plans/plan.md` to reflect:
+  - `openclaw` in current shipped scope
+  - the current action-cluster layout
+  - the current desktop/electron structural boundaries as a near-term rule
+- Updated onboarding scan/import plan docs to reference the live `actions/local-state/` cluster instead of the removed `actions/scan-local/` path.
+- Removed the stale `.vestin/state/features.json` entry for the deleted `docs/openclaw-switching-research.md` note.
+- Result:
+  - `.vestin` top-level architecture docs now describe the current repository structure instead of the pre-refactor layout
+  - historical build logs remain historical, but active guidance now matches the codebase again
+
+### Verification
+
+- `git diff --check -- . ':(exclude)error.log'`
+
+### Step 26: Split SessionResources into workspace and history collaborators
+
+- Added:
+  - `runtime-local/SessionWorkspaceResources.ts`
+  - `runtime-local/SessionHistoryResources.ts`
+- Moved workspace-derived resource ownership out of `SessionResources`:
+  - workspace state
+  - agent selection
+  - saved connections
+  - connection creator
+  - local connection workflows
+  - local agent workflows
+  - usage and cursor-usage operations
+- Moved mutation-history resource ownership out of `SessionResources`:
+  - history caching
+  - scope-specific history reads
+  - history logger scoping
+- Kept `SessionResources` as the session-level coordinator for:
+  - adapter registry creation
+  - delegation to workspace and history collaborators
+- Result:
+  - `SessionResources` now reads more like a thin session composition class
+  - workspace, usage, and history concerns are no longer mixed in one resource holder
+
+### Verification
+
+- `npm run verify:structure`
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 25: Make AgentWorkflows own its own assembly and keep WorkspaceState resource-only
+
+- Simplified `application/local/AgentWorkflows.ts`:
+  - removed the extra `createActions()` hop
+  - made `LocalAgentWorkflows` own its concrete `status`, `scanLocal`, and `importDetectedSetups` collaborators directly
+- Removed local-agent workflow assembly from `LocalWorkspaceState`.
+- Kept `LocalWorkspaceState` focused on:
+  - local registries
+  - connection creation helpers
+  - usage and cursor-usage resource access
+- Updated `runtime-local/SessionResources.ts` to build `LocalAgentWorkflows` directly from workspace registries plus the adapter registry.
+- Result:
+  - `WorkspaceState` now reads more like a resource holder
+  - `AgentWorkflows` now reads more like one cohesive local-state workflow cluster instead of a small factory wrapper
+  - one more resource-vs-workflow ownership seam is now explicit instead of split across two classes
+
+### Verification
+
+- `npm run verify:structure`
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 24: Remove the agent runtime context leak from application/local and narrow the application/local public surface
+
+- Moved the shared agent runtime context contract out of `application/local` into:
+  - `runtime-local/AgentWorkspaceContext.ts`
+- Removed the adapter-context creation method from `LocalWorkspaceState`.
+- Kept `LocalWorkspaceState` focused on local workspace resources and local workflow factories.
+- Updated runtime and agent operation code to consume `AgentWorkspaceContext` from the runtime layer instead of reaching back into `application/local`.
+- Narrowed `application/local/index.ts` so it now exposes only the surface-facing local API:
+  - local connection input/result types
+  - credential request building
+  - credential resolution
+  - cursor usage probe types
+  - cursor usage auto-bind result type
+  - state reset
+- Explicitly stopped exporting internal implementation clusters from `application/local`:
+  - `AgentWorkflows`
+  - `ConnectionWorkflows`
+  - `WorkspaceState`
+  - `CursorUsageAutoBinder`
+- Extended the structure check to block those internal `application/local` exports from reappearing.
+- Result:
+  - `application/local` no longer owns an agent-runtime context concept
+  - `application/local` reads more like a surface-facing local workflow boundary and less like an internal grab-bag
+
+### Verification
+
+- `npm run verify:structure`
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 23: Write the core target structure down and enforce the highest-value boundary rules
+
+- Added the maintainer-facing roadmap:
+  - `quality-roadmap.md`
+- Added the concrete `packages/core` boundary target:
+  - `architecture-core-target.md`
+- Added a repository structure check:
+  - `scripts/check-structure.mjs`
+- Hooked the check into the normal repo verification path:
+  - `npm run verify:structure`
+  - `verify:pre-push`
+- The structure check currently enforces the most valuable architecture constraints:
+  - non-test source files must stay under 500 lines
+  - `packages/core/src/runtime-local/index.ts` may export only `NileSession` and `SessionWork`
+  - workspace imports may use `@nile/core/runtime-local` only for session lifecycle APIs
+  - code outside `models/connection` may not import from the `models/connection/setup/` internal cluster
+- Result:
+  - the current architecture cleanup is no longer just convention and memory
+  - the repo now actively blocks the most likely regressions in `core` boundary shape
+
+### Verification
+
+- `npm run verify:structure`
+- `npm run typecheck`
+
+### Step 22: Remove the runtime-local adapter type facade
+
+- Deleted `runtime-local/AgentAdapterTypes.ts`.
+- Moved the shared adapter/result contracts back to their real owner:
+  - `models/agent/Adapter.ts`
+  - `models/agent/index.ts`
+- Updated core internals to import adapter contracts from `models/agent` instead of routing through `runtime-local`, including:
+  - runtime resource and registry code
+  - apply/current-state/local-state actions
+  - built-in agent adapters and current-state readers
+- Tightened the public `runtime-local` entry again:
+  - removed `AgentAdapterRegistry`
+  - removed adapter/result type re-exports
+  - kept only `NileSession` and `SessionWork`
+- Updated desktop imports so rollback/import result types now come from `models/agent`, leaving `runtime-local` responsible only for session lifecycle APIs.
+- Result:
+  - `runtime-local` is no longer a mixed session-plus-types bucket
+  - adapter/result contracts now have one canonical home
+  - this removes an exact type re-export layer that was adding indirection without semantics
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 21: Extract cursor follow-up and narrow the runtime-local public surface
+
+- Moved cursor post-create/import follow-up out of `NileSession.ts` into:
+  - `runtime-local/CursorUsageConnectionFollowUp.ts`
+- Kept the behavior the same:
+  - cursor-session connection creation/import still attempts usage auto-bind
+  - bind failures still log a warning instead of failing the main operation
+- Tightened the `runtime-local` package surface so it now exports only:
+  - `NileSession`
+  - `SessionWork`
+  - adapter-facing runtime types
+- Added explicit package exports for the concrete non-runtime surfaces that workspace consumers actually use:
+  - `actions/local-state`
+  - `actions/usage`
+  - `actions/usage/cursor`
+- Updated CLI and desktop consumers to import those DTO/result types from their real owning modules instead of the runtime facade.
+- Normalized cross-domain onboarding type imports back to `models/connection` root so `setup/` stays a connection-internal cluster.
+- Result:
+  - `NileSession` no longer owns cursor-specific follow-up logic directly
+  - `runtime-local` no longer acts as a catch-all export bag for unrelated action/application DTOs
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 20: Rename the remaining runtime-local architecture terms to concrete session names
+
+- Renamed the internal runtime files and types:
+  - `Runtime.ts` -> `SessionRuntime.ts`
+  - `Resources.ts` -> `SessionResources.ts`
+  - `RuntimeOptions.ts` -> `SessionRuntimeOptions.ts`
+- Renamed the internal runtime classes and types:
+  - `NileSessionRuntime` -> `SessionRuntime`
+  - `RuntimeResources` -> `SessionResources`
+  - `NileSessionRuntimeOptions` -> `SessionRuntimeOptions`
+- Renamed the owned agent context session:
+  - `AgentAdapterContextSession` -> `AgentWorkspaceSession`
+  - `AgentAdapterContext.ts` -> `AgentWorkspaceSession.ts`
+- Kept the public `runtime-local` entry surface stable:
+  - `NileSession` remains the package-facing API
+  - these renamed pieces stay internal implementation details
+- Renamed the matching runtime test file to keep the directory context coherent:
+  - `Runtime.test.ts` -> `SessionRuntime.test.ts`
+- Result:
+  - `runtime-local` now reads less like a generic architecture layer and more like a concrete session implementation
+  - agent operation classes now refer to an owned workspace session directly instead of a vague adapter-context session
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 19: Group connection setup helpers into one local cluster
+
+- Moved the connection setup support files into `models/connection/setup/`:
+  - `PresetTypes.ts`
+  - `OnboardingPolicy.ts`
+  - `GatewayProbe.ts`
+  - `EndpointBuilder.ts`
+  - `IdentityKeyResolver.ts`
+- Updated all creator/updater, runtime, local workflow, and test imports to read through the new cluster.
+- Kept behavior and exported connection surface stable; this was a directory-shape cleanup, not a domain rewrite.
+- Result:
+  - `Creator` and `Updater` now read more like one cohesive "build or update a connection" story
+  - maintainers no longer need to scan the whole `models/connection/` root to find the setup-only support pieces
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 18: Remove the inherited managed adapter template layer
+
+- Deleted `runtime-local/ManagedAgentAdapter.ts`.
+- Reworked the four built-in adapters to implement the `AgentAdapter` contract directly:
+  - `CodexAgentAdapter`
+  - `ClaudeAgentAdapter`
+  - `CursorAgentAdapter`
+  - `OpenClawAgentAdapter`
+- Inlined the three shared `open -> run -> close` flows for:
+  - detect current selection
+  - apply selection
+  - import current connection
+- Kept rollback logic concrete inside each adapter where it already differed slightly by result mapping.
+- Result:
+  - removed one inheritance layer from `runtime-local`
+  - adapter files now show their full behavior directly instead of hiding three core methods behind a template base class
+  - this aligns better with the repo rule to prefer composition and concrete classes over shallow-but-mechanical inheritance
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 17: Remove two single-use technical buckets from runtime-local and usage
+
+- Folded `runtime-local/Effects.ts` back into `runtime-local/NileSession.ts`.
+- Kept the behavior the same:
+  - create connection with local effects
+  - create local connection with local effects
+  - import current connection with local effects
+  still auto-bind cursor usage for cursor session connections and still warn on bind failures.
+- Result:
+  - maintainers no longer need to chase a vague `Effects` helper to understand post-create/import cursor usage behavior
+  - `NileSession` now owns the only follow-up behavior it actually triggers
+- Folded `actions/usage/ReaderRegistry.ts` back into `actions/usage/Usage.ts`.
+- Kept the concrete readers:
+  - OpenAI session usage
+  - Claude session usage
+  - Cursor usage
+  but removed the extra registry hop because it only served one caller.
+- Result:
+  - the usage read path is now visible in one file
+  - `actions/usage` has one less technical indirection layer
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 16: Rename apply actions and split built-in adapter wiring out of the registry
+
+- Renamed the vague `actions/use/` cluster to the concrete `actions/apply/` cluster:
+  - `actions/apply/Support.ts`
+- Updated the apply path across:
+  - `ApplyMutation`
+  - all four agent apply-selection flows
+  - rollback tests that build `AgentApplySupport`
+- Kept `AgentApplySupport` as the concrete class name, but moved it under an apply-specific cluster so maintainers no longer need to infer that `use` means "apply a saved connection".
+- Split built-in adapter construction out of `runtime-local/AgentAdapterRegistry.ts` into:
+  - `runtime-local/BuiltInAdapters.ts`
+- Kept `AgentAdapterRegistry` focused on actual registry responsibilities:
+  - duplicate detection
+  - adapter lookup
+  - rollback-support listing
+- Updated `RuntimeResources` to compose the two pieces explicitly:
+  - built-in adapters
+  - registry from adapters
+- Result:
+  - the apply path now reads more like a concrete use-case cluster
+  - the registry no longer mixes collection semantics with built-in adapter assembly
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 15: Add typed subpath exports for workspace consumers
+
+- Updated `packages/core/package.json` exports so each public subpath now declares both:
+  - `types`
+  - `default`
+- Covered the current desktop-consumed surfaces, including:
+  - `application/local`
+  - `runtime-local`
+  - `models/agent`
+  - `models/agent/types`
+  - `models/connection/enabled-agents-policy`
+  - wildcard `models/*`
+  - wildcard `services/*`
+- Result:
+  - bundler-mode TypeScript can now resolve desktop imports against `@nile/core` without falling back to missing declaration warnings
+  - workspace consumers no longer depend on accidental JS-only export behavior for subpath typing
+
+### Verification
+
+- `npm run build -w @nile/desktop`
+- `npm run test:desktop`
+- `npm run typecheck`
+
+### Step 14: Rename generic import actions into one current-state cluster
+
+- Moved the cross-agent current-state helper seam out of the vague `actions/import/` folder into:
+  - `actions/current-state/Import.ts`
+  - `actions/current-state/Matcher.ts`
+- Renamed the exported collaborators to read like the story they support:
+  - `AgentImportSupport` -> `CurrentStateImportSupport`
+  - `AgentStateMatcher` -> `CurrentStateMatcher`
+- Updated all detector and import-current flows so the cross-agent path now reads as:
+  - current-state reader
+  - current-state matcher
+  - import current connection
+- Removed the old `actions/import/` shell once the call sites moved over.
+- Result:
+  - this seam no longer looks like a generic import framework
+  - maintainers can now find current-state reconciliation and current-connection import support under one concrete cluster
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
 ## 2026-05-05
 
 ### Step 13: Remove agent adapter pass-through field boilerplate
@@ -22,7 +393,91 @@
 - `npm run test:core`
 - `npm run typecheck`
 
-### Step 9: Split CLI connection add/onboarding flow out of command handlers
+### Step 12 (Core): Group local state actions into one use-case cluster
+
+- Moved the local-state use-case files into one `actions/local-state/` cluster:
+  - `Status`
+  - `ScanLocalSetups`
+  - `ImportDetectedSetups`
+  - `Result`
+- Updated `application/local/AgentWorkflows` and `runtime-local` exports to read from the new cluster instead of splitting that story across `actions/status/` and `actions/scan-local/`.
+- Result:
+  - "read local agent status"
+  - "scan local setup"
+  - "import detected setup"
+  now live in one maintainer-facing area instead of two sibling action folders.
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 11 (Core): Split runtime resource graph from NileSessionRuntime
+
+- Moved the lazy resource graph and object wiring out of `runtime-local/Runtime.ts` into:
+  - `runtime-local/Resources.ts`
+  - `runtime-local/RuntimeOptions.ts`
+- Kept `NileSessionRuntime` as the session-facing entry object for:
+  - saved connections
+  - local connection workflows
+  - agent status/import/apply/rollback calls
+  - usage and mutation-history reads
+- Moved the following responsibilities into `RuntimeResources`:
+  - workspace-state caching
+  - agent-selection caching
+  - adapter-registry wiring
+  - local agent workflow caching
+  - mutation-history creation
+  - usage and cursor-binding resource access
+- Result:
+  - `Runtime.ts` dropped to 119 lines
+  - the runtime composition root now reads more like an entry API over a resource holder instead of one mixed class doing both
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 10 (Core): Split local agent workflow assembly from workspace resources
+
+- Added `application/local/AgentWorkflows.ts` to own the local agent use-case assembly for:
+  - status
+  - scan local setups
+  - import detected setups
+- Renamed `LocalWorkspaceState.createAgentActions(...)` to `createLocalAgentWorkflows(...)` so `WorkspaceState` now reads more like a resource holder and less like a mixed resource-plus-use-case bucket.
+- Kept `WorkspaceState` focused on shared local resources:
+  - endpoint registry
+  - access registry
+  - saved connections
+  - connection creator
+  - usage/binding artifacts
+- Updated `NileSessionRuntime` to ask for local agent workflows explicitly instead of generic "agent actions".
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 9 (Core): Move local connection workflows out of runtime-local
+
+- Moved the local connection workflow object from `runtime-local/Connections.ts` into:
+  - `application/local/ConnectionWorkflows.ts`
+- Renamed `SessionConnections` to `LocalConnectionWorkflows` so the type now reads as a concrete local workflow owner instead of a vague runtime helper.
+- Moved the local connection input/result types out of `runtime-local/ConnectionTypes.ts` into:
+  - `application/local/ConnectionInputs.ts`
+- Kept the public `runtime-local` package surface stable by re-exporting those types from `runtime-local/index.ts`.
+- Updated `NileSessionRuntime` and `NileSession` naming so this path now reads as:
+  - session runtime
+  - local connection workflows
+  - local credential resolution
+  instead of mixing all three concerns under `runtime-local/`.
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+
+### Step 9 (CLI): Split CLI connection add/onboarding flow out of command handlers
 
 - Moved CLI add-connection input resolution into `apps/cli/src/commands/ConnectionAddFlow.ts`.
 - Kept `ConnectionCommands` focused on concrete command handlers:
@@ -48,7 +503,7 @@
 - `npm run test:cli`
 - `npm run typecheck`
 
-### Step 12: Split Claude gateway model cache and ranking out of the settings store
+### Step 12 (Claude): Split Claude gateway model cache and ranking out of the settings store
 
 - Moved Claude gateway model cache reading and preferred-model ranking into `GatewayModelCatalog`.
 - Kept `ClaudeSettingsStore` focused on:
@@ -65,7 +520,7 @@
 - `npm run test:core`
 - `npm run typecheck`
 
-### Step 11: Split CLI agent-selection flow out of add/onboarding orchestration
+### Step 11 (CLI): Split CLI agent-selection flow out of add/onboarding orchestration
 
 - Split agent-selection prompting and OpenClaw validation out of `ConnectionAddFlow` into `ConnectionAgentSelectionFlow`.
 - Kept `ConnectionAddFlow` focused on:
@@ -89,7 +544,7 @@
 - `npm run test:cli`
 - `npm run typecheck`
 
-### Step 10: Split CLI entry routing and presenter label normalization
+### Step 10 (CLI): Split CLI entry routing and presenter label normalization
 
 - Split top-level CLI dispatch out of `NileCli` into `NileCliCommandRouter`.
 - Split JSON/text/cancel/error result wrapping out of `NileCli` into `NileCliResultFactory`.
@@ -109,7 +564,7 @@
 - `npm run test:cli`
 - `npm run typecheck`
 
-### Step 12: Replace implicit access credential compensation with explicit sync state
+### Step 12 (Access Sync): Replace implicit access credential compensation with explicit sync state
 
 - Reworked `models/access` away from hidden in-memory rollback assumptions.
 - Added explicit credential sync state on access rows:
@@ -134,7 +589,7 @@
 - `npm run typecheck`
 - `npm run test:core`
 
-### Step 11: Preserve injected shell environment in default Codex login flows
+### Step 11 (Login Env): Preserve injected shell environment in default Codex login flows
 
 - Updated `NileSessionRuntime.createLocalCredentialResolver()` so the default `CodexSessionLogin` inherits the runtime's injected `EnvironmentSource` instead of silently falling back to `process.env`.
 - Added a focused regression test that installs a temporary fake `codex` binary only in the injected PATH and verifies the runtime login path succeeds through that environment.
@@ -144,7 +599,7 @@
 - `npm run typecheck`
 - `npm run test:core`
 
-### Step 10: Reject async SQLite transaction callbacks
+### Step 10 (SQLite): Reject async SQLite transaction callbacks
 
 - Tightened `SqliteDatabase.transaction()` to return only non-promise results at the type boundary.
 - Added a runtime guard that throws if an async callback still slips through via casting or unsafe call sites.
@@ -155,7 +610,7 @@
 - `npm run typecheck`
 - `npm run test:core`
 
-### Step 9: Remove leftover single-file source directories
+### Step 9 (Cleanup): Remove leftover single-file source directories
 
 - Moved the concrete SQLite-backed model stores out of one-file `store/` directories so the source tree no longer carries directory shells with only one implementation:
   - `models/access/SqliteAccessStore.ts`

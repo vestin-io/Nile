@@ -2,7 +2,7 @@ import type { AgentId } from "../agent";
 import {
   SHARED_CONNECTION_AGENT_POLICY,
 } from "./AgentPolicy";
-import type { ConnectionPresetFamily } from "./PresetTypes";
+import type { ConnectionPresetFamily } from "./setup/PresetTypes";
 
 export type ConnectionDefinition = {
   preset: ConnectionPresetFamily;

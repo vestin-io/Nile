@@ -12,7 +12,7 @@ export {
 } from "./apply/ApplySelection";
 export { CodexSessionLogin } from "./CodexSessionLogin";
 export { CurrentStateDetector } from "./current-state/Detector";
-export { AgentStateMatcher } from "../../actions/import/StateMatcher";
+export { CurrentStateMatcher } from "../../actions/current-state/Matcher";
 export { CurrentStateReader } from "./current-state/Reader";
 export { ImportCurrentConnection } from "./import/ImportCurrentConnection";
 export { RollbackLatestMutation } from "./rollback/RollbackLatestMutation";

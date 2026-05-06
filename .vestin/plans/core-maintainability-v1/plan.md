@@ -4,7 +4,22 @@
 
 Reduce the long-term maintenance cost of `packages/core` without changing user-facing behavior.
 
-This refactor is organized as four scoped PRs so we can keep risk low and verification local.
+## Current Status
+
+This plan is now largely implemented.
+
+The detailed execution history lives in:
+
+- `.vestin/plans/core-maintainability-v1/build.md`
+
+The remaining work is no longer broad structural rescue.
+It is mostly:
+
+- keeping `runtime-local` small and concrete
+- preventing public surface sprawl from regrowing
+- tightening a few remaining ownership seams when they prove high value
+
+This refactor was originally organized as four scoped PRs so we could keep risk low and verification local.
 
 ## PR 1: Agent Flow Unification
 

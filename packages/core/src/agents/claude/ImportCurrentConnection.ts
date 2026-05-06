@@ -4,16 +4,16 @@ import { join } from "node:path";
 import type { CredentialStore } from "../../services/credential/Store";
 import { NileLogger } from "../../services/NileLogger";
 import {
-  AgentImportSupport,
+  CurrentStateImportSupport,
   requireResolvedImportCandidate,
-} from "../../actions/import/ImportSupport";
+} from "../../actions/current-state/Import";
 import {
-  AgentAdapterContextSession,
-  type SharedAgentAdapterContext,
-} from "../../runtime-local/AgentAdapterContext";
+  AgentWorkspaceSession,
+} from "../../runtime-local/AgentWorkspaceSession";
+import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { CurrentStateDetector } from "./current-state/Detector";
 import { CLAUDE_AGENT_ID } from "./types";
-import { AgentStateMatcher } from "../../actions/import/StateMatcher";
+import { CurrentStateMatcher } from "../../actions/current-state/Matcher";
 import { CurrentStateReader } from "./current-state/Reader";
 import { ClaudeCredentialStore } from "./Store";
 import { ClaudeSettingsStore } from "./SettingsStore";
@@ -30,7 +30,7 @@ export class ImportCurrentConnection {
     const claudeHome = options?.claudeHome ?? join(homedir(), ".claude");
     const credentialStore = options.credentialStore;
     const logger = options?.logger ?? NileLogger.silent().child({ module: "claude-import-current-connection" });
-    const context = AgentAdapterContextSession.open(databasePath, credentialStore);
+    const context = AgentWorkspaceSession.open(databasePath, credentialStore);
     const settingsStore = new ClaudeSettingsStore(claudeHome);
     const reader = new CurrentStateReader(
       settingsStore,
@@ -38,7 +38,7 @@ export class ImportCurrentConnection {
     );
 
     return new ImportCurrentConnection(
-      new AgentImportSupport(
+      new CurrentStateImportSupport(
         CLAUDE_AGENT_ID,
         "Claude",
         context.sharedContext.endpointRegistry,
@@ -48,7 +48,7 @@ export class ImportCurrentConnection {
       ),
       new CurrentStateDetector(
         reader,
-        new AgentStateMatcher(
+        new CurrentStateMatcher(
           context.sharedContext.endpointRegistry,
           context.sharedContext.accessRegistry,
           context.agentSelection,
@@ -62,7 +62,7 @@ export class ImportCurrentConnection {
   }
 
   static fromContext(
-    context: SharedAgentAdapterContext,
+    context: AgentWorkspaceContext,
     options: {
       claudeHome?: string;
       credentialStore: CredentialStore;
@@ -79,7 +79,7 @@ export class ImportCurrentConnection {
     );
 
     return new ImportCurrentConnection(
-      new AgentImportSupport(
+      new CurrentStateImportSupport(
         CLAUDE_AGENT_ID,
         "Claude",
         context.endpointRegistry,
@@ -97,10 +97,10 @@ export class ImportCurrentConnection {
   }
 
   constructor(
-    private readonly importSupport: AgentImportSupport,
+    private readonly importSupport: CurrentStateImportSupport,
     private readonly detector: CurrentStateDetector,
     private readonly reader: CurrentStateReader,
-    private readonly ownedContext: AgentAdapterContextSession | null = null,
+    private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   importCurrent() {

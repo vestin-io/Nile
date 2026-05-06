@@ -1,18 +1,23 @@
 import { LocalCredentialResolver } from "../application/local/LocalCredentialResolver";
+import type {
+  CreateLocalConnectionInput,
+  RemoveConnectionResult,
+  UpdateConnectionInput,
+} from "../application/local/ConnectionInputs";
 import type { CursorUsageSessionProbe } from "../application/local/CursorUsageSessionProbe";
 import {
   type ImportDetectedSetupsInput,
   type ImportDetectedSetupsResult,
   type ScanLocalSetupsResult,
-} from "../actions/scan-local";
+} from "../actions/local-state";
 import type {
-  ApplyAgentSelectionResult,
   AgentCapabilitySupport,
+  ApplyAgentSelectionResult,
   ImportCurrentConnectionResult,
   RollbackLatestAgentResult,
-} from "./AgentAdapterTypes";
+} from "../models/agent";
 import type { CreateConnectionInput, CreateConnectionResult } from "../models/connection/Creator";
-import type { ConnectionOnboardingSuggestion } from "../models/connection/OnboardingPolicy";
+import type { ConnectionOnboardingSuggestion } from "../models/connection";
 import type { AgentHomes } from "../models/agent/Homes";
 import { defaultAgentHomes, mergeAgentHomes } from "../models/agent/Homes";
 import type { AgentId } from "../models/agent/Types";
@@ -27,10 +32,9 @@ import type { NileLogger } from "../services/NileLogger";
 import type { ConnectionUsageResult } from "../actions/usage/Result";
 import type { BindCursorUsageResult } from "../actions/usage/cursor/Binder";
 import type { CursorUsageAutoBindResult } from "../application/local/CursorUsageAutoBinder";
-import type { AgentStatusView } from "../actions/status/Status";
-import type { CreateLocalConnectionInput, RemoveConnectionResult, UpdateConnectionInput } from "./ConnectionTypes";
-import { NileSessionRuntime } from "./Runtime";
-import { NileSessionEffects } from "./Effects";
+import type { AgentStatusView } from "../actions/local-state";
+import { CursorUsageConnectionFollowUp } from "./CursorUsageConnectionFollowUp";
+import { SessionRuntime } from "./SessionRuntime";
 
 export type NileSessionOpenOptions = {
   databasePath: string;
@@ -49,7 +53,7 @@ export type NileSessionOpenOptions = {
  */
 export class NileSession {
   static open(options: NileSessionOpenOptions): NileSession {
-    const runtime = new NileSessionRuntime({
+    const runtime = new SessionRuntime({
       databasePath: options.databasePath,
       database: SqliteDatabase.open(options.databasePath),
       credentialStore: options.credentialStore,
@@ -61,13 +65,16 @@ export class NileSession {
     });
     return new NileSession(
       runtime,
-      new NileSessionEffects((connectionId) => runtime.autoBindCursorUsage(connectionId), runtime.getLogger()),
+      new CursorUsageConnectionFollowUp(
+        (connectionId) => runtime.autoBindCursorUsage(connectionId),
+        runtime.getLogger(),
+      ),
     );
   }
 
   private constructor(
-    private readonly runtime: NileSessionRuntime,
-    private readonly effects: NileSessionEffects,
+    private readonly runtime: SessionRuntime,
+    private readonly cursorUsageFollowUp: CursorUsageConnectionFollowUp,
   ) {}
 
   listSavedConnections(): SavedConnectionSummary[] {
@@ -88,7 +95,7 @@ export class NileSession {
   }
 
   async updateConnection(input: UpdateConnectionInput): Promise<SavedConnectionSummary> {
-    return await this.runtime.getConnectionWorkflows().update(input, this.runtime.createLocalCredentialResolver());
+    return await this.runtime.getLocalConnectionWorkflows().update(input, this.runtime.createLocalCredentialResolver());
   }
 
   useConnection(agentId: AgentId, connectionId: string): ApplyAgentSelectionResult {
@@ -136,21 +143,21 @@ export class NileSession {
   }
 
   async createConnectionWithLocalEffects(input: CreateConnectionInput): Promise<CreateConnectionResult> {
-    return await this.effects.applyLocalEffects(this.createConnection(input));
+    return await this.cursorUsageFollowUp.applyAfterConnectionChange(this.createConnection(input));
   }
 
   async createLocalConnection(
     input: CreateLocalConnectionInput,
     localCredentialResolver: LocalCredentialResolver = this.runtime.createLocalCredentialResolver(),
   ): Promise<CreateConnectionResult> {
-    return await this.runtime.getConnectionWorkflows().createLocalWithResolver(input, localCredentialResolver);
+    return await this.runtime.getLocalConnectionWorkflows().createLocalWithResolver(input, localCredentialResolver);
   }
 
   async createLocalConnectionWithLocalEffects(
     input: CreateLocalConnectionInput,
     localCredentialResolver: LocalCredentialResolver = this.runtime.createLocalCredentialResolver(),
   ): Promise<CreateConnectionResult> {
-    return await this.effects.applyLocalEffects(
+    return await this.cursorUsageFollowUp.applyAfterConnectionChange(
       this.createLocalConnection(input, localCredentialResolver),
     );
   }
@@ -159,7 +166,7 @@ export class NileSession {
     input: CreateLocalConnectionInput,
     localCredentialResolver: LocalCredentialResolver = this.runtime.createLocalCredentialResolver(),
   ): Promise<ConnectionOnboardingSuggestion> {
-    return await this.runtime.getConnectionWorkflows().describeLocalOnboardingWithResolver(input, localCredentialResolver);
+    return await this.runtime.getLocalConnectionWorkflows().describeLocalOnboardingWithResolver(input, localCredentialResolver);
   }
 
   importCurrentConnection(agentId: AgentId): ImportCurrentConnectionResult {
@@ -167,7 +174,9 @@ export class NileSession {
   }
 
   importCurrentConnectionWithLocalEffects(agentId: AgentId): ImportCurrentConnectionResult {
-    return this.effects.applyResolvedLocalEffects(this.importCurrentConnection(agentId));
+    return this.cursorUsageFollowUp.applyAfterResolvedConnectionChange(
+      this.importCurrentConnection(agentId),
+    );
   }
 
   rollbackLatestMutation(agentId: AgentId): RollbackLatestAgentResult {

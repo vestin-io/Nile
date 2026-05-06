@@ -1,4 +1,4 @@
-import { formatAgentLabel as readAgentLabel, type AgentId } from "@nile/core/models/agent";
+import { formatAgentLabel as readAgentLabel, type AgentId } from "@nile/core/models/agent/types";
 import type { Translator } from "./I18n";
 
 export function formatAgentLabel(agentId: string): string {

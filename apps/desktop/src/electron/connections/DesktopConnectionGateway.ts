@@ -1,14 +1,8 @@
-import type { AgentHomes } from "@nile/core/models/agent";
-import type { AgentId } from "@nile/core/models/agent";
-import {
-  NileSession,
-  type BindCursorUsageResult,
-  type CursorUsageAutoBindResult,
-  type ImportCurrentConnectionResult,
-  type ImportDetectedSetupsResult,
-  type RemoveConnectionResult,
-  type RollbackLatestAgentResult,
-} from "@nile/core/runtime-local";
+import type { AgentHomes, AgentId, ImportCurrentConnectionResult, RollbackLatestAgentResult } from "@nile/core/models/agent";
+import type { CursorUsageAutoBindResult, RemoveConnectionResult } from "@nile/core/application/local";
+import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-state";
+import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
+import { NileSession } from "@nile/core/runtime-local";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import type { CredentialStore } from "@nile/core/services/credential";
 import { CursorUsageSessionSourceProbe } from "@nile/host-local";

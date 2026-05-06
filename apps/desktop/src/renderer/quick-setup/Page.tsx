@@ -1,9 +1,9 @@
 import type { AgentId } from "@nile/core/models/agent/types";
 import { ArrowRight } from "lucide-react";
-import nileMarkSvg from "../../../../../assets/icons/nile-mark.svg";
 
 import type { SettingsState } from "../shared/DesktopData";
 import type { Translator } from "../shared/I18n";
+import { nileMarkSvg } from "../shared/NileMark";
 import { QuickSetupAgentCard } from "./AgentCard";
 import { QuickSetupGuide } from "./Guide";
 import { Button } from "../ui/button";

@@ -10,7 +10,7 @@ import { AccessRegistry } from "../access";
 import { EndpointRegistry } from "../endpoint";
 import { AgentSelection } from "../selection/Selection";
 import { ConnectionUpdater } from "./Updater";
-import type { GatewayProbeResult } from "./GatewayProbe";
+import type { GatewayProbeResult } from "./setup/GatewayProbe";
 
 const tempRoots: string[] = [];
 
