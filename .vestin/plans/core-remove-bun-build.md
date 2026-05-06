@@ -108,6 +108,18 @@
 - `npm run desktop:build`
 - `rg -n "bun:|\\bBun\\.|from \\\"bun:test\\\"|from 'bun:test'|bun run|bun test|#!/usr/bin/env bun|bun-types" . -g '!node_modules' -g '!research' -g '!apps/desktop/dist'`
 
+### Step 6: Restore npm-compatible local package links
+
+- Replaced regressed `workspace:*` local package specs with explicit `file:` links in:
+  - `apps/cli/package.json`
+  - `apps/desktop/package.json`
+  - `packages/host-local/package.json`
+- This matches the repo's documented npm install contract and avoids `npm install` failing under `npm@11.9.0` at the root with `EUNSUPPORTEDPROTOCOL` while traversing workspace packages.
+
+### Verification
+
+- `npm install`
+
 ### Remaining Note
 
 - `node:sqlite` still emits Node experimental warnings during tests and CLI startup. This is a Node runtime warning, not a Bun dependency.

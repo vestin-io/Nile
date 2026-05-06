@@ -1,7 +1,7 @@
 import { Waypoints } from "lucide-react";
-import openAiSvg from "../../../../node_modules/@lobehub/icons-static-svg/icons/openai.svg";
-import azureAiSvg from "../../../../node_modules/@lobehub/icons-static-svg/icons/azureai-color.svg";
-import claudeSvg from "../../../../node_modules/@lobehub/icons-static-svg/icons/claude.svg";
+import openAiSvg from "@lobehub/icons-static-svg/icons/openai.svg";
+import azureAiSvg from "@lobehub/icons-static-svg/icons/azureai-color.svg";
+import claudeSvg from "@lobehub/icons-static-svg/icons/claude.svg";
 
 import type { Translator } from "../../shared/I18n";
 import { readDefinitionKeywords, type Definition } from "../../shared/Definitions";

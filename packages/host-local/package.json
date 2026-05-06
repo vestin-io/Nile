@@ -9,7 +9,7 @@
     "dist"
   ],
   "dependencies": {
-    "@nile/core": "workspace:*"
+    "@nile/core": "file:../core"
   },
   "scripts": {
     "prebuild": "npm --prefix ../.. run build:core",

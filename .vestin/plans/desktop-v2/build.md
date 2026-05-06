@@ -1140,6 +1140,33 @@
 - `npm run typecheck`
 - `npm test`
 
+### Step 19: Keep Desktop Reset Working When Keychain Delete Fails
+
+- Updated shared local-state reset so desktop reset no longer aborts when a Nile-managed keychain credential cannot be deleted due to an unexpected keychain command failure.
+- Reset still clears the local SQLite database and history directory, which keeps the user-visible "Reset local state" action functional even when macOS keychain cleanup is incomplete.
+- Added a focused regression test covering command-failure credential removal during reset.
+
+### Verification
+
+- `npx vitest run packages/core/src/application/local/StateReset.test.ts`
+- `npm run typecheck` (currently blocked locally by Swift toolchain / macOS SDK mismatch while building the keychain helper)
+
+### Step 20: Fix macOS keychain existence checks for saved usage connections
+
+- Root-caused a machine-specific "no usage, no error" desktop symptom for the saved `jiqiang90@gmail.com` OpenAI session connection.
+- Verified the saved access row was present in `~/.nile-switcher/switcher.sqlite`, but its backing credential had been marked `write_failed` with:
+  - `Failed to has credential access:jiqiang90-gmail-com: security exited with code 1`
+- Traced that failure to the native Swift keychain helper: `read-generic-password` existence checks were calling `SecItemCopyMatching` without any return flag when `includeSecret` was false.
+- Added `kSecReturnAttributes = true` for non-secret existence checks so `KeychainCredentialStore.has(...)` can perform a valid metadata lookup instead of failing with a generic keychain command error.
+- Identified a separate desktop UX gap: usage read failures are currently swallowed by `DesktopUsageCache` and degrade to `null` usage state in the renderer.
+
+### Verification
+
+- Directly reproduced the broken local behavior with:
+  - `node --import tsx ... session.getConnectionUsage("jiqiang90-gmail-com")`
+  - result before fix: `AccessRegistryConsistencyError: Credential for access jiqiang90-gmail-com is not synchronized (write_failed)`
+- Full helper rebuild remains blocked locally by the Swift toolchain / macOS SDK mismatch in this shell environment.
+
 ### Step 16: Desktop Release Pipeline
 
 - Added a GitHub Actions workflow at `.github/workflows/desktop-release.yml` that:

@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
-    "@nile/core": "workspace:*",
-    "@nile/host-local": "workspace:*"
+    "@nile/core": "file:../../packages/core",
+    "@nile/host-local": "file:../../packages/host-local"
   },
   "scripts": {
     "prebuild": "npm --prefix ../.. run build:host-local",

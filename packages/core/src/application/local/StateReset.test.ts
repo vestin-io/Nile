@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { StoredCredential } from "../../services/credential";
 import type { CredentialStore } from "../../services/credential";
+import { CredentialStoreCommandError } from "../../services/credential";
 import { SqliteDatabase } from "../../services/database";
 import { SecureSnapshotStore } from "../../services/history";
 import { StateReset } from "./StateReset";
@@ -93,6 +94,35 @@ describe("StateReset", () => {
       historyRemoved: false,
     });
   });
+
+  it("continues resetting local files when credential removal fails unexpectedly", () => {
+    const root = mkdtempSync(join(tmpdir(), "nile-state-reset-command-failure-"));
+    tempDirs.push(root);
+    const databasePath = join(root, "switcher.sqlite");
+    const historyPath = join(root, "history");
+    const credentialStore = new FailingCredentialStore();
+
+    mkdirSync(dirname(databasePath), { recursive: true });
+    mkdirSync(join(historyPath, "mutation-1"), { recursive: true });
+    writeFileSync(join(historyPath, "mutation-1", "before.json"), "{}");
+    seedResetRefs(databasePath);
+
+    const result = new StateReset(credentialStore).reset(databasePath);
+
+    expect(result).toEqual({
+      databasePath,
+      historyPath,
+      credentialsRemoved: true,
+      databaseRemoved: true,
+      historyRemoved: true,
+    });
+    expect(existsSync(databasePath)).toBe(false);
+    expect(existsSync(historyPath)).toBe(false);
+    expect(credentialStore.removedIds).toEqual([
+      "access:openai-work",
+      "usage:cursor:cursor-work",
+    ]);
+  });
 });
 
 function seedResetRefs(databasePath: string): void {
@@ -136,6 +166,13 @@ class StubCredentialStore implements CredentialStore {
 
   remove(credentialId: string): void {
     this.removedIds.push(credentialId);
+  }
+}
+
+class FailingCredentialStore extends StubCredentialStore {
+  override remove(credentialId: string): void {
+    this.removedIds.push(credentialId);
+    throw new CredentialStoreCommandError(`Failed to remove credential ${credentialId}: security exited with code 1`);
   }
 }
 

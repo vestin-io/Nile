@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import {
   type CredentialStore,
   CredentialNotFoundError,
+  CredentialStoreCommandError,
   KeychainCredentialStore,
 } from "../../services/credential";
 import { SqliteDatabase } from "../../services/database";
@@ -103,7 +104,10 @@ export class StateReset {
     try {
       this.credentialStore.remove(reference);
     } catch (error) {
-      if (error instanceof CredentialNotFoundError) {
+      if (
+        error instanceof CredentialNotFoundError
+        || error instanceof CredentialStoreCommandError
+      ) {
         return;
       }
       throw error;

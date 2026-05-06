@@ -62,7 +62,7 @@ func writeGenericPassword(
   account: String,
   service: String,
   secret: Data,
-  mode: HelperMode,
+  mode: HelperMode
 ) -> OSStatus {
   let matchQuery: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
@@ -79,7 +79,7 @@ func writeGenericPassword(
   case .upsert:
     let updateStatus = SecItemUpdate(
       matchQuery as CFDictionary,
-      [kSecValueData as String: secret] as CFDictionary,
+      [kSecValueData as String: secret] as CFDictionary
     )
     if updateStatus == errSecItemNotFound {
       return SecItemAdd(addQuery as CFDictionary, nil)
@@ -91,7 +91,7 @@ func writeGenericPassword(
 func readGenericPassword(
   account: String,
   service: String,
-  includeSecret: Bool,
+  includeSecret: Bool
 ) -> OSStatus {
   var query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
@@ -102,6 +102,8 @@ func readGenericPassword(
 
   if includeSecret {
     query[kSecReturnData as String] = true
+  } else {
+    query[kSecReturnAttributes as String] = true
   }
 
   var item: CFTypeRef?
@@ -118,7 +120,7 @@ func readGenericPassword(
 
 func deleteGenericPassword(
   account: String,
-  service: String,
+  service: String
 ) -> OSStatus {
   let query: [String: Any] = [
     kSecClass as String: kSecClassGenericPassword,
