@@ -32,6 +32,7 @@ describe("SecurityCli", () => {
       exitCode: 0,
       stdout: "stdout-value",
       stderr: "stderr-value",
+      errorMessage: "",
     });
   });
 });

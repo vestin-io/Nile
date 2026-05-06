@@ -178,6 +178,26 @@
 - `npm run test:core`
 - `npm run typecheck`
 
+### Step 9: Build the keychain helper as a universal macOS binary and surface helper startup errors
+
+- Changed `packages/core/build.mjs` so the native `KeychainGenericPasswordHelper` is now compiled twice on macOS:
+  - `arm64-apple-macos12.0`
+  - `x86_64-apple-macos12.0`
+- Combined those two slices with `lipo -create` into one universal helper before desktop packaging copies it into the app bundle.
+- Removed the temporary per-arch helper slices after the universal binary is created so `packages/core/dist` keeps only the real shipped helper.
+- Extended keychain command result reporting so helper/security process startup failures preserve `spawnSync(...).error.message` instead of collapsing to a vague exit-code-only error.
+- Updated credential-store command error formatting to prefer:
+  - `stderr`
+  - then low-level startup error text
+  - then the generic exit-code fallback
+- Lowered the helper deployment target to `macOS 12.0` so the packaged keychain helper stays compatible with supported Monterey installs such as `12.7.6`, instead of requiring newer Foundation runtime symbols at launch time.
+
+### Verification
+
+- `npm run test:core`
+- `npm run typecheck`
+- `file packages/core/dist/services/credential/KeychainGenericPasswordHelper`
+
 ### Step 21: Extract cursor follow-up and narrow the runtime-local public surface
 
 - Moved cursor post-create/import follow-up out of `NileSession.ts` into:

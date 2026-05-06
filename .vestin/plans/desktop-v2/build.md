@@ -1909,6 +1909,21 @@
 - `npm run build --prefix apps/desktop`
 - `npm run test:desktop`
 
+### Desktop packaged helper architecture alignment
+
+- Kept desktop packaging on the existing `dist/electron/KeychainGenericPasswordHelper` handoff, but changed the shared core build so the copied helper is now a universal macOS binary instead of a host-arch-only artifact.
+- Lowered the bundled helper deployment target to `macOS 12.0` so packaged desktop builds continue to work on supported Monterey machines instead of dying in `dyld` with newer Foundation symbol requirements.
+- This removes the packaged-app failure mode where:
+  - the app bundle is `x64`
+  - but the bundled keychain helper is `arm64`
+  - causing macOS to reject helper startup with `Bad CPU type in executable`
+- Desktop now also benefits from clearer credential-sync diagnostics because helper startup failures preserve the low-level process error message instead of flattening to `security exited with code 1`.
+
+### Verification
+
+- `npm run desktop:build`
+- `file packages/core/dist/services/credential/KeychainGenericPasswordHelper`
+
 ### Desktop state-surface regrouping
 
 - Moved the desktop state-surface cluster out of `apps/desktop/src/` root into `apps/desktop/src/state/`:

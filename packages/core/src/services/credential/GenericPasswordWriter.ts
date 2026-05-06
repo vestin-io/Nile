@@ -47,6 +47,7 @@ export class GenericPasswordWriter {
       exitCode: result.status ?? 1,
       stdout: result.stdout ?? "",
       stderr: result.stderr ?? "",
+      errorMessage: result.error?.message ?? "",
     };
   }
 
@@ -58,6 +59,7 @@ export class GenericPasswordWriter {
       exitCode: result.status ?? 1,
       stdout: result.stdout ?? "",
       stderr: result.stderr ?? "",
+      errorMessage: result.error?.message ?? "",
     };
   }
 
@@ -69,6 +71,7 @@ export class GenericPasswordWriter {
       exitCode: result.status ?? 1,
       stdout: result.stdout ?? "",
       stderr: result.stderr ?? "",
+      errorMessage: result.error?.message ?? "",
     };
   }
 }

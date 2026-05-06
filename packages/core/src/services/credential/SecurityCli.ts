@@ -4,6 +4,7 @@ export type SecurityCliResult = {
   exitCode: number;
   stdout: string;
   stderr: string;
+  errorMessage?: string;
 };
 
 type SpawnSyncFn = (
@@ -24,6 +25,7 @@ export class SecurityCli {
       exitCode: result.status ?? 1,
       stdout: result.stdout ?? "",
       stderr: result.stderr ?? "",
+      errorMessage: result.error?.message ?? "",
     };
   }
 }

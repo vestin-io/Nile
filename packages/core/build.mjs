@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const packageDir = dirname(fileURLToPath(import.meta.url));
 const srcDir = join(packageDir, "src");
 const distDir = join(packageDir, "dist");
+const macosHelperTargetVersion = "12.0";
 
 rmSync(distDir, { recursive: true, force: true });
 
@@ -69,13 +70,34 @@ function buildKeychainHelper() {
   mkdirSync(outputDir, { recursive: true });
   const outputPath = join(outputDir, "KeychainGenericPasswordHelper");
   const moduleCachePath = join(tmpdir(), "nile-swift-module-cache");
+  const arm64OutputPath = join(outputDir, "KeychainGenericPasswordHelper-arm64");
+  const x64OutputPath = join(outputDir, "KeychainGenericPasswordHelper-x64");
   mkdirSync(moduleCachePath, { recursive: true });
-  const result = spawnSync("xcrun", ["swiftc", "-O", "-o", outputPath, sourcePath], {
+
+  compileHelperSlice(sourcePath, arm64OutputPath, `arm64-apple-macos${macosHelperTargetVersion}`, moduleCachePath);
+  compileHelperSlice(sourcePath, x64OutputPath, `x86_64-apple-macos${macosHelperTargetVersion}`, moduleCachePath);
+  createUniversalHelper(outputPath, [arm64OutputPath, x64OutputPath]);
+  rmSync(arm64OutputPath, { force: true });
+  rmSync(x64OutputPath, { force: true });
+}
+
+function compileHelperSlice(sourcePath, outputPath, target, moduleCachePath) {
+  const result = spawnSync("xcrun", ["swiftc", "-O", "-target", target, "-o", outputPath, sourcePath], {
     env: {
       ...process.env,
       CLANG_MODULE_CACHE_PATH: moduleCachePath,
       SWIFT_MODULECACHE_PATH: moduleCachePath,
     },
+    stdio: "inherit",
+  });
+
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+}
+
+function createUniversalHelper(outputPath, inputPaths) {
+  const result = spawnSync("xcrun", ["lipo", "-create", "-output", outputPath, ...inputPaths], {
     stdio: "inherit",
   });
 

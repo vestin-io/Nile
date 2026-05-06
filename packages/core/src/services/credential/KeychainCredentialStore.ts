@@ -224,7 +224,7 @@ export class KeychainCredentialStore implements CredentialStore {
   }
 
   private buildCommandError(action: string, credentialId: string, result: SecurityCliResultLike): string {
-    const detail = result.stderr.trim() || `security exited with code ${result.exitCode}`;
+    const detail = result.stderr.trim() || result.errorMessage?.trim() || `security exited with code ${result.exitCode}`;
     return `Failed to ${action} credential ${credentialId}: ${detail}`;
   }
 }
@@ -232,6 +232,7 @@ export class KeychainCredentialStore implements CredentialStore {
 type SecurityCliResultLike = {
   exitCode: number;
   stderr: string;
+  errorMessage?: string;
 };
 
 type CredentialValidator = (credential: unknown) => void;

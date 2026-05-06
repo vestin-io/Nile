@@ -46,6 +46,36 @@ describe("GenericPasswordWriter", () => {
       exitCode: 0,
       stdout: "",
       stderr: "",
+      errorMessage: "",
+    });
+  });
+
+  it("surfaces spawn startup failures from the helper process", () => {
+    const writer = new GenericPasswordWriter(
+      () => ({
+        status: null,
+        stdout: "",
+        stderr: "",
+        error: new Error("spawnSync /tmp/nile-keychain-helper EBADEXEC"),
+        output: [],
+        pid: 1,
+        signal: null,
+      }),
+      () => "/tmp/nile-keychain-helper",
+    );
+
+    expect(
+      writer.write({
+        account: "openai-work",
+        service: "nile.test",
+        secret: "secret-value",
+        update: false,
+      }),
+    ).toEqual({
+      exitCode: 1,
+      stdout: "",
+      stderr: "",
+      errorMessage: "spawnSync /tmp/nile-keychain-helper EBADEXEC",
     });
   });
 
