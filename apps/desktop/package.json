@@ -1,7 +1,7 @@
 {
   "name": "@nile/desktop",
   "productName": "Nile",
-  "version": "0.15.3",
+  "version": "0.15.4",
   "private": true,
   "description": "Nile desktop app",
   "author": "Nile contributors",
@@ -45,7 +45,7 @@
     "autoprefixer": "^10.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "electron": "^36.3.2",
+    "electron": "36.9.5",
     "electron-builder": "^26.8.1",
     "lucide-react": "^1.14.0",
     "postcss": "^8.5.12",
@@ -58,6 +58,7 @@
   "build": {
     "appId": "dev.nile.desktop",
     "productName": "Nile",
+    "electronVersion": "36.9.5",
     "asarUnpack": [
       "dist/electron/KeychainGenericPasswordHelper"
     ],

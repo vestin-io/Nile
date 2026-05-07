@@ -2529,3 +2529,14 @@
 - `npm run typecheck`
 - `npm run build --prefix apps/desktop`
 - `npm run test:desktop`
+
+### Desktop release Electron runtime pin
+
+- Fixed the macOS release workflow failure where electron-builder could not infer the Electron version from a workspace install plus floating `electron` dependency range.
+- Pinned the desktop Electron dependency to `36.9.5` and added the same version to the electron-builder `electronVersion` config so release packaging is deterministic in CI.
+
+### Verification
+
+- `npm install --package-lock-only`
+- `npm install --package-lock-only --prefix apps/desktop`
+- `npm run build:app:unsigned --prefix apps/desktop`
