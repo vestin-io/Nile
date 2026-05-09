@@ -24,6 +24,7 @@ export class RollbackLatestMutation {
     databasePath: string,
     options: {
       openclawHome?: string;
+      codexHome?: string;
       credentialStore: CredentialStore;
       secureSnapshotStore?: SecureSnapshotStore;
       logger?: NileLogger;
@@ -42,6 +43,7 @@ export class RollbackLatestMutation {
         context.agentSelection,
         CurrentStateDetector.fromContext(context.sharedContext, {
           openclawHome: options?.openclawHome ?? join(homedir(), ".openclaw"),
+          codexHome: options?.codexHome ?? join(homedir(), ".codex"),
           credentialStore: options.credentialStore,
           logger: logger.child({ scope: "openclaw-current-state-detector" }),
         }),
@@ -55,6 +57,7 @@ export class RollbackLatestMutation {
     context: AgentWorkspaceContext,
     options: {
       openclawHome?: string;
+      codexHome?: string;
       credentialStore: CredentialStore;
       secureSnapshotStore?: SecureSnapshotStore;
       logger?: NileLogger;
@@ -72,6 +75,7 @@ export class RollbackLatestMutation {
         context.agentSelection,
         CurrentStateDetector.fromContext(context, {
           openclawHome: options?.openclawHome ?? join(homedir(), ".openclaw"),
+          codexHome: options?.codexHome ?? join(homedir(), ".codex"),
           credentialStore: options.credentialStore,
           logger: logger.child({ scope: "openclaw-current-state-detector" }),
         }),

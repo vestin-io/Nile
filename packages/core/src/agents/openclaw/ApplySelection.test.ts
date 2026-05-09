@@ -85,7 +85,7 @@ describe("OpenClaw ApplySelection", () => {
     apply.close();
   });
 
-  it("writes env var references for env-backed api keys", () => {
+  it("writes official anthropic api keys into the auth-profile store", () => {
     const setup = createSetup();
     seedAnthropicEndpoint(setup.dbPath, "anthropic-work", "Anthropic Work", "https://api.anthropic.com");
     seedAccess(
@@ -117,16 +117,34 @@ describe("OpenClaw ApplySelection", () => {
     apply.apply("anthropic-work");
 
     const config = readConfig(setup.openclawHome);
-    expect(config.models.providers["nile-anthropic-work"]).toEqual({
-      api: "anthropic-messages",
-      apiKey: "${ANTHROPIC_WORK_KEY}",
-      baseUrl: "https://api.anthropic.com",
-      models: [
-        {
-          id: "claude-sonnet-4",
-          name: "claude-sonnet-4",
+    expect(config.auth).toEqual({
+      profiles: {
+        "anthropic:nile-anthropic-work": {
+          provider: "anthropic",
+          mode: "api_key",
         },
-      ],
+      },
+      order: {
+        anthropic: ["anthropic:nile-anthropic-work"],
+      },
+    });
+    expect(config.agents.defaults.model).toEqual({
+      primary: "anthropic/claude-sonnet-4",
+      fallbacks: [],
+    });
+    expect(config.agents.defaults.models).toEqual({
+      "anthropic/claude-sonnet-4": {},
+    });
+
+    expect(readAuthProfiles(setup.openclawHome)).toEqual({
+      version: 1,
+      profiles: {
+        "anthropic:nile-anthropic-work": {
+          type: "api_key",
+          provider: "anthropic",
+          key: "anthropic-secret",
+        },
+      },
     });
 
     apply.close();
@@ -160,6 +178,63 @@ describe("OpenClaw ApplySelection", () => {
     expect(() => apply.apply("router-direct")).toThrow(
       "OpenClaw requires an env-backed api_key credential to avoid writing secrets into config files",
     );
+    apply.close();
+  });
+
+  it("writes OpenAI oauth sessions into the auth-profile store", () => {
+    const setup = createSetup();
+    seedOfficialOpenAiEndpoint(setup.dbPath, "openai", "OpenAI", "https://api.openai.com");
+    seedAccess(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "openai-session",
+        endpointId: "openai",
+        label: "OpenAI Session",
+        authMode: "openai_session",
+        openclawModelId: "gpt-5.3-codex",
+      },
+      {
+        kind: "openai_session",
+        idToken: "header.eyJleHAiOjE4MDAwMDAwMDAsImVtYWlsIjoiamlxaWFuZzkwQGdtYWlsLmNvbSJ9.signature",
+        accessToken: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+        refreshToken: "refresh-token",
+        accountId: "acct-123",
+      },
+    );
+
+    const apply = ApplySelection.open(setup.dbPath, {
+      openclawHome: setup.openclawHome,
+      credentialStore: setup.credentialStore,
+      secureSnapshotStore: setup.secureSnapshots,
+    });
+
+    apply.apply("openai-session");
+
+    const config = readConfig(setup.openclawHome);
+    expect(config.auth.profiles["openai-codex:nile-openai-session"]).toEqual({
+      provider: "openai-codex",
+      mode: "oauth",
+      email: "jiqiang90@gmail.com",
+    });
+    expect(config.auth.order["openai-codex"]).toEqual(["openai-codex:nile-openai-session"]);
+    expect(config.agents.defaults.model.primary).toBe("openai-codex/gpt-5.3-codex");
+
+    expect(readAuthProfiles(setup.openclawHome)).toEqual({
+      version: 1,
+      profiles: {
+        "openai-codex:nile-openai-session": {
+          type: "oauth",
+          provider: "openai-codex",
+          access: "header.eyJleHAiOjE4MDAwMDAwMDB9.signature",
+          refresh: "refresh-token",
+          expires: 1800000000000,
+          accountId: "acct-123",
+          email: "jiqiang90@gmail.com",
+        },
+      },
+    });
+
     apply.close();
   });
 });
@@ -228,6 +303,29 @@ function seedAnthropicEndpoint(
   registry.close();
 }
 
+function seedOfficialOpenAiEndpoint(
+  dbPath: string,
+  id: string,
+  label: string,
+  rootUrl: string,
+): void {
+  const registry = EndpointRegistry.open(dbPath);
+  registry.add({
+    id,
+    label,
+    rootUrl,
+    profile: "openai-official",
+    protocols: {
+      openai: {
+        basePath: "/v1",
+        wireApis: ["responses"],
+        authSchemes: ["bearer"],
+      },
+    },
+  });
+  registry.close();
+}
+
 function seedAccess(
   dbPath: string,
   credentialStore: StubCredentialStore,
@@ -235,7 +333,7 @@ function seedAccess(
     id: string;
     endpointId: string;
     label: string;
-    authMode: "api_key";
+    authMode: "api_key" | "openai_session";
     openclawModelId: string;
   },
   credential: StoredCredential,
@@ -247,6 +345,12 @@ function seedAccess(
 
 function readConfig(openclawHome: string): any {
   return JSON.parse(readFileSync(join(openclawHome, "openclaw.json"), "utf8"));
+}
+
+function readAuthProfiles(openclawHome: string): any {
+  return JSON.parse(
+    readFileSync(join(openclawHome, "agents", "main", "agent", "auth-profiles.json"), "utf8"),
+  );
 }
 
 class StubCredentialStore extends KeychainCredentialStore {

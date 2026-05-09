@@ -50,9 +50,8 @@ export class ConnectionAgentPolicy {
       configurableAgents.push("claude");
     }
     if (
-      input.authMode === "api_key"
-      && input.openclawModelId?.trim()
-      && (input.protocols.openai || input.protocols.anthropic)
+      input.openclawModelId?.trim()
+      && this.supportsOpenClawSavedConnection(input)
     ) {
       configurableAgents.push("openclaw");
     }
@@ -158,19 +157,41 @@ export class ConnectionAgentPolicy {
     authMode: AuthMode;
     onboarding?: ConnectionOnboardingSuggestion;
   }): boolean {
-    if (input.authMode !== "api_key") {
-      return false;
+    if (input.authMode === "api_key") {
+      if (input.preset === "gateway") {
+        return Boolean(input.onboarding?.suggestedAgents.some((agentId) => agentId === "codex" || agentId === "claude"));
+      }
+      return input.preset === "openai"
+        || input.preset === "azure-openai"
+        || input.preset === "anthropic";
     }
-    if (input.preset === "gateway") {
-      return Boolean(input.onboarding?.suggestedAgents.some((agentId) => agentId === "codex" || agentId === "claude"));
+    if (input.authMode === "openai_session") {
+      return input.preset === "openai";
     }
-    return input.preset === "openai"
-      || input.preset === "azure-openai"
-      || input.preset === "anthropic";
+    if (input.authMode === "claude_session") {
+      return input.preset === "anthropic";
+    }
+    return false;
   }
 
   private supportsAgentEnvKey(agentId: AgentId): boolean {
     return agentId === "codex" || agentId === "claude" || agentId === "openclaw";
+  }
+
+  private supportsOpenClawSavedConnection(input: {
+    protocols: EndpointProtocols;
+    authMode: AuthMode;
+  }): boolean {
+    if (input.authMode === "api_key") {
+      return Boolean(input.protocols.openai || input.protocols.anthropic);
+    }
+    if (input.authMode === "openai_session") {
+      return Boolean(input.protocols.openai);
+    }
+    if (input.authMode === "claude_session") {
+      return Boolean(input.protocols.anthropic);
+    }
+    return false;
   }
 }
 

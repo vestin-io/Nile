@@ -71,21 +71,108 @@ describe("OpenClaw ImportCurrentConnection", () => {
 
     importer.close();
   });
+
+  it("imports an OpenAI oauth auth-profile as a session connection", () => {
+    const setup = createSetup();
+    writeFileSync(
+      join(setup.openclawHome, "openclaw.json"),
+      JSON.stringify({
+        auth: {
+          profiles: {
+            "openai-codex:default": {
+              provider: "openai-codex",
+              mode: "oauth",
+            },
+          },
+          order: {
+            "openai-codex": ["openai-codex:default"],
+          },
+        },
+        agents: {
+          defaults: {
+            model: {
+              primary: "openai-codex/gpt-5.3-codex",
+            },
+          },
+        },
+      }, null, 2),
+      "utf8",
+    );
+    writeFileSync(
+      join(setup.openclawHome, "agents", "main", "agent", "auth-profiles.json"),
+      JSON.stringify({
+        version: 1,
+        profiles: {
+          "openai-codex:default": {
+            type: "oauth",
+            provider: "openai-codex",
+            access: "access-token",
+            refresh: "refresh-token",
+            expires: 1770000000000,
+            accountId: "acct-123",
+          },
+        },
+      }, null, 2),
+      "utf8",
+    );
+    writeFileSync(
+      join(setup.codexHome, "auth.json"),
+      JSON.stringify({
+        OPENAI_API_KEY: null,
+        tokens: {
+          id_token: "header.eyJlbWFpbCI6ImppcWlhbmc5MEBnbWFpbC5jb20ifQ.signature",
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+          account_id: "acct-123",
+        },
+      }, null, 2),
+      "utf8",
+    );
+
+    const importer = ImportCurrentConnection.open(setup.dbPath, {
+      openclawHome: setup.openclawHome,
+      codexHome: setup.codexHome,
+      credentialStore: setup.credentialStore,
+    });
+
+    const result = importer.importCurrent();
+
+    expect(result).toEqual(expect.objectContaining({
+      endpointId: "openai",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      authMode: "openai_session",
+    }));
+
+    const accesses = AccessRegistry.open(setup.dbPath, setup.credentialStore);
+    const imported = accesses.get(result.id);
+    expect(imported?.authMode).toBe("openai_session");
+    expect(imported?.openclawModelId).toBe("gpt-5.3-codex");
+    expect(imported?.identityKey).toBe("account:acct-123");
+    accesses.close();
+
+    importer.close();
+  });
 });
 
 function createSetup(): {
   dbPath: string;
   openclawHome: string;
+  codexHome: string;
   credentialStore: StubCredentialStore;
 } {
   const dir = mkdtempSync(join(tmpdir(), "nile-openclaw-import-"));
   tempDirs.push(dir);
   const openclawHome = join(dir, ".openclaw");
+  const codexHome = join(dir, ".codex");
   mkdirSync(openclawHome, { recursive: true });
+  mkdirSync(join(openclawHome, "agents", "main", "agent"), { recursive: true });
+  mkdirSync(codexHome, { recursive: true });
 
   return {
     dbPath: join(dir, "switcher.sqlite"),
     openclawHome,
+    codexHome,
     credentialStore: new StubCredentialStore(),
   };
 }

@@ -178,6 +178,28 @@
 - `npm run test:core`
 - `npm run typecheck`
 
+### Step 9: Add OpenClaw auth-profile support for official OpenAI and Anthropic connections
+
+- Expanded OpenClaw capability selection so Nile now treats official OpenAI and Anthropic session/auth flows as supported instead of API-key-only.
+- Split OpenClaw projection handling between:
+  - legacy provider-config writes for gateway/custom API-key endpoints
+  - auth-profile writes for official OpenAI and Anthropic connections
+- Added `auth-profiles.json` management for OpenClaw apply/restore, including:
+  - OpenAI oauth sessions via `openai-codex`
+  - Anthropic oauth sessions
+  - official OpenAI and Anthropic API-key storage without writing secrets into `openclaw.json`
+- Reworked OpenClaw current-state detection/import to understand both:
+  - legacy `models.providers`
+  - modern `auth.profiles` plus `agents/main/agent/auth-profiles.json`
+- Wired OpenClaw detection/import/rollback to the Codex home so OpenAI oauth state can be reconstructed from Codex session data.
+
+### Verification
+
+- `npm run test:core -- --run packages/core/src/agents/openclaw/current-state/Detector.test.ts packages/core/src/agents/openclaw/ImportCurrentConnection.test.ts packages/core/src/agents/openclaw/ApplySelection.test.ts packages/core/src/projection/Resolver.test.ts packages/core/src/models/connection/AgentPolicy.test.ts`
+- `npx tsc -p packages/core/tsconfig.build.json --noEmit`
+- `npm run typecheck`
+  - blocked in the local environment by the Swift/Xcode toolchain mismatch while building `@nile/core`
+
 ### Step 9: Build the keychain helper as a universal macOS binary and surface helper startup errors
 
 - Changed `packages/core/build.mjs` so the native `KeychainGenericPasswordHelper` is now compiled twice on macOS:

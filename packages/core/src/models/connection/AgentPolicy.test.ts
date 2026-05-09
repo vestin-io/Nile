@@ -3,6 +3,13 @@ import { describe, expect, it } from "vitest";
 import { ConnectionAgentPolicy } from "./AgentPolicy";
 
 describe("ConnectionAgentPolicy", () => {
+  it("allows OpenClaw for official session-backed providers", () => {
+    const policy = new ConnectionAgentPolicy();
+
+    expect(policy.supportsAgent({ preset: "openai", authMode: "openai_session", agentId: "openclaw" })).toBe(true);
+    expect(policy.supportsAgent({ preset: "anthropic", authMode: "claude_session", agentId: "openclaw" })).toBe(true);
+  });
+
   it("allows env-backed api keys for supported api-key providers", () => {
     const policy = new ConnectionAgentPolicy();
 
