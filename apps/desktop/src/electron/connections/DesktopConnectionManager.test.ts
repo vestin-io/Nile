@@ -193,15 +193,15 @@ describe("DesktopConnectionManager", () => {
     const result = await manager.addConnection({
       preset: "gateway",
       authMode: "api_key",
-      endpointUrl: "https://router.example/v1",
-      apiKey: "router-secret",
+      endpointUrl: "https://fallback-router.example/v1",
+      apiKey: "fallback-router-secret",
       enabledAgents: ["codex"],
       allowUndetectedGateway: true,
     });
 
     expect(result).toEqual(
       expect.objectContaining({
-        endpointId: "gateway-router-example",
+        endpointId: "gateway-fallback-router-example",
         endpointFamily: "gateway",
         authMode: "api_key",
       }),

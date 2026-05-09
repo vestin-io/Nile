@@ -135,7 +135,7 @@ export const EN_MESSAGES: Messages = {
     "connections.removeDialogTitle": "Remove connection?",
     "connections.removeDialogDescription": "\"{name}\" will be permanently removed from saved connections.",
     "profiles.title": "Profiles",
-    "profiles.description": "Save multi-agent connection and home-path setups, then apply them in one click.",
+    "profiles.description": "Create reusable work modes for your agents, then switch between them in one click.",
     "profiles.unavailableTitle": "Profiles unlock after multiple agents are connected",
     "profiles.unavailableDescription": "Add usable saved connections for at least two agents before creating profile shortcuts.",
     "profiles.createTitle": "Create New Profile",

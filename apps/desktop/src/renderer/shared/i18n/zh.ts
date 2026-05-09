@@ -136,7 +136,7 @@ export const ZH_MESSAGES: Messages = {
     "connections.clearFilters": "清除筛选",
     "connections.syncAgentsConfirm": "这条连接当前正被 {agents} 使用。现在要把这些更新应用到这些 Agent 吗？",
     "profiles.title": "配置方案",
-    "profiles.description": "保存多 Agent 的连接和 Home Path 组合，然后一键应用。",
+    "profiles.description": "把 Agent 的工作模式保存成可复用配置，然后一键切换。",
     "profiles.unavailableTitle": "连接多个 Agent 后才会启用配置方案",
     "profiles.unavailableDescription": "至少有两个 Agent 拥有可用的已保存连接后，配置方案才有批量切换价值。",
     "profiles.createTitle": "创建新配置方案",

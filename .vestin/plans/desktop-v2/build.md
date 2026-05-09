@@ -487,6 +487,11 @@
 - Replaced profile detail save's split rename/assignment writes with a single atomic profile update so metadata and assignments cannot overwrite each other through concurrent file writes.
 - Replaced create-profile's split create-then-update flow with a single create call, and held create->detail navigation on a pending profile id so the page no longer bounces back to the list while profile refresh is still catching up.
 - Added a tray-menu fallback when the profile feature config file is invalid so menubar profile access degrades to the default enabled state instead of throwing during menu construction.
+- Simplified profile detail editing:
+  - emoji changes now auto-save immediately
+  - connection changes now auto-save immediately
+  - home-path edits still stay local until the user clicks `Save`
+  - `Apply` / `Current` now sit outside the detail action group, leaving the grouped actions focused on `Save` and `Remove`
 
 ### Verification
 

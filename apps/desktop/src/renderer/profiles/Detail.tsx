@@ -64,11 +64,15 @@ export function ProfileDetailPage({
     () => new Map(agentHomes.map((home) => [home.agentId, home.defaultPath])),
     [agentHomes],
   );
+  const savedEditableAssignments = useMemo(
+    () => buildEditableAssignmentsFromProfile(profile, agents, agentHomes),
+    [agentHomes, agents, profile],
+  );
 
   useEffect(() => {
     setProfileName(profile.name);
     setProfileEmoji(profile.emoji ?? "");
-    setEditableAssignments(buildEditableAssignmentsFromProfile(profile, agents, agentHomes));
+    setEditableAssignments(savedEditableAssignments);
     setIsRemoveDialogOpen(false);
     setSaveError(null);
   }, [profile.id]);
@@ -78,8 +82,8 @@ export function ProfileDetailPage({
     [agents, defaultHomesByAgent, editableAssignments],
   );
   const savedAssignments = useMemo(
-    () => normalizeAssignments(buildEditableAssignmentsFromProfile(profile, agents, agentHomes), agents, defaultHomesByAgent),
-    [agentHomes, agents, defaultHomesByAgent, profile],
+    () => normalizeAssignments(savedEditableAssignments, agents, defaultHomesByAgent),
+    [agents, defaultHomesByAgent, savedEditableAssignments],
   );
   const normalizedName = profileName.trim();
   const duplicateName = normalizedName
@@ -91,6 +95,23 @@ export function ProfileDetailPage({
   const isDirty = normalizedName !== profile.name
     || profileEmoji.trim() !== (profile.emoji ?? "")
     || !areAssignmentsEqual(normalizedAssignments, savedAssignments);
+
+  const saveProfile = async (input: {
+    assignments: WorkspaceProfileAssignment[];
+    emoji: string;
+    name: string;
+  }): Promise<void> => {
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      await onSaveProfile(profile.id, input.name, input.emoji, input.assignments);
+    } catch (error) {
+      setSaveError(describeProfileActionError(error, t));
+      throw error;
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -114,19 +135,25 @@ export function ProfileDetailPage({
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-3">
+          {isCurrent ? (
+            <div className="text-sm text-muted-foreground">{t("common.current")}</div>
+          ) : (
+            <Button
+              disabled={isApplying || isSaving || isDeleting}
+              variant="outline"
+              onClick={() => {
+                if (isApplying || isSaving || isDeleting) {
+                  return;
+                }
+                void onApplyProfile(profile.id);
+              }}
+            >
+              {isApplying ? t("profiles.applying") : t("profiles.applyAction")}
+            </Button>
+          )}
           <DetailActionGroup
             items={[
-              {
-                disabled: isApplying || isSaving || isDeleting || isCurrent,
-                label: isApplying ? t("profiles.applying") : (isCurrent ? t("common.current") : t("profiles.applyAction")),
-                onClick: () => {
-                  if (isApplying || isSaving || isDeleting || isCurrent) {
-                    return;
-                  }
-                  void onApplyProfile(profile.id);
-                },
-              },
               {
                 disabled: !isDirty || isSaving || isDeleting || duplicateName || !normalizedName,
                 label: isSaving ? t("profiles.saving") : t("common.save"),
@@ -134,15 +161,11 @@ export function ProfileDetailPage({
                   if (!isDirty || isSaving || isDeleting || duplicateName || !normalizedName) {
                     return;
                   }
-                  setSaveError(null);
-                  setIsSaving(true);
-                  void onSaveProfile(profile.id, normalizedName, profileEmoji, normalizedAssignments)
-                    .catch((error) => {
-                      setSaveError(describeProfileActionError(error, t));
-                    })
-                    .finally(() => {
-                      setIsSaving(false);
-                    });
+                  void saveProfile({
+                    name: normalizedName,
+                    emoji: profileEmoji,
+                    assignments: normalizedAssignments,
+                  }).catch(() => {});
                 },
               },
               {
@@ -168,7 +191,14 @@ export function ProfileDetailPage({
           error={actionError}
           name={profileName}
           t={t}
-          onEmojiChange={setProfileEmoji}
+          onEmojiChange={(emoji) => {
+            setProfileEmoji(emoji);
+            void saveProfile({
+              name: profile.name,
+              emoji,
+              assignments: buildConnectionAutosaveAssignments(editableAssignments, savedEditableAssignments, agents, defaultHomesByAgent),
+            }).catch(() => {});
+          }}
           onNameChange={(name) => {
             setProfileName(name);
             setSaveError(null);
@@ -183,10 +213,21 @@ export function ProfileDetailPage({
         editableAssignments={editableAssignments}
         t={t}
         onChange={(agentId, nextEditable) => {
-          setEditableAssignments((current) => ({
-            ...current,
+          const nextAssignments = {
+            ...editableAssignments,
             [agentId]: nextEditable,
-          }));
+          };
+          const previousEditable = editableAssignments[agentId];
+          const connectionChanged = previousEditable?.connectionId !== nextEditable.connectionId;
+          setEditableAssignments(nextAssignments);
+          if (!connectionChanged) {
+            return;
+          }
+          void saveProfile({
+            name: profile.name,
+            emoji: profileEmoji,
+            assignments: buildConnectionAutosaveAssignments(nextAssignments, savedEditableAssignments, agents, defaultHomesByAgent),
+          }).catch(() => {});
         }}
       />
 
@@ -232,4 +273,20 @@ function describeProfileActionError(error: unknown, t: Translator): string {
     return t("profiles.duplicateName");
   }
   return message;
+}
+
+function buildConnectionAutosaveAssignments(
+  editableAssignments: Record<AgentId, import("./Editor").EditableAssignment>,
+  savedEditableAssignments: Record<AgentId, import("./Editor").EditableAssignment>,
+  agents: DesktopAgentState[],
+  defaultHomesByAgent: Map<AgentId, string>,
+): WorkspaceProfileAssignment[] {
+  const connectionOnlyEditableAssignments = Object.fromEntries(agents.map((agent) => [
+    agent.agentId,
+    {
+      connectionId: editableAssignments[agent.agentId]?.connectionId ?? null,
+      homeInput: savedEditableAssignments[agent.agentId]?.homeInput ?? "",
+    },
+  ])) as Record<AgentId, import("./Editor").EditableAssignment>;
+  return normalizeAssignments(connectionOnlyEditableAssignments, agents, defaultHomesByAgent);
 }
