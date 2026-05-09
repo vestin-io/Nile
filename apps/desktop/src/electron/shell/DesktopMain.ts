@@ -22,10 +22,15 @@ import { DesktopConnectionManager } from "../connections/DesktopConnectionManage
 import { DesktopIpcAppRoutes } from "../ipc/DesktopIpcAppRoutes";
 import { DesktopIpcConnectionRoutes } from "../ipc/DesktopIpcConnectionRoutes";
 import { DesktopIpcInputValidator } from "../ipc/DesktopIpcInputValidator";
+import { DesktopIpcProfileRoutes } from "../ipc/DesktopIpcProfileRoutes";
 import { DesktopIpcStateRoutes } from "../ipc/DesktopIpcStateRoutes";
 import { DesktopIpcUpdateRoutes } from "../ipc/DesktopIpcUpdateRoutes";
+import { WorkspaceProfileManager } from "../profiles/Manager";
+import { WorkspaceProfileStore } from "../profiles/Store";
 import { DesktopShell } from "./DesktopShell";
 import { DesktopTrayMenu } from "./TrayMenu";
+import { DesktopStateReset } from "../state/Reset";
+import { DesktopProfileFeatureStore } from "../state/ProfileFeatureStore";
 import { DesktopStateRefresher } from "../state/DesktopStateRefresher";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 import { DesktopWorkspaceWatcher } from "./DesktopWorkspaceWatcher";
@@ -46,6 +51,9 @@ export class DesktopMain {
   private readonly credentialStore: CredentialStore;
   private readonly environment: EnvironmentSource;
   private readonly agentHomesStore: AgentHomesStore;
+  private readonly profileFeatureStore: DesktopProfileFeatureStore;
+  private readonly profileStore: WorkspaceProfileStore;
+  private readonly profileManager: WorkspaceProfileManager;
   private readonly agentHomes: AgentHomes;
   private readonly surface: DesktopSurface;
   private readonly connectionGateway: DesktopConnectionGateway;
@@ -65,6 +73,8 @@ export class DesktopMain {
     this.credentialStore = options.credentialStore ?? new KeychainCredentialStore();
     this.environment = EnvironmentSource.from(new ShellEnvironment().readLoginShellEnvironment());
     this.agentHomesStore = new AgentHomesStore(join(dirname(options.databasePath), "desktop-agent-homes.json"));
+    this.profileFeatureStore = new DesktopProfileFeatureStore(join(dirname(options.databasePath), "desktop-profile-feature.json"));
+    this.profileStore = new WorkspaceProfileStore(join(dirname(options.databasePath), "desktop-profiles.json"));
     this.agentHomes = mergeAgentHomes(options.agentHomes, this.agentHomesStore.read());
     this.surface = new DesktopSurface({
       databasePath: options.databasePath,
@@ -90,7 +100,20 @@ export class DesktopMain {
       surface: this.surface,
       connectionGateway: this.connectionGateway,
       connectionManager: this.connectionManager,
-      stateReset: new StateReset(this.credentialStore),
+      stateReset: new DesktopStateReset({
+        localStatePaths: [
+          join(dirname(options.databasePath), "desktop-agent-homes.json"),
+          join(dirname(options.databasePath), "desktop-profiles.json"),
+          join(dirname(options.databasePath), "desktop-profile-feature.json"),
+        ],
+        onResetLocalState: () => this.resetDesktopLocalState(),
+        stateReset: new StateReset(this.credentialStore),
+      }),
+    });
+    this.profileManager = new WorkspaceProfileManager({
+      stateStore: this.stateStore,
+      store: this.profileStore,
+      updateAgentHome: (agentId, path) => this.updateAgentHome(agentId, path),
     });
     this.shell = new DesktopShell({
       currentDir,
@@ -103,9 +126,17 @@ export class DesktopMain {
     this.trayMenu = new DesktopTrayMenu({
       logger: this.logger,
       peekState: () => this.stateStore.peekMenubarState(),
+      peekSettingsState: () => this.stateStore.peekSettingsState(),
+      isProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       refreshState: async () => await this.stateStore.refreshMenubarState(),
+      refreshSettingsState: async () => await this.stateStore.getSettingsState({ refreshUsage: false }),
+      listProfiles: () => this.profileManager.list(),
       showSettings: () => this.shell.showSettings(),
       quitApp: () => app.quit(),
+      applyProfile: async (profileId) => {
+        await this.profileManager.apply(profileId);
+        this.reloadAll();
+      },
       switchConnection: async (agentId, connectionId) => {
         await this.stateStore.switchConnection(agentId, connectionId);
         this.reloadAll();
@@ -178,9 +209,11 @@ export class DesktopMain {
 
   private registerIpcRoutes(): void {
     new DesktopIpcStateRoutes({
+      getProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       inputs: this.inputs,
       refreshAll: () => this.reloadAll(),
       refreshDesktopState: (options) => this.refreshDesktopState(options),
+      setProfileFeatureEnabled: (enabled) => this.profileFeatureStore.write(enabled),
       stateStore: this.stateStore,
       updateAgentHome: (agentId, path) => this.updateAgentHome(agentId, path),
     }).register();
@@ -190,6 +223,15 @@ export class DesktopMain {
       inputs: this.inputs,
       refreshAll: () => this.reloadAll(),
       stateStore: this.stateStore,
+    }).register();
+    new DesktopIpcProfileRoutes({
+      applyProfile: async (profileId) => await this.profileManager.apply(profileId),
+      createProfile: (name, emoji, assignments) => this.profileManager.create(name, emoji, assignments),
+      deleteProfile: (profileId) => this.profileManager.delete(profileId),
+      inputs: this.inputs,
+      listProfiles: () => this.profileManager.list(),
+      refreshAll: () => this.invalidateAndReloadAll(),
+      updateProfile: (profileId, name, emoji, assignments) => this.profileManager.update(profileId, name, emoji, assignments),
     }).register();
     new DesktopIpcUpdateRoutes({
       autoUpdateManager: this.autoUpdateManager,
@@ -210,8 +252,24 @@ export class DesktopMain {
     });
   }
 
+  private invalidateAndReloadAll(): void {
+    void this.refreshDesktopState({
+      invalidate: true,
+      notifyRenderer: true,
+    });
+  }
+
   private updateAgentHome(agentId: AgentId, path: string | null): void {
     const next = mergeAgentHomes(this.options.agentHomes, this.agentHomesStore.update(agentId, path));
+    for (const key of Object.keys(this.agentHomes) as AgentId[]) {
+      delete this.agentHomes[key];
+    }
+    Object.assign(this.agentHomes, next);
+  }
+
+  private resetDesktopLocalState(): void {
+    this.connectionManager.clearPreparedConnectionDrafts();
+    const next = mergeAgentHomes(this.options.agentHomes, {});
     for (const key of Object.keys(this.agentHomes) as AgentId[]) {
       delete this.agentHomes[key];
     }

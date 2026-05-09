@@ -3,16 +3,15 @@ import { LoaderCircle } from "lucide-react";
 
 import type { DesktopAgentState, DesktopConnection } from "../../../state/Types";
 import type { Translator } from "../../shared/I18n";
-import { ConnectionQuotaSection } from "../../connections/ConnectionQuotaSection";
 import { ConnectionsToolbar } from "../../connections/ConnectionsToolbar";
-import { authModeLabel, formatUsageText } from "../../shared/DisplayText";
+import { ConnectionUsageCell } from "../../connections/UsageCell";
+import { authModeLabel } from "../../shared/DisplayText";
 import { UsageIndicator } from "../../shared/UsageIndicator";
 import { Alert, AlertDescription } from "../../ui/alert";
 import { Button } from "../../ui/button";
 import { Card, CardContent } from "../../ui/card";
 import { Field } from "../../ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../ui/tooltip";
 
 type AgentConnectionsSectionProps = {
   agent: DesktopAgentState;
@@ -33,6 +32,7 @@ export function AgentConnectionsSection({
 }: AgentConnectionsSectionProps) {
   const [switchingConnectionId, setSwitchingConnectionId] = useState<string | null>(null);
   const [recentlyActivatedConnectionId, setRecentlyActivatedConnectionId] = useState<string | null>(null);
+  const [switchError, setSwitchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!recentlyActivatedConnectionId) {
@@ -51,9 +51,12 @@ export function AgentConnectionsSection({
     }
 
     setSwitchingConnectionId(connectionId);
+    setSwitchError(null);
     try {
       await onSwitch(agent.agentId, connectionId);
       setRecentlyActivatedConnectionId(connectionId);
+    } catch (error) {
+      setSwitchError(error instanceof Error ? error.message : String(error));
     } finally {
       setSwitchingConnectionId(null);
     }
@@ -67,6 +70,11 @@ export function AgentConnectionsSection({
         onOpenAddPage={() => onOpenAddPage(agent.agentId)}
         onRefresh={onRefresh}
       />
+      {switchError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{switchError}</AlertDescription>
+        </Alert>
+      ) : null}
       {agent.connections.length === 0 ? (
         <Alert>
           <AlertDescription>{t("agents.emptyConnections", { agent: agent.agentLabel })}</AlertDescription>
@@ -140,7 +148,7 @@ function AgentConnectionsList({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <Field label={t("common.usage")} value={formatUsageText(connection, t)} />
+                <Field label={t("common.usage")} value={<ConnectionUsageCell connection={connection} t={t} />} />
                 <Field label={t("common.auth")} value={authModeLabel(connection.authMode, t)} />
               </div>
             </CardContent>
@@ -258,45 +266,4 @@ function readUsageRemainingPercent(connection: DesktopConnection): number | null
   }
 
   return connection.usage.remainingPercent;
-}
-
-function ConnectionUsageCell({
-  connection,
-  t,
-}: {
-  connection: DesktopConnection;
-  t: Translator;
-}) {
-  const summary = formatUsageText(connection, t);
-  const hasQuotaDetail = connection.usage?.status === "available" && connection.usage.windows.length > 0;
-
-  if (!hasQuotaDetail) {
-    return summary;
-  }
-
-  return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            className="text-left text-sm text-foreground/90 underline decoration-dotted underline-offset-4 transition-colors hover:text-foreground"
-          >
-            {summary}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent align="start" className="max-w-80 border-0 bg-transparent p-0 shadow-none">
-          <ConnectionQuotaSection
-            className="w-80 shadow-md"
-            connection={connection}
-            framed
-            maxWindows={3}
-            showPlanLabel
-            t={t}
-            title={t("common.usage")}
-          />
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
 }

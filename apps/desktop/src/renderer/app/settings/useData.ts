@@ -16,7 +16,10 @@ export function useDesktopData() {
   const requestIdRef = useRef(0);
   const isMountedRef = useRef(true);
 
-  const read = useCallback(async (options?: { markLoading?: boolean }): Promise<boolean> => {
+  const read = useCallback(async (options?: {
+    markLoading?: boolean;
+    usage?: "refresh" | "snapshot";
+  }): Promise<boolean> => {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
 
@@ -25,8 +28,11 @@ export function useDesktopData() {
     }
 
     try {
+      const settingsStatePromise = options?.usage === "snapshot"
+        ? window.nileDesktop.state.getSettingsStateSnapshot()
+        : window.nileDesktop.state.getSettingsState();
       const [nextSettingsState, nextHistoryState, nextDefinitions] = await Promise.all([
-        window.nileDesktop.state.getSettingsState(),
+        settingsStatePromise,
         window.nileDesktop.state.getHistoryState(),
         window.nileDesktop.connections.listConnectionDefinitions(),
       ]);
@@ -63,6 +69,9 @@ export function useDesktopData() {
     }
     await read();
   }, [read]);
+  const reload = useCallback(async () => {
+    await read({ usage: "snapshot" });
+  }, [read]);
   const canConfigureAgent = useCallback(
     (agentId: AgentId) => readAgentConfigurability(definitions, agentId),
     [definitions],
@@ -91,6 +100,7 @@ export function useDesktopData() {
     historyState,
     isLoading,
     readDefinitionsForAgent,
+    reload,
     refresh,
     settingsState,
   };

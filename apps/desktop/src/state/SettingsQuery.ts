@@ -22,6 +22,10 @@ type DesktopSettingsStateQueryOptions = {
   resolveDesktopAgentHome(agentId: AgentId): string;
 };
 
+type DesktopSettingsStateReadOptions = {
+  refreshUsage?: boolean;
+};
+
 export class DesktopSettingsStateQuery {
   constructor(
     private readonly options: DesktopSettingsStateQueryOptions,
@@ -29,10 +33,12 @@ export class DesktopSettingsStateQuery {
     private readonly usage: DesktopUsageCache,
   ) {}
 
-  async read(session: NileSession): Promise<SettingsState> {
+  async read(session: NileSession, options: DesktopSettingsStateReadOptions = {}): Promise<SettingsState> {
     const savedConnections = session.listSavedConnections();
     const scan = this.buildOnboarding(session);
-    const usageByConnectionId = await this.usage.readByConnectionId(session, savedConnections);
+    const usageByConnectionId = options.refreshUsage === false
+      ? this.usage.snapshotByConnectionId(savedConnections)
+      : await this.usage.readByConnectionId(session, savedConnections);
     const agentStates = this.buildAgentStates(session, savedConnections, usageByConnectionId);
     const codexState = agentStates.find((state) => state.agentId === CODEX_AGENT_ID);
     if (!codexState) {

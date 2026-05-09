@@ -6,6 +6,7 @@ import type { EndpointFamily } from "@nile/core/models/endpoint";
 import type { RemoveConnectionResult } from "@nile/core/application/local";
 import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-state";
 import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
+import type { WorkspaceProfile, WorkspaceProfileAssignment } from "./profiles/Store";
 
 export type DesktopConnectionCredentialInput = {
   apiKeySource?: "direct" | "env_key";
@@ -73,7 +74,10 @@ export type DesktopDescribeSavedConnectionOnboardingInput = DesktopConnectionCre
 export type DesktopStateBridge = {
   getMenubarState(): Promise<import("../state/Types").MenubarState>;
   getSettingsState(): Promise<import("../state/Types").SettingsState>;
+  getSettingsStateSnapshot(): Promise<import("../state/Types").SettingsState>;
   getHistoryState(): Promise<import("../state/Types").HistoryState>;
+  getProfileFeatureEnabled(): Promise<boolean>;
+  setProfileFeatureEnabled(enabled: boolean): Promise<boolean>;
   refreshSettings(): Promise<void>;
   refreshMenubar(): Promise<void>;
 };
@@ -111,9 +115,23 @@ export type DesktopAppBridge = {
   updateAgentHome(agentId: AgentId, path: string | null): Promise<void>;
 };
 
+export type DesktopProfileBridge = {
+  listProfiles(): Promise<WorkspaceProfile[]>;
+  createProfile(name: string, emoji: string | undefined, assignments: WorkspaceProfileAssignment[]): Promise<WorkspaceProfile>;
+  updateProfile(
+    profileId: string,
+    name: string,
+    emoji: string | undefined,
+    assignments: WorkspaceProfileAssignment[],
+  ): Promise<WorkspaceProfile>;
+  deleteProfile(profileId: string): Promise<void>;
+  applyProfile(profileId: string): Promise<WorkspaceProfile>;
+};
+
 export type DesktopBridge = {
   app: DesktopAppBridge;
   connections: DesktopConnectionBridge;
+  profiles: DesktopProfileBridge;
   state: DesktopStateBridge;
   updates: DesktopUpdateBridge;
 };

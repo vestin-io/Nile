@@ -41,6 +41,13 @@ export class DesktopIpcInputValidator {
     return value;
   }
 
+  readBoolean(value: unknown, fieldName: string): boolean {
+    if (typeof value !== "boolean") {
+      throw new Error(`${fieldName} must be a boolean`);
+    }
+    return value;
+  }
+
   readAgentId(value: unknown, fieldName = "agentId"): AgentId {
     const agentId = this.readRequiredString(value, fieldName);
     if (!isAgentId(agentId)) {
@@ -100,6 +107,27 @@ export class DesktopIpcInputValidator {
     return {
       draftId: this.readRequiredString(record.draftId, "draftId"),
     };
+  }
+
+  readWorkspaceProfileAssignments(value: unknown): Array<{ agentId: AgentId; connectionId?: string; homePath?: string | null }> {
+    if (!Array.isArray(value)) {
+      throw new Error("assignments must be an array");
+    }
+
+    return value.map((entry, index) => {
+      const record = this.readRecord(entry, `assignments[${index}]`);
+      const assignment: { agentId: AgentId; connectionId?: string; homePath?: string | null } = {
+        agentId: this.readAgentId(record.agentId, `assignments[${index}].agentId`),
+      };
+      const connectionId = this.readOptionalString(record.connectionId, `assignments[${index}].connectionId`);
+      if (connectionId?.trim()) {
+        assignment.connectionId = connectionId.trim();
+      }
+      if (record.homePath !== undefined) {
+        assignment.homePath = this.readNullableString(record.homePath, `assignments[${index}].homePath`);
+      }
+      return assignment;
+    });
   }
 
   private readRecord(input: unknown, fieldName: string): Record<string, unknown> {

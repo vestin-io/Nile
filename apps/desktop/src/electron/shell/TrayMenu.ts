@@ -3,18 +3,27 @@ import type { MenuItemConstructorOptions } from "electron";
 import type { AgentId } from "@nile/core/models/agent";
 import { NileLogger } from "@nile/core/services/NileLogger";
 
-import type { MenubarAgentState, MenubarState } from "../../state/Types";
+import { readCurrentProfile } from "../../profiles/CurrentProfile";
+import type { MenubarAgentState, MenubarState, SettingsState } from "../../state/Types";
+import type { WorkspaceProfile } from "../profiles/Store";
 
 type DesktopTrayMenuOptions = {
+  isProfileFeatureEnabled(): boolean;
   logger: NileLogger;
   peekState(): MenubarState | null;
+  peekSettingsState(): SettingsState | null;
   refreshState(): Promise<MenubarState>;
+  refreshSettingsState(): Promise<SettingsState>;
+  listProfiles(): WorkspaceProfile[];
   showSettings(): void;
   quitApp(): void;
+  applyProfile(profileId: string): Promise<void>;
   switchConnection(agentId: AgentId, connectionId: string): Promise<void>;
 };
 
 export class DesktopTrayMenu {
+  private static readonly PROFILE_EMOJI_PLACEHOLDER = "·";
+
   constructor(private readonly options: DesktopTrayMenuOptions) {}
 
   async readTemplate(): Promise<MenuItemConstructorOptions[]> {
@@ -24,14 +33,32 @@ export class DesktopTrayMenu {
       });
       return this.options.peekState();
     });
-    return this.buildTemplate(state);
+    const settingsState = await this.options.refreshSettingsState().catch((error) => {
+      this.options.logger.warn("desktop.settings_state_refresh_failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return this.options.peekSettingsState();
+    });
+    return this.buildTemplate(state, settingsState, this.options.listProfiles());
   }
 
-  private buildTemplate(state: MenubarState | null): MenuItemConstructorOptions[] {
+  private buildTemplate(
+    state: MenubarState | null,
+    settingsState: SettingsState | null,
+    profiles: WorkspaceProfile[],
+  ): MenuItemConstructorOptions[] {
+    const profileMenu = this.readProfileFeatureEnabled()
+      ? this.buildProfileSubmenu(
+          profiles,
+          settingsState ? readCurrentProfile(profiles, settingsState.agents, settingsState.advanced.agentHomes) : null,
+        )
+      : null;
+
     if (!state) {
       return [
         { label: "Open Main Window", click: () => this.options.showSettings() },
         { type: "separator" },
+        ...(profileMenu ? [profileMenu, { type: "separator" as const }] : []),
         { label: "Loading connections…", enabled: false },
         { type: "separator" },
         { label: "Quit", click: () => this.options.quitApp() },
@@ -41,10 +68,38 @@ export class DesktopTrayMenu {
     return [
       { label: "Open Main Window", click: () => this.options.showSettings() },
       { type: "separator" },
+      ...(profileMenu ? [profileMenu, { type: "separator" as const }] : []),
       ...state.agents.map((agent) => this.buildAgentSubmenu(agent)),
       { type: "separator" },
       { label: "Quit", click: () => this.options.quitApp() },
     ];
+  }
+
+  private buildProfileSubmenu(
+    profiles: WorkspaceProfile[],
+    currentProfile: WorkspaceProfile | null,
+  ): MenuItemConstructorOptions {
+    if (profiles.length === 0) {
+      return {
+        label: "Profile",
+        submenu: [{ label: "No saved profiles", enabled: false }],
+      };
+    }
+
+    return {
+      label: currentProfile ? this.formatProfileLabel(currentProfile) : "Profile",
+      submenu: profiles.map<MenuItemConstructorOptions>((profile) => ({
+        label: this.formatProfileLabel(profile),
+        type: "checkbox",
+        checked: profile.id === currentProfile?.id,
+        click: () => {
+          if (profile.id === currentProfile?.id) {
+            return;
+          }
+          void this.applyProfile(profile.id);
+        },
+      })),
+    };
   }
 
   private buildAgentSubmenu(agent: MenubarAgentState): MenuItemConstructorOptions {
@@ -89,5 +144,32 @@ export class DesktopTrayMenu {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  private async applyProfile(profileId: string): Promise<void> {
+    try {
+      await this.options.applyProfile(profileId);
+    } catch (error) {
+      this.options.logger.warn("desktop.tray.apply_profile_failed", {
+        profileId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private readProfileFeatureEnabled(): boolean {
+    try {
+      return this.options.isProfileFeatureEnabled();
+    } catch (error) {
+      this.options.logger.warn("desktop.tray.profile_feature_read_failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return true;
+    }
+  }
+
+  private formatProfileLabel(profile: WorkspaceProfile): string {
+    const emoji = profile.emoji?.trim() || DesktopTrayMenu.PROFILE_EMOJI_PLACEHOLDER;
+    return `${emoji} ${profile.name}`;
   }
 }

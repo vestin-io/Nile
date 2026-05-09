@@ -773,6 +773,37 @@ describe("DesktopSurface", () => {
     });
   });
 
+  it("can read desktop settings from cached usage without refreshing usage", async () => {
+    const setup = createSetup();
+    seedProvider(setup.dbPath, {
+      id: "openai-official",
+      label: "OpenAI Official",
+      endpointFamily: "openai",
+      supportedAuthModes: ["openai_session"],
+    });
+    seedBinding(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "personal",
+        endpointId: "openai-official",
+        label: "Personal",
+        authMode: "openai_session",
+      },
+      openAiSessionCredential(),
+    );
+    let fetchCalls = 0;
+    globalThis.fetch = (async () => {
+      fetchCalls += 1;
+      return new Response(JSON.stringify({}), { status: 500 });
+    }) as unknown as typeof fetch;
+
+    const state = await createSurface(setup).getSettingsState({ refreshUsage: false });
+
+    expect(fetchCalls).toBe(0);
+    expect(state.connections[0]?.usage).toBeNull();
+  });
+
   it("omits connection usage in settings rows when no usage snapshot is available", async () => {
     const setup = createSetup();
     seedProvider(setup.dbPath, {
@@ -812,10 +843,10 @@ describe("DesktopSurface", () => {
       authFile: {
         OPENAI_API_KEY: null,
         tokens: {
-          id_token: "header.eyJlbWFpbCI6InNwb3R0by5haUBleGFtcGxlLmNvbSJ9.signature",
-          access_token: "spotto-access-token",
-          refresh_token: "spotto-refresh-token",
-          account_id: "acct-spotto",
+          id_token: "header.eyJlbWFpbCI6ImFjdGl2ZUBleGFtcGxlLmNvbSJ9.signature",
+          access_token: "active-access-token",
+          refresh_token: "active-refresh-token",
+          account_id: "acct-active",
         },
         last_refresh: "2026-04-25T00:00:00.000Z",
       },
@@ -830,37 +861,37 @@ describe("DesktopSurface", () => {
       setup.dbPath,
       setup.credentialStore,
       {
-        id: "jiqiang",
+        id: "previous",
         endpointId: "openai-official",
-        label: "jiqiang90@gmail.com",
+        label: "previous@example.com",
         authMode: "openai_session",
-        identityKey: "account:acct-jiqiang",
+        identityKey: "account:acct-previous",
       },
       openAiSessionCredential({
-        accountId: "acct-jiqiang",
-        accessToken: "jiqiang-access-token",
-        refreshToken: "jiqiang-refresh-token",
+        accountId: "acct-previous",
+        accessToken: "previous-access-token",
+        refreshToken: "previous-refresh-token",
       }),
     );
     seedBinding(
       setup.dbPath,
       setup.credentialStore,
       {
-        id: "spotto",
+        id: "active",
         endpointId: "openai-official",
-        label: "jay.ji@spotto.ai",
+        label: "active@example.com",
         authMode: "openai_session",
-        identityKey: "account:acct-spotto",
+        identityKey: "account:acct-active",
       },
       openAiSessionCredential({
-        accountId: "acct-spotto",
-        accessToken: "spotto-access-token",
-        refreshToken: "spotto-refresh-token",
+        accountId: "acct-active",
+        accessToken: "active-access-token",
+        refreshToken: "active-refresh-token",
       }),
     );
 
     const agentSelection = AgentSelection.open(setup.dbPath);
-    agentSelection.setApplied("codex", "jiqiang", "2026-04-25T00:00:00.000Z");
+    agentSelection.setApplied("codex", "previous", "2026-04-25T00:00:00.000Z");
     agentSelection.close();
 
     globalThis.fetch = (async () =>
@@ -882,14 +913,14 @@ describe("DesktopSurface", () => {
 
     const state = await createSurface(setup).getSettingsState();
 
-    expect(state.currentConnection?.id).toBe("spotto");
-    expect(state.currentConnection?.label).toBe("jay.ji@spotto.ai");
-    expect(state.liveConnection?.id).toBe("spotto");
+    expect(state.currentConnection?.id).toBe("active");
+    expect(state.currentConnection?.label).toBe("active@example.com");
+    expect(state.liveConnection?.id).toBe("active");
     expect(state.syncState).toBe("synced");
-    expect(state.connections[0]?.id).toBe("spotto");
+    expect(state.connections[0]?.id).toBe("active");
     expect(state.connections[0]?.isCurrent).toBe(true);
     expect(state.connections[0]?.selectedByAgents).toEqual(["codex"]);
-    expect(state.connections[1]?.id).toBe("jiqiang");
+    expect(state.connections[1]?.id).toBe("previous");
     expect(state.connections[1]?.isCurrent).toBe(false);
     expect(state.connections[1]?.selectedByAgents).toEqual([]);
     expect(state.agents.find((agent) => agent.agentId === "codex")?.currentUsage).toEqual(

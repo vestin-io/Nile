@@ -50,4 +50,55 @@ describe("DesktopLauncher", () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it("prepares the macOS host when Electron is hoisted to the workspace root", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "nile-desktop-launcher-"));
+    const appRoot = join(repoRoot, "apps", "desktop");
+    try {
+      const electronAppRoot = join(
+        repoRoot,
+        "node_modules",
+        "electron",
+        "dist",
+        "Electron.app",
+        "Contents",
+      );
+      mkdirSync(join(appRoot, "build", "icons"), { recursive: true });
+      mkdirSync(join(electronAppRoot, "MacOS"), { recursive: true });
+      mkdirSync(join(electronAppRoot, "Resources"), { recursive: true });
+      mkdirSync(join(repoRoot, "node_modules", "electron"), { recursive: true });
+      writeFileSync(join(appRoot, "package.json"), "{}");
+      writeFileSync(join(appRoot, "build", "icons", "icon.icns"), "nile-icon");
+      writeFileSync(join(repoRoot, "node_modules", "electron", "package.json"), "{}");
+      writeFileSync(join(electronAppRoot, "MacOS", "Electron"), "");
+      writeFileSync(join(electronAppRoot, "Resources", "electron.icns"), "electron-icon");
+      writeFileSync(
+        join(electronAppRoot, "Info.plist"),
+        [
+          "<plist>",
+          "<dict>",
+          "<key>CFBundleDisplayName</key><string>Electron</string>",
+          "<key>CFBundleIdentifier</key><string>com.github.electron</string>",
+          "<key>CFBundleName</key><string>Electron</string>",
+          "</dict>",
+          "</plist>",
+        ].join("\n"),
+      );
+
+      const launcher = new DesktopLauncher(appRoot);
+      const prepareMacHost = (
+        Reflect.get(launcher, "prepareMacHost") as () => string
+      ).bind(launcher);
+      const executablePath = prepareMacHost();
+      const targetRoot = join(appRoot, ".runtime", "host", "Nile.app", "Contents");
+
+      expect(executablePath).toBe(join(targetRoot, "MacOS", "Electron"));
+      expect(readFileSync(join(targetRoot, "Resources", "electron.icns"), "utf8")).toBe("nile-icon");
+      expect(readFileSync(join(targetRoot, "Info.plist"), "utf8")).toContain(
+        "<key>CFBundleName</key><string>Nile</string>",
+      );
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
 });

@@ -5,6 +5,8 @@ import { AgentPage } from "../../agents/AgentPage";
 import { AddConnectionPage } from "../../connections/add/Page";
 import { ConnectionsPage } from "../../connections/list/Page";
 import { ProvidersPage } from "../../providers/ProvidersPage";
+import { ProfilesPage } from "../../profiles/Page";
+import type { WorkspaceProfile, WorkspaceProfileAssignment } from "../../profiles/useProfiles";
 import { QuickSetupPage } from "../../quick-setup/Page";
 import { SettingsPage } from "../../settings/general/Page";
 import type {
@@ -31,18 +33,25 @@ type SettingsPageContentProps = {
   definitions: Definition[];
   historyState: HistoryState;
   isResetting: boolean;
+  isSavingProfileFeature: boolean;
   language: LanguagePreference;
   preferences: DesktopPreferences;
+  profileFeatureEnabled: boolean;
+  profileError: string | null;
+  profiles: WorkspaceProfile[];
   releaseInfo: DesktopReleaseInfo | null;
   selectedAgentDetailId: AgentId | null;
   selectedAgentDetailTab: AgentDetailTab;
   selectedConnectionContextAgent: DesktopAgentState | null;
   selectedConnectionId: string | null;
+  selectedProfileId: string | null;
   settingsState: SettingsState;
   showQuickSetupNav: boolean;
+  showProfiles: boolean;
   t: Translator;
   visiblePage: PageId;
   onAddConnection(input: AddConnectionSubmitInput): Promise<void>;
+  onApplyProfile(profileId: string): Promise<void>;
   onAgentOrderChange(agentOrder: AgentId[]): void;
   onBackFromAgentDetail(): void;
   onBindCursorUsage(connectionId: string): Promise<void>;
@@ -51,12 +60,15 @@ type SettingsPageContentProps = {
   onConfigureAgent(agentId: AgentId): void;
   onConfirmImportAgent(agentId: AgentId): Promise<void>;
   onCompleteQuickSetup(): void;
+  onCreateProfile(name: string, emoji: string, assignments: WorkspaceProfileAssignment[]): Promise<string>;
+  onDeleteProfile(profileId: string): Promise<void>;
   onInstallUpdate(): Promise<void>;
   onLanguageChange(language: LanguagePreference): void;
   onOpenAddConnection(): void;
   onOpenConnection(connectionId: string, agentId: AgentId): void;
   onOpenProvidersLink(url: string): Promise<void>;
   onOpenQuickSetup(): void;
+  onProfileFeatureEnabledChange(enabled: boolean): Promise<void>;
   onPrepareConnectionDraft(input: AddConnectionSubmitInput): Promise<PreparedConnectionDraft>;
   onRefresh(): Promise<void>;
   onRemoveConnection(connectionId: string): Promise<void>;
@@ -67,8 +79,10 @@ type SettingsPageContentProps = {
   onSelectAgentDetailTab(tab: AgentDetailTab): void;
   onSelectConnection(connectionId: string | null): void;
   onSelectConnectionContextAgent(agentId: AgentId | null): void;
+  onSelectProfile(profileId: string | null): void;
   onThemeChange(theme: ThemePreference): void;
   onUpdateAgentHome(agentId: AgentId, path: string | null): Promise<void>;
+  onSaveProfile(profileId: string, name: string, emoji: string, assignments: WorkspaceProfileAssignment[]): Promise<void>;
   onUpdateConnection(input: {
     connectionId: string;
     label?: string;
@@ -93,18 +107,25 @@ export function SettingsPageContent({
   definitions,
   historyState,
   isResetting,
+  isSavingProfileFeature,
   language,
   preferences,
+  profileFeatureEnabled,
+  profileError,
+  profiles,
   releaseInfo,
   selectedAgentDetailId,
   selectedAgentDetailTab,
   selectedConnectionContextAgent,
   selectedConnectionId,
+  selectedProfileId,
   settingsState,
   showQuickSetupNav,
+  showProfiles,
   t,
   visiblePage,
   onAddConnection,
+  onApplyProfile,
   onAgentOrderChange,
   onBackFromAgentDetail,
   onBindCursorUsage,
@@ -113,12 +134,15 @@ export function SettingsPageContent({
   onConfigureAgent,
   onConfirmImportAgent,
   onCompleteQuickSetup,
+  onCreateProfile,
+  onDeleteProfile,
   onInstallUpdate,
   onLanguageChange,
   onOpenAddConnection,
   onOpenConnection,
   onOpenProvidersLink,
   onOpenQuickSetup,
+  onProfileFeatureEnabledChange,
   onPrepareConnectionDraft,
   onRefresh,
   onRemoveConnection,
@@ -129,8 +153,10 @@ export function SettingsPageContent({
   onSelectAgentDetailTab,
   onSelectConnection,
   onSelectConnectionContextAgent,
+  onSelectProfile,
   onThemeChange,
   onUpdateAgentHome,
+  onSaveProfile,
   onUpdateConnection,
   onUseConnection,
 }: SettingsPageContentProps) {
@@ -203,6 +229,26 @@ export function SettingsPageContent({
     );
   }
 
+  if (visiblePage === "profiles") {
+    return (
+      <ProfilesPage
+        agentHomes={settingsState.advanced.agentHomes}
+        agents={settingsState.agents}
+        isAvailable={showProfiles}
+        profileError={profileError}
+        profiles={profiles}
+        selectedProfileId={selectedProfileId}
+        t={t}
+        onApplyProfile={onApplyProfile}
+        onBackFromDetail={() => onSelectProfile(null)}
+        onCreateProfile={onCreateProfile}
+        onDeleteProfile={onDeleteProfile}
+        onOpenProfile={onSelectProfile}
+        onSaveProfile={onSaveProfile}
+      />
+    );
+  }
+
   if (visiblePage === "add-connection") {
     return (
       <AddConnectionPage
@@ -224,12 +270,15 @@ export function SettingsPageContent({
     return (
       <SettingsPage
         isResetting={isResetting}
+        isSavingProfileFeature={isSavingProfileFeature}
         preferences={preferences}
+        profileFeatureEnabled={profileFeatureEnabled}
         releaseInfo={releaseInfo}
         t={t}
         onCheckForUpdates={onCheckForUpdates}
         onInstallUpdate={onInstallUpdate}
         onLanguageChange={onLanguageChange}
+        onProfileFeatureEnabledChange={onProfileFeatureEnabledChange}
         onReset={onReset}
         onThemeChange={onThemeChange}
       />

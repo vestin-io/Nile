@@ -29,6 +29,10 @@ type DesktopSurfaceOptions = {
   logger?: NileLogger;
 };
 
+type DesktopSettingsStateOptions = {
+  refreshUsage?: boolean;
+};
+
 export class DesktopSurface {
   private readonly logger: NileLogger;
   private readonly usage: DesktopUsageCache;
@@ -74,8 +78,8 @@ export class DesktopSurface {
     return await this.menubarUsageRefresh;
   }
 
-  async getSettingsState(): Promise<SettingsState> {
-    return await this.withSession("settings-state", async (session) => await this.settings.read(session));
+  async getSettingsState(options: DesktopSettingsStateOptions = {}): Promise<SettingsState> {
+    return await this.withSession("settings-state", async (session) => await this.settings.read(session, options));
   }
 
   async importDetectedSetups(scanIds: AgentId[]) {

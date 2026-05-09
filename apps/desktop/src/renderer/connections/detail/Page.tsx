@@ -1,8 +1,10 @@
 import type { DesktopConnection } from "../../../state/Types";
+import { useState } from "react";
 import type { Translator } from "../../shared/I18n";
 import { CircleHelp } from "lucide-react";
 import { ConnectionActionGroup } from "./ActionGroup";
 import { ConnectionQuotaSection } from "../ConnectionQuotaSection";
+import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { formatAgentLabel, formatAgentsList } from "../../shared/AgentSelection";
 import { authModeLabel } from "../../shared/DisplayText";
 import {
@@ -43,6 +45,8 @@ export function ConnectionDetailPage({
   onRefresh,
   onRemove,
 }: ConnectionDetailPageProps) {
+  const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
   const canRepairUsage =
     connection.endpointFamily === "cursor"
     && connection.authMode === "cursor_session"
@@ -130,7 +134,7 @@ export function ConnectionDetailPage({
               onEdit={onEdit}
               onRefresh={onRefresh}
               onRemove={async () => {
-                await onRemove(connection.id);
+                setIsRemoveDialogOpen(true);
               }}
             />
           </div>
@@ -157,6 +161,32 @@ export function ConnectionDetailPage({
         showPlanLabel
         t={t}
         title={t("common.usage")}
+      />
+
+      <ConfirmDialog
+        confirmLabel={t("common.remove")}
+        description={t("connections.removeDialogDescription", { name: connection.label })}
+        isConfirming={isRemoving}
+        open={isRemoveDialogOpen}
+        title={t("connections.removeDialogTitle")}
+        t={t}
+        onConfirm={async () => {
+          if (isRemoving) {
+            return;
+          }
+          setIsRemoving(true);
+          try {
+            await onRemove(connection.id);
+          } finally {
+            setIsRemoving(false);
+          }
+        }}
+        onOpenChange={(open) => {
+          if (isRemoving) {
+            return;
+          }
+          setIsRemoveDialogOpen(open);
+        }}
       />
     </div>
   );

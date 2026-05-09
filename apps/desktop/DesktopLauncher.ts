@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawn, type ChildProcess } from "node:child_process";
-import { join } from "node:path";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
 
 type SpawnOptions = {
   entryPath: string;
@@ -30,20 +31,14 @@ export class DesktopLauncher {
 
   private resolveExecutablePath(): string {
     if (process.platform !== "darwin") {
-      return join(this.root, "node_modules", ".bin", "electron");
+      return this.resolveElectronExecutablePath();
     }
 
     return this.prepareMacHost();
   }
 
   private prepareMacHost(): string {
-    const sourceAppPath = join(
-      this.root,
-      "node_modules",
-      "electron",
-      "dist",
-      "Electron.app",
-    );
+    const sourceAppPath = join(this.resolveElectronPackageRoot(), "dist", "Electron.app");
     const targetRoot = join(this.root, ".runtime", "host");
     const targetAppPath = join(targetRoot, DesktopLauncher.macHostName);
     const plistPath = join(targetAppPath, "Contents", "Info.plist");
@@ -61,6 +56,23 @@ export class DesktopLauncher {
     this.copyMacHostIcon(targetIconPath);
 
     return join(targetAppPath, "Contents", "MacOS", "Electron");
+  }
+
+  private resolveElectronExecutablePath(): string {
+    const electron = this.requireFromRoot()("electron");
+    if (typeof electron !== "string") {
+      throw new Error("Electron package did not resolve to an executable path");
+    }
+
+    return electron;
+  }
+
+  private resolveElectronPackageRoot(): string {
+    return dirname(this.requireFromRoot().resolve("electron/package.json"));
+  }
+
+  private requireFromRoot(): NodeJS.Require {
+    return createRequire(join(this.root, "package.json"));
   }
 
   private copyMacHostIcon(targetIconPath: string): void {

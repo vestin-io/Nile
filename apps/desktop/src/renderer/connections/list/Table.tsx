@@ -1,8 +1,8 @@
 import type { Translator } from "../../shared/I18n";
 import type { SettingsState } from "../../shared/DesktopData";
 import { formatAgentsList } from "../../shared/AgentSelection";
-import { formatUsageText } from "../../shared/DisplayText";
 import { AgentIconStack } from "../../agents/AgentIconStack";
+import { ConnectionUsageCell } from "../UsageCell";
 import { readProviderLabel } from "../ProviderDisplay";
 import { Card, CardContent } from "../../ui/card";
 import { Field } from "../../ui/field";
@@ -38,7 +38,7 @@ export function ConnectionTable({
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t("common.provider")} value={readProviderLabel(connection.endpointFamily, t)} />
-                <Field label={t("common.usage")} value={formatUsageText(connection, t)} />
+                <Field label={t("common.usage")} value={<ConnectionUsageCell connection={connection} t={t} />} />
                 <Field
                   label={t("common.capability")}
                   value={connection.enabledAgents.length === 0 ? t("common.none") : formatAgentsList(connection.enabledAgents, t)}
@@ -72,7 +72,7 @@ export function ConnectionTable({
                 </TableCell>
                 <TableCell className="font-medium">{connection.label}</TableCell>
                 <TableCell>{readProviderLabel(connection.endpointFamily, t)}</TableCell>
-                <TableCell>{formatUsageText(connection, t)}</TableCell>
+                <TableCell><ConnectionUsageCell connection={connection} t={t} /></TableCell>
                 <TableCell>{connection.enabledAgents.length === 0 ? t("common.none") : formatAgentsList(connection.enabledAgents, t)}</TableCell>
               </TableRow>
             ))}

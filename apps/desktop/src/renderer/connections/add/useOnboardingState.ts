@@ -3,6 +3,7 @@ import type { AgentId } from "@nile/core/models/agent/types";
 
 import type { Definition } from "../../shared/Definitions";
 import type { AddConnectionSubmitInput } from "./Types";
+import type { SetEnabledAgentsOptions } from "./useForm";
 
 type UseAddConnectionOnboardingStateOptions = {
   selectedDefinition: Definition | null;
@@ -12,9 +13,10 @@ type UseAddConnectionOnboardingStateOptions = {
   endpointUrl: string;
   envKey: string;
   enabledAgents: AgentId[];
+  enabledAgentsManuallyEdited: boolean;
   hasResolvedApiKeyInput: boolean;
   requiresGatewayPreparation: boolean;
-  setEnabledAgents(agentIds: AgentId[]): void;
+  setEnabledAgents(agentIds: AgentId[], options?: SetEnabledAgentsOptions): void;
   readConnectionInput(): AddConnectionSubmitInput | null;
 };
 
@@ -26,6 +28,7 @@ export function useAddConnectionOnboardingState({
   endpointUrl,
   envKey,
   enabledAgents,
+  enabledAgentsManuallyEdited,
   hasResolvedApiKeyInput,
   requiresGatewayPreparation,
   setEnabledAgents,
@@ -85,15 +88,12 @@ export function useAddConnectionOnboardingState({
         );
         setSuggestedAgents(onboarding.suggestedAgents);
         setResolvedConfigurableAgents(nextConfigurableAgents);
-        if (enabledAgents.length > 0) {
-          setEnabledAgents(resolveEnabledAgents(
-            enabledAgents,
-            nextConfigurableAgents,
-            onboarding.defaultEnabledAgents,
-          ));
-          return;
-        }
-        setEnabledAgents(resolveEnabledAgents([], nextConfigurableAgents, onboarding.defaultEnabledAgents));
+        setEnabledAgents(resolveDetectedEnabledAgents({
+          current: enabledAgents,
+          configurableAgents: nextConfigurableAgents,
+          defaultEnabledAgents: onboarding.defaultEnabledAgents,
+          preserveCurrent: enabledAgentsManuallyEdited,
+        }), { userEdited: false });
       })
       .catch(() => {
         if (!cancelled) {
@@ -115,6 +115,7 @@ export function useAddConnectionOnboardingState({
     apiKeySource,
     authMode,
     enabledAgents,
+    enabledAgentsManuallyEdited,
     endpointUrl,
     envKey,
     selectedDefinition,
@@ -164,11 +165,12 @@ export function useAddConnectionOnboardingState({
       );
       setSuggestedAgents(onboarding.suggestedAgents);
       setResolvedConfigurableAgents(nextConfigurableAgents);
-      setEnabledAgents(resolveEnabledAgents(
-        enabledAgents,
-        nextConfigurableAgents,
-        onboarding.defaultEnabledAgents,
-      ));
+      setEnabledAgents(resolveDetectedEnabledAgents({
+        current: enabledAgents,
+        configurableAgents: nextConfigurableAgents,
+        defaultEnabledAgents: onboarding.defaultEnabledAgents,
+        preserveCurrent: enabledAgentsManuallyEdited,
+      }), { userEdited: false });
       setGatewayProbeError(null);
       setGatewayPrepared(true);
     } catch (error) {
@@ -204,15 +206,21 @@ function mergeConfigurableAgents(
   return [...new Set([...current, ...next])];
 }
 
-function resolveEnabledAgents(
-  current: AgentId[],
-  configurableAgents: AgentId[],
-  fallback: AgentId[],
-): AgentId[] {
-  const allowed = new Set(configurableAgents);
-  const retained = current.filter((agentId) => allowed.has(agentId));
-  if (retained.length > 0) {
-    return [...new Set(retained)];
+export function resolveDetectedEnabledAgents(input: {
+  current: AgentId[];
+  configurableAgents: AgentId[];
+  defaultEnabledAgents: AgentId[];
+  preserveCurrent: boolean;
+}): AgentId[] {
+  const allowed = new Set(input.configurableAgents);
+  if (input.preserveCurrent) {
+    return [...new Set(input.current.filter((agentId) => allowed.has(agentId)))];
   }
-  return [...new Set(fallback.filter((agentId) => allowed.has(agentId)))];
+
+  const detectedDefault = input.defaultEnabledAgents.filter((agentId) => allowed.has(agentId));
+  if (detectedDefault.length > 0) {
+    return [...new Set(detectedDefault)];
+  }
+
+  return [...new Set(input.current.filter((agentId) => allowed.has(agentId)))];
 }

@@ -20,6 +20,10 @@ type AddConnectionFormState = {
   sessionSource: "login" | "current_codex";
 };
 
+export type SetEnabledAgentsOptions = {
+  userEdited?: boolean;
+};
+
 function createInitialFormState(defaultOpenAiAuthJsonPath: string): AddConnectionFormState {
   return {
     apiKey: "",
@@ -37,6 +41,7 @@ function createInitialFormState(defaultOpenAiAuthJsonPath: string): AddConnectio
 export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAuthJsonPath: string) {
   const enabledAgentsPolicy = useMemo(() => new EnabledAgentsPolicy(), []);
   const previousDefaultOpenAiAuthJsonPath = useRef(defaultOpenAiAuthJsonPath);
+  const [enabledAgentsManuallyEdited, setEnabledAgentsManuallyEdited] = useState(false);
   const [formState, setFormState] = useState<AddConnectionFormState>(() =>
     createInitialFormState(defaultOpenAiAuthJsonPath),
   );
@@ -55,6 +60,10 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
     () => definitions.find((definition) => definition.preset === formState.preset) ?? definitions[0] ?? null,
     [definitions, formState.preset],
   );
+
+  useEffect(() => {
+    setEnabledAgentsManuallyEdited(false);
+  }, [selectedDefinition?.preset]);
 
   useEffect(() => {
     const previousDefault = previousDefaultOpenAiAuthJsonPath.current;
@@ -151,12 +160,16 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
     [],
   );
   const setEnabledAgents = useCallback(
-    (enabledAgents: AgentId[]) =>
+    (enabledAgents: AgentId[], options?: SetEnabledAgentsOptions) => {
+      if (options?.userEdited !== false) {
+        setEnabledAgentsManuallyEdited(true);
+      }
       setFormState((current) =>
         sameAgentSelection(enabledAgents, current.enabledAgents)
           ? current
           : { ...current, enabledAgents }
-      ),
+      );
+    },
     [],
   );
   const setPreset = useCallback(
@@ -169,6 +182,7 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
   );
 
   return {
+    enabledAgentsManuallyEdited,
     formState,
     selectedDefinition,
     setApiKey,

@@ -28,10 +28,22 @@ const bridge: DesktopBridge = {
     bindCursorUsage: (connectionId, sessionToken) => ipcRenderer.invoke("desktop:bind-cursor-usage", connectionId, sessionToken),
     resetState: () => ipcRenderer.invoke("desktop:reset-state"),
   },
+  profiles: {
+    listProfiles: () => ipcRenderer.invoke("desktop:list-workspace-profiles"),
+    createProfile: (name, emoji, assignments) => ipcRenderer.invoke("desktop:create-workspace-profile", name, emoji, assignments),
+    updateProfile: (profileId, name, emoji, assignments) => (
+      ipcRenderer.invoke("desktop:update-workspace-profile", profileId, name, emoji, assignments)
+    ),
+    deleteProfile: (profileId) => ipcRenderer.invoke("desktop:delete-workspace-profile", profileId),
+    applyProfile: (profileId) => ipcRenderer.invoke("desktop:apply-workspace-profile", profileId),
+  },
   state: {
     getMenubarState: () => ipcRenderer.invoke("desktop:get-menubar-state"),
     getSettingsState: () => ipcRenderer.invoke("desktop:get-settings-state"),
+    getSettingsStateSnapshot: () => ipcRenderer.invoke("desktop:get-settings-state-snapshot"),
     getHistoryState: () => ipcRenderer.invoke("desktop:get-history-state"),
+    getProfileFeatureEnabled: () => ipcRenderer.invoke("desktop:get-profile-feature-enabled"),
+    setProfileFeatureEnabled: (enabled) => ipcRenderer.invoke("desktop:set-profile-feature-enabled", enabled),
     refreshSettings: () => ipcRenderer.invoke("desktop:refresh-settings"),
     refreshMenubar: () => ipcRenderer.invoke("desktop:refresh-menubar"),
   },

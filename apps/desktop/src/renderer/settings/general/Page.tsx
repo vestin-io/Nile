@@ -20,10 +20,13 @@ import { UpdateSection } from "./UpdateSection";
 
 type SettingsPageProps = {
   isResetting: boolean;
+  isSavingProfileFeature: boolean;
   preferences: DesktopPreferences;
+  profileFeatureEnabled: boolean;
   releaseInfo: DesktopReleaseInfo | null;
   onCheckForUpdates(): Promise<void>;
   onInstallUpdate(): Promise<void>;
+  onProfileFeatureEnabledChange(enabled: boolean): Promise<void>;
   onReset(): void;
   onLanguageChange(language: LanguagePreference): void;
   onThemeChange(theme: ThemePreference): void;
@@ -32,10 +35,13 @@ type SettingsPageProps = {
 
 export function SettingsPage({
   isResetting,
+  isSavingProfileFeature,
   preferences,
+  profileFeatureEnabled,
   releaseInfo,
   onCheckForUpdates,
   onInstallUpdate,
+  onProfileFeatureEnabledChange,
   onReset,
   onLanguageChange,
   onThemeChange,
@@ -75,6 +81,29 @@ export function SettingsPage({
             <SelectItem value="system">{t("settings.theme.system")}</SelectItem>
             <SelectItem value="light">{t("settings.theme.light")}</SelectItem>
             <SelectItem value="dark">{t("settings.theme.dark")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingsSection>
+
+      <Separator />
+
+      <SettingsSection
+        title={t("settings.profiles.title")}
+        description={t("settings.profiles.description")}
+      >
+        <Select
+          value={profileFeatureEnabled ? "enabled" : "disabled"}
+          onValueChange={(value) => {
+            void onProfileFeatureEnabledChange(value === "enabled");
+          }}
+          disabled={isSavingProfileFeature}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t("settings.profiles.label")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="enabled">{t("settings.profiles.enabled")}</SelectItem>
+            <SelectItem value="disabled">{t("settings.profiles.disabled")}</SelectItem>
           </SelectContent>
         </Select>
       </SettingsSection>

@@ -12,6 +12,7 @@ const PAGE_TITLE_KEYS: Record<PageId, string> = {
   "quick-setup": "page.quickSetup",
   agents: "page.agents",
   connections: "page.connections",
+  profiles: "page.profiles",
   providers: "page.providers",
   settings: "page.settings",
   "add-connection": "page.addConnection",
@@ -20,10 +21,13 @@ const PAGE_TITLE_KEYS: Record<PageId, string> = {
 type SettingsChromeProps = {
   children: React.ReactNode;
   currentPage: PageId;
+  currentProfileEmoji: string;
+  currentProfileName: string | null;
   error: string | null;
   isSidebarOpen: boolean;
   showAgents: boolean;
   showConnections: boolean;
+  showProfiles: boolean;
   showQuickSetup: boolean;
   t: Translator;
   onOpenAbout(): void;
@@ -35,10 +39,13 @@ type SettingsChromeProps = {
 export function SettingsChrome({
   children,
   currentPage,
+  currentProfileEmoji,
+  currentProfileName,
   error,
   isSidebarOpen,
   showAgents,
   showConnections,
+  showProfiles,
   showQuickSetup,
   t,
   onOpenAbout,
@@ -87,8 +94,11 @@ export function SettingsChrome({
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <SettingsSidebarNav
           currentPage={currentPage}
+          currentProfileEmoji={currentProfileEmoji}
+          currentProfileName={currentProfileName}
           showAgents={showAgents}
           showConnections={showConnections}
+          showProfiles={showProfiles}
           showQuickSetup={showQuickSetup}
           t={t}
           onPageChange={onPageChange}

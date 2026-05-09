@@ -31,7 +31,11 @@ type DesktopStateStoreOptions = {
   surface: DesktopSurface;
   connectionGateway: DesktopConnectionGateway;
   connectionManager: DesktopConnectionManager;
-  stateReset?: StateReset;
+  stateReset?: Pick<StateReset, "reset">;
+};
+
+type GetSettingsStateOptions = {
+  refreshUsage?: boolean;
 };
 
 export class DesktopStateStore {
@@ -39,7 +43,7 @@ export class DesktopStateStore {
   private readonly settingsState: CachedValue<SettingsState> = this.createCachedValue();
   private readonly historyState: CachedValue<HistoryState> = this.createCachedValue();
 
-  private readonly stateReset: StateReset;
+  private readonly stateReset: Pick<StateReset, "reset">;
 
   constructor(private readonly options: DesktopStateStoreOptions) {
     this.stateReset = options.stateReset ?? new StateReset();
@@ -49,12 +53,16 @@ export class DesktopStateStore {
     return this.menubarState.value;
   }
 
+  peekSettingsState(): SettingsState | null {
+    return this.settingsState.value;
+  }
+
   async getMenubarState(): Promise<MenubarState> {
     return await this.readState(this.menubarState, async () => await this.options.surface.getMenubarState());
   }
 
-  async getSettingsState(): Promise<SettingsState> {
-    return await this.readState(this.settingsState, async () => await this.options.surface.getSettingsState());
+  async getSettingsState(options: GetSettingsStateOptions = {}): Promise<SettingsState> {
+    return await this.readState(this.settingsState, async () => await this.options.surface.getSettingsState(options));
   }
 
   async getHistoryState(): Promise<HistoryState> {

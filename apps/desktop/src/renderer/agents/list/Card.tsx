@@ -130,7 +130,7 @@ export function AgentCard({
                       disabled={isEditingOrder || agent.connections.length === 0}
                       value={agent.currentConnection?.id}
                       onValueChange={(connectionId) => {
-                        void onSwitch(agent.agentId, connectionId);
+                        void onSwitch(agent.agentId, connectionId).catch(() => undefined);
                       }}
                     >
                       <SelectTrigger className="h-11 max-w-[20rem] rounded-xl">

@@ -26,6 +26,7 @@ export function useAddConnectionPageState({
 }: UseAddConnectionPageStateOptions) {
   const {
     formState,
+    enabledAgentsManuallyEdited,
     selectedDefinition,
     setApiKey,
     setApiKeySource,
@@ -125,6 +126,7 @@ export function useAddConnectionPageState({
     endpointUrl: formState.endpointUrl,
     envKey: formState.envKey,
     enabledAgents: formState.enabledAgents,
+    enabledAgentsManuallyEdited,
     hasResolvedApiKeyInput,
     requiresGatewayPreparation,
     setEnabledAgents,
@@ -180,7 +182,7 @@ export function useAddConnectionPageState({
       setActionError(null);
       const draft = await onPrepareDraft(input);
       setPreparedDraft(draft);
-      setEnabledAgents(draft.defaultEnabledAgents);
+      setEnabledAgents(draft.defaultEnabledAgents, { userEdited: false });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));
     } finally {

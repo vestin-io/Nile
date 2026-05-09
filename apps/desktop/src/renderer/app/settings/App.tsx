@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { readCodexAuthJsonPath } from "../../connections/AuthJsonPath";
 import type { AgentDetailTab } from "../../agents/detail/Page";
 import { useDesktopPreferences } from "./usePreferences";
+import { useProfileFeature } from "./useProfileFeature";
 import { useSettingsNavigation } from "./useNavigation";
 import { useDesktopData } from "./useData";
 import { useSidebarState } from "./useSidebarState";
@@ -12,6 +13,8 @@ import { SettingsPageContent } from "./PageContent";
 import { useDesktopReleaseInfo } from "./useReleaseInfo";
 import { useSettingsConnectionActions } from "./useConnectionActions";
 import { useSettingsFlow } from "./useFlow";
+import { readCurrentProfile } from "../../../profiles/CurrentProfile";
+import { useWorkspaceProfiles, type WorkspaceProfileAssignment } from "../../profiles/useProfiles";
 import { Button } from "../../ui/button";
 import { Alert, AlertDescription, AlertTitle } from "../../ui/alert";
 
@@ -23,10 +26,17 @@ export function SettingsApp() {
     historyState,
     isLoading,
     readDefinitionsForAgent,
+    reload,
     refresh,
     settingsState,
   } = useDesktopData();
   const { preferences, setPreferences, t } = useDesktopPreferences();
+  const {
+    isLoaded: isProfileFeatureLoaded,
+    isSaving: isSavingProfileFeature,
+    profileFeatureEnabled,
+    setProfileFeatureEnabled,
+  } = useProfileFeature();
   const { sidebarOpen, setSidebarOpen } = useSidebarState();
   const {
     addConnectionReturnTarget,
@@ -39,24 +49,30 @@ export function SettingsApp() {
     selectedAgentDetailId,
     selectedConnectionContextAgentId,
     selectedConnectionId,
+    selectedProfileId,
     setCurrentPage,
     setRepairUsageConnectionId,
     setReusedConnectionDialog,
     setSelectedAgentDetailId,
     setSelectedConnectionContextAgentId,
     setSelectedConnectionId,
+    setSelectedProfileId,
     showAgents,
     showConnections,
+    showProfiles,
     showQuickSetupNav,
     visiblePage,
   } = useSettingsNavigation({
+    profileFeatureEnabled: isProfileFeatureLoaded ? profileFeatureEnabled : false,
     quickSetupDismissed: preferences.quickSetupDismissed,
     settingsState,
   });
   const [nileDialogOpen, setNileDialogOpen] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [selectedAgentDetailTab, setSelectedAgentDetailTab] = useState<AgentDetailTab>("connections");
   const releaseInfo = useDesktopReleaseInfo();
+  const { profiles, profileError, refreshProfiles } = useWorkspaceProfiles();
   const {
     closeAddConnectionPage,
     completeQuickSetup,
@@ -67,6 +83,7 @@ export function SettingsApp() {
     addConnectionReturnTarget,
     hasSavedConnections,
     refresh,
+    refreshProfiles,
     setCurrentPage,
     setPreferences,
   });
@@ -83,6 +100,12 @@ export function SettingsApp() {
     settingsState?.connections.find((connection) => connection.id === repairUsageConnectionId) ?? null;
   const selectedConnectionContextAgent =
     settingsState?.agents.find((agent) => agent.agentId === selectedConnectionContextAgentId) ?? null;
+  const currentProfile = useMemo(
+    () => profileFeatureEnabled
+      ? readCurrentProfile(profiles, settingsState?.agents ?? [], settingsState?.advanced.agentHomes ?? [])
+      : null,
+    [profileFeatureEnabled, profiles, settingsState?.advanced.agentHomes, settingsState?.agents],
+  );
 
   if (isLoading && (!settingsState || !historyState)) {
     return <LoadingShell label={t("loading.desktop")} />;
@@ -124,7 +147,7 @@ export function SettingsApp() {
     useConnection,
   } = useSettingsConnectionActions({
     addConnectionReturnTarget,
-    addConnectionTargetAgentId,
+    reload,
     refresh,
     reusedConnectionDialog,
     settingsState,
@@ -134,20 +157,27 @@ export function SettingsApp() {
     setSelectedAgentDetailId,
     setSelectedConnectionContextAgentId,
     setSelectedConnectionId,
+    onActionError: setActionError,
   });
 
   return (
     <SettingsChrome
       currentPage={currentPage}
-      error={error}
+      error={actionError ?? error}
       isSidebarOpen={sidebarOpen}
+      currentProfileEmoji={currentProfile?.emoji ?? ""}
+      currentProfileName={currentProfile?.name ?? null}
       showAgents={showAgents}
       showConnections={showConnections}
+      showProfiles={showProfiles}
       showQuickSetup={showQuickSetupNav}
       t={t}
       onOpenAbout={() => setNileDialogOpen(true)}
       onPageChange={setCurrentPage}
-      onRefresh={refresh}
+      onRefresh={async () => {
+        setActionError(null);
+        await refresh();
+      }}
       onSidebarOpenChange={setSidebarOpen}
     >
       <SettingsPageContent
@@ -160,13 +190,19 @@ export function SettingsApp() {
         isResetting={isResetting}
         language={preferences.language}
         preferences={preferences}
+        profileFeatureEnabled={profileFeatureEnabled}
+        isSavingProfileFeature={isSavingProfileFeature}
         releaseInfo={releaseInfo}
+        profileError={profileError}
+        profiles={profiles}
         selectedAgentDetailId={selectedAgentDetailId}
         selectedAgentDetailTab={selectedAgentDetailTab}
         selectedConnectionContextAgent={selectedConnectionContextAgent}
         selectedConnectionId={selectedConnectionId}
+        selectedProfileId={selectedProfileId}
         settingsState={settingsState}
         showQuickSetupNav={showQuickSetupNav}
+        showProfiles={showProfiles}
         t={t}
         visiblePage={visiblePage}
         onAddConnection={addConnection}
@@ -178,6 +214,19 @@ export function SettingsApp() {
         }}
         onCloseAddConnectionPage={closeAddConnectionPage}
         onCompleteQuickSetup={completeQuickSetup}
+        onApplyProfile={async (profileId) => {
+          await window.nileDesktop.profiles.applyProfile(profileId);
+          await refresh();
+        }}
+        onCreateProfile={async (name, emoji, assignments: WorkspaceProfileAssignment[]) => {
+          const profile = await window.nileDesktop.profiles.createProfile(name, emoji, assignments);
+          await refreshProfiles();
+          return profile.id;
+        }}
+        onDeleteProfile={async (profileId) => {
+          await window.nileDesktop.profiles.deleteProfile(profileId);
+          await refreshProfiles();
+        }}
         onConfigureAgent={(agentId) => openAddConnectionPage(agentId)}
         onConfirmImportAgent={importCurrentConnection}
         onInstallUpdate={async () => {
@@ -190,6 +239,7 @@ export function SettingsApp() {
           await window.nileDesktop.app.openExternalUrl(url);
         }}
         onOpenQuickSetup={openQuickSetup}
+        onProfileFeatureEnabledChange={setProfileFeatureEnabled}
         onPrepareConnectionDraft={prepareConnectionDraft}
         onRefresh={refresh}
         onRemoveConnection={removeConnection}
@@ -205,9 +255,14 @@ export function SettingsApp() {
         onSelectAgentDetailTab={setSelectedAgentDetailTab}
         onSelectConnection={setSelectedConnectionId}
         onSelectConnectionContextAgent={setSelectedConnectionContextAgentId}
+        onSelectProfile={setSelectedProfileId}
         onThemeChange={(theme) => setPreferences((current) => ({ ...current, theme }))}
         onUpdateAgentHome={async (agentId, path) => {
           await window.nileDesktop.app.updateAgentHome(agentId, path);
+        }}
+        onSaveProfile={async (profileId, name, emoji, assignments) => {
+          await window.nileDesktop.profiles.updateProfile(profileId, name, emoji, assignments);
+          await refreshProfiles();
         }}
         onUpdateConnection={updateConnection}
         onUseConnection={useConnection}

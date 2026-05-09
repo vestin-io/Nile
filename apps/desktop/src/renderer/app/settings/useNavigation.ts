@@ -4,7 +4,7 @@ import { isAgentId, type AgentId } from "@nile/core/models/agent/types";
 
 import type { SettingsState } from "../../shared/DesktopData";
 
-export type PageId = "quick-setup" | "agents" | "connections" | "providers" | "settings" | "add-connection";
+export type PageId = "quick-setup" | "agents" | "connections" | "profiles" | "providers" | "settings" | "add-connection";
 type MainPageId = Exclude<PageId, "add-connection">;
 
 export type AddConnectionReturnTarget =
@@ -18,6 +18,7 @@ export type ReusedConnectionDialogState = {
 } | null;
 
 type UseSettingsNavigationOptions = {
+  profileFeatureEnabled: boolean;
   quickSetupDismissed: boolean;
   settingsState: SettingsState | null;
 };
@@ -33,19 +34,23 @@ type SettingsNavigationState = {
   selectedAgentDetailId: AgentId | null;
   selectedConnectionContextAgentId: AgentId | null;
   selectedConnectionId: string | null;
+  selectedProfileId: string | null;
   setCurrentPage(page: PageId): void;
   setRepairUsageConnectionId(connectionId: string | null): void;
   setReusedConnectionDialog(state: ReusedConnectionDialogState): void;
   setSelectedAgentDetailId(agentId: AgentId | null): void;
   setSelectedConnectionContextAgentId(agentId: AgentId | null): void;
   setSelectedConnectionId(connectionId: string | null): void;
+  setSelectedProfileId(profileId: string | null): void;
   showAgents: boolean;
   showConnections: boolean;
+  showProfiles: boolean;
   showQuickSetupNav: boolean;
   visiblePage: PageId;
 };
 
 export function useSettingsNavigation({
+  profileFeatureEnabled,
   quickSetupDismissed,
   settingsState,
 }: UseSettingsNavigationOptions): SettingsNavigationState {
@@ -58,6 +63,7 @@ export function useSettingsNavigation({
   const [selectedAgentDetailId, setSelectedAgentDetailId] = useState<AgentId | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [selectedConnectionContextAgentId, setSelectedConnectionContextAgentId] = useState<AgentId | null>(null);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [reusedConnectionDialog, setReusedConnectionDialog] = useState<ReusedConnectionDialogState>(null);
   const [repairUsageConnectionId, setRepairUsageConnectionId] = useState<string | null>(null);
 
@@ -66,6 +72,8 @@ export function useSettingsNavigation({
   const showQuickSetupNav = isQuickSetupPage || !quickSetupDismissed || !hasSavedConnections;
   const showAgents = hasSavedConnections;
   const showConnections = hasSavedConnections;
+  const showProfiles = profileFeatureEnabled
+    && (settingsState?.agents.filter((agent) => agent.connections.length > 0).length ?? 0) >= 2;
   const repairUsageConnection =
     settingsState?.connections.find((connection) => connection.id === repairUsageConnectionId) ?? null;
 
@@ -99,8 +107,13 @@ export function useSettingsNavigation({
 
     if (currentPage === "connections" && !showConnections) {
       setCurrentPage("quick-setup");
+      return;
     }
-  }, [currentPage, showAgents, showConnections]);
+
+    if (currentPage === "profiles" && !showProfiles) {
+      setCurrentPage(hasSavedConnections ? "agents" : "quick-setup");
+    }
+  }, [currentPage, hasSavedConnections, showAgents, showConnections, showProfiles]);
 
   const visiblePage: PageId = useMemo(() => {
     if (currentPage === "add-connection") {
@@ -112,11 +125,14 @@ export function useSettingsNavigation({
     if (currentPage === "connections" && !showConnections) {
       return "quick-setup";
     }
+    if (currentPage === "profiles" && !showProfiles) {
+      return hasSavedConnections ? "agents" : "quick-setup";
+    }
     if (currentPage === "quick-setup" && !showQuickSetupNav && hasSavedConnections) {
       return "agents";
     }
     return currentPage;
-  }, [currentPage, hasSavedConnections, showAgents, showConnections, showQuickSetupNav]);
+  }, [currentPage, hasSavedConnections, showAgents, showConnections, showProfiles, showQuickSetupNav]);
 
   useEffect(() => {
     if (repairUsageConnectionId && !repairUsageConnection) {
@@ -136,6 +152,12 @@ export function useSettingsNavigation({
       setAddConnectionTargetAgentId(null);
     }
   }, [addConnectionTargetAgentId, currentPage]);
+
+  useEffect(() => {
+    if (!showProfiles && selectedProfileId) {
+      setSelectedProfileId(null);
+    }
+  }, [selectedProfileId, showProfiles]);
 
   const openAddConnectionPage = (agentId?: AgentId | Event | unknown) => {
     setReusedConnectionDialog(null);
@@ -162,14 +184,17 @@ export function useSettingsNavigation({
     selectedAgentDetailId,
     selectedConnectionContextAgentId,
     selectedConnectionId,
+    selectedProfileId,
     setCurrentPage,
     setRepairUsageConnectionId,
     setReusedConnectionDialog,
     setSelectedAgentDetailId,
     setSelectedConnectionContextAgentId,
     setSelectedConnectionId,
+    setSelectedProfileId,
     showAgents,
     showConnections,
+    showProfiles,
     showQuickSetupNav,
     visiblePage,
   };

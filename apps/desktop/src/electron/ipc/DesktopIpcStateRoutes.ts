@@ -6,9 +6,11 @@ import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 
 type DesktopIpcStateRoutesOptions = {
+  getProfileFeatureEnabled(): boolean;
   inputs: DesktopIpcInputValidator;
   refreshAll(): void;
   refreshDesktopState(options: { invalidate: boolean; notifyRenderer: boolean }): Promise<void>;
+  setProfileFeatureEnabled(enabled: boolean): boolean;
   stateStore: DesktopStateStore;
   updateAgentHome(agentId: AgentId, path: string | null): void;
 };
@@ -21,7 +23,12 @@ export class DesktopIpcStateRoutes {
 
     ipcMain.handle("desktop:get-menubar-state", () => stateStore.getMenubarState());
     ipcMain.handle("desktop:get-settings-state", () => stateStore.getSettingsState());
+    ipcMain.handle("desktop:get-settings-state-snapshot", () => stateStore.getSettingsState({ refreshUsage: false }));
     ipcMain.handle("desktop:get-history-state", () => stateStore.getHistoryState());
+    ipcMain.handle("desktop:get-profile-feature-enabled", () => this.options.getProfileFeatureEnabled());
+    ipcMain.handle("desktop:set-profile-feature-enabled", (_event, enabled: unknown) => {
+      return this.options.setProfileFeatureEnabled(inputs.readBoolean(enabled, "enabled"));
+    });
     ipcMain.handle("desktop:switch-connection", async (_event, agentId: unknown, connectionId: unknown) => {
       const result = await stateStore.switchConnection(
         inputs.readAgentId(agentId),

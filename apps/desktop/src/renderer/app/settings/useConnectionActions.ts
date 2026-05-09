@@ -16,7 +16,7 @@ import type {
 
 type UseSettingsConnectionActionsOptions = {
   addConnectionReturnTarget: AddConnectionReturnTarget;
-  addConnectionTargetAgentId: AgentId | null;
+  reload(): Promise<void>;
   refresh(): Promise<void>;
   reusedConnectionDialog: ReusedConnectionDialogState;
   settingsState: SettingsState;
@@ -26,11 +26,12 @@ type UseSettingsConnectionActionsOptions = {
   setSelectedAgentDetailId(agentId: AgentId | null): void;
   setSelectedConnectionContextAgentId(agentId: AgentId | null): void;
   setSelectedConnectionId(connectionId: string | null): void;
+  onActionError(message: string | null): void;
 };
 
 export function useSettingsConnectionActions({
   addConnectionReturnTarget,
-  addConnectionTargetAgentId,
+  reload,
   refresh,
   reusedConnectionDialog,
   settingsState,
@@ -40,6 +41,7 @@ export function useSettingsConnectionActions({
   setSelectedAgentDetailId,
   setSelectedConnectionContextAgentId,
   setSelectedConnectionId,
+  onActionError,
 }: UseSettingsConnectionActionsOptions) {
   const addConnection = async (input: AddConnectionSubmitInput) => {
     const created = await window.nileDesktop.connections.addConnection({
@@ -126,7 +128,14 @@ export function useSettingsConnectionActions({
   };
 
   const useConnection = async (agentId: AgentId, connectionId: string) => {
-    await window.nileDesktop.connections.switchConnection(agentId, connectionId);
+    onActionError(null);
+    try {
+      await window.nileDesktop.connections.switchConnection(agentId, connectionId);
+    } catch (error) {
+      const message = describeActionError(error);
+      onActionError(message);
+      throw new Error(message);
+    }
   };
 
   const continueReusedConnection = () => {
@@ -139,11 +148,7 @@ export function useSettingsConnectionActions({
   };
 
   const completeConnectionMutation = async (connectionId: string, reused: boolean) => {
-    const targetAgentId = addConnectionTargetAgentId;
-    if (targetAgentId) {
-      await window.nileDesktop.connections.switchConnection(targetAgentId, connectionId);
-    }
-    await refresh();
+    await reload();
     if (reused) {
       setReusedConnectionDialog({
         connectionId,
@@ -167,4 +172,11 @@ export function useSettingsConnectionActions({
     updateConnection,
     useConnection,
   };
+}
+
+function describeActionError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.replace(/^Error invoking remote method '[^']+':\s*/, "");
+  }
+  return String(error);
 }

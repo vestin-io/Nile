@@ -17,6 +17,14 @@ export class DesktopUsageCache {
     return this.usageByConnectionId.get(connectionId) ?? null;
   }
 
+  snapshotByConnectionId(savedConnections: SavedConnectionSummary[]): Map<string, DesktopUsageState | null> {
+    const result = new Map<string, DesktopUsageState | null>();
+    for (const connection of savedConnections) {
+      result.set(connection.id, this.peek(connection.id));
+    }
+    return result;
+  }
+
   async readByConnectionId(
     session: NileSession,
     savedConnections: SavedConnectionSummary[],

@@ -476,6 +476,311 @@
 ### Verification
 
 - `npm run typecheck`
+
+### Profile current-state cleanup
+
+- Switched tray profile state reads onto the lightweight settings snapshot path so opening the macOS menu no longer forces a full usage-refresh-grade settings read just to resolve the current profile.
+- Tightened current profile detection to return one unique winner only:
+  - more specific profile assignments beat looser subset matches
+  - ties now resolve to no current profile instead of whichever profile happened to be listed first
+- Included `desktop-profile-feature.json` in desktop local-state reset so `Reset local state` clears the profile feature gate alongside profiles and agent homes.
+- Replaced profile detail save's split rename/assignment writes with a single atomic profile update so metadata and assignments cannot overwrite each other through concurrent file writes.
+- Replaced create-profile's split create-then-update flow with a single create call, and held create->detail navigation on a pending profile id so the page no longer bounces back to the list while profile refresh is still catching up.
+- Added a tray-menu fallback when the profile feature config file is invalid so menubar profile access degrades to the default enabled state instead of throwing during menu construction.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/profiles/CurrentProfile.test.ts apps/desktop/src/electron/state/Reset.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+- `npm run typecheck`
+
+### Menubar profile submenu
+
+- Added a menubar `Profile` submenu between `Open Main Window` and the per-agent switchers.
+- The submenu label now reflects the current matched workspace profile:
+  - `emoji + name` when current state matches a saved profile
+  - `Profile` when no saved profile currently matches
+- Added direct profile apply actions in the menubar submenu and reused the same current-profile matching logic as the renderer sidebar.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run typecheck`
+
+### Profile feature gate
+
+- Added a desktop-local `useProfiles` feature flag backed by a main-process store instead of renderer-only `localStorage`.
+- Added a new Settings section for `Use Profile` so the preference can be enabled or disabled from the desktop settings surface.
+- Wired the flag into settings navigation and route fallback so turning it off hides the Profiles page and sidebar entry, and exits any open profile page.
+- Wired the same flag into the tray menu so all profile-related menubar entries disappear when profile usage is disabled.
+- Kept saved profile data intact when the flag is disabled; this only gates visibility and apply entry points.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/ProfileFeatureStore.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run typecheck`
+
+### Profile card simplification
+
+- Simplified profile list cards to focus on account mode instead of full assignment detail.
+- Removed assignment counts and default-home display from the list view.
+- Moved `Current` into the title line, kept `More` in the top-right corner, and moved `Apply` to the bottom-right action area.
+- Reduced the card body to an agent-to-connection summary, with custom homes and missing connections shown only as muted exception lines.
+
+### Verification
+
+- `npm run typecheck`
+
+### Sidebar current profile label
+
+- Added shared current-profile matching helpers for renderer profile surfaces.
+- After a successful profile apply, the settings sidebar now replaces the generic `Profiles` nav item with the current profile's emoji and name.
+- Kept the fallback behavior unchanged: if no profile matches current agent state, the sidebar still shows the default `Profiles` label with the workflow icon.
+
+### Verification
+
+- `npm run typecheck`
+
+### Unique profile names
+
+- Added workspace-profile name uniqueness checks in the desktop profile store so both create and rename reject duplicate names after trimming and case-folding.
+- Added renderer-side duplicate-name validation for profile create and edit so the user sees an inline warning before saving, and the save action stays disabled while the name conflicts.
+- Mapped duplicate-name store errors back to the same localized inline message in the renderer so race cases do not surface raw backend strings.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+- `npm run typecheck`
+
+### Chinese i18n catch-up
+
+- Filled the remaining `zh` overrides that were still falling back to English for:
+  - provider label
+  - connection search/filter/empty-state copy
+  - connection edit sync confirmation copy
+  - update-check transient status copy
+
+### Verification
+
+- ad hoc key diff: `zh missing: 0`
+
+### Full i18n override completion
+
+- Filled the remaining explicit translation overrides for `de`, `es`, `fr`, `it`, `ja`, `ko`, `th`, and `vi` so those catalogs no longer rely on English spread fallbacks for the recently added profile, connection-filter, OpenClaw issue, agent home, update-state, and related shared UI copy.
+- Kept the existing `...EN_MESSAGES` fallback structure intact, but every current English key is now explicitly overridden in all shipped language catalogs.
+
+### Verification
+
+- ad hoc key diff:
+  - `de missing: 0`
+  - `es missing: 0`
+  - `fr missing: 0`
+  - `it missing: 0`
+  - `ja missing: 0`
+  - `ko missing: 0`
+  - `th missing: 0`
+  - `vi missing: 0`
+  - `zh missing: 0`
+
+### Empty default create name
+
+- Changed the create-profile form so the new profile name starts empty instead of prefilled with `Nilo`.
+- This avoids showing a duplicate-name error immediately when an existing profile already uses that name, and keeps the create flow consistent with explicit user input before save.
+
+### Minimal profile apply and current marker
+
+- Wired the existing desktop profile apply IPC into the settings UI so profiles can now be explicitly applied from both the list card and the detail page.
+- Added a lightweight `Current` marker based on real-time state matching instead of storing a separate “active profile id”.
+- The current-marker logic now reads the real current agent connection/home state without editor fallbacks and treats a profile as current when every saved assignment in that profile is satisfied by the live state.
+- Reused a single in-page apply loading state across list and detail and surfaced apply failures through the existing destructive alert style.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+- `npm run typecheck`
+
+### Profile emoji as card icon
+
+- Stopped rendering profile emoji inline with the profile name.
+- Profile list cards now use the saved emoji to replace the leading default icon, while titles and breadcrumbs stay text-only and continue to update live from the profile name.
+- Removed the old profile label helper because profile display now separates icon treatment from name rendering.
+
+### Verification
+
+- `npm run typecheck`
+
+### Emoji picker theme sync
+
+- Removed the hardcoded dark theme from the profile emoji picker.
+- The picker now follows Nile's resolved renderer theme by observing the document theme state, so fixed light, fixed dark, and system-driven changes all stay visually aligned with the rest of the app.
+
+### Verification
+
+- `npm run typecheck`
+
+### Profile meta editor alignment
+
+- Replaced the custom hardcoded profile emoji grid with `emoji-picker-react` so profile create/edit now uses a real picker while keeping the emoji trigger and name field as one input group.
+- Moved the profile name and emoji editor above the agent assignment table in profile detail so edit matches the create-page layout.
+- Removed the extra create-page helper sentence below the profile meta editor to keep the page focused on the actual form.
+- Updated create and edit titles/breadcrumb labels to reflect the current in-progress profile name and emoji instead of staying static until save.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+- `npm run typecheck`
+
+### Profile detail cleanup
+
+- Removed the extra profile summary block from profile detail so the page no longer repeats the profile name and assignment count above the editor.
+- Removed the standalone card wrapper around the profile name and emoji editor in both create and edit so that section sits directly in the page flow above the assignment table.
+
+### Verification
+
+- `npm run typecheck`
+
+### Profile emoji and name editing
+
+- Added persisted optional profile emoji metadata.
+- Profile create now supports choosing an emoji and naming the profile before save.
+- Profile detail now supports editing both emoji and name, and saves those changes together with assignment edits.
+- Added a lightweight built-in emoji picker dialog so profile emoji selection does not require a third-party dependency.
+- Updated profile titles/cards to render `emoji + name` when an emoji is present.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+- `npm run typecheck`
+
+### Profile assignment table layout
+
+- Replaced the repeated per-agent profile assignment cards with a single shared table layout.
+- Removed the repeated descriptive copy from each agent row.
+- The shared editor now renders assignments as `Agent | Connection | Home | Reset Default`, and both profile create and profile detail/edit reuse that same table module.
+
+### Verification
+
+- `npm run typecheck`
+
+### Profile create page reuse
+
+- Moved profile creation out of the list page into a dedicated create page.
+- Extracted the profile assignment editor into a shared renderer module so create and detail/edit now reuse the same assignment cards, empty-state handling, and assignment normalization logic.
+- Profile creation now starts from current state, lets the user adjust assignments before saving, then creates the profile and applies those edited assignments immediately.
+
+### Verification
+
+- `npm run typecheck`
+
+### Profile remove dialog stability
+
+- Fixed the profile detail remove dialog closing itself during background state refreshes.
+- Root cause: profile detail was resetting local UI state on every profile/agent refresh, which also forced the remove dialog closed.
+- Narrowed that reset path so it only runs when the selected profile changes, instead of on every background refresh tick.
+
+### Verification
+
+- `npm run typecheck`
+
+### Remove confirmation dialogs
+
+- Replaced the inline two-click remove confirmation with real modal confirmation dialogs.
+- Added a shared confirm dialog component for destructive actions in detail pages.
+- Connection detail remove now opens a confirmation dialog before deletion.
+- Profile detail remove now opens the same style of confirmation dialog before deletion.
+- Kept the grouped detail action buttons while moving the second confirmation step into the dialog.
+
+### Verification
+
+- `npm run typecheck`
+
+### Detail action groups and remove confirmation
+
+- Extracted a shared detail action group so profile detail and connection detail use the same segmented button treatment.
+- Changed profile detail header actions to the grouped `Save` + `Remove` layout.
+- Changed connection detail removal to a two-step inline confirmation flow.
+- Changed profile detail removal to the same two-step inline confirmation flow.
+- The first remove click now enters a `Confirm remove` state; only the second click executes deletion.
+
+### Verification
+
+- `npm run typecheck`
+
+### Profile detail inline assignment editing
+
+- Reworked the profile detail page so each agent assignment can be edited in place instead of using a separate apply action.
+- Added direct per-agent editing for:
+  - saved connection selection
+  - home path override
+- Connection changes now save immediately.
+- Home path edits debounce briefly and then auto-save, with a small saving/status hint in the UI.
+- Kept destructive profile removal inside the detail page and removed the detail-level apply control.
+- Added desktop IPC/profile store support for updating profile assignments directly from the renderer.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+
+### Profile detail save flow adjustment
+
+- Removed the profile detail auto-save behavior after review.
+- Profile assignment edits now stay local until the user clicks the shared `Save` action in the detail header.
+- Placed the shared `Save` action before `Remove`.
+- Moved the home reset affordance next to the home input so users can quickly reset that field to the default path before saving.
+
+### Verification
+
+- `npm run typecheck`
+
+### Profiles detail view and destructive action placement
+
+- Added a dedicated profile detail screen under the existing Profiles page flow, with breadcrumb back navigation and assignment details.
+- Changed profile cards so the top-right action now matches the agent list pattern:
+  - `More` opens the detail screen
+- Moved destructive profile removal out of the list card and into the detail screen.
+- Kept profile creation available from the list-level header even after profiles already exist.
+
+### Verification
+
+- `npm run typecheck`
+
+### Profiles page add and delete entry points
+
+- Updated the desktop Profiles page so create-profile entry remains available even after profiles already exist, instead of only showing when the list is empty.
+- Added per-profile action buttons for:
+  - apply
+  - delete
+- Kept the reset-profile refresh fix intact while reusing the existing profile create/delete IPC flows.
+
+### Verification
+
+- `npm run typecheck`
+
+### Reset refreshes workspace profiles immediately
+
+- Fixed desktop reset flow so the settings renderer now refreshes workspace profiles explicitly after `desktop:reset-state`, instead of only relying on the asynchronous `state-changed` broadcast.
+- This closes the local bug where reset could clear `desktop-profiles.json` on disk but leave stale profile cards visible until a later refresh.
+- Added a focused renderer-flow regression test for the reset sequence.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/app/settings/useFlow.test.ts apps/desktop/src/electron/state/Reset.test.ts apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+
+### Desktop reset clears local profile state
+
+- Kept shared core `StateReset` scoped to workspace database/history/keychain cleanup so CLI semantics stay unchanged.
+- Added a desktop-local reset wrapper that now also removes:
+  - `desktop-profiles.json`
+  - `desktop-agent-homes.json`
+- Reset now also clears in-memory desktop-only runtime state by:
+  - resetting the live `agentHomes` overrides back to the startup/default map
+  - clearing prepared add-connection drafts still held by the desktop process
+- Updated desktop reset copy to match the actual behavior in English and Chinese.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/Reset.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+- `npm run typecheck`
 - `npm run test:desktop`
 
 ### Desktop quick-setup and shared-text cleanup
@@ -495,6 +800,15 @@
 ### Verification
 
 - `npm run typecheck`
+ 
+### Sanitize sensitive fixture literals
+
+- Replaced residual real-looking test fixture identifiers with generic placeholders in desktop/core tests and build notes.
+- Cleared the local `apps/desktop/.env.release` values so the workspace no longer retains notarization secrets under the project tree.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/agents/codex/current-state/Detector.test.ts packages/core/src/models/connection/SavedConnections.test.ts packages/core/src/services/credential/KeychainCredentialStore.test.ts packages/core/src/models/connection/Labeler.test.ts`
 - `npm run test:desktop`
 
 ### Step 54: Split workspace watching out of DesktopMain
@@ -1195,9 +1509,9 @@
 
 ### Step 20: Fix macOS keychain existence checks for saved usage connections
 
-- Root-caused a machine-specific "no usage, no error" desktop symptom for the saved `jiqiang90@gmail.com` OpenAI session connection.
+- Root-caused a machine-specific "no usage, no error" desktop symptom for the saved `primary@example.com` OpenAI session connection.
 - Verified the saved access row was present in `~/.nile-switcher/switcher.sqlite`, but its backing credential had been marked `write_failed` with:
-  - `Failed to has credential access:jiqiang90-gmail-com: security exited with code 1`
+  - `Failed to has credential access:primary-example-com: security exited with code 1`
 - Traced that failure to the native Swift keychain helper: `read-generic-password` existence checks were calling `SecItemCopyMatching` without any return flag when `includeSecret` was false.
 - Added `kSecReturnAttributes = true` for non-secret existence checks so `KeychainCredentialStore.has(...)` can perform a valid metadata lookup instead of failing with a generic keychain command error.
 - Identified a separate desktop UX gap: usage read failures are currently swallowed by `DesktopUsageCache` and degrade to `null` usage state in the renderer.
@@ -1205,8 +1519,8 @@
 ### Verification
 
 - Directly reproduced the broken local behavior with:
-  - `node --import tsx ... session.getConnectionUsage("jiqiang90-gmail-com")`
-  - result before fix: `AccessRegistryConsistencyError: Credential for access jiqiang90-gmail-com is not synchronized (write_failed)`
+  - `node --import tsx ... session.getConnectionUsage("primary-example-com")`
+  - result before fix: `AccessRegistryConsistencyError: Credential for access primary-example-com is not synchronized (write_failed)`
 - Full helper rebuild remains blocked locally by the Swift toolchain / macOS SDK mismatch in this shell environment.
 
 ### Step 16: Desktop Release Pipeline
@@ -2540,3 +2854,141 @@
 - `npm install --package-lock-only`
 - `npm install --package-lock-only --prefix apps/desktop`
 - `npm run build:app:unsigned --prefix apps/desktop`
+
+### Profile Mode MVP
+
+- Added manual Workspace Profile support for desktop:
+  - save the current multi-agent connection/home setup as a named profile
+  - apply a profile to update agent home paths and selected connections in one explicit action
+  - rename and delete profiles without deleting connections or agent state
+- Kept profile storage desktop-local in `desktop-profiles.json` next to existing desktop-local state.
+- Kept Profile Mode separate from endpoint profiles and future Local Gateway routing:
+  - profiles reference saved `connectionId` values only
+  - profile apply reuses existing agent home and connection switch mutation paths
+  - profile apply updates home paths before switching connections so target config writes land in the selected home path
+- Added conditional UI exposure: the sidebar only shows Profiles when at least two agents have usable saved connections.
+
+### Verification
+
+- `npm run test:desktop -- --run apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+- `npm run typecheck`
+- `npm run build --prefix apps/desktop`
+
+### Gateway endpoint protocol merge
+
+- Fixed endpoint reuse for gateways that are discovered through different agent paths but point at the same backend URL.
+- `ConnectionCreator` now treats matching `rootUrl + profile` as the endpoint identity and merges protocol capabilities instead of creating a second endpoint when one side reports only OpenAI and another reports only Anthropic.
+- `ConnectionUpdater` uses the same identity merge when an edited connection moves to an existing endpoint, so shared connections can reuse and enrich the existing endpoint record.
+- Added protocol-aware merge helpers on `EndpointShape` so merged endpoints retain existing protocol metadata while adding newly detected wire APIs/auth schemes.
+- Kept saved connection agent summaries capability-filtered so stale persisted `enabledAgents` entries do not advertise an agent the endpoint cannot currently support.
+- Added renderer error surfacing for failed connection switches so validation errors such as unsupported Claude/Gateway protocol choices are visible instead of only landing in Electron logs.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/Creator.test.ts packages/core/src/models/connection/Updater.test.ts packages/core/src/models/connection/SavedConnections.test.ts`
+- `npm run typecheck`
+
+### Desktop gateway detected-agent selection
+
+- Fixed the add-connection gateway form so detected default agents replace the initial preset default when the user has not manually edited the checkbox list.
+- Added a form-level manual-edit flag for enabled agents:
+  - automatic defaults from detection/session preparation do not mark the selection as manually edited
+  - user checkbox changes do mark it as manually edited
+  - later detection respects a manual selection instead of re-adding unchecked agents
+- Added a regression test for the pure selection resolver covering detected defaults and manual preservation.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/connections/add/useForm.test.ts`
+- `npm run typecheck`
+
+### Quick setup gateway endpoint merge
+
+- Fixed the current-state import path used by quick setup so it now uses the same `rootUrl + profile` endpoint identity merge as connection create/edit.
+- Claude current-state import still reads only the Anthropic capability from Claude local settings, but importing that detected setup now enriches an existing same-URL gateway endpoint instead of creating a separate `claude` endpoint.
+- Added a regression test that seeds an OpenAI-only gateway endpoint, imports a Claude Anthropic view of the same URL, and verifies the final endpoint contains both protocols with the Claude access attached to the existing endpoint.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/current-state/Import.test.ts packages/core/src/models/connection/Creator.test.ts packages/core/src/models/connection/Updater.test.ts packages/core/src/models/connection/SavedConnections.test.ts`
+- `npm run typecheck`
+
+### Shared connection upsert path
+
+- Introduced a shared core `ConnectionUpsert` class for endpoint/access persistence:
+  - endpoint reuse is based on `rootUrl + profile`
+  - endpoint protocol capabilities are merged instead of replaced
+  - access reuse is based on endpoint, auth mode, credential identity, and OpenClaw model identity
+  - enabled agents can be either replaced for explicit create/edit flows or merged for observed current-state imports
+- Moved `ConnectionCreator` onto the shared upsert path so Add connection no longer owns separate endpoint/access reuse logic.
+- Moved `CurrentStateImportSupport` onto the same upsert path so quick setup/import current setup uses the same merge/reuse rules while still staying observed-only for capability detection.
+- Kept `ConnectionUpdater` on its specialized update path because editing existing connections has extra shared-endpoint movement rules, but it now shares the same endpoint identity/merge primitives.
+- Added coverage for the sequential quick setup case where a Codex gateway access already exists and importing Claude with the same key reuses that access, merges endpoint protocols, and enables both agents.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/current-state/Import.test.ts packages/core/src/models/connection/Creator.test.ts packages/core/src/models/connection/Updater.test.ts packages/core/src/models/connection/SavedConnections.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts`
+- `npm run typecheck`
+
+### Gateway add latency reduction
+
+- Confirmed the gateway add form could spend a long time in `Adding...` because saving a gateway connection re-ran the same capability probe that the user had just run with `Detect again`.
+- Added a short process-local cache to the default `GatewayProbe`, keyed by normalized endpoint URL and a hash of the API key, so detect-then-save can reuse the recent probe result without storing the raw key.
+- Parallelized independent gateway probe work:
+  - OpenAI and Anthropic protocol checks now run together.
+  - OpenAI responses/chat semantic probes now run together after model discovery.
+- Removed the extra `/models` route existence check from OpenAI support detection because Nile only persists OpenAI support when a real wire API probe succeeds.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/GatewayProbe.test.ts packages/core/src/models/connection/Creator.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts`
+- `npm run typecheck`
+
+### Add connection stays non-applying
+
+- Removed the implicit `switchConnection(...)` call after saving a connection from an agent-scoped add-connection page.
+- The agent context still filters/adds copy for relevant connection types, but saving now only creates or reuses the connection; selecting it for an agent remains an explicit user action.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts packages/core/src/actions/current-state/Import.test.ts`
+
+### Claude gateway current-state labels
+
+- Confirmed current local Codex and Claude configs both point to `llmfk.dpdns.org` and use the same key fingerprint.
+- Updated Claude current-state import labels for non-official Anthropic base URLs to use the same gateway-oriented naming as Codex:
+  - endpoint label: `Gateway (host)`
+  - access label: `Gateway (host) API Key`
+- Kept official Anthropic Claude configs labeled as `Claude` / `Claude API Key`.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/agents/claude/current-state/Reader.test.ts packages/core/src/actions/current-state/Import.test.ts`
+
+### Connection save refresh latency
+
+- Found that successful add/save connection flows waited for `refreshSettings()` before leaving the add page.
+- That path invalidates all desktop state and waits for menubar state plus usage refresh, while the save IPC already schedules a main-process refresh and renderer notification.
+- Added a lightweight renderer `reload()` path backed by a settings-state snapshot IPC that skips usage refresh and only uses cached usage values.
+- Changed add/save completion to use the lightweight reload so the `Adding...` button is not blocked by menubar usage refresh after the connection has already been persisted.
+- Kept manual Refresh on the full refresh path because that action is explicitly asking to refresh external state.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+- `npm run typecheck`
+
+### Unified connection usage cells
+
+- Extracted the connection quota-left table cell into a shared renderer component.
+- Reused the same quota text, dotted underline, and quota tooltip in both:
+  - the global Connections table
+  - the Agent detail Connections table
+- Applied the same shared cell in the responsive card variants so small viewports do not drift visually.
+- Stopped quota tooltip clicks from bubbling into the parent row/card open action.
+
+### Verification
+
+- `npm run typecheck`
