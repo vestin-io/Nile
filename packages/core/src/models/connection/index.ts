@@ -17,3 +17,4 @@ export type { UpdateConnectionInput } from "./Updater";
 export type { ConnectionOnboardingSuggestion } from "./setup/OnboardingPolicy";
 export { SavedConnections } from "./SavedConnections";
 export type { SavedConnectionSummary } from "./SavedConnections";
+export { ConnectionIdentityKeyResolver } from "./setup/IdentityKeyResolver";

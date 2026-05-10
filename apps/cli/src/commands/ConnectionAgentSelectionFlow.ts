@@ -121,16 +121,13 @@ export class ConnectionAgentSelectionFlow {
     if (!includesOpenClaw && !input.openclawModelId) {
       return input.enabledAgents ? { enabledAgents: input.enabledAgents } : {};
     }
-    if (input.authMode !== "api_key") {
-      throw new Error("OpenClaw requires api_key access");
-    }
     if (!SHARED_CONNECTION_AGENT_POLICY.supportsAgent({
       agentId: "openclaw",
       authMode: input.authMode,
       onboarding: input.onboarding,
       preset: input.definition.preset,
     })) {
-      throw new Error("OpenClaw is only available for OpenAI- or Anthropic-compatible API key connections");
+      throw new Error("OpenClaw is only available for supported OpenAI- or Anthropic-compatible connections");
     }
     if (includesOpenClaw && !input.openclawModelId) {
       throw new Error("add --agents openclaw requires --openclaw-model-id");

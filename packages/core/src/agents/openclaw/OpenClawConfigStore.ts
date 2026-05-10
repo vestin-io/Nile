@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import type { OpenClawProjection } from "../../projection";
+import type { OpenClawAuthProfileProjection, OpenClawProviderProjection } from "../../projection";
 import { parseJson5Object } from "./Json5";
 
 type JsonObject = Record<string, unknown>;
@@ -36,10 +36,7 @@ export class OpenClawConfigStore {
     return parseJson5Object(snapshot);
   }
 
-  applyProjection(
-    projection: OpenClawProjection,
-    envKey: string,
-  ): void {
+  applyProviderProjection(projection: OpenClawProviderProjection, envKey: string): void {
     const config = this.readParsedConfig();
     const providerId = this.providerIdForAccess(projection.accessId);
     const modelId = projection.modelId.trim();
@@ -66,6 +63,45 @@ export class OpenClawConfigStore {
     this.writeConfig(root);
   }
 
+  applyAuthProfileProjection(
+    projection: OpenClawAuthProfileProjection,
+    profileId: string,
+    metadata?: { email?: string },
+  ): void {
+    const config = this.readParsedConfig();
+    const modelId = projection.modelId.trim();
+    if (!modelId) {
+      throw new Error("OpenClaw projection is missing modelId");
+    }
+
+    const root = ensureObject(config);
+    const auth = ensureChildObject(root, "auth");
+    const profiles = ensureChildObject(auth, "profiles");
+    profiles[profileId] = {
+      provider: projection.providerId,
+      mode: projection.profileMode,
+      ...(metadata?.email ? { email: metadata.email } : {}),
+    };
+
+    const order = ensureChildObject(auth, "order");
+    const currentOrder = Array.isArray(order[projection.providerId])
+      ? (order[projection.providerId] as unknown[]).filter((value): value is string => typeof value === "string")
+      : [];
+    order[projection.providerId] = [profileId, ...currentOrder.filter((value) => value !== profileId)];
+
+    const agents = ensureChildObject(root, "agents");
+    const defaults = ensureChildObject(agents, "defaults");
+    defaults.model = {
+      primary: `${projection.providerId}/${modelId}`,
+      fallbacks: [],
+    };
+
+    const models = ensureChildObject(defaults, "models");
+    models[`${projection.providerId}/${modelId}`] = {};
+
+    this.writeConfig(root);
+  }
+
   restore(snapshot: string | null): void {
     if (snapshot === null) {
       rmSync(this.configPath, { force: true });
@@ -80,8 +116,12 @@ export class OpenClawConfigStore {
     return `nile-${accessId}`;
   }
 
+  profileIdForAccess(providerId: string, accessId: string): string {
+    return `${providerId}:nile-${accessId}`;
+  }
+
   private buildProviderConfig(
-    projection: OpenClawProjection,
+    projection: OpenClawProviderProjection,
     envKey: string,
     modelId: string,
   ): OpenClawProviderConfig {

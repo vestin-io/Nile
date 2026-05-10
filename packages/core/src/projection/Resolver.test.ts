@@ -203,10 +203,10 @@ describe("AgentProjectionResolver", () => {
     });
   });
 
-  it("projects OpenClaw providers for OpenAI and Anthropic endpoints", () => {
+  it("projects OpenClaw provider and auth-profile configs", () => {
     const resolver = new AgentProjectionResolver();
 
-    const openai = resolver.resolve("openclaw", {
+    const gatewayOpenAi = resolver.resolve("openclaw", {
       endpoint: gatewayEndpoint(),
       access: {
         ...apiKeyAccess("gateway-openclaw"),
@@ -214,7 +214,7 @@ describe("AgentProjectionResolver", () => {
       },
       credential: apiKeyCredential(),
     });
-    const anthropic = resolver.resolve("openclaw", {
+    const anthropicSession = resolver.resolve("openclaw", {
       endpoint: {
         id: "claude-official",
         label: "Claude Official",
@@ -231,14 +231,21 @@ describe("AgentProjectionResolver", () => {
       },
       access: {
         ...apiKeyAccess("claude-openclaw"),
+        authMode: "claude_session",
         openclawModelId: "claude-sonnet-4",
       },
-      credential: apiKeyCredential(),
+      credential: {
+        kind: "claude_session",
+        accessToken: "claude-access",
+        refreshToken: "claude-refresh",
+        email: "team@example.com",
+      },
     });
 
-    expect(openai).toEqual({
+    expect(gatewayOpenAi).toEqual({
       agentId: "openclaw",
       protocol: "openai",
+      configKind: "provider",
       endpointId: "gateway",
       endpointLabel: "Gateway",
       accessId: "gateway-openclaw",
@@ -248,16 +255,17 @@ describe("AgentProjectionResolver", () => {
       wireApi: "responses",
       modelId: "gpt-4.1",
     });
-    expect(anthropic).toEqual({
+    expect(anthropicSession).toEqual({
       agentId: "openclaw",
       protocol: "anthropic",
+      configKind: "auth_profile",
       endpointId: "claude-official",
       endpointLabel: "Claude Official",
       accessId: "claude-openclaw",
       accessLabel: "Gateway Shared",
-      authMode: "api_key",
-      baseUrl: "https://api.anthropic.com",
-      authScheme: "x_api_key",
+      authMode: "claude_session",
+      providerId: "anthropic",
+      profileMode: "oauth",
       modelId: "claude-sonnet-4",
     });
   });
