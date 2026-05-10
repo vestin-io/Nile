@@ -12,6 +12,7 @@
   "type": "module",
   "main": "dist/electron/main.cjs",
   "dependencies": {
+    "@radix-ui/react-switch": "^1.2.6",
     "emoji-picker-react": "^4.19.1",
     "update-electron-app": "^3.2.0"
   },

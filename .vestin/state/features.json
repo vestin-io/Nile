@@ -67,6 +67,7 @@
     { "module": "surfaces", "feature": "openclaw-agent-surface", "state": "built" },
     { "module": "surfaces", "feature": "desktop-profile-mode", "state": "built" },
     { "module": "surfaces", "feature": "desktop-profile-feature-gate", "state": "built" },
+    { "module": "surfaces", "feature": "desktop-notification-history", "state": "built" },
     { "module": "surfaces", "feature": "app-boundary-cleanup", "state": "built" },
     { "module": "docs", "feature": "terminology-glossary", "state": "built" }
   ]

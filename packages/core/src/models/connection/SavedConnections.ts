@@ -177,7 +177,7 @@ export class SavedConnections {
       authMode: access.authMode,
       ...(access.openclawModelId ? { openclawModelId: access.openclawModelId } : {}),
       ...(apiKeyMetadata ?? {}),
-      enabledAgents: [...access.enabledAgents],
+      enabledAgents: this.readEnabledAgents(access, endpoint),
       configurableAgents: this.readConfigurableAgents(access, endpoint),
       selectedByAgents,
     };
@@ -196,6 +196,13 @@ export class SavedConnections {
       authMode: access.authMode,
       openclawModelId: access.openclawModelId,
     }).configurableAgents;
+  }
+
+  private readEnabledAgents(
+    access: AccessRecord,
+    endpoint: EndpointRecord | null,
+  ): AgentId[] {
+    return access.enabledAgents.filter((agentId) => this.endpointSupportsAgent(endpoint, agentId));
   }
 
   private readEndpointUrl(endpoint: EndpointRecord | null): string | null {

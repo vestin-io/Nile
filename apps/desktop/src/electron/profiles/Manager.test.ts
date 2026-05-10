@@ -233,6 +233,7 @@ function createConnection(id: string, label: string, enabledAgents: AgentId[]): 
     endpointFamily: "openai",
     authMode: "api_key",
     isCurrent: false,
+    activeAlertCount: 0,
     enabledAgents,
     configurableAgents: enabledAgents,
     selectedByAgents: [],
@@ -250,5 +251,5 @@ function readConnection(state: SettingsState, agentId: AgentId, connectionId: st
 function createStorePath(): string {
   const dir = mkdtempSync(join(tmpdir(), "nile-desktop-profile-manager-"));
   tempDirs.push(dir);
-  return join(dir, "profiles.json");
+  return join(dir, "desktop.sqlite");
 }

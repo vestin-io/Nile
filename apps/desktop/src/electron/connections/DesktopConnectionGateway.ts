@@ -10,7 +10,7 @@ import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 import { DesktopConnectionPresenter } from "../../state/ConnectionPresenter";
 import type { DesktopConnection } from "../../state/Types";
 import { SessionRunner } from "./SessionRunner";
-import type { DesktopConnectionSummary } from "../types";
+import type { DesktopConnectionSummary } from "./contracts";
 
 type DesktopConnectionGatewayOptions = {
   databasePath: string;

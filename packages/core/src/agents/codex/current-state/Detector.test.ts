@@ -43,7 +43,7 @@ describe("CurrentStateDetector", () => {
       {
         id: "openai-connection",
         endpointId: "openai",
-        label: "jiqiang90@gmail.com",
+        label: "primary@example.com",
         authMode: "openai_session",
         identityKey: "account:acct-123",
       },
@@ -60,7 +60,7 @@ describe("CurrentStateDetector", () => {
         {
           OPENAI_API_KEY: null,
           tokens: {
-            id_token: "header.eyJlbWFpbCI6ImppcWlhbmc5MEBnbWFpbC5jb20ifQ.signature",
+            id_token: "header.eyJlbWFpbCI6InByaW1hcnlAZXhhbXBsZS5jb20ifQ.signature",
             access_token: "access-token",
             refresh_token: "refresh-token",
             account_id: "acct-123",
@@ -114,7 +114,7 @@ describe("CurrentStateDetector", () => {
       {
         id: "default-connection",
         endpointId: "openai",
-        label: "jiqiang90@gmail.com",
+        label: "primary@example.com",
         authMode: "openai_session",
         identityKey: "account:acct-123",
       },
@@ -143,7 +143,7 @@ describe("CurrentStateDetector", () => {
         {
           OPENAI_API_KEY: null,
           tokens: {
-            id_token: "header.eyJlbWFpbCI6ImppcWlhbmc5MEBnbWFpbC5jb20ifQ.signature",
+            id_token: "header.eyJlbWFpbCI6InByaW1hcnlAZXhhbXBsZS5jb20ifQ.signature",
             access_token: "access-token",
             refresh_token: "refresh-token",
             account_id: "acct-123",

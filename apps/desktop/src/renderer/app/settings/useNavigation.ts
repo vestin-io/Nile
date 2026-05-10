@@ -4,8 +4,21 @@ import { isAgentId, type AgentId } from "@nile/core/models/agent/types";
 
 import type { SettingsState } from "../../shared/DesktopData";
 
-export type PageId = "quick-setup" | "agents" | "connections" | "profiles" | "providers" | "settings" | "add-connection";
+export type PageId =
+  | "quick-setup"
+  | "agents"
+  | "connections"
+  | "profiles"
+  | "providers"
+  | "settings"
+  | "notifications"
+  | "add-connection";
 type MainPageId = Exclude<PageId, "add-connection">;
+export type NotificationHistoryKindFilter = "all" | "alerts";
+export type NotificationHistoryFilter = {
+  connectionId: string | null;
+  kind: NotificationHistoryKindFilter;
+};
 
 export type AddConnectionReturnTarget =
   | { kind: "quick-setup" }
@@ -31,11 +44,13 @@ type SettingsNavigationState = {
   openAddConnectionPage(agentId?: AgentId | Event | unknown): void;
   repairUsageConnectionId: string | null;
   reusedConnectionDialog: ReusedConnectionDialogState;
+  notificationHistoryFilter: NotificationHistoryFilter;
   selectedAgentDetailId: AgentId | null;
   selectedConnectionContextAgentId: AgentId | null;
   selectedConnectionId: string | null;
   selectedProfileId: string | null;
   setCurrentPage(page: PageId): void;
+  setNotificationHistoryFilter(filter: NotificationHistoryFilter): void;
   setRepairUsageConnectionId(connectionId: string | null): void;
   setReusedConnectionDialog(state: ReusedConnectionDialogState): void;
   setSelectedAgentDetailId(agentId: AgentId | null): void;
@@ -64,6 +79,10 @@ export function useSettingsNavigation({
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
   const [selectedConnectionContextAgentId, setSelectedConnectionContextAgentId] = useState<AgentId | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [notificationHistoryFilter, setNotificationHistoryFilter] = useState<NotificationHistoryFilter>({
+    connectionId: null,
+    kind: "all",
+  });
   const [reusedConnectionDialog, setReusedConnectionDialog] = useState<ReusedConnectionDialogState>(null);
   const [repairUsageConnectionId, setRepairUsageConnectionId] = useState<string | null>(null);
 
@@ -179,6 +198,7 @@ export function useSettingsNavigation({
     currentPage,
     hasSavedConnections,
     openAddConnectionPage,
+    notificationHistoryFilter,
     repairUsageConnectionId,
     reusedConnectionDialog,
     selectedAgentDetailId,
@@ -186,6 +206,7 @@ export function useSettingsNavigation({
     selectedConnectionId,
     selectedProfileId,
     setCurrentPage,
+    setNotificationHistoryFilter,
     setRepairUsageConnectionId,
     setReusedConnectionDialog,
     setSelectedAgentDetailId,

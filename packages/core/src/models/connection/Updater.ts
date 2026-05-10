@@ -164,15 +164,15 @@ export class ConnectionUpdater {
       });
     }
 
-    const existingEquivalent = this.endpointRegistry
+    const existingMergeable = this.endpointRegistry
       .list()
-      .find((endpoint) => endpoint.id !== currentEndpoint.id && EndpointShape.matchesRecord(endpoint, candidate));
-    if (existingEquivalent) {
-      return this.endpointRegistry.update(existingEquivalent.id, {
+      .find((endpoint) => endpoint.id !== currentEndpoint.id && EndpointShape.matchesIdentity(endpoint, candidate));
+    if (existingMergeable) {
+      return this.endpointRegistry.update(existingMergeable.id, {
         label: candidate.label,
         rootUrl: candidate.rootUrl,
         profile: candidate.profile ?? null,
-        protocols: candidate.protocols,
+        protocols: EndpointShape.mergeProtocols(existingMergeable.protocols, candidate.protocols),
       });
     }
 
@@ -180,21 +180,24 @@ export class ConnectionUpdater {
       .list()
       .some((access) => access.id !== current.id && access.endpointId === currentEndpoint.id);
     if (!sharedEndpoint) {
+      const protocols = EndpointShape.matchesIdentity(currentEndpoint, candidate)
+        ? EndpointShape.mergeProtocols(currentEndpoint.protocols, candidate.protocols)
+        : candidate.protocols;
       return this.endpointRegistry.update(currentEndpoint.id, {
         label: candidate.label,
         rootUrl: candidate.rootUrl,
         profile: candidate.profile ?? null,
-        protocols: candidate.protocols,
+        protocols,
       });
     }
 
     const hinted = this.endpointRegistry.get(candidate.id);
-    if (hinted && hinted.rootUrl === candidate.rootUrl && hinted.profile === candidate.profile) {
+    if (hinted && EndpointShape.matchesIdentity(hinted, candidate)) {
       return this.endpointRegistry.update(hinted.id, {
         label: candidate.label,
         rootUrl: candidate.rootUrl,
         profile: candidate.profile ?? null,
-        protocols: candidate.protocols,
+        protocols: EndpointShape.mergeProtocols(hinted.protocols, candidate.protocols),
       });
     }
 

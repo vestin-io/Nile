@@ -22,15 +22,34 @@ export class EndpointShape {
   }
 
   static matchesRecord(record: EndpointRecord, candidate: EndpointRegistryInput): boolean {
-    return record.rootUrl === candidate.rootUrl
-      && record.profile === candidate.profile
+    return EndpointShape.matchesIdentity(record, candidate)
       && EndpointShape.protocolsEqual(record.protocols, candidate.protocols);
   }
 
   static matchesRecordCandidateSubset(record: EndpointRecord, candidate: EndpointRegistryInput): boolean {
-    return record.rootUrl === candidate.rootUrl
-      && record.profile === candidate.profile
+    return EndpointShape.matchesIdentity(record, candidate)
       && EndpointShape.protocolsContain(record.protocols, candidate.protocols);
+  }
+
+  static matchesIdentity(
+    record: Pick<EndpointRecord, "rootUrl" | "profile">,
+    candidate: Pick<EndpointRegistryInput, "rootUrl" | "profile">,
+  ): boolean {
+    return record.rootUrl === candidate.rootUrl && record.profile === candidate.profile;
+  }
+
+  static mergeProtocols(current: EndpointProtocols, next: EndpointProtocols): EndpointProtocols {
+    return {
+      ...(current.openai || next.openai
+        ? { openai: EndpointShape.mergeOpenAi(current.openai, next.openai) }
+        : {}),
+      ...(current.anthropic || next.anthropic
+        ? { anthropic: EndpointShape.mergeAnthropic(current.anthropic, next.anthropic) }
+        : {}),
+      ...(current.cursor || next.cursor
+        ? { cursor: next.cursor ?? current.cursor }
+        : {}),
+    };
   }
 
   static protocolsEqual(left: EndpointProtocols, right: EndpointProtocols): boolean {
@@ -111,5 +130,41 @@ export class EndpointShape {
     }
 
     return left.backendPath === right.backendPath;
+  }
+
+  private static mergeOpenAi(
+    current: EndpointProtocols["openai"],
+    next: EndpointProtocols["openai"],
+  ): EndpointProtocols["openai"] {
+    if (!current || !next) {
+      return next ?? current;
+    }
+
+    return {
+      basePath: next.basePath ?? current.basePath,
+      wireApis: EndpointShape.mergeUnique(current.wireApis, next.wireApis),
+      authSchemes: EndpointShape.mergeUnique(current.authSchemes, next.authSchemes),
+      envKeyOverride: next.envKeyOverride ?? current.envKeyOverride,
+    };
+  }
+
+  private static mergeAnthropic(
+    current: EndpointProtocols["anthropic"],
+    next: EndpointProtocols["anthropic"],
+  ): EndpointProtocols["anthropic"] {
+    if (!current || !next) {
+      return next ?? current;
+    }
+
+    return {
+      basePath: next.basePath ?? current.basePath,
+      authSchemes: EndpointShape.mergeUnique(current.authSchemes, next.authSchemes),
+      envKeyOverride: next.envKeyOverride ?? current.envKeyOverride,
+      versionHeader: next.versionHeader ?? current.versionHeader,
+    };
+  }
+
+  private static mergeUnique<T>(current: T[], next: T[]): T[] {
+    return [...new Set([...current, ...next])];
   }
 }

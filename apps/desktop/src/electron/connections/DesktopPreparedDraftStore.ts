@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { ConnectionOnboardingSuggestion } from "@nile/core/models/connection";
 import type { StoredCredential } from "@nile/core/services/credential";
 
-import type { DesktopAddConnectionInput } from "../types";
+import type { DesktopAddConnectionInput } from "./contracts";
 
 export type PreparedConnectionDraftRecord = {
   authMode: DesktopAddConnectionInput["authMode"];

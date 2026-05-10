@@ -16,8 +16,8 @@ describe("UsageSummary", () => {
       status: "available",
       planLabel: "Plus",
       windows: [
-        { label: "5h", remainingPercent: 62, resetsAt: null },
-        { label: "weekly", remainingPercent: 31, resetsAt: null },
+        { key: "5h", label: "5h", remainingPercent: 62, resetsAt: null },
+        { key: "weekly", label: "weekly", remainingPercent: 31, resetsAt: null },
       ],
       windowLabel: "weekly",
       remainingPercent: 31,

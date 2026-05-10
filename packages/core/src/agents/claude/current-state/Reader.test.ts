@@ -37,7 +37,7 @@ describe("CurrentStateReader", () => {
       value: {
         endpoint: {
           id: "claude",
-          label: "Claude Gateway",
+          label: "Gateway (gateway.example.test)",
           rootUrl: "https://gateway.example.test",
           profile: "generic-gateway",
           protocols: {
@@ -50,13 +50,13 @@ describe("CurrentStateReader", () => {
           },
         },
         access: {
-          label: "Claude API Key",
+          label: "Gateway (gateway.example.test) API Key",
           authMode: "api_key",
         },
         detectedEndpoint: {
           endpointFamily: "anthropic",
           endpointIdHint: "claude",
-          labelHint: "Claude Gateway",
+          labelHint: "Gateway (gateway.example.test)",
           baseUrl: "https://gateway.example.test/v1",
           envKey: "ANTHROPIC_AUTH_TOKEN",
         },
@@ -67,7 +67,7 @@ describe("CurrentStateReader", () => {
         },
         detectedAccess: {
           authMode: "api_key",
-          labelHint: "Claude API Key",
+          labelHint: "Gateway (gateway.example.test) API Key",
         },
       },
     });

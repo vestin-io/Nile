@@ -1,5 +1,6 @@
 import type { Translator } from "../../shared/I18n";
 import { nileMarkSvg } from "../../shared/NileMark";
+import { Bell } from "lucide-react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "../../ui/breadcrumb";
 import { Button } from "../../ui/button";
 import { Separator } from "../../ui/separator";
@@ -15,6 +16,7 @@ const PAGE_TITLE_KEYS: Record<PageId, string> = {
   profiles: "page.profiles",
   providers: "page.providers",
   settings: "page.settings",
+  notifications: "page.notifications",
   "add-connection": "page.addConnection",
 };
 
@@ -24,6 +26,7 @@ type SettingsChromeProps = {
   currentProfileEmoji: string;
   currentProfileName: string | null;
   error: string | null;
+  hasUnreadNotifications: boolean;
   isSidebarOpen: boolean;
   showAgents: boolean;
   showConnections: boolean;
@@ -31,6 +34,7 @@ type SettingsChromeProps = {
   showQuickSetup: boolean;
   t: Translator;
   onOpenAbout(): void;
+  onOpenNotifications(): void;
   onPageChange(page: PageId): void;
   onRefresh(): Promise<void>;
   onSidebarOpenChange(open: boolean): void;
@@ -42,6 +46,7 @@ export function SettingsChrome({
   currentProfileEmoji,
   currentProfileName,
   error,
+  hasUnreadNotifications,
   isSidebarOpen,
   showAgents,
   showConnections,
@@ -49,6 +54,7 @@ export function SettingsChrome({
   showQuickSetup,
   t,
   onOpenAbout,
+  onOpenNotifications,
   onPageChange,
   onRefresh,
   onSidebarOpenChange,
@@ -74,19 +80,36 @@ export function SettingsChrome({
             </BreadcrumbList>
           </Breadcrumb>
           <div className="ml-auto" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-            <Button
-              aria-label={t("nile.dialog.title")}
-              className="h-9 w-9 rounded-xl p-0 [&_svg]:h-[18px] [&_svg]:w-[18px]"
-              title={t("nile.dialog.title")}
-              variant="ghost"
-              onClick={onOpenAbout}
-            >
-              <span
-                aria-hidden="true"
-                className="flex h-[18px] w-[18px] items-center justify-center [&_svg]:h-full [&_svg]:w-full"
-                dangerouslySetInnerHTML={{ __html: nileMarkSvg }}
-              />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                aria-label={t("page.notifications")}
+                className="relative h-9 w-9 rounded-xl p-0"
+                title={t("page.notifications")}
+                variant={currentPage === "notifications" ? "secondary" : "ghost"}
+                onClick={onOpenNotifications}
+              >
+                <Bell className="h-[18px] w-[18px]" />
+                {hasUnreadNotifications ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-background"
+                  />
+                ) : null}
+              </Button>
+              <Button
+                aria-label={t("nile.dialog.title")}
+                className="h-9 w-9 rounded-xl p-0 [&_svg]:h-[18px] [&_svg]:w-[18px]"
+                title={t("nile.dialog.title")}
+                variant="ghost"
+                onClick={onOpenAbout}
+              >
+                <span
+                  aria-hidden="true"
+                  className="flex h-[18px] w-[18px] items-center justify-center [&_svg]:h-full [&_svg]:w-full"
+                  dangerouslySetInnerHTML={{ __html: nileMarkSvg }}
+                />
+              </Button>
+            </div>
           </div>
         </div>
       </header>

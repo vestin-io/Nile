@@ -5,6 +5,7 @@ import { NileLogger } from "@nile/core/services/NileLogger";
 
 import { readCurrentProfile } from "../../profiles/CurrentProfile";
 import type { MenubarAgentState, MenubarState, SettingsState } from "../../state/Types";
+import type { DesktopNotificationIntent } from "../notifications/Types";
 import type { WorkspaceProfile } from "../profiles/Store";
 
 type DesktopTrayMenuOptions = {
@@ -18,6 +19,7 @@ type DesktopTrayMenuOptions = {
   showSettings(): void;
   quitApp(): void;
   applyProfile(profileId: string): Promise<void>;
+  notify(intent: DesktopNotificationIntent): void;
   switchConnection(agentId: AgentId, connectionId: string): Promise<void>;
 };
 
@@ -96,7 +98,7 @@ export class DesktopTrayMenu {
           if (profile.id === currentProfile?.id) {
             return;
           }
-          void this.applyProfile(profile.id);
+          void this.applyProfile(profile.id, profile.name);
         },
       })),
     };
@@ -124,7 +126,7 @@ export class DesktopTrayMenu {
         if (connection.isCurrent) {
           return;
         }
-        void this.switchConnection(agent.agentId, connection.id);
+        void this.switchConnection(agent.agentId, connection.id, connection.label);
       },
     })));
 
@@ -134,7 +136,7 @@ export class DesktopTrayMenu {
     };
   }
 
-  private async switchConnection(agentId: AgentId, connectionId: string): Promise<void> {
+  private async switchConnection(agentId: AgentId, connectionId: string, connectionLabel: string): Promise<void> {
     try {
       await this.options.switchConnection(agentId, connectionId);
     } catch (error) {
@@ -143,16 +145,44 @@ export class DesktopTrayMenu {
         connectionId,
         error: error instanceof Error ? error.message : String(error),
       });
+      this.options.notify({
+        id: `connection-switch-failed:${agentId}:${connectionId}`,
+        title: "Couldn't switch connection",
+        body: "Open Connections to review this saved connection.",
+        kind: "action-required",
+        scope: "connection",
+        subject: {
+          id: connectionId,
+          label: connectionLabel,
+        },
+        target: { page: "connections", connectionId, agentId },
+        dedupeKey: `connection-switch-failed:${agentId}:${connectionId}`,
+        cooldownMs: 60_000,
+      });
     }
   }
 
-  private async applyProfile(profileId: string): Promise<void> {
+  private async applyProfile(profileId: string, profileName: string): Promise<void> {
     try {
       await this.options.applyProfile(profileId);
     } catch (error) {
       this.options.logger.warn("desktop.tray.apply_profile_failed", {
         profileId,
         error: error instanceof Error ? error.message : String(error),
+      });
+      this.options.notify({
+        id: `profile-apply-failed:${profileId}`,
+        title: "Couldn't apply profile",
+        body: "Open Profiles to review this work mode.",
+        kind: "action-required",
+        scope: "profile",
+        subject: {
+          id: profileId,
+          label: profileName,
+        },
+        target: { page: "profiles", profileId },
+        dedupeKey: `profile-apply-failed:${profileId}`,
+        cooldownMs: 60_000,
       });
     }
   }

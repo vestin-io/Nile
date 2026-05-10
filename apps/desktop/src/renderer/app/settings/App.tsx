@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 
 import { readCodexAuthJsonPath } from "../../connections/AuthJsonPath";
 import type { AgentDetailTab } from "../../agents/detail/Page";
+import { useNotificationHistory } from "./useNotificationHistory";
+import { useNotificationUnread } from "./useNotificationUnread";
+import { useNotificationMute } from "./useNotificationMute";
 import { useDesktopPreferences } from "./usePreferences";
 import { useProfileFeature } from "./useProfileFeature";
 import { useSettingsNavigation } from "./useNavigation";
@@ -10,13 +13,13 @@ import { useSidebarState } from "./useSidebarState";
 import { SettingsChrome } from "./Chrome";
 import { SettingsDialogs } from "./Dialogs";
 import { SettingsPageContent } from "./PageContent";
+import { ErrorShell, LoadingShell } from "./Shell";
+import { useNotificationTargetNavigation, type NotificationTargetNavigatorOptions } from "./useNotificationTargetNavigation";
 import { useDesktopReleaseInfo } from "./useReleaseInfo";
 import { useSettingsConnectionActions } from "./useConnectionActions";
 import { useSettingsFlow } from "./useFlow";
 import { readCurrentProfile } from "../../../profiles/CurrentProfile";
 import { useWorkspaceProfiles, type WorkspaceProfileAssignment } from "../../profiles/useProfiles";
-import { Button } from "../../ui/button";
-import { Alert, AlertDescription, AlertTitle } from "../../ui/alert";
 
 export function SettingsApp() {
   const {
@@ -32,6 +35,12 @@ export function SettingsApp() {
   } = useDesktopData();
   const { preferences, setPreferences, t } = useDesktopPreferences();
   const {
+    isLoaded: isNotificationMuteLoaded,
+    isSaving: isSavingNotificationMute,
+    notificationsMuted,
+    setNotificationsMuted,
+  } = useNotificationMute();
+  const {
     isLoaded: isProfileFeatureLoaded,
     isSaving: isSavingProfileFeature,
     profileFeatureEnabled,
@@ -43,6 +52,7 @@ export function SettingsApp() {
     addConnectionTargetAgentId,
     currentPage,
     hasSavedConnections,
+    notificationHistoryFilter,
     openAddConnectionPage,
     repairUsageConnectionId,
     reusedConnectionDialog,
@@ -51,6 +61,7 @@ export function SettingsApp() {
     selectedConnectionId,
     selectedProfileId,
     setCurrentPage,
+    setNotificationHistoryFilter,
     setRepairUsageConnectionId,
     setReusedConnectionDialog,
     setSelectedAgentDetailId,
@@ -73,6 +84,19 @@ export function SettingsApp() {
   const [selectedAgentDetailTab, setSelectedAgentDetailTab] = useState<AgentDetailTab>("connections");
   const releaseInfo = useDesktopReleaseInfo();
   const { profiles, profileError, refreshProfiles } = useWorkspaceProfiles();
+  const {
+    connectionTargets: notificationHistoryConnections,
+    entries: notificationHistoryState,
+    isLoading: isLoadingNotificationHistory,
+    isMarkingRead: isMarkingNotificationHistoryRead,
+    markRead: markNotificationHistoryRead,
+    markReadByFilter: markNotificationHistoryReadByFilter,
+    reload: reloadNotificationHistory,
+  } = useNotificationHistory(
+    visiblePage === "notifications",
+    visiblePage === "notifications" ? notificationHistoryFilter : undefined,
+  );
+  const hasUnreadNotifications = useNotificationUnread(true);
   const {
     closeAddConnectionPage,
     completeQuickSetup,
@@ -106,6 +130,39 @@ export function SettingsApp() {
       : null,
     [profileFeatureEnabled, profiles, settingsState?.advanced.agentHomes, settingsState?.agents],
   );
+  const notificationTargetNavigation = useMemo<NotificationTargetNavigatorOptions>(() => ({
+    onOpenAgents: (agentId) => {
+      setSelectedAgentDetailId(agentId ?? null);
+      setCurrentPage("agents");
+    },
+    onOpenConnections: (connectionId, agentId) => {
+      setSelectedConnectionId(connectionId ?? null);
+      setSelectedConnectionContextAgentId(agentId ?? null);
+      setCurrentPage("connections");
+    },
+    onOpenNotifications: (connectionId, kind) => {
+      setNotificationHistoryFilter({
+        connectionId: connectionId ?? null,
+        kind: kind ?? "all",
+      });
+      setCurrentPage("notifications");
+    },
+    onOpenProfiles: (profileId) => {
+      setSelectedProfileId(profileId ?? null);
+      setCurrentPage("profiles");
+    },
+    onOpenSettings: () => {
+      setCurrentPage("settings");
+    },
+  }), [
+    setCurrentPage,
+    setNotificationHistoryFilter,
+    setSelectedAgentDetailId,
+    setSelectedConnectionContextAgentId,
+    setSelectedConnectionId,
+    setSelectedProfileId,
+  ]);
+  const { openNotificationTarget } = useNotificationTargetNavigation(notificationTargetNavigation);
 
   if (isLoading && (!settingsState || !historyState)) {
     return <LoadingShell label={t("loading.desktop")} />;
@@ -164,6 +221,7 @@ export function SettingsApp() {
     <SettingsChrome
       currentPage={currentPage}
       error={actionError ?? error}
+      hasUnreadNotifications={hasUnreadNotifications}
       isSidebarOpen={sidebarOpen}
       currentProfileEmoji={currentProfile?.emoji ?? ""}
       currentProfileName={currentProfile?.name ?? null}
@@ -173,6 +231,13 @@ export function SettingsApp() {
       showQuickSetup={showQuickSetupNav}
       t={t}
       onOpenAbout={() => setNileDialogOpen(true)}
+      onOpenNotifications={() => {
+        setNotificationHistoryFilter({
+          connectionId: null,
+          kind: "all",
+        });
+        setCurrentPage("notifications");
+      }}
       onPageChange={setCurrentPage}
       onRefresh={async () => {
         setActionError(null);
@@ -187,8 +252,16 @@ export function SettingsApp() {
         defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
         definitions={definitions}
         historyState={historyState}
+        isLoadedNotificationMute={isNotificationMuteLoaded}
+        isLoadingNotificationHistory={isLoadingNotificationHistory}
+        isMarkingNotificationHistoryRead={isMarkingNotificationHistoryRead}
+        isSavingNotificationMute={isSavingNotificationMute}
         isResetting={isResetting}
         language={preferences.language}
+        notificationsMuted={notificationsMuted}
+        notificationHistoryFilter={notificationHistoryFilter}
+        notificationHistoryConnections={notificationHistoryConnections}
+        notificationHistoryState={notificationHistoryState}
         preferences={preferences}
         profileFeatureEnabled={profileFeatureEnabled}
         isSavingProfileFeature={isSavingProfileFeature}
@@ -209,6 +282,10 @@ export function SettingsApp() {
         onAgentOrderChange={(agentOrder) => setPreferences((current) => ({ ...current, agentOrder }))}
         onBackFromAgentDetail={() => setCurrentPage("agents")}
         onBindCursorUsage={bindCursorUsage}
+        onCreateConnectionAlert={async (input) => {
+          await window.nileDesktop.connections.createUsageAlert(input);
+          await reload();
+        }}
         onCheckForUpdates={async () => {
           await window.nileDesktop.updates.checkForUpdates().catch(() => ({ status: "unavailable" as const }));
         }}
@@ -227,14 +304,28 @@ export function SettingsApp() {
           await window.nileDesktop.profiles.deleteProfile(profileId);
           await refreshProfiles();
         }}
+        onDeleteConnectionAlert={async (connectionId, alertId) => {
+          await window.nileDesktop.connections.deleteUsageAlert(connectionId, alertId);
+          await reload();
+        }}
         onConfigureAgent={(agentId) => openAddConnectionPage(agentId)}
         onConfirmImportAgent={importCurrentConnection}
         onInstallUpdate={async () => {
           await window.nileDesktop.updates.installUpdate().catch(() => ({ status: "unavailable" as const }));
         }}
         onLanguageChange={(language) => setPreferences((current) => ({ ...current, language }))}
+        onNotificationsMutedChange={setNotificationsMuted}
+        onNotificationHistoryFilterChange={(filter) => {
+          setNotificationHistoryFilter(filter);
+          setCurrentPage("notifications");
+        }}
+        onMarkNotificationHistoryRead={markNotificationHistoryRead}
+        onMarkNotificationHistoryReadByFilter={async (filter) => {
+          await markNotificationHistoryReadByFilter(filter);
+        }}
         onOpenAddConnection={() => openAddConnectionPage()}
         onOpenConnection={openConnection}
+        onOpenNotificationTarget={openNotificationTarget}
         onOpenProvidersLink={async (url) => {
           await window.nileDesktop.app.openExternalUrl(url);
         }}
@@ -242,6 +333,7 @@ export function SettingsApp() {
         onProfileFeatureEnabledChange={setProfileFeatureEnabled}
         onPrepareConnectionDraft={prepareConnectionDraft}
         onRefresh={refresh}
+        onRefreshNotificationHistory={reloadNotificationHistory}
         onRemoveConnection={removeConnection}
         onReset={() => setResetDialogOpen(true)}
         onRollbackAgent={rollbackAgent}
@@ -259,6 +351,10 @@ export function SettingsApp() {
         onThemeChange={(theme) => setPreferences((current) => ({ ...current, theme }))}
         onUpdateAgentHome={async (agentId, path) => {
           await window.nileDesktop.app.updateAgentHome(agentId, path);
+        }}
+        onUpdateConnectionAlert={async (input) => {
+          await window.nileDesktop.connections.updateUsageAlert(input);
+          await reload();
         }}
         onSaveProfile={async (profileId, name, emoji, assignments) => {
           await window.nileDesktop.profiles.updateProfile(profileId, name, emoji, assignments);
@@ -294,50 +390,5 @@ export function SettingsApp() {
         onSetResetDialogOpen={setResetDialogOpen}
       />
     </SettingsChrome>
-  );
-}
-
-function LoadingShell({ label }: { label: string }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="rounded-lg border bg-card px-6 py-5 text-sm text-muted-foreground shadow-sm">
-        {label}
-      </div>
-    </div>
-  );
-}
-
-function ErrorShell({
-  description,
-  isResetting,
-  resetLabel,
-  retryLabel,
-  title,
-  onReset,
-  onRetry,
-}: {
-  description: string;
-  isResetting: boolean;
-  resetLabel: string;
-  retryLabel: string;
-  title: string;
-  onReset(): void;
-  onRetry(): void;
-}) {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="w-full max-w-lg rounded-xl border bg-card p-5 shadow-sm">
-        <Alert variant="destructive">
-          <AlertTitle>{title}</AlertTitle>
-          <AlertDescription>{description}</AlertDescription>
-        </Alert>
-        <div className="mt-4 flex justify-end gap-3">
-          <Button variant="outline" disabled={isResetting} onClick={onReset}>
-            {isResetting ? `${resetLabel}...` : resetLabel}
-          </Button>
-          <Button onClick={onRetry}>{retryLabel}</Button>
-        </div>
-      </div>
-    </div>
   );
 }

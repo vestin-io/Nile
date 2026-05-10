@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-import type { DesktopBridge } from "./types";
+import type { DesktopNotificationTarget } from "./notifications/contracts";
+import type { DesktopBridge } from "./Bridge";
 
 const bridge: DesktopBridge = {
   app: {
@@ -26,6 +27,9 @@ const bridge: DesktopBridge = {
     importCurrentConnection: (agentId) => ipcRenderer.invoke("desktop:import-current-connection", agentId),
     removeConnection: (connectionId) => ipcRenderer.invoke("desktop:remove-connection", connectionId),
     bindCursorUsage: (connectionId, sessionToken) => ipcRenderer.invoke("desktop:bind-cursor-usage", connectionId, sessionToken),
+    createUsageAlert: (input) => ipcRenderer.invoke("desktop:create-connection-usage-alert", input),
+    updateUsageAlert: (input) => ipcRenderer.invoke("desktop:update-connection-usage-alert", input),
+    deleteUsageAlert: (connectionId, alertId) => ipcRenderer.invoke("desktop:delete-connection-usage-alert", connectionId, alertId),
     resetState: () => ipcRenderer.invoke("desktop:reset-state"),
   },
   profiles: {
@@ -42,7 +46,14 @@ const bridge: DesktopBridge = {
     getSettingsState: () => ipcRenderer.invoke("desktop:get-settings-state"),
     getSettingsStateSnapshot: () => ipcRenderer.invoke("desktop:get-settings-state-snapshot"),
     getHistoryState: () => ipcRenderer.invoke("desktop:get-history-state"),
+    getNotificationHistory: (filter) => ipcRenderer.invoke("desktop:get-notification-history", filter),
+    getNotificationHistoryConnections: (filter) => ipcRenderer.invoke("desktop:get-notification-history-connections", filter),
+    hasUnreadNotifications: () => ipcRenderer.invoke("desktop:has-unread-notifications"),
+    markNotificationHistoryRead: (entryIds) => ipcRenderer.invoke("desktop:mark-notification-history-read", entryIds),
+    markNotificationHistoryReadByFilter: (filter) => ipcRenderer.invoke("desktop:mark-notification-history-read-by-filter", filter),
+    getNotificationsMuted: () => ipcRenderer.invoke("desktop:get-notifications-muted"),
     getProfileFeatureEnabled: () => ipcRenderer.invoke("desktop:get-profile-feature-enabled"),
+    setNotificationsMuted: (muted) => ipcRenderer.invoke("desktop:set-notifications-muted", muted),
     setProfileFeatureEnabled: (enabled) => ipcRenderer.invoke("desktop:set-profile-feature-enabled", enabled),
     refreshSettings: () => ipcRenderer.invoke("desktop:refresh-settings"),
     refreshMenubar: () => ipcRenderer.invoke("desktop:refresh-menubar"),
@@ -56,11 +67,25 @@ const bridge: DesktopBridge = {
 
 contextBridge.exposeInMainWorld("nileDesktop", bridge);
 contextBridge.exposeInMainWorld("nileDesktopEvents", {
+  onNotificationHistoryChanged(callback: () => void) {
+    const listener = () => callback();
+    ipcRenderer.on("desktop:notification-history-changed", listener);
+    return () => {
+      ipcRenderer.removeListener("desktop:notification-history-changed", listener);
+    };
+  },
   onStateChanged(callback: () => void) {
     const listener = () => callback();
     ipcRenderer.on("desktop:state-changed", listener);
     return () => {
       ipcRenderer.removeListener("desktop:state-changed", listener);
+    };
+  },
+  onNotificationTarget(callback: (target: DesktopNotificationTarget) => void) {
+    const listener = (_event: Electron.IpcRendererEvent, target: DesktopNotificationTarget) => callback(target);
+    ipcRenderer.on("desktop:notification-target", listener);
+    return () => {
+      ipcRenderer.removeListener("desktop:notification-target", listener);
     };
   },
 });

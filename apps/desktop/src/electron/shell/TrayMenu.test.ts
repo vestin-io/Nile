@@ -85,6 +85,40 @@ describe("DesktopTrayMenu", () => {
     expect(applyProfile).toHaveBeenCalledWith("profile-personal");
   });
 
+  it("shows a profile notification when applying a tray profile fails", async () => {
+    const notify = vi.fn();
+    const menu = createMenu({
+      applyProfile: async () => {
+        throw new Error("apply failed");
+      },
+      notify,
+      profiles: [
+        {
+          id: "profile-personal",
+          name: "Personal",
+          assignments: [{ agentId: "codex", connectionId: "codex-personal", homePath: null }],
+        },
+      ],
+    });
+
+    const template = await menu.readTemplate();
+    const submenu = readSubmenu(template[2]);
+    submenu[0]?.click?.({} as never, {} as never, {} as never);
+    await Promise.resolve();
+
+    expect(notify).toHaveBeenCalledWith({
+      id: "profile-apply-failed:profile-personal",
+      title: "Couldn't apply profile",
+      body: "Open Profiles to review this work mode.",
+      kind: "action-required",
+      scope: "profile",
+      subject: { id: "profile-personal", label: "Personal" },
+      target: { page: "profiles", profileId: "profile-personal" },
+      dedupeKey: "profile-apply-failed:profile-personal",
+      cooldownMs: 60_000,
+    });
+  });
+
   it("keeps submenu profile labels text-aligned by using emoji or a placeholder", async () => {
     const menu = createMenu({
       profiles: [
@@ -143,6 +177,7 @@ describe("DesktopTrayMenu", () => {
         name: "Work",
         assignments: [{ agentId: "codex", connectionId: "codex-work", homePath: null }],
       }],
+      notify: () => {},
       showSettings: () => {},
       quitApp: () => {},
       applyProfile: async () => {},
@@ -154,12 +189,45 @@ describe("DesktopTrayMenu", () => {
     expect(template[2]?.label).toBe("· Work");
     expect(warn).toHaveBeenCalledWith("desktop.tray.profile_feature_read_failed", { error: "broken config" });
   });
+
+  it("shows a connection notification when tray switching fails", async () => {
+    const notify = vi.fn();
+    const switchConnection = vi.fn(async () => {
+      throw new Error("switch failed");
+    });
+    const menu = createMenu({
+      notify,
+      profiles: [],
+      switchConnection,
+    });
+
+    const template = await menu.readTemplate();
+    const codexMenu = template.find((item) => item.label === "Codex");
+    const submenu = readSubmenu(codexMenu ?? {});
+    submenu[1]?.click?.({} as never, {} as never, {} as never);
+    await Promise.resolve();
+
+    expect(switchConnection).toHaveBeenCalledWith("codex", "codex-personal");
+    expect(notify).toHaveBeenCalledWith({
+      id: "connection-switch-failed:codex:codex-personal",
+      title: "Couldn't switch connection",
+      body: "Open Connections to review this saved connection.",
+      kind: "action-required",
+      scope: "connection",
+      subject: { id: "codex-personal", label: "Codex Personal" },
+      target: { page: "connections", connectionId: "codex-personal", agentId: "codex" },
+      dedupeKey: "connection-switch-failed:codex:codex-personal",
+      cooldownMs: 60_000,
+    });
+  });
 });
 
 function createMenu(options: {
   applyProfile?: (profileId: string) => Promise<void>;
+  notify?: (intent: object) => void;
   profileFeatureEnabled?: boolean;
   profiles: WorkspaceProfile[];
+  switchConnection?: (agentId: AgentId, connectionId: string) => Promise<void>;
 }) {
   const settingsState = createSettingsState();
   const menubarState = createMenubarState();
@@ -174,10 +242,11 @@ function createMenu(options: {
     refreshState: async () => menubarState,
     refreshSettingsState: async () => settingsState,
     listProfiles: () => options.profiles,
+    notify: options.notify ?? (() => {}),
     showSettings: () => {},
     quitApp: () => {},
     applyProfile: options.applyProfile ?? (async () => {}),
-    switchConnection: async () => {},
+    switchConnection: options.switchConnection ?? (async () => {}),
   });
 }
 
@@ -294,6 +363,7 @@ function createConnection(id: string, label: string, enabledAgents: AgentId[]): 
     endpointFamily: "openai",
     authMode: "api_key",
     isCurrent: false,
+    activeAlertCount: 0,
     enabledAgents,
     configurableAgents: enabledAgents,
     selectedByAgents: [],

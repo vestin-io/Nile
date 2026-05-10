@@ -477,6 +477,291 @@
 
 - `npm run typecheck`
 
+### Desktop architecture cleanup
+
+- Split settings notification target routing out of `renderer/app/settings/App.tsx` into:
+  - `renderer/app/settings/useNotificationTargetNavigation.ts`
+  - `renderer/app/settings/Shell.tsx`
+- Reduced `App.tsx` back under the repository file-size limit and removed duplicated notification target routing logic.
+- Split desktop notification and alert state access out of `electron/state/DesktopStateStore.ts` into:
+  - `electron/state/NotificationHistoryState.ts`
+  - `electron/state/ConnectionAlerts.ts`
+- Split Electron bridge contracts by domain:
+  - `electron/notifications/contracts.ts`
+  - `electron/connections/contracts.ts`
+  - `electron/app/contracts.ts`
+  - `electron/profiles/contracts.ts`
+  - `electron/state/contracts.ts`
+  - `electron/updates/contracts.ts`
+  - `electron/Bridge.ts`
+- Kept `electron/types.ts` as a thin compatibility re-export instead of a catch-all contract module.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/electron/notifications/History.test.ts apps/desktop/src/electron/alerts/Evaluator.test.ts`
+
+### Notification reset metadata
+
+- Added optional `resetAt` metadata to desktop notification intents and persisted notification history rows.
+- Usage-threshold and usage-renewed alerts now store the current quota reset time alongside the notification history entry.
+- Added SQLite schema upgrade for `desktop_notification_history.reset_at`.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/notifications/History.test.ts apps/desktop/src/electron/alerts/Evaluator.test.ts`
+- `npm run typecheck`
+
+### Profile/notification follow-up hardening
+
+- Added a SQLite schema upgrade path for `desktop_workspace_profile_assignments` so earlier SQLite-backed profile builds that lacked `home_path_kind` are upgraded in place instead of failing profile reads/writes.
+- Moved Notifications page filtering down into SQLite queries:
+  - `kind=alerts` and `connectionId` now filter before `LIMIT`, so connection-specific history no longer disappears behind the latest global 200 rows
+  - `Mark all read` now operates on the server-filtered result set instead of a renderer-side slice
+- Stopped the connection alert evaluator from retaining stale per-metric observations after a connection, metric, or enabled alert disappears.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/notifications/History.test.ts apps/desktop/src/electron/alerts/Evaluator.test.ts`
+- `npm run typecheck`
+
+### Profile/notification semantics follow-up
+
+- Refined the legacy `desktop_workspace_profile_assignments` SQLite upgrade so old rows without `home_path_kind` are backfilled conservatively:
+  - `home_path != null` becomes `value`
+  - `home_path == null` with a `connection_id` becomes `unset`
+  - only rows with both `home_path == null` and `connection_id == null` become explicit `null`
+- Added a real “mark all read for current filter” path in notification history:
+  - SQLite now updates all matching rows without the UI page limit
+  - the Notifications page keeps row-level mark-read separate from bulk mark-all-read
+- Restored deleted-connection history discoverability in the Notifications connection selector by merging current saved connections with labels present in the loaded history entries.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/notifications/History.test.ts apps/desktop/src/electron/alerts/Evaluator.test.ts`
+- `npm run typecheck`
+
+### Notification history follow-up
+
+- Added a distinct notification-history connection query so the Notifications filter selector no longer depends on whatever happens to be in the current page slice.
+- Changed `Mark all read` to a true filter-level operation in SQLite instead of reusing the row-level mark-read path with currently loaded entry ids.
+- Kept row click / row action behavior on the single-entry mark-read path so table interactions still stay lightweight.
+- Tightened the legacy profile-assignment schema upgrade again so ambiguous old rows preserve connection-only assignments as `unset` instead of silently becoming an explicit default-home reset.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/notifications/History.test.ts apps/desktop/src/electron/profiles/Store.test.ts`
+- `npm run typecheck`
+
+### Notification event split and alert label snapshots
+
+- Added a dedicated renderer notification-history event so notification-only changes no longer piggyback on the full desktop state refresh path.
+- Removed the extra state-change broadcast when opening the settings window from a macOS notification click; the history-change event now covers unread-state updates by itself.
+- Persisted `metricLabel` alongside each saved connection alert and used that snapshot as the fallback display label when live usage metrics are temporarily unavailable.
+- Kept alert editing workable during metric outages by:
+  - preserving the saved metric label in the edit dialog selector
+  - sorting and rendering saved alerts by the label snapshot instead of degrading back to canonical metric keys
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/alerts/Store.test.ts apps/desktop/src/electron/alerts/Overlay.test.ts apps/desktop/src/electron/alerts/Evaluator.test.ts apps/desktop/src/electron/notifications/History.test.ts apps/desktop/src/electron/notifications/Service.test.ts apps/desktop/src/electron/state/NotificationMuteStore.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/state/UsageSummary.test.ts apps/desktop/src/state/Surface.test.ts`
+
+### Desktop local config sqlite migration
+
+- Migrated desktop-only local config off standalone JSON files and into the desktop SQLite database:
+  - agent home overrides
+  - notification mute preference
+  - profile feature enablement
+  - workspace profiles and assignments
+  - connection alert rules
+- Kept each existing store interface stable so the renderer and main-process call sites did not need a broad rewrite.
+- Added one-time legacy JSON import for each store:
+  - reads the old file on first access when the SQLite table is still empty
+  - imports valid records into SQLite
+  - removes the legacy JSON file after migration
+- Kept store-specific legacy tolerance rules during migration:
+  - mute + alerts degrade malformed legacy files to defaults
+  - profile feature + agent homes still reject invalid top-level config shapes
+- Preserved profile assignment tri-state home semantics in SQLite:
+  - unset home override
+  - explicit reset-to-default (`null`)
+  - explicit custom path
+- Left `desktop_notification_history` in SQLite and aligned the rest of desktop local state with it so desktop config/history now live in one storage system.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/AgentHomesStore.test.ts apps/desktop/src/electron/state/NotificationMuteStore.test.ts apps/desktop/src/electron/state/ProfileFeatureStore.test.ts apps/desktop/src/electron/profiles/Store.test.ts apps/desktop/src/electron/profiles/Manager.test.ts apps/desktop/src/electron/alerts/Store.test.ts apps/desktop/src/electron/alerts/Overlay.test.ts apps/desktop/src/electron/state/Reset.test.ts`
+
+### Notifications mute selector
+
+- Changed the global `Mute notifications` control in Settings from a switch to the same selector pattern used by other desktop feature toggles.
+- Kept the underlying notification mute state and persistence unchanged; this is a UI consistency pass only.
+
+### Verification
+
+- `npm run typecheck`
+
+### Notifications history table cleanup
+
+- Reframed the notifications history `Type` column to show broad notification categories instead of alert subtypes.
+- Removed the dedicated `Read` column and moved unread state to a dot in the notification cell.
+- Made notification rows mark themselves read on click without navigating away; opening the related page stays on the explicit action button.
+- Grouped notification filters on the left side of the toolbar and kept bulk actions on the right so filter controls read as one unit.
+- Moved `Mark all read` and `Refresh` into the shared segmented button-group pattern used by other desktop detail actions.
+- Added an unread dot to the top-right bell button whenever any notification history entry remains unread.
+- Tightened the notifications toolbar layout so tabs, connection filter, clear-filters action, and the right-side button group stay in a single wrapped row on narrower widths.
+
+### Verification
+
+- `npm run typecheck`
+
+
+### Global notification history
+
+- Added a SQLite-backed desktop notification history store so every delivered macOS notification can be reviewed later without changing the existing JSON-backed alert configuration.
+- Routed history through the shared desktop notification service:
+  - delivered notifications are logged after successful macOS delivery
+  - click-throughs mark the matching history entry as opened
+  - history logging is best-effort and does not block notification delivery
+- Added a global `Notifications` page behind the top-right bell entry instead of expanding connection detail into a second history surface.
+- Kept connection detail focused on alert configuration and added a lightweight history entry there that deep-links into the global notifications page with `alerts + current connection` filters applied.
+- The new history page supports:
+  - `All` vs `Alerts` filtering
+  - connection filtering
+  - reopening the related page for a recorded notification
+- Extended tray failure notifications and usage alert notifications with subject metadata so the history page can show concise, readable sources.
+- Polished the page into a more standard shadcn-style data view:
+  - one header + one bordered table card
+  - toolbar filters live in the card header instead of a separate filter summary strip
+  - connection detail uses a lightweight history action rather than embedding another tabbed history surface
+- Refined the history table to the simpler product-facing shape:
+  - `Notification`, `Time`, `Type`, `Read`, `Actions`
+  - removed the extra `Source` column
+  - added `Mark all read` in the toolbar
+  - separated `read` from `opened` by persisting a dedicated `read_at` field instead of inferring read state from click-throughs
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/notifications/History.test.ts apps/desktop/src/electron/notifications/Service.test.ts apps/desktop/src/electron/alerts/Evaluator.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+- `npm run typecheck`
+
+### Global notification mute
+
+- Added a main-backed global `Mute notifications` setting that pauses all macOS notification delivery without changing any alert rule `enabled` state.
+- Stored the mute flag separately from profile feature settings so alert configuration remains intact while notifications are muted.
+- Wired the mute state into the shared desktop notification service rather than into individual alert evaluators, so all current and future notification sources respect the same global gate.
+- Added a Settings toggle for notification mute and kept the default behavior unmuted.
+- Included the new notification-mute file in desktop local-state reset so reset clears the global notification gate as well.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/NotificationMuteStore.test.ts apps/desktop/src/electron/notifications/Service.test.ts apps/desktop/src/electron/state/Reset.test.ts`
+- `npm run typecheck`
+
+### Connection renewed alerts
+
+- Extended connection usage alerts to support a second alert type: `renewed`.
+- Kept low-usage alerts as-is and upgraded the alert model to a discriminated union instead of overloading threshold rules.
+- Updated the connection alert store to:
+  - persist `renewed` alerts
+  - reject duplicate renewed alerts per `connection + metric`
+  - keep backward compatibility by reading older threshold-only alert rows as `low-percent`
+- Updated the connection detail Alerts UI:
+  - add/edit modal now lets the user choose between `Low usage` and `Renewed`
+  - renewed alerts do not require a threshold input
+  - alert table now shows alert type and a condition column instead of assuming every rule is threshold-based
+- Extended the evaluator to send macOS notifications when a metric renews:
+  - first preference is a changed `resetsAt` timestamp plus a recovering remaining percentage
+  - fallback is a conservative large recovery from a lower percentage back to a high remaining percentage
+  - avoided the brittle `remainingPercent === 100` shortcut
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/alerts/Store.test.ts apps/desktop/src/electron/alerts/Overlay.test.ts apps/desktop/src/electron/alerts/Evaluator.test.ts apps/desktop/src/electron/notifications/Service.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run typecheck`
+
+### Connection alert table simplification
+
+- Removed the `Remaining` column from the connection detail Alerts table because it did not materially help rule management.
+- Replaced the `On` / `Off` badge in the `Status` column with a shadcn-style inline toggle switch.
+- Toggling a rule now saves immediately without opening the edit modal; edit is only needed for changing type, metric, or threshold.
+- Added a shared renderer `ui/switch.tsx` component backed by `@radix-ui/react-switch`.
+
+### Verification
+
+- `npm run typecheck`
+
+### Connection usage alerts
+
+- Added a main-backed `desktop-connection-alerts.json` store for connection-level usage alerts.
+- Extended desktop connection view state with:
+  - `alertMetrics` derived from structured usage windows
+  - persisted `alerts`
+  - `activeAlertCount`
+- Decorated settings-state connections through a dedicated alert overlay instead of pushing alert persistence down into shared/core usage code.
+- Added connection alert IPC/bridge methods for create, update, and delete.
+- Built the first real alert-management UI in connection detail:
+  - `Quota left` now has an `Alerts` section directly underneath
+  - alert rules render as a table
+  - add/edit uses a modal
+  - remove is inline
+- Kept this first version intentionally scoped to low-remaining-percentage alerts only.
+- Moved the Connections list `Alerts` count to the final column and kept the zero state blank.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/alerts/Store.test.ts apps/desktop/src/electron/alerts/Overlay.test.ts apps/desktop/src/electron/notifications/Service.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run typecheck`
+
+### Connection alert evaluation and notification delivery
+
+- Added a dedicated connection usage alert evaluator and attached it to the desktop refresh chain.
+- Low-usage alerts now trigger from refreshed usage state instead of sitting as stored configuration only.
+- Evaluation rules in this first version:
+  - only enabled alerts participate
+  - alerts trigger only when a metric crosses from at-or-above a threshold to below it
+  - the first observation does not notify
+  - when one metric crosses multiple thresholds in a single refresh, Nile sends only the most severe one
+  - after recovery above a threshold, a later drop can notify again
+- Triggered notifications reuse the shared macOS notification service and open the related connection detail when clicked.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/alerts/Store.test.ts apps/desktop/src/electron/alerts/Overlay.test.ts apps/desktop/src/electron/alerts/Evaluator.test.ts apps/desktop/src/electron/notifications/Service.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run typecheck`
+
+### macOS notification foundation
+
+- Added a dedicated desktop notification layer for macOS system notifications under `apps/desktop/src/electron/notifications/`:
+  - `MacNotificationCenter` owns the Electron `Notification` integration
+  - `DesktopNotificationService` owns dedupe/cooldown and click handling
+  - notification payloads now carry stable `scope`, `kind`, and `target` fields so future connection/agent/profile reminders can reuse the same path
+- Added a renderer-safe notification navigation contract:
+  - main can now send `desktop:notification-target`
+  - preload exposes `window.nileDesktopEvents.onNotificationTarget(...)`
+  - settings app consumes those targets and opens the related page/detail without exposing renderer routing to main
+- Wired the first real use into tray failures so the foundation is exercised end-to-end:
+  - failed tray profile apply shows a macOS notification that opens the related profile page
+  - failed tray connection switch shows a macOS notification that opens the related connections page
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/notifications/Service.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run typecheck`
+
+### Connections alert-count column
+
+- Added an `activeAlertCount` field to desktop connection view state so connection list surfaces can show alert totals without depending on the future alert-rule storage shape.
+- Updated the Connections list table and mobile cards to show a new `Alerts` column/field.
+- The count stays blank when there are no active alerts, which matches the intended quiet default.
+- Seeded the presenter and typed test fixtures with `activeAlertCount: 0` so the UI shape is ready for the upcoming connection-level usage alert rules.
+
+### Verification
+
+- `npm run typecheck`
+
 ### Profile current-state cleanup
 
 - Switched tray profile state reads onto the lightweight settings snapshot path so opening the macOS menu no longer forces a full usage-refresh-grade settings read just to resolve the current profile.
@@ -2947,6 +3232,29 @@
 ### Verification
 
 - `./node_modules/.bin/vitest run packages/core/src/models/connection/GatewayProbe.test.ts packages/core/src/models/connection/Creator.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts`
+- `npm run typecheck`
+
+### Alerts and notifications hardening
+
+- Added a stable usage metric key alongside the existing display label so connection alerts no longer bind directly to provider-facing usage copy.
+- Canonicalized usage metric keys on both summary generation and alert persistence, which keeps saved alerts matching through casing and minor label-shape changes while still rendering friendly labels in the UI.
+- Hardened the connection alert store hot path:
+  - added an in-memory cache so settings-state decoration no longer re-reads and reparses the alerts JSON on every refresh
+  - degraded malformed alert config files to an empty alert set instead of breaking the entire settings state
+  - cleared the in-memory alert cache during desktop local-state reset
+- Fixed the connection detail Alerts section to keep rendering saved rules even when live usage metrics are temporarily unavailable, while still disabling new alert creation until metrics return.
+- Split the unread bell-dot path away from full notification-history loading:
+  - added a lightweight unread-history query in the notification history store and state bridge
+  - switched the titlebar bell indicator to that boolean path instead of keeping the full history list subscribed all the time
+  - limited the full notification-history hook to the Notifications page
+- Made notification-history read changes propagate immediately to the renderer:
+  - row-level mark-read now notifies the renderer
+  - macOS notification show/click events also emit a renderer update so the bell dot clears promptly after a system-notification click
+- Hardened notification mute reads so malformed mute config falls back to unmuted instead of breaking notification delivery.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/state/UsageSummary.test.ts apps/desktop/src/electron/alerts/Store.test.ts apps/desktop/src/electron/alerts/Overlay.test.ts apps/desktop/src/electron/notifications/History.test.ts apps/desktop/src/electron/notifications/Service.test.ts apps/desktop/src/electron/state/NotificationMuteStore.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/state/Surface.test.ts`
 - `npm run typecheck`
 
 ### Add connection stays non-applying

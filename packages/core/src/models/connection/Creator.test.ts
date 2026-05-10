@@ -35,7 +35,6 @@ describe("ConnectionCreator", () => {
       null,
     );
     const creator = new ConnectionCreator(
-      database,
       endpointRegistry,
       accessRegistry,
     );
@@ -79,7 +78,6 @@ describe("ConnectionCreator", () => {
       new StaticCredentialSourceFactory(),
     );
     const creator = new ConnectionCreator(
-      database,
       endpointRegistry,
       accessRegistry,
     );
@@ -152,7 +150,6 @@ describe("ConnectionCreator", () => {
       new StaticCredentialSourceFactory(),
     );
     const creator = new ConnectionCreator(
-      database,
       endpointRegistry,
       accessRegistry,
       new StubGatewayProbe({
@@ -220,7 +217,6 @@ describe("ConnectionCreator", () => {
       new StaticCredentialSourceFactory(),
     );
     const creator = new ConnectionCreator(
-      database,
       endpointRegistry,
       accessRegistry,
       new ThrowingGatewayProbe(),
@@ -273,7 +269,6 @@ describe("ConnectionCreator", () => {
       new StaticCredentialSourceFactory(),
     );
     const creator = new ConnectionCreator(
-      database,
       endpointRegistry,
       accessRegistry,
     );
@@ -341,7 +336,6 @@ describe("ConnectionCreator", () => {
       apiKey: "secret",
     });
     const creator = new ConnectionCreator(
-      database,
       endpointRegistry,
       accessRegistry,
       new StubGatewayProbe({
@@ -404,6 +398,82 @@ describe("ConnectionCreator", () => {
     }
   });
 
+  test("merges gateway protocols into an existing same-url endpoint with a different id", async () => {
+    const dbPath = createTempDatabasePath();
+    const database = SqliteDatabase.open(dbPath);
+    const credentialStore = new StubCredentialStore();
+    const endpointRegistry = EndpointRegistry.fromDatabase(database);
+    endpointRegistry.add({
+      id: "claude",
+      label: "Claude Gateway",
+      rootUrl: "https://gateway.example.test",
+      profile: "generic-gateway",
+      protocols: {
+        anthropic: {
+          authSchemes: ["bearer"],
+          envKeyOverride: "ANTHROPIC_AUTH_TOKEN",
+          versionHeader: "2023-06-01",
+        },
+      },
+    });
+    const accessRegistry = AccessRegistry.fromDatabase(
+      database,
+      credentialStore,
+      new StaticCredentialSourceFactory(),
+    );
+    const creator = new ConnectionCreator(
+      endpointRegistry,
+      accessRegistry,
+      new StubGatewayProbe({
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses", "chat"],
+          authSchemes: ["bearer"],
+          envKeyOverride: "OPENAI_API_KEY",
+        },
+        anthropic: null,
+      }),
+    );
+
+    try {
+      const result = await creator.create({
+        preset: "gateway",
+        authMode: "api_key",
+        endpointUrl: "https://gateway.example.test",
+        label: "Gateway Key",
+        credential: {
+          kind: "api_key",
+          apiKey: "secret",
+        },
+      });
+
+      expect(result.endpointId).toBe("claude");
+      expect(endpointRegistry.list()).toHaveLength(1);
+      expect(endpointRegistry.get("claude")).toEqual(
+        expect.objectContaining({
+          label: "Gateway (gateway.example.test)",
+          rootUrl: "https://gateway.example.test",
+          profile: "generic-gateway",
+          protocols: {
+            openai: {
+              basePath: "/v1",
+              wireApis: ["responses", "chat"],
+              authSchemes: ["bearer"],
+              envKeyOverride: "OPENAI_API_KEY",
+            },
+            anthropic: {
+              authSchemes: ["bearer"],
+              envKeyOverride: "ANTHROPIC_AUTH_TOKEN",
+              versionHeader: "2023-06-01",
+            },
+          },
+        }),
+      );
+    } finally {
+      database.close();
+    }
+  });
+
   test("updates enabled agents when reusing an existing gateway access", async () => {
     const dbPath = createTempDatabasePath();
     const database = SqliteDatabase.open(dbPath);
@@ -444,7 +514,6 @@ describe("ConnectionCreator", () => {
       apiKey: "secret",
     });
     const creator = new ConnectionCreator(
-      database,
       endpointRegistry,
       accessRegistry,
       new StubGatewayProbe({
@@ -518,7 +587,6 @@ describe("ConnectionCreator", () => {
       refreshToken: "refresh-shared",
     });
     const creator = new ConnectionCreator(
-      database,
       endpointRegistry,
       accessRegistry,
     );

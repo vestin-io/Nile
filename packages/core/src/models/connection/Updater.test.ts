@@ -125,6 +125,114 @@ describe("ConnectionUpdater", () => {
     database.close();
   });
 
+  test("moves a shared connection to an existing same-url endpoint and merges protocols", async () => {
+    const dbPath = createTempDatabasePath();
+    const database = SqliteDatabase.open(dbPath);
+    const credentialStore = new StubCredentialStore();
+    const endpointRegistry = EndpointRegistry.fromDatabase(database);
+    const accessRegistry = AccessRegistry.fromDatabase(database, credentialStore);
+    const agentSelection = AgentSelection.fromDatabase(database);
+
+    endpointRegistry.add({
+      id: "gateway-main",
+      label: "Gateway (old.example.com)",
+      rootUrl: "https://old.example.com",
+      profile: "generic-gateway",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+    endpointRegistry.add({
+      id: "claude",
+      label: "Claude Gateway",
+      rootUrl: "https://gateway.example.test",
+      profile: "generic-gateway",
+      protocols: {
+        anthropic: {
+          authSchemes: ["bearer"],
+          versionHeader: "2023-06-01",
+        },
+      },
+    });
+    accessRegistry.add({
+      id: "primary",
+      endpointId: "gateway-main",
+      label: "Primary",
+      authMode: "api_key",
+      enabledAgents: ["codex"],
+    }, {
+      kind: "api_key",
+      apiKey: "secret",
+    });
+    accessRegistry.add({
+      id: "shared",
+      endpointId: "gateway-main",
+      label: "Shared",
+      authMode: "api_key",
+      enabledAgents: ["codex"],
+    }, {
+      kind: "api_key",
+      apiKey: "secret-2",
+    });
+    agentSelection.setApplied("codex", "primary");
+
+    const updater = new ConnectionUpdater(
+      database,
+      endpointRegistry,
+      accessRegistry,
+      agentSelection,
+      new StubGatewayProbe({
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses", "chat"],
+          authSchemes: ["bearer"],
+        },
+        anthropic: null,
+      }),
+    );
+
+    const updated = await updater.update({
+      connectionId: "primary",
+      endpointUrl: "https://gateway.example.test",
+      enabledAgents: ["codex"],
+      credential: {
+        kind: "api_key",
+        apiKey: "secret",
+      },
+    });
+
+    expect(updated.endpointId).toBe("claude");
+    expect(endpointRegistry.list()).toHaveLength(2);
+    expect(endpointRegistry.get("claude")).toEqual(
+      expect.objectContaining({
+        label: "Gateway (gateway.example.test)",
+        protocols: {
+          openai: {
+            basePath: "/v1",
+            wireApis: ["responses", "chat"],
+            authSchemes: ["bearer"],
+          },
+          anthropic: {
+            authSchemes: ["bearer"],
+            versionHeader: "2023-06-01",
+          },
+        },
+      }),
+    );
+    expect(agentSelection.get("codex")).toEqual(
+      expect.objectContaining({
+        connectionId: "primary",
+        endpointId: "claude",
+      }),
+    );
+
+    database.close();
+  });
+
   test("rejects gateway updates that would drop the selected agent capability", async () => {
     const dbPath = createTempDatabasePath();
     const database = SqliteDatabase.open(dbPath);

@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { Translator } from "../../shared/I18n";
 import { CircleHelp } from "lucide-react";
 import { ConnectionActionGroup } from "./ActionGroup";
+import { ConnectionAlertsSection } from "../alerts/Section";
 import { ConnectionQuotaSection } from "../ConnectionQuotaSection";
 import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { formatAgentLabel, formatAgentsList } from "../../shared/AgentSelection";
@@ -31,6 +32,16 @@ type ConnectionDetailPageProps = {
   onEdit(): void;
   onRefresh(): Promise<void>;
   onRemove(connectionId: string): Promise<void>;
+  onCreateAlert(input:
+    | { connectionId: string; metricKey: string; metricLabel: string; type: "low-percent"; thresholdPercent: number; enabled: boolean }
+    | { connectionId: string; metricKey: string; metricLabel: string; type: "renewed"; enabled: boolean }
+  ): Promise<void>;
+  onUpdateAlert(input:
+    | { alertId: string; connectionId: string; metricKey: string; metricLabel: string; type: "low-percent"; thresholdPercent: number; enabled: boolean }
+    | { alertId: string; connectionId: string; metricKey: string; metricLabel: string; type: "renewed"; enabled: boolean }
+  ): Promise<void>;
+  onDeleteAlert(connectionId: string, alertId: string): Promise<void>;
+  onOpenNotificationHistory(connectionId: string): void;
 };
 
 export function ConnectionDetailPage({
@@ -44,6 +55,10 @@ export function ConnectionDetailPage({
   onEdit,
   onRefresh,
   onRemove,
+  onCreateAlert,
+  onUpdateAlert,
+  onDeleteAlert,
+  onOpenNotificationHistory,
 }: ConnectionDetailPageProps) {
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -161,6 +176,17 @@ export function ConnectionDetailPage({
         showPlanLabel
         t={t}
         title={t("common.usage")}
+      />
+
+      <ConnectionAlertsSection
+        alerts={connection.alerts ?? []}
+        connectionId={connection.id}
+        metrics={connection.alertMetrics ?? []}
+        t={t}
+        onCreateAlert={onCreateAlert}
+        onDeleteAlert={onDeleteAlert}
+        onOpenHistory={() => onOpenNotificationHistory(connection.id)}
+        onUpdateAlert={onUpdateAlert}
       />
 
       <ConfirmDialog

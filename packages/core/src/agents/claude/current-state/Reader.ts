@@ -1,4 +1,5 @@
 import type { EndpointRegistryInput } from "../../../models/endpoint";
+import { ConnectionNaming } from "../../../models/connection/Naming";
 import { splitEndpointUrl } from "../../../projection/Url";
 import { ClaudeCredentialStore } from "../Store";
 import type { ClaudeSessionCredential } from "../../../services/credential/Types";
@@ -119,7 +120,7 @@ export class CurrentStateReader {
 
     const detectedAccess: ClaudeDetectedAccess = {
       authMode: "api_key",
-      labelHint: "Claude API Key",
+      labelHint: `${endpoint.label} API Key`,
     };
 
     const resolvedState: ResolvedLiveState = {
@@ -193,7 +194,7 @@ export class CurrentStateReader {
     const { rootUrl, path } = splitEndpointUrl(baseUrl);
     return {
       id,
-      label: rootUrl === DEFAULT_BASE_URL ? "Claude" : "Claude Gateway",
+      label: rootUrl === DEFAULT_BASE_URL ? "Claude" : this.suggestGatewayLabel(rootUrl),
       rootUrl,
       profile: rootUrl === DEFAULT_BASE_URL ? "anthropic-official" : "generic-gateway",
       protocols: {
@@ -205,5 +206,10 @@ export class CurrentStateReader {
         },
       },
     };
+  }
+
+  private suggestGatewayLabel(rootUrl: string): string {
+    const host = ConnectionNaming.prettifyHost(rootUrl);
+    return host ? `Gateway (${host})` : "Gateway";
   }
 }

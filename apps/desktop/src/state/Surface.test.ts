@@ -65,6 +65,7 @@ describe("DesktopSurface", () => {
           agentId: "codex",
           agentLabel: "Codex",
           currentConnection: {
+            activeAlertCount: 0,
             apiKeySource: "direct",
             id: "work",
             label: "Work",
@@ -179,6 +180,7 @@ describe("DesktopSurface", () => {
     expect(await surface.getSettingsState()).toEqual({
       onboarding: null,
       currentConnection: {
+        activeAlertCount: 0,
         apiKeySource: "direct",
         id: "azure-account",
         label: "Azure Account",
@@ -194,6 +196,7 @@ describe("DesktopSurface", () => {
       },
       currentConnectionState: "saved",
       liveConnection: {
+        activeAlertCount: 0,
         apiKeySource: "direct",
         id: "azure-account",
         label: "Azure Account",
@@ -309,6 +312,7 @@ describe("DesktopSurface", () => {
       currentConnection: null,
       currentConnectionState: "none",
       liveConnection: {
+        activeAlertCount: 0,
         id: "OpenAI API Key",
         label: "OpenAI API Key",
         endpointLabel: "OpenAI",
@@ -722,8 +726,8 @@ describe("DesktopSurface", () => {
       status: "available",
       planLabel: "Plus",
       windows: [
-        { label: "5h", remainingPercent: 60, resetsAt: "2026-02-02T02:40:00.000Z" },
-        { label: "weekly", remainingPercent: 30, resetsAt: "2026-02-07T21:33:20.000Z" },
+        { key: "5h", label: "5h", remainingPercent: 60, resetsAt: "2026-02-02T02:40:00.000Z" },
+        { key: "weekly", label: "weekly", remainingPercent: 30, resetsAt: "2026-02-07T21:33:20.000Z" },
       ],
       windowLabel: "weekly",
       remainingPercent: 30,
@@ -764,8 +768,8 @@ describe("DesktopSurface", () => {
       status: "available",
       planLabel: "Plus",
       windows: [
-        { label: "5h", remainingPercent: 85, resetsAt: "2026-02-02T02:40:00.000Z" },
-        { label: "weekly", remainingPercent: 90, resetsAt: "2026-02-07T21:33:20.000Z" },
+        { key: "5h", label: "5h", remainingPercent: 85, resetsAt: "2026-02-02T02:40:00.000Z" },
+        { key: "weekly", label: "weekly", remainingPercent: 90, resetsAt: "2026-02-07T21:33:20.000Z" },
       ],
       windowLabel: "5h",
       remainingPercent: 85,
@@ -931,9 +935,9 @@ describe("DesktopSurface", () => {
         remainingPercent: 34,
         text: "weekly 34% left",
         windows: [
-          { label: "5h", remainingPercent: 96, resetsAt: "2026-04-29T02:38:20.000Z" },
-          { label: "weekly", remainingPercent: 34, resetsAt: "2026-04-30T01:18:20.000Z" },
-          { label: "GPT-5.3-Codex-Spark", remainingPercent: 100, resetsAt: "2026-04-29T02:58:20.000Z" },
+          { key: "5h", label: "5h", remainingPercent: 96, resetsAt: "2026-04-29T02:38:20.000Z" },
+          { key: "weekly", label: "weekly", remainingPercent: 34, resetsAt: "2026-04-30T01:18:20.000Z" },
+          { key: "gpt-5.3-codex-spark", label: "GPT-5.3-Codex-Spark", remainingPercent: 100, resetsAt: "2026-04-29T02:58:20.000Z" },
         ],
       }),
     );

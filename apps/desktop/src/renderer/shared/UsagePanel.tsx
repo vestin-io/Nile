@@ -58,7 +58,7 @@ export function UsagePanel({
         <div className="space-y-4">
           {windows.map((window) => (
             <QuotaMeter
-              key={window.label}
+              key={window.key}
               label={window.label}
               remainingPercent={window.remainingPercent}
               renewalAt={showRenewalAt ? formatUsageResetAt(window.resetsAt ?? null) : undefined}

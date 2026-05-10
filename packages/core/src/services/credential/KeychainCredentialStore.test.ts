@@ -181,8 +181,8 @@ describe("KeychainCredentialStore", () => {
       refreshToken: "cursor-refresh-token",
       authId: "auth0|user_123",
       authCacheKey: "auth:auth0|user_123",
-      email: "jay@example.com",
-      displayName: "Jay Ji",
+      email: "cursor.user@example.com",
+      displayName: "Cursor User",
       userId: 247015891,
     };
     const writer = new StubGenericPasswordWriter([

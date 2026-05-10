@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type {
   EndpointAnthropicProtocol,
   EndpointOpenAiProtocol,
@@ -5,6 +7,7 @@ import type {
 
 const DEFAULT_TIMEOUT_MS = 3000;
 const DEFAULT_ANTHROPIC_VERSION = "2023-06-01";
+const DEFAULT_CACHE_TTL_MS = 2 * 60 * 1000;
 
 export type GatewayProbeResult = {
   openai: EndpointOpenAiProtocol | null;
@@ -22,23 +25,43 @@ type OpenAiModelListResponse = {
 };
 
 export class GatewayProbe implements GatewayCapabilityProbe {
+  private static readonly cache = new Map<string, { expiresAt: number; result: GatewayProbeResult }>();
+  private readonly cacheEnabled: boolean;
+
   constructor(
     private readonly fetchFn: typeof fetch = globalThis.fetch.bind(globalThis),
-  ) {}
+  ) {
+    this.cacheEnabled = arguments.length === 0;
+  }
 
   async probe(baseUrl: string, apiKey: string): Promise<GatewayProbeResult> {
+    const cacheKey = this.cacheEnabled ? this.readCacheKey(baseUrl, apiKey) : null;
+    const cached = cacheKey ? this.readCachedResult(cacheKey) : null;
+    if (cached) {
+      return cached;
+    }
+
     const parsed = new URL(baseUrl);
     const inputPath = this.normalizePath(parsed.pathname);
     const rootUrl = parsed.origin;
 
-    const openai = await this.probeOpenAi(rootUrl, inputPath, apiKey);
-    const anthropic = await this.probeAnthropic(rootUrl, inputPath, apiKey);
+    const [openai, anthropic] = await Promise.all([
+      this.probeOpenAi(rootUrl, inputPath, apiKey),
+      this.probeAnthropic(rootUrl, inputPath, apiKey),
+    ]);
 
     if (!openai && !anthropic) {
       throw new Error(`Unable to detect supported gateway protocols at ${baseUrl}`);
     }
 
-    return { openai, anthropic };
+    const result = { openai, anthropic };
+    if (cacheKey) {
+      GatewayProbe.cache.set(cacheKey, {
+        expiresAt: Date.now() + DEFAULT_CACHE_TTL_MS,
+        result,
+      });
+    }
+    return result;
   }
 
   private async probeOpenAi(
@@ -54,34 +77,29 @@ export class GatewayProbe implements GatewayCapabilityProbe {
     const modelsUrl = this.buildUrl(rootUrl, `${basePath}/models`);
     const probeModels = await this.readOpenAiProbeModels(modelsUrl, headers);
 
-    const supportsResponses = await this.findWorkingOpenAiWireApi(
-      this.buildUrl(rootUrl, `${basePath}/responses`),
-      headers,
-      probeModels,
-      (modelId) => ({
-        model: modelId,
-        input: "ping",
-      }),
-    );
-    const supportsChat = await this.findWorkingOpenAiWireApi(
-      this.buildUrl(rootUrl, `${basePath}/chat/completions`),
-      headers,
-      probeModels,
-      (modelId) => ({
-        model: modelId,
-        messages: [{ role: "user", content: "ping" }],
-        stream: false,
-      }),
-    );
-    const supportsModels = await this.routeExists(
-      modelsUrl,
-      {
-        method: "GET",
+    const [supportsResponses, supportsChat] = await Promise.all([
+      this.findWorkingOpenAiWireApi(
+        this.buildUrl(rootUrl, `${basePath}/responses`),
         headers,
-      },
-    );
+        probeModels,
+        (modelId) => ({
+          model: modelId,
+          input: "ping",
+        }),
+      ),
+      this.findWorkingOpenAiWireApi(
+        this.buildUrl(rootUrl, `${basePath}/chat/completions`),
+        headers,
+        probeModels,
+        (modelId) => ({
+          model: modelId,
+          messages: [{ role: "user", content: "ping" }],
+          stream: false,
+        }),
+      ),
+    ]);
 
-    if (!supportsResponses && !supportsChat && !supportsModels) {
+    if (!supportsResponses && !supportsChat) {
       return null;
     }
 
@@ -277,5 +295,27 @@ export class GatewayProbe implements GatewayCapabilityProbe {
     }
     const normalized = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
     return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+  }
+
+  private readCacheKey(baseUrl: string, apiKey: string): string {
+    const parsed = new URL(baseUrl);
+    const normalizedBaseUrl = `${parsed.origin}${this.normalizePath(parsed.pathname)}`;
+    const keyHash = createHash("sha256").update(apiKey).digest("hex");
+    return `${normalizedBaseUrl}:${keyHash}`;
+  }
+
+  private readCachedResult(cacheKey: string): GatewayProbeResult | null {
+    const cached = GatewayProbe.cache.get(cacheKey);
+    if (!cached) {
+      return null;
+    }
+    if (cached.expiresAt <= Date.now()) {
+      GatewayProbe.cache.delete(cacheKey);
+      return null;
+    }
+    return {
+      openai: cached.result.openai ? { ...cached.result.openai } : null,
+      anthropic: cached.result.anthropic ? { ...cached.result.anthropic } : null,
+    };
   }
 }

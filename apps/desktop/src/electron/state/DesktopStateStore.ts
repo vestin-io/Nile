@@ -5,14 +5,20 @@ import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 
 import { DesktopSurface } from "../../state/Surface";
 import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";
+import type { DesktopNotificationHistoryFilterInput } from "../notifications/contracts";
+import { ConnectionAlertOverlay } from "../alerts/Overlay";
+import type { ConnectionAlertStore, CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../alerts/Store";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
+import { DesktopNotificationHistory } from "../notifications/History";
 import type {
   DesktopAddConnectionInput,
   DesktopConnectionSummary,
   DesktopSavePreparedConnectionInput,
   DesktopUpdateConnectionInput,
-} from "../types";
+} from "../connections/contracts";
+import { ConnectionAlerts } from "./ConnectionAlerts";
+import { NotificationHistoryState } from "./NotificationHistoryState";
 
 type CachedValue<T> = {
   dirty: boolean;
@@ -31,6 +37,9 @@ type DesktopStateStoreOptions = {
   surface: DesktopSurface;
   connectionGateway: DesktopConnectionGateway;
   connectionManager: DesktopConnectionManager;
+  connectionAlertOverlay?: ConnectionAlertOverlay;
+  connectionAlertStore?: ConnectionAlertStore;
+  notificationHistory?: DesktopNotificationHistory;
   stateReset?: Pick<StateReset, "reset">;
 };
 
@@ -44,9 +53,15 @@ export class DesktopStateStore {
   private readonly historyState: CachedValue<HistoryState> = this.createCachedValue();
 
   private readonly stateReset: Pick<StateReset, "reset">;
+  private readonly connectionAlertOverlay: ConnectionAlertOverlay | null;
+  private readonly connectionAlerts: ConnectionAlerts;
+  private readonly notificationHistory: NotificationHistoryState;
 
   constructor(private readonly options: DesktopStateStoreOptions) {
     this.stateReset = options.stateReset ?? new StateReset();
+    this.connectionAlertOverlay = options.connectionAlertOverlay ?? null;
+    this.connectionAlerts = new ConnectionAlerts(options.connectionAlertStore ?? null);
+    this.notificationHistory = new NotificationHistoryState(options.notificationHistory ?? null);
   }
 
   peekMenubarState(): MenubarState | null {
@@ -62,11 +77,34 @@ export class DesktopStateStore {
   }
 
   async getSettingsState(options: GetSettingsStateOptions = {}): Promise<SettingsState> {
-    return await this.readState(this.settingsState, async () => await this.options.surface.getSettingsState(options));
+    return await this.readState(this.settingsState, async () => {
+      const state = await this.options.surface.getSettingsState(options);
+      return this.connectionAlertOverlay ? this.connectionAlertOverlay.decorateSettingsState(state) : state;
+    });
   }
 
   async getHistoryState(): Promise<HistoryState> {
     return await this.readState(this.historyState, async () => await this.options.surface.getHistoryState());
+  }
+
+  getNotificationHistory(filter?: DesktopNotificationHistoryFilterInput) {
+    return this.notificationHistory.list(filter);
+  }
+
+  getNotificationHistoryConnections(filter?: DesktopNotificationHistoryFilterInput) {
+    return this.notificationHistory.listConnections(filter);
+  }
+
+  hasUnreadNotifications(): boolean {
+    return this.notificationHistory.hasUnread();
+  }
+
+  markNotificationHistoryRead(entryIds: string[]): void {
+    this.notificationHistory.markRead(entryIds);
+  }
+
+  markNotificationHistoryReadByFilter(filter?: DesktopNotificationHistoryFilterInput): void {
+    this.notificationHistory.markReadByFilter(filter);
   }
 
   async refreshMenubarUsage(): Promise<void> {
@@ -163,6 +201,27 @@ export class DesktopStateStore {
     return this.runMutation(
       () => this.options.connectionGateway.bindCursorUsage(connectionId, sessionToken),
       this.menubarState,
+      this.settingsState,
+    );
+  }
+
+  createConnectionAlert(input: CreateConnectionAlertInput) {
+    return this.runMutation(
+      () => this.connectionAlerts.create(input),
+      this.settingsState,
+    );
+  }
+
+  updateConnectionAlert(input: UpdateConnectionAlertInput) {
+    return this.runMutation(
+      () => this.connectionAlerts.update(input),
+      this.settingsState,
+    );
+  }
+
+  deleteConnectionAlert(connectionId: string, alertId: string): void {
+    this.runMutation(
+      () => this.connectionAlerts.delete(connectionId, alertId),
       this.settingsState,
     );
   }

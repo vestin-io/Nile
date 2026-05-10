@@ -1,9 +1,12 @@
 import type { AgentId } from "@nile/core/models/agent/types";
 
-import type { DesktopAgentState, DesktopReleaseInfo } from "../../../state/Types";
+import type { DesktopAgentState, DesktopNotificationHistoryConnection, DesktopReleaseInfo } from "../../../state/Types";
+import type { CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../../../electron/alerts/Store";
+import type { DesktopNotificationTarget } from "../../../electron/notifications/contracts";
 import { AgentPage } from "../../agents/AgentPage";
 import { AddConnectionPage } from "../../connections/add/Page";
 import { ConnectionsPage } from "../../connections/list/Page";
+import { NotificationsPage } from "../../notifications/Page";
 import { ProvidersPage } from "../../providers/ProvidersPage";
 import { ProfilesPage } from "../../profiles/Page";
 import type { WorkspaceProfile, WorkspaceProfileAssignment } from "../../profiles/useProfiles";
@@ -14,11 +17,11 @@ import type {
   LanguagePreference,
   ThemePreference,
 } from "../../settings/Preferences";
-import type { HistoryState, SettingsState } from "../../shared/DesktopData";
+import type { HistoryState, NotificationHistoryState, SettingsState } from "../../shared/DesktopData";
 import type { Definition } from "../../shared/Definitions";
 import type { Translator } from "../../shared/I18n";
 import type { AgentDetailTab } from "../../agents/detail/Page";
-import type { PageId } from "./useNavigation";
+import type { NotificationHistoryFilter, PageId } from "./useNavigation";
 import type {
   AddConnectionPreparedSaveInput,
   AddConnectionSubmitInput,
@@ -32,9 +35,17 @@ type SettingsPageContentProps = {
   defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
   historyState: HistoryState;
+  isLoadedNotificationMute: boolean;
+  isLoadingNotificationHistory: boolean;
+  isMarkingNotificationHistoryRead: boolean;
+  isSavingNotificationMute: boolean;
   isResetting: boolean;
   isSavingProfileFeature: boolean;
   language: LanguagePreference;
+  notificationsMuted: boolean;
+  notificationHistoryFilter: NotificationHistoryFilter;
+  notificationHistoryConnections: DesktopNotificationHistoryConnection[];
+  notificationHistoryState: NotificationHistoryState;
   preferences: DesktopPreferences;
   profileFeatureEnabled: boolean;
   profileError: string | null;
@@ -55,6 +66,7 @@ type SettingsPageContentProps = {
   onAgentOrderChange(agentOrder: AgentId[]): void;
   onBackFromAgentDetail(): void;
   onBindCursorUsage(connectionId: string): Promise<void>;
+  onCreateConnectionAlert(input: CreateConnectionAlertInput): Promise<void>;
   onCheckForUpdates(): Promise<void>;
   onCloseAddConnectionPage(): void;
   onConfigureAgent(agentId: AgentId): void;
@@ -64,13 +76,19 @@ type SettingsPageContentProps = {
   onDeleteProfile(profileId: string): Promise<void>;
   onInstallUpdate(): Promise<void>;
   onLanguageChange(language: LanguagePreference): void;
+  onNotificationsMutedChange(muted: boolean): Promise<void>;
+  onNotificationHistoryFilterChange(filter: NotificationHistoryFilter): void;
+  onMarkNotificationHistoryRead(entryIds: string[]): Promise<void>;
+  onMarkNotificationHistoryReadByFilter(filter: NotificationHistoryFilter): Promise<void>;
   onOpenAddConnection(): void;
   onOpenConnection(connectionId: string, agentId: AgentId): void;
+  onOpenNotificationTarget(target: DesktopNotificationTarget): void;
   onOpenProvidersLink(url: string): Promise<void>;
   onOpenQuickSetup(): void;
   onProfileFeatureEnabledChange(enabled: boolean): Promise<void>;
   onPrepareConnectionDraft(input: AddConnectionSubmitInput): Promise<PreparedConnectionDraft>;
   onRefresh(): Promise<void>;
+  onRefreshNotificationHistory(): Promise<void>;
   onRemoveConnection(connectionId: string): Promise<void>;
   onReset(): void;
   onRollbackAgent(agentId: AgentId): Promise<void>;
@@ -83,6 +101,8 @@ type SettingsPageContentProps = {
   onThemeChange(theme: ThemePreference): void;
   onUpdateAgentHome(agentId: AgentId, path: string | null): Promise<void>;
   onSaveProfile(profileId: string, name: string, emoji: string, assignments: WorkspaceProfileAssignment[]): Promise<void>;
+  onDeleteConnectionAlert(connectionId: string, alertId: string): Promise<void>;
+  onUpdateConnectionAlert(input: UpdateConnectionAlertInput): Promise<void>;
   onUpdateConnection(input: {
     connectionId: string;
     label?: string;
@@ -106,9 +126,17 @@ export function SettingsPageContent({
   defaultOpenAiAuthJsonPath,
   definitions,
   historyState,
+  isLoadedNotificationMute,
+  isLoadingNotificationHistory,
+  isMarkingNotificationHistoryRead,
+  isSavingNotificationMute,
   isResetting,
   isSavingProfileFeature,
   language,
+  notificationsMuted,
+  notificationHistoryFilter,
+  notificationHistoryConnections,
+  notificationHistoryState,
   preferences,
   profileFeatureEnabled,
   profileError,
@@ -129,6 +157,7 @@ export function SettingsPageContent({
   onAgentOrderChange,
   onBackFromAgentDetail,
   onBindCursorUsage,
+  onCreateConnectionAlert,
   onCheckForUpdates,
   onCloseAddConnectionPage,
   onConfigureAgent,
@@ -138,13 +167,19 @@ export function SettingsPageContent({
   onDeleteProfile,
   onInstallUpdate,
   onLanguageChange,
+  onNotificationsMutedChange,
+  onNotificationHistoryFilterChange,
+  onMarkNotificationHistoryRead,
+  onMarkNotificationHistoryReadByFilter,
   onOpenAddConnection,
   onOpenConnection,
+  onOpenNotificationTarget,
   onOpenProvidersLink,
   onOpenQuickSetup,
   onProfileFeatureEnabledChange,
   onPrepareConnectionDraft,
   onRefresh,
+  onRefreshNotificationHistory,
   onRemoveConnection,
   onReset,
   onRollbackAgent,
@@ -157,6 +192,8 @@ export function SettingsPageContent({
   onThemeChange,
   onUpdateAgentHome,
   onSaveProfile,
+  onDeleteConnectionAlert,
+  onUpdateConnectionAlert,
   onUpdateConnection,
   onUseConnection,
 }: SettingsPageContentProps) {
@@ -223,8 +260,36 @@ export function SettingsPageContent({
         }}
         onRefresh={onRefresh}
         onBindCursorUsage={onBindCursorUsage}
+        onCreateAlert={onCreateConnectionAlert}
+        onDeleteAlert={onDeleteConnectionAlert}
         onRemove={onRemoveConnection}
+        onOpenNotificationHistory={(connectionId) => {
+          onNotificationHistoryFilterChange({
+            connectionId,
+            kind: "alerts",
+          });
+        }}
+        onUpdateAlert={onUpdateConnectionAlert}
         onUpdateConnection={onUpdateConnection}
+      />
+    );
+  }
+
+  if (visiblePage === "notifications") {
+    return (
+      <NotificationsPage
+        connections={settingsState.connections}
+        entries={notificationHistoryState}
+        filter={notificationHistoryFilter}
+        historyConnections={notificationHistoryConnections}
+        isLoading={isLoadingNotificationHistory}
+        isMarkingAllRead={isMarkingNotificationHistoryRead}
+        t={t}
+        onFilterChange={onNotificationHistoryFilterChange}
+        onMarkRead={onMarkNotificationHistoryRead}
+        onMarkAllRead={onMarkNotificationHistoryReadByFilter}
+        onOpenEntry={onOpenNotificationTarget}
+        onRefresh={onRefreshNotificationHistory}
       />
     );
   }
@@ -269,8 +334,11 @@ export function SettingsPageContent({
   if (visiblePage === "settings") {
     return (
       <SettingsPage
+        isLoadedNotificationMute={isLoadedNotificationMute}
+        isSavingNotificationMute={isSavingNotificationMute}
         isResetting={isResetting}
         isSavingProfileFeature={isSavingProfileFeature}
+        notificationsMuted={notificationsMuted}
         preferences={preferences}
         profileFeatureEnabled={profileFeatureEnabled}
         releaseInfo={releaseInfo}
@@ -278,6 +346,7 @@ export function SettingsPageContent({
         onCheckForUpdates={onCheckForUpdates}
         onInstallUpdate={onInstallUpdate}
         onLanguageChange={onLanguageChange}
+        onNotificationsMutedChange={onNotificationsMutedChange}
         onProfileFeatureEnabledChange={onProfileFeatureEnabledChange}
         onReset={onReset}
         onThemeChange={onThemeChange}

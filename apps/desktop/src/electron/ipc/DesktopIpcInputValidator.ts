@@ -11,7 +11,9 @@ import type {
   DesktopDiscardPreparedConnectionDraftInput,
   DesktopSavePreparedConnectionInput,
   DesktopUpdateConnectionInput,
-} from "../types";
+} from "../connections/contracts";
+import type { DesktopNotificationHistoryFilterInput } from "../notifications/contracts";
+import type { CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../alerts/Store";
 
 export class DesktopIpcInputValidator {
   readOptionalString(value: unknown, fieldName: string): string | undefined {
@@ -63,6 +65,13 @@ export class DesktopIpcInputValidator {
     return value.map((entry, index) => this.readAgentId(entry, `${fieldName}[${index}]`));
   }
 
+  readStringArray(value: unknown, fieldName: string): string[] {
+    if (!Array.isArray(value)) {
+      throw new Error(`${fieldName} must be an array`);
+    }
+    return value.map((entry, index) => this.readRequiredString(entry, `${fieldName}[${index}]`));
+  }
+
   readAddConnectionInput(input: unknown): DesktopAddConnectionInput {
     const record = this.readRecord(input, "add connection input");
     return {
@@ -109,6 +118,51 @@ export class DesktopIpcInputValidator {
     };
   }
 
+  readCreateConnectionAlertInput(input: unknown): CreateConnectionAlertInput {
+    const record = this.readRecord(input, "create connection alert input");
+    const base = {
+      connectionId: this.readRequiredString(record.connectionId, "connectionId"),
+      metricKey: this.readRequiredString(record.metricKey, "metricKey"),
+      metricLabel: this.readRequiredString(record.metricLabel, "metricLabel"),
+      enabled: this.readBoolean(record.enabled, "enabled"),
+    };
+    const type = this.readConnectionAlertType(record.type);
+    if (type === "renewed") {
+      return {
+        ...base,
+        type,
+      };
+    }
+    return {
+      ...base,
+      type,
+      thresholdPercent: this.readPercent(record.thresholdPercent, "thresholdPercent"),
+    };
+  }
+
+  readUpdateConnectionAlertInput(input: unknown): UpdateConnectionAlertInput {
+    const record = this.readRecord(input, "update connection alert input");
+    const base = {
+      alertId: this.readRequiredString(record.alertId, "alertId"),
+      connectionId: this.readRequiredString(record.connectionId, "connectionId"),
+      metricKey: this.readRequiredString(record.metricKey, "metricKey"),
+      metricLabel: this.readRequiredString(record.metricLabel, "metricLabel"),
+      enabled: this.readBoolean(record.enabled, "enabled"),
+    };
+    const type = this.readConnectionAlertType(record.type);
+    if (type === "renewed") {
+      return {
+        ...base,
+        type,
+      };
+    }
+    return {
+      ...base,
+      type,
+      thresholdPercent: this.readPercent(record.thresholdPercent, "thresholdPercent"),
+    };
+  }
+
   readWorkspaceProfileAssignments(value: unknown): Array<{ agentId: AgentId; connectionId?: string; homePath?: string | null }> {
     if (!Array.isArray(value)) {
       throw new Error("assignments must be an array");
@@ -128,6 +182,23 @@ export class DesktopIpcInputValidator {
       }
       return assignment;
     });
+  }
+
+  readNotificationHistoryFilter(value: unknown): DesktopNotificationHistoryFilterInput | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    const record = this.readRecord(value, "notification history filter");
+    const kind = record.kind === undefined ? undefined : this.readNotificationHistoryKind(record.kind);
+    const connectionId = record.connectionId === undefined
+      ? undefined
+      : this.readNullableString(record.connectionId, "notification history filter.connectionId");
+    const limit = record.limit === undefined ? undefined : this.readPositiveInteger(record.limit, "notification history filter.limit");
+    return {
+      ...(kind ? { kind } : {}),
+      ...(connectionId !== undefined ? { connectionId } : {}),
+      ...(limit !== undefined ? { limit } : {}),
+    };
   }
 
   private readRecord(input: unknown, fieldName: string): Record<string, unknown> {
@@ -213,6 +284,38 @@ export class DesktopIpcInputValidator {
     }
     if (typeof value !== "boolean") {
       throw new Error(`${fieldName} must be a boolean`);
+    }
+    return value;
+  }
+
+  private readPositiveInteger(value: unknown, fieldName: string): number {
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+      throw new Error(`${fieldName} must be a positive integer`);
+    }
+    return value;
+  }
+
+  private readPercent(value: unknown, fieldName: string): number {
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new Error(`${fieldName} must be a number`);
+    }
+    const rounded = Math.round(value);
+    if (rounded < 1 || rounded > 100) {
+      throw new Error(`${fieldName} must be between 1 and 100`);
+    }
+    return rounded;
+  }
+
+  private readConnectionAlertType(value: unknown): "low-percent" | "renewed" {
+    if (value !== "low-percent" && value !== "renewed") {
+      throw new Error("type is not supported");
+    }
+    return value;
+  }
+
+  private readNotificationHistoryKind(value: unknown): "all" | "alerts" {
+    if (value !== "all" && value !== "alerts") {
+      throw new Error("notification history filter kind is not supported");
     }
     return value;
   }

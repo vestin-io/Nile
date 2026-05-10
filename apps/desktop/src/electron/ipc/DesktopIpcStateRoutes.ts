@@ -6,10 +6,13 @@ import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 
 type DesktopIpcStateRoutesOptions = {
+  getNotificationsMuted(): boolean;
   getProfileFeatureEnabled(): boolean;
   inputs: DesktopIpcInputValidator;
+  notifyNotificationHistoryChanged(): void;
   refreshAll(): void;
   refreshDesktopState(options: { invalidate: boolean; notifyRenderer: boolean }): Promise<void>;
+  setNotificationsMuted(muted: boolean): boolean;
   setProfileFeatureEnabled(enabled: boolean): boolean;
   stateStore: DesktopStateStore;
   updateAgentHome(agentId: AgentId, path: string | null): void;
@@ -25,7 +28,24 @@ export class DesktopIpcStateRoutes {
     ipcMain.handle("desktop:get-settings-state", () => stateStore.getSettingsState());
     ipcMain.handle("desktop:get-settings-state-snapshot", () => stateStore.getSettingsState({ refreshUsage: false }));
     ipcMain.handle("desktop:get-history-state", () => stateStore.getHistoryState());
+    ipcMain.handle("desktop:get-notification-history", (_event, filter: unknown) =>
+      stateStore.getNotificationHistory(inputs.readNotificationHistoryFilter(filter)));
+    ipcMain.handle("desktop:get-notification-history-connections", (_event, filter: unknown) =>
+      stateStore.getNotificationHistoryConnections(inputs.readNotificationHistoryFilter(filter)));
+    ipcMain.handle("desktop:has-unread-notifications", () => stateStore.hasUnreadNotifications());
+    ipcMain.handle("desktop:mark-notification-history-read", (_event, entryIds: unknown) => {
+      stateStore.markNotificationHistoryRead(inputs.readStringArray(entryIds, "entryIds"));
+      this.options.notifyNotificationHistoryChanged();
+    });
+    ipcMain.handle("desktop:mark-notification-history-read-by-filter", (_event, filter: unknown) => {
+      stateStore.markNotificationHistoryReadByFilter(inputs.readNotificationHistoryFilter(filter));
+      this.options.notifyNotificationHistoryChanged();
+    });
+    ipcMain.handle("desktop:get-notifications-muted", () => this.options.getNotificationsMuted());
     ipcMain.handle("desktop:get-profile-feature-enabled", () => this.options.getProfileFeatureEnabled());
+    ipcMain.handle("desktop:set-notifications-muted", (_event, muted: unknown) => {
+      return this.options.setNotificationsMuted(inputs.readBoolean(muted, "muted"));
+    });
     ipcMain.handle("desktop:set-profile-feature-enabled", (_event, enabled: unknown) => {
       return this.options.setProfileFeatureEnabled(inputs.readBoolean(enabled, "enabled"));
     });

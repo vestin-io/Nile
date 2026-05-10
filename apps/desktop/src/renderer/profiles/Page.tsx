@@ -9,6 +9,7 @@ import { ProfileDetailPage } from "./Detail";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
+import { cn } from "../ui/cn";
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "../ui/empty";
 import { TextButton } from "../ui/text-button";
 import { readCurrentProfileIds } from "../../profiles/CurrentProfile";
@@ -228,12 +229,22 @@ function ProfileCard({
   onOpenProfile,
 }: ProfileCardProps) {
   return (
-    <Card className="rounded-2xl">
+    <Card
+      className={cn(
+        "rounded-2xl transition-colors",
+        isCurrent && "border-foreground/20 bg-muted/30 shadow-md",
+      )}
+    >
       <div className="px-5 py-5 sm:px-6">
         <div className="flex items-stretch justify-between gap-6">
           <div className="min-w-0 flex-1 space-y-5">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl border bg-muted/40">
+              <div
+                className={cn(
+                  "flex h-12 w-12 items-center justify-center rounded-xl border bg-muted/40",
+                  isCurrent && "border-foreground/15 bg-background shadow-sm",
+                )}
+              >
                 {profile.emoji?.trim()
                   ? <span className="text-3xl leading-none">{profile.emoji.trim()}</span>
                   : <Workflow className="h-6 w-6 text-muted-foreground" />}
@@ -242,7 +253,9 @@ function ProfileCard({
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="truncate text-lg font-semibold text-foreground">{profile.name}</div>
                   {isCurrent ? (
-                    <span className="shrink-0 text-sm text-muted-foreground">{`· ${t("common.current")}`}</span>
+                    <span className="shrink-0 rounded-full border border-foreground/10 bg-background px-2.5 py-1 text-xs font-medium text-foreground shadow-sm">
+                      {t("common.current")}
+                    </span>
                   ) : null}
                 </div>
               </div>

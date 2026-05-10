@@ -1,4 +1,5 @@
 export type DesktopUsageWindowSummary = {
+  key: string;
   label: string;
   remainingPercent: number;
   resetsAt?: string | null;
@@ -40,6 +41,22 @@ type UsageInput = {
   }>;
 };
 
+export function canonicalizeUsageMetricKey(label: string): string {
+  const normalized = label.trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+  if (
+    normalized === "7d"
+    || normalized === "weekly"
+    || normalized === "seven day"
+    || normalized === "seven-day"
+  ) {
+    return "weekly";
+  }
+  return normalized.replace(/\s+/g, "-");
+}
+
 export class UsageSummary {
   static fromResult(result: UsageInput): DesktopUsageState | null {
     if (result.status !== "available") {
@@ -61,6 +78,7 @@ export class UsageSummary {
       (window): window is DesktopUsageWindowSummary =>
         typeof window.remainingPercent === "number",
     ).map((window) => ({
+      key: canonicalizeUsageMetricKey(window.label),
       label: this.normalizeLabel(window.label),
       remainingPercent: Math.max(0, Math.min(100, Math.round(window.remainingPercent))),
       resetsAt: window.resetsAt ?? null,
@@ -89,15 +107,10 @@ export class UsageSummary {
   }
 
   private static normalizeLabel(label: string): string {
-    if (label === "7d") {
+    const metricKey = canonicalizeUsageMetricKey(label);
+    if (metricKey === "weekly") {
       return "weekly";
     }
-
-    const normalized = label.trim().toLowerCase();
-    if (normalized === "seven day" || normalized === "seven-day") {
-      return "weekly";
-    }
-
-    return label;
+    return label.trim();
   }
 }

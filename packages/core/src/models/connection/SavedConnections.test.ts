@@ -31,7 +31,7 @@ describe("SavedConnections", () => {
       endpointLabel: "OpenAI",
       endpointFamily: "openai",
       accessId: "openai-session",
-      accountLabel: "jiqiang90@gmail.com",
+      accountLabel: "primary@example.com",
       authMode: "openai_session",
       credential: {
         kind: "openai_session",
@@ -53,7 +53,7 @@ describe("SavedConnections", () => {
           id: "openai-session",
           endpointId: "openai",
           endpointUrl: "https://api.openai.com/v1",
-          label: "jiqiang90@gmail.com",
+          label: "primary@example.com",
           endpointLabel: "OpenAI",
           endpointFamily: "openai",
           authMode: "openai_session",
@@ -159,6 +159,53 @@ describe("SavedConnections", () => {
     }
   });
 
+  test("omits enabled agents that the endpoint protocols do not support", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+
+    const endpointRegistry = EndpointRegistry.open(dbPath);
+    endpointRegistry.add({
+      id: "gateway-openai-only",
+      label: "Gateway (OpenAI only)",
+      rootUrl: "https://gateway.example.com",
+      profile: "generic-gateway",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+    endpointRegistry.close();
+
+    const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+    accessRegistry.add({
+      id: "gateway-primary",
+      endpointId: "gateway-openai-only",
+      label: "Gateway Primary",
+      authMode: "api_key",
+      enabledAgents: ["codex", "claude"],
+    }, {
+      kind: "api_key",
+      apiKey: "secret",
+    });
+    accessRegistry.close();
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.list()).toEqual([
+        expect.objectContaining({
+          id: "gateway-primary",
+          enabledAgents: ["codex"],
+        }),
+      ]);
+      expect(connections.listForAgent("claude")).toEqual([]);
+    } finally {
+      connections.close();
+    }
+  });
+
   test("removes saved connections and clears saved agent selections that pointed at them", () => {
     const dbPath = createTempDatabasePath();
     const credentialStore = new StubCredentialStore();
@@ -213,7 +260,7 @@ describe("SavedConnections", () => {
       endpointLabel: "OpenAI",
       endpointFamily: "openai",
       accessId: "openai-session",
-      accountLabel: "jiqiang90@gmail.com",
+      accountLabel: "primary@example.com",
       authMode: "openai_session",
       credential: {
         kind: "openai_session",
@@ -259,7 +306,7 @@ describe("SavedConnections", () => {
       endpointLabel: "OpenAI",
       endpointFamily: "openai",
       accessId: "shared-session",
-      accountLabel: "jiqiang90@gmail.com",
+      accountLabel: "primary@example.com",
       authMode: "openai_session",
       credential: {
         kind: "openai_session",

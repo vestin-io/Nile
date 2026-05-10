@@ -21,16 +21,18 @@ describe("DesktopStateReset", () => {
     const root = mkdtempSync(join(tmpdir(), "nile-desktop-reset-"));
     tempDirs.push(root);
     const homesPath = join(root, "desktop-agent-homes.json");
+    const notificationMutePath = join(root, "desktop-notification-mute.json");
     const profilesPath = join(root, "desktop-profiles.json");
     const profileFeaturePath = join(root, "desktop-profile-feature.json");
     writeFileSync(homesPath, "{}\n", "utf8");
+    writeFileSync(notificationMutePath, "{}\n", "utf8");
     writeFileSync(profilesPath, "{}\n", "utf8");
     writeFileSync(profileFeaturePath, "{}\n", "utf8");
 
     const delegate = new StubStateReset();
     let resetLocalStateCalls = 0;
     const reset = new DesktopStateReset({
-      localStatePaths: [homesPath, profilesPath, profileFeaturePath],
+      localStatePaths: [homesPath, notificationMutePath, profilesPath, profileFeaturePath],
       onResetLocalState: () => {
         resetLocalStateCalls += 1;
       },
@@ -42,6 +44,7 @@ describe("DesktopStateReset", () => {
     expect(result).toEqual(delegate.result);
     expect(delegate.databasePaths).toEqual([join(root, "switcher.sqlite")]);
     expect(existsSync(homesPath)).toBe(false);
+    expect(existsSync(notificationMutePath)).toBe(false);
     expect(existsSync(profilesPath)).toBe(false);
     expect(existsSync(profileFeaturePath)).toBe(false);
     expect(resetLocalStateCalls).toBe(1);

@@ -3,6 +3,55 @@ import type { AuthMode } from "@nile/core/models/access";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
 import type { DesktopUsageState } from "./UsageSummary";
 
+export type DesktopConnectionAlertMetric = {
+  key: string;
+  label: string;
+  remainingPercent: number;
+  resetsAt?: string | null;
+};
+
+export type DesktopLowPercentConnectionAlert = {
+  id: string;
+  type: "low-percent";
+  metricKey: string;
+  metricLabel: string;
+  thresholdPercent: number;
+  enabled: boolean;
+};
+
+export type DesktopRenewedConnectionAlert = {
+  id: string;
+  type: "renewed";
+  metricKey: string;
+  metricLabel: string;
+  enabled: boolean;
+};
+
+export type DesktopConnectionAlert = DesktopLowPercentConnectionAlert | DesktopRenewedConnectionAlert;
+
+export type DesktopNotificationHistoryEntry = {
+  id: string;
+  shownAt: string;
+  readAt: string | null;
+  clickedAt: string | null;
+  resetAt: string | null;
+  title: string;
+  body: string;
+  kind: "action-required" | "profile-rule-suggestion" | "usage-threshold" | "usage-renewed";
+  scope: "connection" | "agent" | "profile";
+  subjectId: string | null;
+  subjectLabel: string | null;
+  targetPage: "settings" | "profiles" | "connections" | "agents" | "notifications" | null;
+  targetConnectionId: string | null;
+  targetAgentId: AgentId | null;
+  targetProfileId: string | null;
+};
+
+export type DesktopNotificationHistoryConnection = {
+  connectionId: string;
+  label: string;
+};
+
 export type DesktopConnection = {
   id: string;
   label: string;
@@ -15,6 +64,9 @@ export type DesktopConnection = {
   isCurrent: boolean;
   appliedAt?: string;
   usage?: DesktopUsageState | null;
+  alertMetrics?: DesktopConnectionAlertMetric[];
+  alerts?: DesktopConnectionAlert[];
+  activeAlertCount: number;
   enabledAgents: AgentId[];
   configurableAgents: AgentId[];
   selectedByAgents: AgentId[];

@@ -66,7 +66,6 @@ export class LocalWorkspaceState {
 
   createConnectionCreator(): ConnectionCreator {
     return new ConnectionCreator(
-      this.database,
       this.endpointRegistry,
       this.accessRegistry,
     );

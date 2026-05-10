@@ -4,6 +4,8 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import type { DesktopNotificationTarget } from "../notifications/contracts";
+
 type DesktopShellOptions = {
   currentDir: string;
   onSettingsClose(): void;
@@ -15,6 +17,7 @@ export class DesktopShell {
   private static readonly trayIconName = "nileTemplate@2x.png";
   private tray: Tray | null = null;
   private settingsWindow: BrowserWindow | null = null;
+  private pendingNotificationTarget: DesktopNotificationTarget | null = null;
 
   constructor(private readonly options: DesktopShellOptions) {}
 
@@ -28,10 +31,18 @@ export class DesktopShell {
     this.settingsWindow?.webContents.send("desktop:state-changed");
   }
 
+  notifyNotificationHistoryChanged(): void {
+    this.settingsWindow?.webContents.send("desktop:notification-history-changed");
+  }
+
   showSettings(): void {
     this.settingsWindow?.show();
     this.settingsWindow?.focus();
-    this.notifyStateChanged();
+  }
+
+  showSettingsTarget(target: DesktopNotificationTarget): void {
+    this.showSettings();
+    this.sendNotificationTarget(target);
   }
 
   async chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null> {
@@ -110,6 +121,14 @@ export class DesktopShell {
     });
     const settingsUrl = pathToFileURL(join(this.options.currentDir, "..", "renderer", "settings.html"));
     this.settingsWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    this.settingsWindow.webContents.on("did-finish-load", () => {
+      if (!this.pendingNotificationTarget) {
+        return;
+      }
+      const pendingTarget = this.pendingNotificationTarget;
+      this.pendingNotificationTarget = null;
+      this.settingsWindow?.webContents.send("desktop:notification-target", pendingTarget);
+    });
     this.settingsWindow.webContents.on("will-navigate", (event, url) => {
       const target = new URL(url);
       if (target.protocol !== settingsUrl.protocol || target.pathname !== settingsUrl.pathname) {
@@ -133,6 +152,17 @@ export class DesktopShell {
     }
     const menu = Menu.buildFromTemplate(await this.options.onTrayMenuRequested());
     this.tray.popUpContextMenu(menu);
+  }
+
+  private sendNotificationTarget(target: DesktopNotificationTarget): void {
+    if (!this.settingsWindow) {
+      return;
+    }
+    if (this.settingsWindow.webContents.isLoadingMainFrame()) {
+      this.pendingNotificationTarget = target;
+      return;
+    }
+    this.settingsWindow.webContents.send("desktop:notification-target", target);
   }
 
   private resolveDialogPath(path: string | undefined): string | undefined {

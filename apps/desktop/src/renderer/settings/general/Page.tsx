@@ -19,13 +19,17 @@ import { SettingsSection } from "./Section";
 import { UpdateSection } from "./UpdateSection";
 
 type SettingsPageProps = {
+  isLoadedNotificationMute: boolean;
+  isSavingNotificationMute: boolean;
   isResetting: boolean;
   isSavingProfileFeature: boolean;
+  notificationsMuted: boolean;
   preferences: DesktopPreferences;
   profileFeatureEnabled: boolean;
   releaseInfo: DesktopReleaseInfo | null;
   onCheckForUpdates(): Promise<void>;
   onInstallUpdate(): Promise<void>;
+  onNotificationsMutedChange(muted: boolean): Promise<void>;
   onProfileFeatureEnabledChange(enabled: boolean): Promise<void>;
   onReset(): void;
   onLanguageChange(language: LanguagePreference): void;
@@ -34,13 +38,17 @@ type SettingsPageProps = {
 };
 
 export function SettingsPage({
+  isLoadedNotificationMute,
+  isSavingNotificationMute,
   isResetting,
   isSavingProfileFeature,
+  notificationsMuted,
   preferences,
   profileFeatureEnabled,
   releaseInfo,
   onCheckForUpdates,
   onInstallUpdate,
+  onNotificationsMutedChange,
   onProfileFeatureEnabledChange,
   onReset,
   onLanguageChange,
@@ -81,6 +89,29 @@ export function SettingsPage({
             <SelectItem value="system">{t("settings.theme.system")}</SelectItem>
             <SelectItem value="light">{t("settings.theme.light")}</SelectItem>
             <SelectItem value="dark">{t("settings.theme.dark")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingsSection>
+
+      <Separator />
+
+      <SettingsSection
+        title={t("settings.notifications.title")}
+        description={t("settings.notifications.description")}
+      >
+        <Select
+          value={notificationsMuted ? "on" : "off"}
+          onValueChange={(value) => {
+            void onNotificationsMutedChange(value === "on");
+          }}
+          disabled={!isLoadedNotificationMute || isSavingNotificationMute}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t("settings.notifications.muteLabel")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="on">{t("common.on")}</SelectItem>
+            <SelectItem value="off">{t("common.off")}</SelectItem>
           </SelectContent>
         </Select>
       </SettingsSection>

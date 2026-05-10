@@ -17,6 +17,9 @@ import { DesktopSurface } from "../../state/Surface";
 import { DesktopApplicationMenu } from "./DesktopApplicationMenu";
 import { AgentHomesStore } from "../state/AgentHomesStore";
 import { AutoUpdateManager } from "../updates/AutoUpdateManager";
+import { ConnectionUsageAlertEvaluator } from "../alerts/Evaluator";
+import { ConnectionAlertOverlay } from "../alerts/Overlay";
+import { ConnectionAlertStore } from "../alerts/Store";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
 import { DesktopIpcAppRoutes } from "../ipc/DesktopIpcAppRoutes";
@@ -25,11 +28,15 @@ import { DesktopIpcInputValidator } from "../ipc/DesktopIpcInputValidator";
 import { DesktopIpcProfileRoutes } from "../ipc/DesktopIpcProfileRoutes";
 import { DesktopIpcStateRoutes } from "../ipc/DesktopIpcStateRoutes";
 import { DesktopIpcUpdateRoutes } from "../ipc/DesktopIpcUpdateRoutes";
+import { MacNotificationCenter } from "../notifications/Center";
+import { DesktopNotificationHistory } from "../notifications/History";
+import { DesktopNotificationService } from "../notifications/Service";
 import { WorkspaceProfileManager } from "../profiles/Manager";
 import { WorkspaceProfileStore } from "../profiles/Store";
 import { DesktopShell } from "./DesktopShell";
 import { DesktopTrayMenu } from "./TrayMenu";
 import { DesktopStateReset } from "../state/Reset";
+import { DesktopNotificationMuteStore } from "../state/NotificationMuteStore";
 import { DesktopProfileFeatureStore } from "../state/ProfileFeatureStore";
 import { DesktopStateRefresher } from "../state/DesktopStateRefresher";
 import { DesktopStateStore } from "../state/DesktopStateStore";
@@ -51,8 +58,11 @@ export class DesktopMain {
   private readonly credentialStore: CredentialStore;
   private readonly environment: EnvironmentSource;
   private readonly agentHomesStore: AgentHomesStore;
+  private readonly notificationMuteStore: DesktopNotificationMuteStore;
   private readonly profileFeatureStore: DesktopProfileFeatureStore;
   private readonly profileStore: WorkspaceProfileStore;
+  private readonly connectionAlertStore: ConnectionAlertStore;
+  private readonly notificationHistory: DesktopNotificationHistory;
   private readonly profileManager: WorkspaceProfileManager;
   private readonly agentHomes: AgentHomes;
   private readonly surface: DesktopSurface;
@@ -65,6 +75,7 @@ export class DesktopMain {
   private readonly trayMenu: DesktopTrayMenu;
   private readonly autoUpdateManager: AutoUpdateManager;
   private readonly applicationMenu: DesktopApplicationMenu;
+  private readonly notifications: DesktopNotificationService;
   private readonly inputs = new DesktopIpcInputValidator();
   private isQuitting = false;
 
@@ -72,9 +83,27 @@ export class DesktopMain {
     this.logger = NileLogger.createDefault({ module: "desktop-main" });
     this.credentialStore = options.credentialStore ?? new KeychainCredentialStore();
     this.environment = EnvironmentSource.from(new ShellEnvironment().readLoginShellEnvironment());
-    this.agentHomesStore = new AgentHomesStore(join(dirname(options.databasePath), "desktop-agent-homes.json"));
-    this.profileFeatureStore = new DesktopProfileFeatureStore(join(dirname(options.databasePath), "desktop-profile-feature.json"));
-    this.profileStore = new WorkspaceProfileStore(join(dirname(options.databasePath), "desktop-profiles.json"));
+    this.agentHomesStore = new AgentHomesStore(
+      options.databasePath,
+      join(dirname(options.databasePath), "desktop-agent-homes.json"),
+    );
+    this.notificationMuteStore = new DesktopNotificationMuteStore(
+      options.databasePath,
+      join(dirname(options.databasePath), "desktop-notification-mute.json"),
+    );
+    this.profileFeatureStore = new DesktopProfileFeatureStore(
+      options.databasePath,
+      join(dirname(options.databasePath), "desktop-profile-feature.json"),
+    );
+    this.profileStore = new WorkspaceProfileStore(
+      options.databasePath,
+      join(dirname(options.databasePath), "desktop-profiles.json"),
+    );
+    this.connectionAlertStore = new ConnectionAlertStore(
+      options.databasePath,
+      join(dirname(options.databasePath), "desktop-connection-alerts.json"),
+    );
+    this.notificationHistory = new DesktopNotificationHistory(options.databasePath);
     this.agentHomes = mergeAgentHomes(options.agentHomes, this.agentHomesStore.read());
     this.surface = new DesktopSurface({
       databasePath: options.databasePath,
@@ -103,12 +132,17 @@ export class DesktopMain {
       stateReset: new DesktopStateReset({
         localStatePaths: [
           join(dirname(options.databasePath), "desktop-agent-homes.json"),
+          join(dirname(options.databasePath), "desktop-notification-mute.json"),
           join(dirname(options.databasePath), "desktop-profiles.json"),
           join(dirname(options.databasePath), "desktop-profile-feature.json"),
+          join(dirname(options.databasePath), "desktop-connection-alerts.json"),
         ],
         onResetLocalState: () => this.resetDesktopLocalState(),
         stateReset: new StateReset(this.credentialStore),
       }),
+      connectionAlertOverlay: new ConnectionAlertOverlay(this.connectionAlertStore),
+      connectionAlertStore: this.connectionAlertStore,
+      notificationHistory: this.notificationHistory,
     });
     this.profileManager = new WorkspaceProfileManager({
       stateStore: this.stateStore,
@@ -123,6 +157,14 @@ export class DesktopMain {
       onTrayMenuRequested: async () => await this.trayMenu.readTemplate(),
       shouldHideOnClose: () => !this.isQuitting,
     });
+    this.notifications = new DesktopNotificationService({
+      center: new MacNotificationCenter(),
+      history: this.notificationHistory,
+      isMuted: () => this.notificationMuteStore.read(),
+      logger: this.logger.child({ scope: "notifications" }),
+      notifyHistoryChanged: () => this.shell.notifyNotificationHistoryChanged(),
+      openTarget: (target) => this.shell.showSettingsTarget(target),
+    });
     this.trayMenu = new DesktopTrayMenu({
       logger: this.logger,
       peekState: () => this.stateStore.peekMenubarState(),
@@ -131,6 +173,9 @@ export class DesktopMain {
       refreshState: async () => await this.stateStore.refreshMenubarState(),
       refreshSettingsState: async () => await this.stateStore.getSettingsState({ refreshUsage: false }),
       listProfiles: () => this.profileManager.list(),
+      notify: (intent) => {
+        this.notifications.notify(intent);
+      },
       showSettings: () => this.shell.showSettings(),
       quitApp: () => app.quit(),
       applyProfile: async (profileId) => {
@@ -143,6 +188,11 @@ export class DesktopMain {
       },
     });
     this.stateRefresher = new DesktopStateRefresher({
+      alertEvaluator: new ConnectionUsageAlertEvaluator({
+        notify: (intent) => {
+          this.notifications.notify(intent);
+        },
+      }),
       logger: this.logger,
       notifyRenderer: () => this.shell.notifyStateChanged(),
       stateStore: this.stateStore,
@@ -209,10 +259,13 @@ export class DesktopMain {
 
   private registerIpcRoutes(): void {
     new DesktopIpcStateRoutes({
+      getNotificationsMuted: () => this.notificationMuteStore.read(),
       getProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       inputs: this.inputs,
+      notifyNotificationHistoryChanged: () => this.shell.notifyNotificationHistoryChanged(),
       refreshAll: () => this.reloadAll(),
       refreshDesktopState: (options) => this.refreshDesktopState(options),
+      setNotificationsMuted: (muted) => this.notificationMuteStore.write(muted),
       setProfileFeatureEnabled: (enabled) => this.profileFeatureStore.write(enabled),
       stateStore: this.stateStore,
       updateAgentHome: (agentId, path) => this.updateAgentHome(agentId, path),
@@ -269,6 +322,7 @@ export class DesktopMain {
 
   private resetDesktopLocalState(): void {
     this.connectionManager.clearPreparedConnectionDrafts();
+    this.connectionAlertStore.clearCache();
     const next = mergeAgentHomes(this.options.agentHomes, {});
     for (const key of Object.keys(this.agentHomes) as AgentId[]) {
       delete this.agentHomes[key];

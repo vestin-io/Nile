@@ -30,8 +30,8 @@ describe("ConnectionLabeler", () => {
     expect(labeler.resolveSuggestedAccessLabel(
       "openai",
       "cursor_session",
-      cursorSessionCredential("auth0|user_123", "jay@example.com"),
-    )).toBe("jay@example.com");
+      cursorSessionCredential("auth0|user_123", "cursor.user@example.com"),
+    )).toBe("cursor.user@example.com");
   });
 
   it("falls back to generated api-key labels", () => {
@@ -72,7 +72,7 @@ function cursorSessionCredential(authId: string, email: string): StoredCredentia
     authId,
     authCacheKey: `auth:${authId}`,
     email,
-    displayName: "Jay Ji",
+    displayName: "Cursor User",
     userId: 247015891,
   };
 }

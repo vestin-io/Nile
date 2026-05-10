@@ -342,6 +342,7 @@ class StubConnectionGateway {
       endpointFamily: "openai",
       authMode: "api_key",
       isCurrent: true,
+      activeAlertCount: 0,
       enabledAgents: [],
       configurableAgents: [],
       selectedByAgents: [],

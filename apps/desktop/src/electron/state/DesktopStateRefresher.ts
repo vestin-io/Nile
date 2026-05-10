@@ -1,5 +1,6 @@
 import type { NileLogger } from "@nile/core/services/NileLogger";
 
+import { ConnectionUsageAlertEvaluator } from "../alerts/Evaluator";
 import { DesktopStateStore } from "./DesktopStateStore";
 
 type RefreshDesktopStateOptions = {
@@ -13,6 +14,7 @@ type RefreshMenubarUsageOptions = {
 };
 
 type DesktopStateRefresherOptions = {
+  alertEvaluator?: ConnectionUsageAlertEvaluator;
   logger: NileLogger;
   notifyRenderer(): void;
   stateStore: DesktopStateStore;
@@ -28,11 +30,9 @@ export class DesktopStateRefresher {
 
     await Promise.all([
       this.options.stateStore.refreshMenubarState(),
-      this.refreshMenubarUsage({
-        notifyRenderer: false,
-        tolerateFailures: false,
-      }),
+      this.options.stateStore.refreshMenubarUsage(),
     ]);
+    await this.evaluateAlerts();
 
     if (options.notifyRenderer) {
       this.options.notifyRenderer();
@@ -45,6 +45,7 @@ export class DesktopStateRefresher {
 
     try {
       await this.options.stateStore.refreshMenubarUsage();
+      await this.evaluateAlerts();
       if (notifyRenderer) {
         this.options.notifyRenderer();
       }
@@ -57,5 +58,13 @@ export class DesktopStateRefresher {
         error: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  private async evaluateAlerts(): Promise<void> {
+    if (!this.options.alertEvaluator) {
+      return;
+    }
+    const settingsState = await this.options.stateStore.getSettingsState({ refreshUsage: false });
+    this.options.alertEvaluator.evaluate(settingsState);
   }
 }

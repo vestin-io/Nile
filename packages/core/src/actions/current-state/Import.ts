@@ -1,15 +1,11 @@
 import type { AccessRegistry } from "../../models/access";
 import type { AccessRegistryInput } from "../../models/access";
 import type { AgentId } from "../../models/agent/Types";
-import { ConnectionNaming } from "../../models/connection/Naming";
+import { ConnectionUpsert } from "../../models/connection/Upsert";
 import type { EndpointRegistry } from "../../models/endpoint";
 import { EndpointShape, type EndpointFamily, type EndpointRegistryInput } from "../../models/endpoint";
 import type { AgentSelection } from "../../models/selection/Selection";
-import {
-  isEnvKeyApiKeyCredential,
-  sameApiKeyCredential,
-  type StoredCredential,
-} from "../../services/credential/Types";
+import type { StoredCredential } from "../../services/credential/Types";
 import type { NileLogger } from "../../services/NileLogger";
 import type { DetectedAgentState, ImportCurrentConnectionResult } from "../../models/agent";
 
@@ -28,6 +24,8 @@ type ResolvedImportState = {
 };
 
 export class CurrentStateImportSupport {
+  private readonly upsert: ConnectionUpsert;
+
   constructor(
     private readonly agentId: AgentId,
     private readonly agentLabel: string,
@@ -35,7 +33,9 @@ export class CurrentStateImportSupport {
     private readonly accessRegistry: AccessRegistry,
     private readonly agentSelection: AgentSelection,
     private readonly logger: NileLogger,
-  ) {}
+  ) {
+    this.upsert = new ConnectionUpsert(endpointRegistry, accessRegistry);
+  }
 
   importDetected(
     detected: DetectedAgentState,
@@ -57,15 +57,26 @@ export class CurrentStateImportSupport {
     }
 
     const candidate = resolveCandidate();
-    const endpoint = this.ensureEndpoint(candidate.endpoint);
-    const { access, reused } = this.ensureAccess(endpoint.id, candidate);
-    this.logger.info(`${this.agentId}.import-current.created`, {
-      endpointId: endpoint.id,
-      accessId: access.id,
-      endpointFamily: EndpointShape.readFamily(endpoint),
-      authMode: access.authMode,
+    const result = this.upsert.upsert({
+      endpoint: candidate.endpoint,
+      access: {
+        label: candidate.access.label,
+        authMode: candidate.access.authMode,
+        credential: candidate.credential,
+        identityKey: candidate.access.identityKey ?? null,
+        openclawModelId: candidate.access.openclawModelId ?? null,
+        enabledAgents: [this.agentId],
+        enabledAgentsMode: "merge",
+        apiKeyEnvKeyFallback: candidate.endpoint.protocols.openai?.envKeyOverride,
+      },
     });
-    return this.selectAndSummarize(endpoint.id, access.id, reused);
+    this.logger.info(`${this.agentId}.import-current.created`, {
+      endpointId: result.endpoint.id,
+      accessId: result.access.id,
+      endpointFamily: EndpointShape.readFamily(result.endpoint),
+      authMode: result.access.authMode,
+    });
+    return this.selectAndSummarize(result.endpoint.id, result.access.id, result.reused);
   }
 
   private reuseMatchedConnection(connectionId: string): ImportCurrentConnectionResult {
@@ -105,122 +116,6 @@ export class CurrentStateImportSupport {
       summary.reused = true;
     }
     return summary;
-  }
-
-  private ensureEndpoint(candidate: EndpointRegistryInput) {
-    const hinted = this.endpointRegistry.get(candidate.id);
-    if (hinted && EndpointShape.matchesRecord(hinted, candidate)) {
-      return this.endpointRegistry.update(hinted.id, {
-        label: candidate.label,
-        rootUrl: candidate.rootUrl,
-        profile: candidate.profile ?? null,
-        protocols: candidate.protocols,
-      });
-    }
-
-    const existingEquivalent = this.endpointRegistry
-      .list()
-      .find((endpoint) => EndpointShape.matchesRecord(endpoint, candidate));
-    if (existingEquivalent) {
-      return this.endpointRegistry.update(existingEquivalent.id, {
-        label: candidate.label,
-        rootUrl: candidate.rootUrl,
-        profile: candidate.profile ?? null,
-        protocols: candidate.protocols,
-      });
-    }
-
-    const endpointId = hinted
-      ? ConnectionNaming.createUniqueId(candidate.id || candidate.label, this.endpointRegistry.list().map((entry) => entry.id))
-      : candidate.id;
-    return this.endpointRegistry.add({
-      ...candidate,
-      id: endpointId,
-    });
-  }
-
-  private ensureAccess(
-    endpointId: string,
-    candidate: AgentImportCandidate,
-  ) {
-    const existing = this.findExistingAccess(endpointId, candidate);
-    if (existing) {
-      const current = this.accessRegistry.get(existing.id);
-      const enabledAgents = current ? [...new Set([...current.enabledAgents, this.agentId])] : [this.agentId];
-      return {
-        access: this.accessRegistry.update(existing.id, {
-          label: candidate.access.label,
-          identityKey: candidate.access.identityKey ?? null,
-          openclawModelId: candidate.access.openclawModelId ?? null,
-          enabledAgents,
-        }, candidate.credential),
-        reused: true,
-      };
-    }
-
-    const accessId = ConnectionNaming.createUniqueId(
-      candidate.access.label,
-      this.accessRegistry.list().map((entry) => entry.id),
-    );
-    return {
-      access: this.accessRegistry.add({
-        id: accessId,
-        endpointId,
-        label: candidate.access.label,
-        authMode: candidate.access.authMode,
-        enabledAgents: [this.agentId],
-        ...(candidate.access.openclawModelId ? { openclawModelId: candidate.access.openclawModelId } : {}),
-        ...(candidate.access.identityKey ? { identityKey: candidate.access.identityKey } : {}),
-      }, candidate.credential),
-      reused: false,
-    };
-  }
-
-  private findExistingAccess(
-    endpointId: string,
-    candidate: AgentImportCandidate,
-  ) {
-    return this.accessRegistry
-      .list()
-      .filter((access) => access.endpointId === endpointId && access.authMode === candidate.access.authMode)
-      .find((access) => this.matchesCredential(access.id, candidate, candidate.access.identityKey));
-  }
-
-  private matchesCredential(
-    accessId: string,
-    candidate: AgentImportCandidate,
-    identityKey?: string,
-  ): boolean {
-    const credential = candidate.credential;
-    if (credential.kind === "api_key") {
-      try {
-        const stored = this.accessRegistry.readCredential(accessId);
-        if (stored.kind !== "api_key") {
-          return false;
-        }
-        if (sameApiKeyCredential(stored, credential)) {
-          return this.matchesOpenClawModel(candidate, accessId);
-        }
-        return isEnvKeyApiKeyCredential(stored)
-          && stored.envKey === candidate.endpoint.protocols.openai?.envKeyOverride;
-      } catch {
-        return false;
-      }
-    }
-
-    if (!identityKey) {
-      return false;
-    }
-
-    const access = this.accessRegistry.get(accessId);
-    return access?.identityKey === identityKey;
-  }
-
-  private matchesOpenClawModel(candidate: AgentImportCandidate, accessId: string): boolean {
-    const candidateModelId = candidate.access.openclawModelId?.trim() || undefined;
-    const existing = this.accessRegistry.get(accessId);
-    const existingModelId = existing?.openclawModelId?.trim() || undefined;
-    return candidateModelId === existingModelId;
   }
 }
 

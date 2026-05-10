@@ -27,7 +27,7 @@ import {
   type DesktopPreparedConnectionDraft,
   type DesktopSavePreparedConnectionInput,
   type DesktopUpdateConnectionInput,
-} from "../types";
+} from "./contracts";
 import { DesktopPreparedDraftStore } from "./DesktopPreparedDraftStore";
 import { SessionRunner } from "./SessionRunner";
 

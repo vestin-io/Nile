@@ -34,7 +34,45 @@ type ConnectionsPageProps = {
   onSelectConnection(connectionId: string | null): void;
   onRefresh(): Promise<void>;
   onBindCursorUsage(connectionId: string): Promise<void>;
+  onCreateAlert(input:
+    | {
+      connectionId: string;
+      metricKey: string;
+      metricLabel: string;
+      type: "low-percent";
+      thresholdPercent: number;
+      enabled: boolean;
+    }
+    | {
+      connectionId: string;
+      metricKey: string;
+      metricLabel: string;
+      type: "renewed";
+      enabled: boolean;
+    }
+  ): Promise<void>;
+  onDeleteAlert(connectionId: string, alertId: string): Promise<void>;
+  onOpenNotificationHistory(connectionId: string): void;
   onRemove(connectionId: string): Promise<void>;
+  onUpdateAlert(input:
+    | {
+      alertId: string;
+      connectionId: string;
+      metricKey: string;
+      metricLabel: string;
+      type: "low-percent";
+      thresholdPercent: number;
+      enabled: boolean;
+    }
+    | {
+      alertId: string;
+      connectionId: string;
+      metricKey: string;
+      metricLabel: string;
+      type: "renewed";
+      enabled: boolean;
+    }
+  ): Promise<void>;
   onUpdateConnection(input: {
     connectionId: string;
     label?: string;
@@ -63,7 +101,11 @@ export function ConnectionsPage({
   onSelectConnection,
   onRefresh,
   onBindCursorUsage,
+  onCreateAlert,
+  onDeleteAlert,
+  onOpenNotificationHistory,
   onRemove,
+  onUpdateAlert,
   onUpdateConnection,
 }: ConnectionsPageProps) {
   const [mode, setMode] = useState<"detail" | "edit">("detail");
@@ -137,12 +179,16 @@ export function ConnectionsPage({
           onBackFromAgentDetail();
         } : undefined}
         onBindCursorUsage={onBindCursorUsage}
+        onCreateAlert={onCreateAlert}
+        onDeleteAlert={onDeleteAlert}
         onEdit={() => setMode("edit")}
+        onOpenNotificationHistory={onOpenNotificationHistory}
         onRefresh={onRefresh}
         onRemove={async (connectionId) => {
           await onRemove(connectionId);
           onSelectConnection(null);
         }}
+        onUpdateAlert={onUpdateAlert}
       />
     );
   }

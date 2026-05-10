@@ -39,6 +39,7 @@ export function ConnectionTable({
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t("common.provider")} value={readProviderLabel(connection.endpointFamily, t)} />
                 <Field label={t("common.usage")} value={<ConnectionUsageCell connection={connection} t={t} />} />
+                <Field label={t("common.alerts")} value={readAlertCountValue(connection.activeAlertCount)} />
                 <Field
                   label={t("common.capability")}
                   value={connection.enabledAgents.length === 0 ? t("common.none") : formatAgentsList(connection.enabledAgents, t)}
@@ -58,6 +59,7 @@ export function ConnectionTable({
               <TableHead>{t("common.provider")}</TableHead>
               <TableHead>{t("common.usage")}</TableHead>
               <TableHead>{t("common.capability")}</TableHead>
+              <TableHead>{t("common.alerts")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -74,6 +76,7 @@ export function ConnectionTable({
                 <TableCell>{readProviderLabel(connection.endpointFamily, t)}</TableCell>
                 <TableCell><ConnectionUsageCell connection={connection} t={t} /></TableCell>
                 <TableCell>{connection.enabledAgents.length === 0 ? t("common.none") : formatAgentsList(connection.enabledAgents, t)}</TableCell>
+                <TableCell>{readAlertCountValue(connection.activeAlertCount)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -81,4 +84,8 @@ export function ConnectionTable({
       </div>
     </>
   );
+}
+
+function readAlertCountValue(activeAlertCount: number): string {
+  return activeAlertCount > 0 ? String(activeAlertCount) : "";
 }

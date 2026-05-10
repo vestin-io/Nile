@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { SqliteDatabase } from "@nile/core/services/database";
 
 import { WorkspaceProfileStore } from "./Store";
 
@@ -15,8 +16,8 @@ afterEach(() => {
 
 describe("WorkspaceProfileStore", () => {
   it("stores sparse per-agent profile assignments", () => {
-    const path = createStorePath();
-    const store = new WorkspaceProfileStore(path);
+    const { databasePath } = createStorePaths();
+    const store = new WorkspaceProfileStore(databasePath);
 
     const profile = store.create({
       name: " Work ",
@@ -30,13 +31,19 @@ describe("WorkspaceProfileStore", () => {
     expect(profile.name).toBe("Work");
     expect(profile.emoji).toBe("💼");
     expect(store.list()).toEqual([profile]);
-    expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({
-      profiles: [profile],
-    });
+    const database = SqliteDatabase.open(databasePath);
+    try {
+      expect(database.query<{ id: string; name: string; emoji: string | null }>("SELECT id, name, emoji FROM desktop_workspace_profiles").all()).toEqual([
+        { id: profile.id, name: "Work", emoji: "💼" },
+      ]);
+    } finally {
+      database.close();
+    }
   });
 
   it("updates and deletes a profile without touching other profiles", () => {
-    const store = new WorkspaceProfileStore(createStorePath());
+    const { databasePath } = createStorePaths();
+    const store = new WorkspaceProfileStore(databasePath);
     const work = store.create({ name: "Work", assignments: [{ agentId: "codex", connectionId: "work" }] });
     const personal = store.create({ name: "Personal", assignments: [{ agentId: "codex", connectionId: "home" }] });
 
@@ -58,7 +65,8 @@ describe("WorkspaceProfileStore", () => {
   });
 
   it("rejects duplicate profile names during create and rename", () => {
-    const store = new WorkspaceProfileStore(createStorePath());
+    const { databasePath } = createStorePaths();
+    const store = new WorkspaceProfileStore(databasePath);
     const work = store.create({ name: "Work", assignments: [{ agentId: "codex", connectionId: "work" }] });
     const personal = store.create({ name: "Personal", assignments: [{ agentId: "claude", connectionId: "home" }] });
 
@@ -82,7 +90,8 @@ describe("WorkspaceProfileStore", () => {
   });
 
   it("updates profile assignments without changing other profiles", () => {
-    const store = new WorkspaceProfileStore(createStorePath());
+    const { databasePath } = createStorePaths();
+    const store = new WorkspaceProfileStore(databasePath);
     const work = store.create({ name: "Work", assignments: [{ agentId: "codex", connectionId: "work" }] });
     const personal = store.create({ name: "Personal", assignments: [{ agentId: "claude", connectionId: "home" }] });
 
@@ -108,8 +117,8 @@ describe("WorkspaceProfileStore", () => {
   });
 
   it("drops invalid persisted assignments while preserving valid ones", () => {
-    const path = createStorePath();
-    writeFileSync(path, JSON.stringify({
+    const { databasePath, legacyPath } = createStorePaths();
+    writeFileSync(legacyPath, JSON.stringify({
       profiles: [
         {
           id: "profile-1",
@@ -123,7 +132,7 @@ describe("WorkspaceProfileStore", () => {
       ],
     }), "utf8");
 
-    const store = new WorkspaceProfileStore(path);
+    const store = new WorkspaceProfileStore(databasePath, legacyPath);
 
     expect(store.list()).toEqual([
       {
@@ -132,11 +141,86 @@ describe("WorkspaceProfileStore", () => {
         assignments: [{ agentId: "codex", connectionId: "work" }],
       },
     ]);
+    expect(existsSync(legacyPath)).toBe(false);
+  });
+
+  it("upgrades early sqlite assignment rows that predate home_path_kind", () => {
+    const { databasePath } = createStorePaths();
+    const database = SqliteDatabase.open(databasePath);
+    try {
+      database.exec(`
+        CREATE TABLE desktop_workspace_profiles (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          emoji TEXT
+        );
+
+        CREATE TABLE desktop_workspace_profile_assignments (
+          profile_id TEXT NOT NULL,
+          agent_id TEXT NOT NULL,
+          connection_id TEXT,
+          home_path TEXT
+        );
+      `);
+      database.run(
+        "INSERT INTO desktop_workspace_profiles (id, name, emoji) VALUES (?, ?, ?)",
+        "profile-1",
+        "Work",
+        null,
+      );
+      database.run(
+        `
+          INSERT INTO desktop_workspace_profile_assignments (profile_id, agent_id, connection_id, home_path)
+          VALUES (?, ?, ?, ?)
+        `,
+        "profile-1",
+        "codex",
+        "work",
+        null,
+      );
+      database.run(
+        `
+          INSERT INTO desktop_workspace_profile_assignments (profile_id, agent_id, connection_id, home_path)
+          VALUES (?, ?, ?, ?)
+        `,
+        "profile-1",
+        "claude",
+        null,
+        null,
+      );
+      database.run(
+        `
+          INSERT INTO desktop_workspace_profile_assignments (profile_id, agent_id, connection_id, home_path)
+          VALUES (?, ?, ?, ?)
+        `,
+        "profile-1",
+        "cursor",
+        "cursor-work",
+        "/tmp/cursor-work",
+      );
+    } finally {
+      database.close();
+    }
+
+    const store = new WorkspaceProfileStore(databasePath);
+
+    expect(store.list()).toEqual([{
+      id: "profile-1",
+      name: "Work",
+      assignments: [
+        { agentId: "codex", connectionId: "work" },
+        { agentId: "claude", homePath: null },
+        { agentId: "cursor", connectionId: "cursor-work", homePath: "/tmp/cursor-work" },
+      ],
+    }]);
   });
 });
 
-function createStorePath(): string {
+function createStorePaths(): { databasePath: string; legacyPath: string } {
   const dir = mkdtempSync(join(tmpdir(), "nile-desktop-profiles-"));
   tempDirs.push(dir);
-  return join(dir, "profiles.json");
+  return {
+    databasePath: join(dir, "desktop.sqlite"),
+    legacyPath: join(dir, "profiles.json"),
+  };
 }

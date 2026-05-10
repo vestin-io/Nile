@@ -69,5 +69,17 @@ export class DesktopIpcConnectionRoutes {
       this.options.refreshAll();
       return result;
     });
+    ipcMain.handle("desktop:create-connection-usage-alert", async (_event, input: unknown) => {
+      return stateStore.createConnectionAlert(inputs.readCreateConnectionAlertInput(input));
+    });
+    ipcMain.handle("desktop:update-connection-usage-alert", async (_event, input: unknown) => {
+      return stateStore.updateConnectionAlert(inputs.readUpdateConnectionAlertInput(input));
+    });
+    ipcMain.handle("desktop:delete-connection-usage-alert", async (_event, connectionId: unknown, alertId: unknown) => {
+      stateStore.deleteConnectionAlert(
+        inputs.readRequiredString(connectionId, "connectionId"),
+        inputs.readRequiredString(alertId, "alertId"),
+      );
+    });
   }
 }
