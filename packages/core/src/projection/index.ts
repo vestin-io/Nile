@@ -3,7 +3,9 @@ export type {
   ClaudeProjection,
   CodexProjection,
   CursorProjection,
+  OpenClawAuthProfileProjection,
   OpenClawProjection,
+  OpenClawProviderProjection,
   ProjectionInput,
 } from "./Types";
 export { AgentProjectionError } from "./ProjectionError";

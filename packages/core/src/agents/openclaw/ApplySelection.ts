@@ -9,12 +9,14 @@ import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore"
 import { NileLogger } from "../../services/NileLogger";
 import { AgentApplySupport, type PreparedAgentApplySelection } from "../../actions/apply/Support";
 import { ApplyMutation } from "../ApplyMutation";
-import type { OpenClawProjection } from "../../projection";
+import type { OpenClawAuthProfileProjection, OpenClawProjection, OpenClawProviderProjection } from "../../projection";
 import {
   AgentWorkspaceSession,
 } from "../../runtime-local/AgentWorkspaceSession";
 import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
+import type { StoredCredential } from "../../services/credential/Types";
 import { OPENCLAW_AGENT_ID } from "./types";
+import { OpenClawAuthProfileStore, type OpenClawAuthProfileCredential } from "./AuthProfileStore";
 import { OpenClawConfigStore } from "./OpenClawConfigStore";
 
 export class ApplySelectionValidationError extends Error {
@@ -60,6 +62,7 @@ export class ApplySelection {
         logger,
       ),
       new OpenClawConfigStore(openclawHome),
+      new OpenClawAuthProfileStore(openclawHome),
       environment,
       context,
     );
@@ -99,6 +102,7 @@ export class ApplySelection {
         logger,
       ),
       new OpenClawConfigStore(openclawHome),
+      new OpenClawAuthProfileStore(openclawHome),
       environment,
     );
   }
@@ -106,12 +110,14 @@ export class ApplySelection {
   constructor(
     private readonly applyMutation: ApplyMutation,
     private readonly configStore: OpenClawConfigStore,
+    private readonly authProfileStore: OpenClawAuthProfileStore,
     private readonly environment: EnvironmentSource,
     private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
   apply(connectionId: string) {
     const configSnapshot = this.configStore.snapshot();
+    const authProfileSnapshot = this.authProfileStore.snapshot();
     return this.applyMutation.execute({
       agentId: OPENCLAW_AGENT_ID,
       connectionId,
@@ -123,18 +129,32 @@ export class ApplySelection {
           existedBefore: configSnapshot !== null,
           isSensitive: true,
         },
+        {
+          path: this.authProfileStore.filePath,
+          content: authProfileSnapshot,
+          existedBefore: authProfileSnapshot !== null,
+          isSensitive: true,
+        },
       ],
       apply: (prepared) => {
-        this.configStore.applyProjection(
-          this.requireOpenClawProjection(prepared.projection),
-          this.requireConfiguredEnvKey(prepared.credential),
-        );
+        const projection = this.requireOpenClawProjection(prepared.projection);
+        if (projection.configKind === "provider") {
+          this.configStore.applyProviderProjection(
+            projection,
+            this.requireConfiguredEnvKey(prepared.credential),
+          );
+          return;
+        }
+
+        this.applyAuthProfileProjection(projection, prepared.credential);
       },
       readAppliedFiles: () => [
         { path: this.configStore.configPath, content: this.configStore.snapshot() },
+        { path: this.authProfileStore.filePath, content: this.authProfileStore.snapshot() },
       ],
       restore: () => {
         this.configStore.restore(configSnapshot);
+        this.authProfileStore.restore(authProfileSnapshot);
       },
     });
   }
@@ -153,6 +173,72 @@ export class ApplySelection {
       );
     }
     return projection as OpenClawProjection;
+  }
+
+  private applyAuthProfileProjection(
+    projection: OpenClawAuthProfileProjection,
+    credential: PreparedAgentApplySelection["credential"],
+  ): void {
+    const profileId = this.configStore.profileIdForAccess(projection.providerId, projection.accessId);
+    const profileCredential = this.buildAuthProfileCredential(projection, credential);
+    this.configStore.applyAuthProfileProjection(projection, profileId, {
+      email: this.readProfileEmail(profileCredential),
+    });
+
+    const store = this.authProfileStore.readParsedStore();
+    store.profiles[profileId] = profileCredential;
+    this.authProfileStore.writeStore(store);
+  }
+
+  private buildAuthProfileCredential(
+    projection: OpenClawAuthProfileProjection,
+    credential: PreparedAgentApplySelection["credential"],
+  ): OpenClawAuthProfileCredential {
+    if (projection.authMode === "openai_session") {
+      if (credential.kind !== "openai_session") {
+        throw new ApplySelectionValidationError("OpenClaw openai_session access requires an openai_session credential");
+      }
+
+      return {
+        type: "oauth",
+        provider: projection.providerId,
+        access: credential.accessToken,
+        refresh: credential.refreshToken,
+        expires: this.requireOpenAiSessionExpiry(credential),
+        ...(credential.accountId?.trim() ? { accountId: credential.accountId.trim() } : {}),
+        ...(this.readOpenAiSessionEmail(credential)?.trim() ? { email: this.readOpenAiSessionEmail(credential) } : {}),
+      };
+    }
+
+    if (projection.authMode === "claude_session") {
+      if (credential.kind !== "claude_session") {
+        throw new ApplySelectionValidationError("OpenClaw claude_session access requires a claude_session credential");
+      }
+
+      return {
+        type: "oauth",
+        provider: projection.providerId,
+        access: credential.accessToken,
+        refresh: credential.refreshToken,
+        expires: this.requireClaudeSessionExpiry(credential),
+        ...(credential.email?.trim() ? { email: credential.email.trim() } : {}),
+      };
+    }
+
+    const apiKey = this.requireApiKeyValue(credential);
+    if (projection.profileMode === "token") {
+      return {
+        type: "token",
+        provider: projection.providerId,
+        token: apiKey,
+      };
+    }
+
+    return {
+      type: "api_key",
+      provider: projection.providerId,
+      key: apiKey,
+    };
   }
 
   private requireConfiguredEnvKey(
@@ -179,6 +265,89 @@ export class ApplySelection {
     }
 
     return envKey;
+  }
+
+  private requireApiKeyValue(credential: StoredCredential): string {
+    if (credential.kind !== "api_key") {
+      throw new ApplySelectionValidationError("OpenClaw api_key access requires an api_key credential");
+    }
+
+    if (credential.source === "env_key") {
+      const envKey = credential.envKey.trim();
+      if (!/^[A-Z_][A-Z0-9_]*$/.test(envKey)) {
+        throw new ApplySelectionValidationError(`OpenClaw env var name is invalid: ${credential.envKey}`);
+      }
+      const apiKey = this.environment.read(envKey);
+      if (!apiKey?.trim()) {
+        throw new ApplySelectionValidationError(`OpenClaw could not read API key from env var ${envKey}`);
+      }
+      return apiKey.trim();
+    }
+
+    if (!credential.apiKey.trim()) {
+      throw new ApplySelectionValidationError("OpenClaw api_key credential is empty");
+    }
+    return credential.apiKey.trim();
+  }
+
+  private requireOpenAiSessionExpiry(
+    credential: Extract<PreparedAgentApplySelection["credential"], { kind: "openai_session" }>,
+  ): number {
+    const expiry = this.readJwtExpiryMs(credential.idToken) ?? this.readJwtExpiryMs(credential.accessToken);
+    if (expiry) {
+      return expiry;
+    }
+    throw new ApplySelectionValidationError("OpenClaw could not determine an expiry for the OpenAI session credential");
+  }
+
+  private requireClaudeSessionExpiry(
+    credential: Extract<PreparedAgentApplySelection["credential"], { kind: "claude_session" }>,
+  ): number {
+    if (typeof credential.expiresAt === "number" && Number.isFinite(credential.expiresAt)) {
+      return credential.expiresAt;
+    }
+    const expiry = this.readJwtExpiryMs(credential.accessToken);
+    if (expiry) {
+      return expiry;
+    }
+    throw new ApplySelectionValidationError("OpenClaw could not determine an expiry for the Claude session credential");
+  }
+
+  private readOpenAiSessionEmail(
+    credential: Extract<PreparedAgentApplySelection["credential"], { kind: "openai_session" }>,
+  ): string | undefined {
+    const claims = this.decodeJwtPayload(credential.idToken);
+    const email = claims?.email;
+    return typeof email === "string" && email.trim() ? email.trim() : undefined;
+  }
+
+  private readProfileEmail(credential: OpenClawAuthProfileCredential): string | undefined {
+    return credential.email?.trim() || undefined;
+  }
+
+  private readJwtExpiryMs(token: string): number | null {
+    const claims = this.decodeJwtPayload(token);
+    const exp = claims?.exp;
+    return typeof exp === "number" && Number.isFinite(exp) ? exp * 1000 : null;
+  }
+
+  private decodeJwtPayload(token: string): Record<string, unknown> | null {
+    const parts = token.split(".");
+    if (parts.length < 2) {
+      return null;
+    }
+
+    try {
+      const encoded = parts[1]
+        .replace(/-/g, "+")
+        .replace(/_/g, "/")
+        .padEnd(Math.ceil(parts[1].length / 4) * 4, "=");
+      const payload = Buffer.from(encoded, "base64").toString("utf8");
+      const parsed = JSON.parse(payload);
+      return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
+    } catch {
+      return null;
+    }
   }
 
   private static createApplySupport(

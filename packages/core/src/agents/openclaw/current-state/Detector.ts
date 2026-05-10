@@ -9,6 +9,8 @@ import {
 } from "../../../runtime-local/AgentWorkspaceSession";
 import type { AgentWorkspaceContext } from "../../../runtime-local/AgentWorkspaceContext";
 import { CurrentStateMatcher } from "../../../actions/current-state/Matcher";
+import { CodexAuthStore } from "../../codex/stores/CodexAuthStore";
+import { OpenClawAuthProfileStore } from "../AuthProfileStore";
 import { OpenClawConfigStore } from "../OpenClawConfigStore";
 import { OPENCLAW_AGENT_ID, type OpenClawDetectedAccess, type OpenClawDetectedCurrentState, type OpenClawDetectedEndpoint } from "../types";
 import type { ReadCurrentStateResult } from "./Internal";
@@ -19,14 +21,18 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<OpenClawDet
     databasePath: string,
     options: {
       openclawHome?: string;
+      codexHome?: string;
       credentialStore: CredentialStore;
       logger?: NileLogger;
     },
   ): CurrentStateDetector {
     const logger = options?.logger ?? NileLogger.silent().child({ module: "openclaw-current-state-detector" });
     const context = AgentWorkspaceSession.open(databasePath, options.credentialStore);
+    const openclawHome = options?.openclawHome ?? join(homedir(), ".openclaw");
     const reader = new CurrentStateReader(
-      new OpenClawConfigStore(options?.openclawHome ?? join(homedir(), ".openclaw")),
+      new OpenClawConfigStore(openclawHome),
+      new OpenClawAuthProfileStore(openclawHome),
+      new CodexAuthStore({ codexHome: options?.codexHome ?? join(homedir(), ".codex") }),
     );
     const matcher = new CurrentStateMatcher(
       context.sharedContext.endpointRegistry,
@@ -41,13 +47,17 @@ export class CurrentStateDetector extends AbstractAgentStateDetector<OpenClawDet
     context: AgentWorkspaceContext,
     options: {
       openclawHome?: string;
+      codexHome?: string;
       credentialStore: CredentialStore;
       logger?: NileLogger;
     },
   ): CurrentStateDetector {
     const logger = options?.logger ?? NileLogger.silent().child({ module: "openclaw-current-state-detector" });
+    const openclawHome = options?.openclawHome ?? join(homedir(), ".openclaw");
     const reader = new CurrentStateReader(
-      new OpenClawConfigStore(options?.openclawHome ?? join(homedir(), ".openclaw")),
+      new OpenClawConfigStore(openclawHome),
+      new OpenClawAuthProfileStore(openclawHome),
+      new CodexAuthStore({ codexHome: options?.codexHome ?? join(homedir(), ".codex") }),
     );
     const matcher = new CurrentStateMatcher(
       context.endpointRegistry,

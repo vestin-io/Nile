@@ -1,19 +1,27 @@
-import { ConnectionNaming } from "../../../models/connection/Naming";
-import type { EndpointProfile, EndpointRegistryInput } from "../../../models/endpoint";
-import { splitEndpointUrl } from "../../../projection/Url";
-import type { ApiKeyCredential } from "../../../services/credential/Types";
+import { CodexAuthStore } from "../../codex/stores/CodexAuthStore";
+import {
+  OpenClawAuthProfileStore,
+} from "../AuthProfileStore";
 import { OpenClawConfigStore } from "../OpenClawConfigStore";
-import type { OpenClawDetectedAccess, OpenClawDetectedEndpoint } from "../types";
-import type { ReadCurrentStateResult, ResolvedLiveState } from "./Internal";
-
-const OPENAI_HOST_MARKERS = ["api.openai.com"];
-const AZURE_HOST_MARKERS = [".cognitiveservices.azure.com", ".openai.azure.com"];
-const ANTHROPIC_HOST_MARKERS = ["api.anthropic.com"];
+import type { ReadCurrentStateResult } from "./Internal";
+import {
+  CurrentStateResolver,
+  type OpenClawAuthProfileMetadata,
+  type OpenClawAuthProfileMode,
+} from "./Resolver";
 
 type JsonObject = Record<string, unknown>;
 
 export class CurrentStateReader {
-  constructor(private readonly configStore: OpenClawConfigStore) {}
+  private readonly stateResolver: CurrentStateResolver;
+
+  constructor(
+    private readonly configStore: OpenClawConfigStore,
+    private readonly authProfileStore: OpenClawAuthProfileStore,
+    private readonly codexAuthStore: CodexAuthStore,
+  ) {
+    this.stateResolver = new CurrentStateResolver(this.codexAuthStore);
+  }
 
   read(): ReadCurrentStateResult {
     const snapshot = this.configStore.snapshot();
@@ -51,6 +59,59 @@ export class CurrentStateReader {
       };
     }
 
+    const authProfile = this.readAuthProfile(config, primary.providerId);
+    if ("error" in authProfile) {
+      return {
+        kind: "invalid_semantics",
+        issues: [authProfile.error],
+        endpoint: null,
+        access: null,
+      };
+    }
+
+    if (authProfile.value) {
+      let authStore: ReturnType<OpenClawAuthProfileStore["readParsedStore"]>;
+      try {
+        authStore = this.authProfileStore.readParsedStore();
+      } catch (error) {
+        return {
+          kind: "invalid_structure",
+          issues: [error instanceof Error ? error.message : String(error)],
+        };
+      }
+
+      const credential = authStore.profiles[authProfile.value.profileId];
+      if (!credential) {
+        return {
+          kind: "invalid_semantics",
+          issues: [
+            `OpenClaw auth-profiles.json does not contain profile ${authProfile.value.profileId}`,
+          ],
+          endpoint: null,
+          access: null,
+        };
+      }
+
+      const resolved = this.stateResolver.resolveAuthProfileState(
+        authProfile.value,
+        primary.modelId,
+        credential,
+      );
+      if ("error" in resolved) {
+        return {
+          kind: "invalid_semantics",
+          issues: [resolved.error],
+          endpoint: resolved.endpoint ?? null,
+          access: resolved.access ?? null,
+        };
+      }
+
+      return {
+        kind: "resolved",
+        value: resolved.value,
+      };
+    }
+
     const provider = this.readProvider(config, primary.providerId);
     if ("error" in provider) {
       return {
@@ -61,7 +122,7 @@ export class CurrentStateReader {
       };
     }
 
-    const resolved = this.resolveLiveState(primary.providerId, primary.modelId, provider.value);
+    const resolved = this.stateResolver.resolveProviderState(primary.providerId, primary.modelId, provider.value);
     if ("error" in resolved) {
       return {
         kind: "invalid_semantics",
@@ -100,6 +161,92 @@ export class CurrentStateReader {
     };
   }
 
+  private readAuthProfile(
+    config: Record<string, unknown>,
+    providerId: string,
+  ): { value: OpenClawAuthProfileMetadata | null } | { error: string } {
+    const auth = asObject(config.auth);
+    const profiles = asObject(auth?.profiles);
+    if (!profiles) {
+      return { value: null };
+    }
+
+    const profileId = this.selectActiveProfileId(auth, profiles, providerId);
+    if ("error" in profileId) {
+      return profileId;
+    }
+    if (!profileId.value) {
+      return { value: null };
+    }
+
+    const metadata = asObject(profiles[profileId.value]);
+    if (!metadata) {
+      return {
+        error: `OpenClaw auth profile ${profileId.value} must be an object`,
+      };
+    }
+
+    const profileProviderId = readString(metadata.provider);
+    if (!profileProviderId) {
+      return {
+        error: `OpenClaw auth profile ${profileId.value} is missing provider`,
+      };
+    }
+    if (profileProviderId !== providerId) {
+      return {
+        error: `OpenClaw auth profile ${profileId.value} targets provider ${profileProviderId}, expected ${providerId}`,
+      };
+    }
+
+    const mode = readMode(metadata.mode);
+    if (!mode) {
+      return {
+        error: `OpenClaw auth profile ${profileId.value} uses unsupported mode ${String(metadata.mode)}`,
+      };
+    }
+
+    return {
+      value: {
+        profileId: profileId.value,
+        providerId,
+        mode,
+        ...(readString(metadata.email) ? { email: readString(metadata.email)! } : {}),
+      },
+    };
+  }
+
+  private selectActiveProfileId(
+    auth: JsonObject | null,
+    profiles: JsonObject,
+    providerId: string,
+  ): { value: string | null } | { error: string } {
+    const lastGoodId = readString(asObject(auth?.lastGood)?.[providerId]);
+    if (lastGoodId && hasProfile(profiles, lastGoodId)) {
+      return { value: lastGoodId };
+    }
+
+    const orderValues = asStringArray(asObject(auth?.order)?.[providerId]);
+    const orderedProfileId = orderValues.find((profileId) => hasProfile(profiles, profileId));
+    if (orderedProfileId) {
+      return { value: orderedProfileId };
+    }
+
+    const matchingProfileIds = Object.entries(profiles)
+      .filter(([, value]) => asObject(value)?.provider === providerId)
+      .map(([profileId]) => profileId);
+
+    if (matchingProfileIds.length === 0) {
+      return { value: null };
+    }
+    if (matchingProfileIds.length > 1) {
+      return {
+        error: `OpenClaw config does not define an active auth profile for provider ${providerId}`,
+      };
+    }
+
+    return { value: matchingProfileIds[0] };
+  }
+
   private readProvider(
     config: Record<string, unknown>,
     providerId: string,
@@ -119,206 +266,10 @@ export class CurrentStateReader {
     return { value: provider };
   }
 
-  private resolveLiveState(
-    providerId: string,
-    modelId: string,
-    provider: JsonObject,
-  ): { value: ResolvedLiveState } | { error: string; endpoint?: OpenClawDetectedEndpoint; access?: OpenClawDetectedAccess } {
-    const baseUrl = readString(provider.baseUrl);
-    if (!baseUrl) {
-      return { error: `OpenClaw provider ${providerId} is missing baseUrl` };
-    }
+}
 
-    const apiKey = readString(provider.apiKey);
-    if (!apiKey) {
-      return { error: `OpenClaw provider ${providerId} is missing apiKey` };
-    }
-
-    const api = readString(provider.api);
-    if (!api) {
-      return { error: `OpenClaw provider ${providerId} is missing api` };
-    }
-
-    if (api === "openai-completions" || api === "openai-responses") {
-      return {
-        value: this.buildOpenAiState(providerId, modelId, baseUrl, apiKey, api),
-      };
-    }
-
-    if (api === "anthropic-messages") {
-      return {
-        value: this.buildAnthropicState(providerId, modelId, baseUrl, apiKey),
-      };
-    }
-
-    return {
-      error: `OpenClaw provider ${providerId} uses unsupported api protocol ${api}`,
-    };
-  }
-
-  private buildOpenAiState(
-    providerId: string,
-    modelId: string,
-    baseUrl: string,
-    apiKey: string,
-    api: "openai-completions" | "openai-responses",
-  ): ResolvedLiveState {
-    const endpointFamily = this.inferOpenAiEndpointFamily(providerId, baseUrl);
-    const endpoint = this.buildOpenAiEndpoint(providerId, endpointFamily, baseUrl, api);
-    const detectedEndpoint: OpenClawDetectedEndpoint = {
-      endpointFamily,
-      endpointIdHint: providerId,
-      labelHint: endpoint.label,
-      baseUrl,
-      wireApi: api === "openai-completions" ? "chat" : "responses",
-    };
-    const detectedAccess: OpenClawDetectedAccess = {
-      authMode: "api_key",
-      labelHint: `${endpoint.label} ${modelId}`,
-      openclawModelId: modelId,
-    };
-
-    return {
-      endpoint,
-      access: {
-        authMode: "api_key",
-        label: detectedAccess.labelHint,
-        openclawModelId: modelId,
-      },
-      detectedEndpoint,
-      credential: {
-        kind: "api_key",
-        source: "direct",
-        apiKey,
-      },
-      detectedAccess,
-    };
-  }
-
-  private buildAnthropicState(
-    providerId: string,
-    modelId: string,
-    baseUrl: string,
-    apiKey: string,
-  ): ResolvedLiveState {
-    const endpoint = this.buildAnthropicEndpoint(providerId, baseUrl);
-    const detectedEndpoint: OpenClawDetectedEndpoint = {
-      endpointFamily: "anthropic",
-      endpointIdHint: providerId,
-      labelHint: endpoint.label,
-      baseUrl,
-    };
-    const detectedAccess: OpenClawDetectedAccess = {
-      authMode: "api_key",
-      labelHint: `${endpoint.label} ${modelId}`,
-      openclawModelId: modelId,
-    };
-
-    return {
-      endpoint,
-      access: {
-        authMode: "api_key",
-        label: detectedAccess.labelHint,
-        openclawModelId: modelId,
-      },
-      detectedEndpoint,
-      credential: {
-        kind: "api_key",
-        source: "direct",
-        apiKey,
-      },
-      detectedAccess,
-    };
-  }
-
-  private buildOpenAiEndpoint(
-    providerId: string,
-    endpointFamily: OpenClawDetectedEndpoint["endpointFamily"],
-    baseUrl: string,
-    api: "openai-completions" | "openai-responses",
-  ): EndpointRegistryInput {
-    const { rootUrl, path } = splitEndpointUrl(baseUrl);
-    const profile: EndpointProfile =
-      endpointFamily === "azure-openai"
-        ? "azure-openai"
-        : endpointFamily === "gateway"
-          ? "generic-gateway"
-          : "openai-official";
-
-    return {
-      id: providerId,
-      label: this.suggestOpenAiEndpointLabel(endpointFamily, rootUrl, baseUrl),
-      rootUrl,
-      profile,
-      protocols: {
-        openai: {
-          ...(path ? { basePath: path } : {}),
-          wireApis: [api === "openai-completions" ? "chat" : "responses"],
-          authSchemes: ["bearer"],
-        },
-      },
-    };
-  }
-
-  private buildAnthropicEndpoint(
-    providerId: string,
-    baseUrl: string,
-  ): EndpointRegistryInput {
-    const { rootUrl, path } = splitEndpointUrl(baseUrl);
-    const authSchemes = ANTHROPIC_HOST_MARKERS.some((marker) => rootUrl.includes(marker))
-      ? ["x_api_key"] as const
-      : ["bearer"] as const;
-
-    return {
-      id: providerId,
-      label: this.suggestAnthropicEndpointLabel(rootUrl),
-      rootUrl,
-      profile: "anthropic-official",
-      protocols: {
-        anthropic: {
-          ...(path ? { basePath: path } : {}),
-          authSchemes: [...authSchemes],
-        },
-      },
-    };
-  }
-
-  private inferOpenAiEndpointFamily(
-    providerId: string,
-    baseUrl: string,
-  ): OpenClawDetectedEndpoint["endpointFamily"] {
-    if (providerId === "openai") {
-      return "openai";
-    }
-    if (OPENAI_HOST_MARKERS.some((marker) => baseUrl.includes(marker))) {
-      return "openai";
-    }
-    if (AZURE_HOST_MARKERS.some((marker) => baseUrl.includes(marker))) {
-      return "azure-openai";
-    }
-    return "gateway";
-  }
-
-  private suggestOpenAiEndpointLabel(
-    endpointFamily: OpenClawDetectedEndpoint["endpointFamily"],
-    rootUrl: string,
-    baseUrl: string,
-  ): string {
-    if (endpointFamily === "azure-openai") {
-      const resource = ConnectionNaming.prettifyAzureResource(baseUrl);
-      return resource ? `Azure OpenAI (${resource})` : "Azure OpenAI";
-    }
-    if (endpointFamily === "gateway") {
-      const host = ConnectionNaming.prettifyHost(rootUrl);
-      return host === "openrouter.ai" ? "OpenRouter" : host ? `Gateway (${host})` : "Gateway";
-    }
-    return "OpenAI";
-  }
-
-  private suggestAnthropicEndpointLabel(rootUrl: string): string {
-    const host = ConnectionNaming.prettifyHost(rootUrl);
-    return host && host !== "api.anthropic.com" ? `Anthropic (${host})` : "Anthropic";
-  }
+function hasProfile(profiles: JsonObject, profileId: string): boolean {
+  return profileId in profiles && asObject(profiles[profileId]) !== null;
 }
 
 function asObject(value: unknown): JsonObject | null {
@@ -327,6 +278,18 @@ function asObject(value: unknown): JsonObject | null {
     : null;
 }
 
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    : [];
+}
+
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readMode(value: unknown): OpenClawAuthProfileMode | null {
+  return value === "api_key" || value === "oauth" || value === "token"
+    ? value
+    : null;
 }

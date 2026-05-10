@@ -39,7 +39,19 @@ describe("OpenClaw CurrentStateDetector", () => {
 
   it("matches a saved connection when provider, credential, and model hint align", () => {
     const setup = createSetup();
-    seedEndpoint(setup.dbPath);
+    seedEndpoint(setup.dbPath, {
+      id: "gateway",
+      label: "Gateway",
+      rootUrl: "https://router.example",
+      profile: "generic-gateway",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
     seedAccess(
       setup.dbPath,
       setup.credentialStore,
@@ -104,40 +116,154 @@ describe("OpenClaw CurrentStateDetector", () => {
 
     detector.close();
   });
+
+  it("matches a saved OpenAI session from auth-profile state", () => {
+    const setup = createSetup();
+    seedEndpoint(setup.dbPath, {
+      id: "openai",
+      label: "OpenAI",
+      rootUrl: "https://api.openai.com",
+      profile: "openai-official",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+    seedAccess(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "openai-session",
+        endpointId: "openai",
+        label: "jiqiang90@gmail.com gpt-5.3-codex",
+        authMode: "openai_session",
+        identityKey: "account:acct-123",
+        openclawModelId: "gpt-5.3-codex",
+      },
+      openAiSessionCredential(),
+    );
+
+    writeFileSync(
+      join(setup.openclawHome, "openclaw.json"),
+      JSON.stringify({
+        auth: {
+          profiles: {
+            "openai-codex:default": {
+              provider: "openai-codex",
+              mode: "oauth",
+            },
+          },
+          order: {
+            "openai-codex": ["openai-codex:default"],
+          },
+        },
+        agents: {
+          defaults: {
+            model: {
+              primary: "openai-codex/gpt-5.3-codex",
+            },
+          },
+        },
+      }, null, 2),
+      "utf8",
+    );
+    writeFileSync(
+      join(setup.openclawHome, "agents", "main", "agent", "auth-profiles.json"),
+      JSON.stringify({
+        version: 1,
+        profiles: {
+          "openai-codex:default": {
+            type: "oauth",
+            provider: "openai-codex",
+            access: "access-token",
+            refresh: "refresh-token",
+            expires: 1770000000000,
+            accountId: "acct-123",
+          },
+        },
+      }, null, 2),
+      "utf8",
+    );
+    writeFileSync(
+      join(setup.codexHome, "auth.json"),
+      JSON.stringify({
+        OPENAI_API_KEY: null,
+        tokens: {
+          id_token: "header.eyJlbWFpbCI6ImppcWlhbmc5MEBnbWFpbC5jb20ifQ.signature",
+          access_token: "access-token",
+          refresh_token: "refresh-token",
+          account_id: "acct-123",
+        },
+      }, null, 2),
+      "utf8",
+    );
+
+    const detector = CurrentStateDetector.open(setup.dbPath, {
+      openclawHome: setup.openclawHome,
+      codexHome: setup.codexHome,
+      credentialStore: setup.credentialStore,
+    });
+
+    const result = detector.detect();
+
+    expect(result.validity).toBe("valid_matched");
+    expect(result.access).toEqual({
+      authMode: "openai_session",
+      labelHint: "jiqiang90@gmail.com gpt-5.3-codex",
+      openclawModelId: "gpt-5.3-codex",
+      identityKey: "account:acct-123",
+    });
+    expect(result.matchedConnection).toEqual({
+      connectionId: "openai-session",
+      endpointId: "openai",
+      accessId: "openai-session",
+      matchesAgentSelection: false,
+    });
+
+    detector.close();
+  });
 });
 
 function createSetup(): {
   dbPath: string;
   openclawHome: string;
+  codexHome: string;
   credentialStore: StubCredentialStore;
 } {
   const dir = mkdtempSync(join(tmpdir(), "nile-openclaw-detector-"));
   tempDirs.push(dir);
   const openclawHome = join(dir, ".openclaw");
+  const codexHome = join(dir, ".codex");
   mkdirSync(openclawHome, { recursive: true });
+  mkdirSync(join(openclawHome, "agents", "main", "agent"), { recursive: true });
+  mkdirSync(codexHome, { recursive: true });
 
   return {
     dbPath: join(dir, "switcher.sqlite"),
     openclawHome,
+    codexHome,
     credentialStore: new StubCredentialStore(),
   };
 }
 
-function seedEndpoint(dbPath: string): void {
+function seedEndpoint(dbPath: string, input: {
+  id: string;
+  label: string;
+  rootUrl: string;
+  profile: "generic-gateway" | "openai-official";
+  protocols: {
+    openai: {
+      basePath: string;
+      wireApis: Array<"responses" | "chat">;
+      authSchemes: ["bearer"];
+    };
+  };
+}): void {
   const registry = EndpointRegistry.open(dbPath);
-  registry.add({
-    id: "gateway",
-    label: "Gateway",
-    rootUrl: "https://router.example",
-    profile: "generic-gateway",
-    protocols: {
-      openai: {
-        basePath: "/v1",
-        wireApis: ["responses"],
-        authSchemes: ["bearer"],
-      },
-    },
-  });
+  registry.add(input);
   registry.close();
 }
 
@@ -148,7 +274,8 @@ function seedAccess(
     id: string;
     endpointId: string;
     label: string;
-    authMode: "api_key";
+    authMode: "api_key" | "openai_session";
+    identityKey?: string;
     openclawModelId: string;
   },
   credential: StoredCredential,
@@ -156,6 +283,16 @@ function seedAccess(
   const registry = AccessRegistry.open(dbPath, credentialStore);
   registry.add(input, credential);
   registry.close();
+}
+
+function openAiSessionCredential(): StoredCredential {
+  return {
+    kind: "openai_session",
+    idToken: "header.eyJlbWFpbCI6ImppcWlhbmc5MEBnbWFpbC5jb20ifQ.signature",
+    accessToken: "access-token",
+    refreshToken: "refresh-token",
+    accountId: "acct-123",
+  };
 }
 
 class StubCredentialStore extends KeychainCredentialStore {

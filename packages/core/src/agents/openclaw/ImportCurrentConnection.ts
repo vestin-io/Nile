@@ -12,6 +12,8 @@ import {
   AgentWorkspaceSession,
 } from "../../runtime-local/AgentWorkspaceSession";
 import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
+import { CodexAuthStore } from "../codex/stores/CodexAuthStore";
+import { OpenClawAuthProfileStore } from "./AuthProfileStore";
 import { OPENCLAW_AGENT_ID } from "./types";
 import { OpenClawConfigStore } from "./OpenClawConfigStore";
 import { CurrentStateDetector } from "./current-state/Detector";
@@ -22,14 +24,20 @@ export class ImportCurrentConnection {
     databasePath: string,
     options: {
       openclawHome?: string;
+      codexHome?: string;
       credentialStore: CredentialStore;
       logger?: NileLogger;
     },
   ): ImportCurrentConnection {
     const openclawHome = options?.openclawHome ?? join(homedir(), ".openclaw");
+    const codexHome = options?.codexHome ?? join(homedir(), ".codex");
     const logger = options?.logger ?? NileLogger.silent().child({ module: "openclaw-import-current-connection" });
     const context = AgentWorkspaceSession.open(databasePath, options.credentialStore);
-    const reader = new CurrentStateReader(new OpenClawConfigStore(openclawHome));
+    const reader = new CurrentStateReader(
+      new OpenClawConfigStore(openclawHome),
+      new OpenClawAuthProfileStore(openclawHome),
+      new CodexAuthStore({ codexHome }),
+    );
 
     return new ImportCurrentConnection(
       new CurrentStateImportSupport(
@@ -59,13 +67,19 @@ export class ImportCurrentConnection {
     context: AgentWorkspaceContext,
     options: {
       openclawHome?: string;
+      codexHome?: string;
       credentialStore: CredentialStore;
       logger?: NileLogger;
     },
   ): ImportCurrentConnection {
     const openclawHome = options?.openclawHome ?? join(homedir(), ".openclaw");
+    const codexHome = options?.codexHome ?? join(homedir(), ".codex");
     const logger = options?.logger ?? NileLogger.silent().child({ module: "openclaw-import-current-connection" });
-    const reader = new CurrentStateReader(new OpenClawConfigStore(openclawHome));
+    const reader = new CurrentStateReader(
+      new OpenClawConfigStore(openclawHome),
+      new OpenClawAuthProfileStore(openclawHome),
+      new CodexAuthStore({ codexHome }),
+    );
 
     return new ImportCurrentConnection(
       new CurrentStateImportSupport(
@@ -78,6 +92,7 @@ export class ImportCurrentConnection {
       ),
       CurrentStateDetector.fromContext(context, {
         openclawHome,
+        codexHome,
         credentialStore: options.credentialStore,
         logger: logger.child({ scope: "detector" }),
       }),
