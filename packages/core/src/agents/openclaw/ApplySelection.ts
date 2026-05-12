@@ -56,6 +56,7 @@ export class ApplySelection {
           context.sharedContext.endpointRegistry,
           context.sharedContext.accessRegistry,
           context.agentSelection,
+          context.sharedContext.agentConnectionSettings,
           logger,
           credentialStore,
         ),
@@ -96,6 +97,7 @@ export class ApplySelection {
           context.endpointRegistry,
           context.accessRegistry,
           context.agentSelection,
+          context.agentConnectionSettings,
           logger,
           credentialStore,
         ),
@@ -244,13 +246,18 @@ export class ApplySelection {
   private requireConfiguredEnvKey(
     credential: PreparedAgentApplySelection["credential"],
   ): string {
-    if (credential.kind !== "api_key" || credential.source !== "env_key") {
+    if (credential.kind !== "api_key") {
       throw new ApplySelectionValidationError(
         "OpenClaw requires an env-backed api_key credential to avoid writing secrets into config files",
       );
     }
 
-    const envKey = credential.envKey.trim();
+    const envKey = credential.envKey?.trim();
+    if (!envKey) {
+      throw new ApplySelectionValidationError(
+        "OpenClaw requires an env-backed api_key credential to avoid writing secrets into config files",
+      );
+    }
     if (!/^[A-Z_][A-Z0-9_]*$/.test(envKey)) {
       throw new ApplySelectionValidationError(
         `OpenClaw env var name is invalid: ${credential.envKey}`,
@@ -354,6 +361,7 @@ export class ApplySelection {
     endpointRegistry: AgentWorkspaceContext["endpointRegistry"],
     accessRegistry: AgentWorkspaceContext["accessRegistry"],
     agentSelection: AgentWorkspaceContext["agentSelection"],
+    agentConnectionSettings: AgentWorkspaceContext["agentConnectionSettings"],
     logger: NileLogger,
     credentialStore: CredentialStore,
   ): AgentApplySupport {
@@ -362,6 +370,7 @@ export class ApplySelection {
       endpointRegistry,
       accessRegistry,
       agentSelection,
+      agentConnectionSettings,
       credentialStore,
       logger,
       (message) => new ApplySelectionValidationError(message),

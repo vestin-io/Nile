@@ -5,7 +5,7 @@ import type {
   ImportDetectedSetupsInput,
   ImportDetectedSetupsResult,
   ScanLocalSetupsResult,
-} from "@nile/core/actions/local-state";
+} from "@nile/core/actions/local-setup";
 import type { CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { CodexSessionLogin } from "@nile/core/agents";
@@ -74,7 +74,11 @@ export class ConnectionCommands {
   ): Promise<AddConnectionResult> {
     const input = await this.addFlow.resolveInput(options, flags);
     return await this.sessions.runAsync(options, "create-connection", async (session) => {
-      const created = await session.createConnectionWithLocalEffects(input);
+      const { selectedModelId, ...createInput } = input;
+      const created = await session.createConnectionWithLocalEffects(createInput);
+      if (selectedModelId) {
+        session.setAgentConnectionModel("openclaw", created.id, selectedModelId);
+      }
       return this.buildAddConnectionResult(created);
     });
   }
@@ -82,14 +86,18 @@ export class ConnectionCommands {
   async addConnectionInteractive(options: ResolvedCliOptions): Promise<AddConnectionResult> {
     const input = await this.addFlow.resolveInput(options, new Map());
     return await this.sessions.runAsync(options, "create-connection", async (session) => {
-      const created = await session.createConnectionWithLocalEffects(input);
+      const { selectedModelId, ...createInput } = input;
+      const created = await session.createConnectionWithLocalEffects(createInput);
+      if (selectedModelId) {
+        session.setAgentConnectionModel("openclaw", created.id, selectedModelId);
+      }
       return this.buildAddConnectionResult(created);
     });
   }
 
-  importCurrentConnection(options: ResolvedCliOptions, agentId: AgentId): AddConnectionResult {
-    return this.sessions.run(options, `${agentId}-import-current-connection`, (session) => {
-      const imported = session.importCurrentConnectionWithLocalEffects(agentId);
+  async importCurrentConnection(options: ResolvedCliOptions, agentId: AgentId): Promise<AddConnectionResult> {
+    return await this.sessions.runAsync(options, `${agentId}-import-current-connection`, async (session) => {
+      const imported = await session.importCurrentConnectionWithLocalEffects(agentId);
       return this.buildAddConnectionResult(imported);
     });
   }
@@ -98,11 +106,12 @@ export class ConnectionCommands {
     return this.sessions.run(options, "scan-local-setups", (session) => session.scanLocalSetups(agentIds));
   }
 
-  importDetectedSetups(
+  async importDetectedSetups(
     options: ResolvedCliOptions,
     input: ImportDetectedSetupsInput,
-  ): ImportDetectedSetupsResult {
-    return this.sessions.run(options, "import-detected-setups", (session) => session.importDetectedSetups(input));
+  ): Promise<ImportDetectedSetupsResult> {
+    return await this.sessions.runAsync(options, "import-detected-setups", async (session) =>
+      await session.importDetectedSetups(input));
   }
 
   useConnection(

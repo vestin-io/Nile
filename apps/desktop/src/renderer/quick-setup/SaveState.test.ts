@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldKeepPendingSave } from "./SaveState";
+import { readPendingSaveMessageKey, shouldKeepPendingSave } from "./SaveState";
 
 describe("shouldKeepPendingSave", () => {
   it("keeps the spinner visible while the save is still waiting for external confirmation", () => {
@@ -8,7 +8,7 @@ describe("shouldKeepPendingSave", () => {
       shouldKeepPendingSave({
         confirmed: false,
         hasLocalSetup: true,
-        phase: "pending-confirmation",
+        phase: "saving",
       }),
     ).toBe(true);
   });
@@ -18,7 +18,7 @@ describe("shouldKeepPendingSave", () => {
       shouldKeepPendingSave({
         confirmed: true,
         hasLocalSetup: true,
-        phase: "pending-confirmation",
+        phase: "saving",
       }),
     ).toBe(false);
   });
@@ -28,8 +28,13 @@ describe("shouldKeepPendingSave", () => {
       shouldKeepPendingSave({
         confirmed: false,
         hasLocalSetup: false,
-        phase: "pending-confirmation",
+        phase: "saving",
       }),
     ).toBe(false);
+  });
+
+  it("maps pending phases to user-facing helper messages", () => {
+    expect(readPendingSaveMessageKey("saving")).toBe("quickSetup.saveProgress.saving");
+    expect(readPendingSaveMessageKey("idle")).toBeNull();
   });
 });

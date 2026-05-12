@@ -38,7 +38,8 @@ export class DesktopMenubarStateQuery {
     return SUPPORTED_AGENT_IDS.map((agentId) => {
       const status = session.getAgentStatus(agentId);
       const currentConnection = this.connections.resolveEffectiveCurrentConnection(status, savedConnections);
-      const compatibleConnections = savedConnections.filter((connection) => connection.enabledAgents.includes(agentId));
+      const compatibleConnections = savedConnections.filter((connection) =>
+        connection.configurableAgents.includes(agentId));
       const selectionOverride = this.connections.createSelectionDisplayOverride(agentId, currentConnection);
       const currentUsage = currentConnection
         ? this.usage.peek(currentConnection.id)

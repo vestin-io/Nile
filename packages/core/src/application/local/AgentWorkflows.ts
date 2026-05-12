@@ -1,4 +1,4 @@
-import { ImportDetectedSetups, ScanLocalSetups, Status } from "../../actions/local-state";
+import { ImportDetectedSetups, ScanLocalSetups, Status } from "../../actions/local-setup";
 import type { AccessRegistry } from "../../models/access";
 import type { AgentAdapterLookup } from "../../models/agent";
 import type { EndpointRegistry } from "../../models/endpoint";

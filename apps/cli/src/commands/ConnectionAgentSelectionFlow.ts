@@ -1,6 +1,6 @@
 import { SHARED_CONNECTION_AGENT_POLICY } from "@nile/core/models/connection";
 import type { ConnectionDefinition, ConnectionOnboardingSuggestion } from "@nile/core/models/connection";
-import type { AgentId } from "@nile/core/models/agent";
+import { AGENT_CAPABILITIES, type AgentId } from "@nile/core/models/agent";
 import type { AuthMode } from "@nile/core/models/access";
 
 import { formatAgentLabel } from "../formatters";
@@ -10,14 +10,14 @@ type AgentSelectionInput = {
   authMode: AuthMode;
   definition: ConnectionDefinition;
   onboarding?: ConnectionOnboardingSuggestion;
-  openclawModelId?: string;
+  selectedModelId?: string;
   requestedAgents?: AgentId[];
 };
 
 export class ConnectionAgentSelectionFlow {
   constructor(private readonly prompt: InteractivePrompt) {}
 
-  finalize(input: AgentSelectionInput): { enabledAgents?: AgentId[]; openclawModelId?: string } {
+  finalize(input: AgentSelectionInput): { enabledAgents?: AgentId[]; selectedModelId?: string } {
     if (input.requestedAgents) {
       return this.finalizeSelection({
         authMode: input.authMode,
@@ -25,7 +25,7 @@ export class ConnectionAgentSelectionFlow {
         enabledAgents: input.requestedAgents,
         hasExplicitAgents: true,
         onboarding: input.onboarding,
-        openclawModelId: input.openclawModelId,
+        selectedModelId: input.selectedModelId,
       });
     }
 
@@ -35,10 +35,10 @@ export class ConnectionAgentSelectionFlow {
     return this.finalizeSelection({
       authMode: input.authMode,
       definition: input.definition,
-      enabledAgents: defaultEnabledAgents,
+      enabledAgents: this.filterImplicitSelectedModelAgents(defaultEnabledAgents, input.selectedModelId),
       hasExplicitAgents: false,
       onboarding: input.onboarding,
-      openclawModelId: input.openclawModelId,
+      selectedModelId: input.selectedModelId,
     });
   }
 
@@ -46,7 +46,7 @@ export class ConnectionAgentSelectionFlow {
     definition: ConnectionDefinition,
     authMode: AuthMode,
     onboarding: ConnectionOnboardingSuggestion,
-  ): Promise<{ enabledAgents?: AgentId[]; openclawModelId?: string }> {
+  ): Promise<{ enabledAgents?: AgentId[]; selectedModelId?: string }> {
     const configurableAgents = SHARED_CONNECTION_AGENT_POLICY.readSelectableAgents({
       authMode,
       onboarding,
@@ -59,8 +59,8 @@ export class ConnectionAgentSelectionFlow {
 
     while (true) {
       const selection = await this.prompt.multiSelect(
-        onboarding.suggestedAgents.length > 0
-          ? `Detected support: ${onboarding.suggestedAgents.map((agentId) => formatAgentLabel(agentId)).join(", ")}. Choose which agents to enable`
+        onboarding.defaultEnabledAgents.length > 0
+          ? `Detected support: ${onboarding.defaultEnabledAgents.map((agentId) => formatAgentLabel(agentId)).join(", ")}. Choose which agents to enable`
           : "No compatible agents were detected yet. Choose which agents to enable",
         configurableAgents.map((agentId) => ({
           value: agentId,
@@ -71,7 +71,7 @@ export class ConnectionAgentSelectionFlow {
           allowCancel: true,
           allowDone: true,
           doneLabel: "Enable selected",
-          initialValues: onboarding.defaultEnabledAgents,
+          initialValues: this.filterImplicitSelectedModelAgents(onboarding.defaultEnabledAgents),
         },
       );
       if (selection.type === "cancel") {
@@ -89,11 +89,11 @@ export class ConnectionAgentSelectionFlow {
         return { enabledAgents };
       }
 
-      const openclawModelId = await this.promptForOpenClawModelId();
-      if (openclawModelId === null) {
+      const selectedModelId = await this.promptForOpenClawModelId();
+      if (selectedModelId === null) {
         continue;
       }
-      return { enabledAgents, openclawModelId };
+      return { enabledAgents, selectedModelId };
     }
   }
 
@@ -115,10 +115,10 @@ export class ConnectionAgentSelectionFlow {
     enabledAgents?: AgentId[];
     hasExplicitAgents: boolean;
     onboarding?: ConnectionOnboardingSuggestion;
-    openclawModelId?: string;
-  }): { enabledAgents?: AgentId[]; openclawModelId?: string } {
+    selectedModelId?: string;
+  }): { enabledAgents?: AgentId[]; selectedModelId?: string } {
     const includesOpenClaw = input.enabledAgents?.includes("openclaw") ?? false;
-    if (!includesOpenClaw && !input.openclawModelId) {
+    if (!includesOpenClaw && !input.selectedModelId) {
       return input.enabledAgents ? { enabledAgents: input.enabledAgents } : {};
     }
     if (!SHARED_CONNECTION_AGENT_POLICY.supportsAgent({
@@ -129,24 +129,24 @@ export class ConnectionAgentSelectionFlow {
     })) {
       throw new Error("OpenClaw is only available for supported OpenAI- or Anthropic-compatible connections");
     }
-    if (includesOpenClaw && !input.openclawModelId) {
-      throw new Error("add --agents openclaw requires --openclaw-model-id");
+    if (includesOpenClaw && !input.selectedModelId) {
+      throw new Error("add --agents openclaw requires --model-id");
     }
-    if (input.openclawModelId && input.hasExplicitAgents && !includesOpenClaw) {
-      throw new Error("add --openclaw-model-id requires --agents to include openclaw");
+    if (input.selectedModelId && input.hasExplicitAgents && !includesOpenClaw) {
+      throw new Error("add --model-id requires --agents to include openclaw");
     }
-    if (input.openclawModelId && !input.enabledAgents) {
-      return { enabledAgents: ["openclaw"], openclawModelId: input.openclawModelId };
+    if (input.selectedModelId && !input.enabledAgents) {
+      return { enabledAgents: ["openclaw"], selectedModelId: input.selectedModelId };
     }
     return {
       enabledAgents: this.uniqueAgents([...(input.enabledAgents ?? []), "openclaw"]),
-      openclawModelId: input.openclawModelId,
+      selectedModelId: input.selectedModelId,
     };
   }
 
   private async promptForOpenClawModelId(): Promise<string | null> {
     while (true) {
-      const input = await this.prompt.input("OpenClaw model id", { allowBack: true, allowCancel: true });
+      const input = await this.prompt.input("Model id", { allowBack: true, allowCancel: true });
       if (input.type === "cancel") {
         throw new Error("Cancelled");
       }
@@ -162,5 +162,17 @@ export class ConnectionAgentSelectionFlow {
 
   private uniqueAgents(agentIds: AgentId[]): AgentId[] {
     return [...new Set(agentIds)];
+  }
+
+  private filterImplicitSelectedModelAgents(
+    enabledAgents?: AgentId[],
+    selectedModelId?: string,
+  ): AgentId[] | undefined {
+    if (!enabledAgents || enabledAgents.length === 0 || selectedModelId?.trim()) {
+      return enabledAgents;
+    }
+
+    return enabledAgents.filter((agentId) =>
+      !AGENT_CAPABILITIES.read(agentId).requiredApplyRequirements.includes("selected-model"));
   }
 }

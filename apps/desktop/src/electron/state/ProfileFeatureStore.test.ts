@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SqliteDatabase } from "@nile/core/services/database";
@@ -45,41 +45,12 @@ describe("DesktopProfileFeatureStore", () => {
     expect(store.read()).toBe(true);
   });
 
-  it("treats invalid config shapes as enabled and removes the legacy file", () => {
-    const { databasePath, legacyPath } = createStorePaths();
-    writeFileSync(legacyPath, "[]\n", "utf8");
-    const store = new DesktopProfileFeatureStore(databasePath, legacyPath);
-
-    expect(store.read()).toBe(true);
-    expect(existsSync(legacyPath)).toBe(false);
-  });
-
-  it("migrates a disabled legacy config into sqlite", () => {
-    const { databasePath, legacyPath } = createStorePaths();
-    writeFileSync(legacyPath, JSON.stringify({ enabled: false }), "utf8");
-
-    const store = new DesktopProfileFeatureStore(databasePath, legacyPath);
-
-    expect(store.read()).toBe(false);
-    expect(existsSync(legacyPath)).toBe(false);
-  });
-
-  it("treats invalid json as enabled and removes the legacy file", () => {
-    const { databasePath, legacyPath } = createStorePaths();
-    writeFileSync(legacyPath, "{ invalid }\n", "utf8");
-
-    const store = new DesktopProfileFeatureStore(databasePath, legacyPath);
-
-    expect(store.read()).toBe(true);
-    expect(existsSync(legacyPath)).toBe(false);
-  });
 });
 
-function createStorePaths(): { databasePath: string; legacyPath: string } {
+function createStorePaths(): { databasePath: string } {
   const dir = mkdtempSync(join(tmpdir(), "nile-desktop-profile-feature-"));
   tempDirs.push(dir);
   return {
     databasePath: join(dir, "desktop.sqlite"),
-    legacyPath: join(dir, "profile-feature.json"),
   };
 }

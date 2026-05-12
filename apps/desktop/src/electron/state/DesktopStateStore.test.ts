@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { RollbackLatestAgentResult } from "@nile/core/models/agent";
 import type { CursorUsageAutoBindResult, RemoveConnectionResult, ResetStateResult } from "@nile/core/application/local";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-state";
+import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 
 import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";
@@ -209,6 +209,27 @@ describe("DesktopStateStore", () => {
     expect(surface.getMenubarStateCalls).toBe(2);
     expect(surface.getSettingsStateCalls).toBe(2);
   });
+
+  it("invalidates cached settings state after updating an agent connection model", async () => {
+    const surface = new StubSurface();
+    const gateway = new StubConnectionGateway();
+    const store = new DesktopStateStore({
+      databasePath: "/tmp/test.sqlite",
+      surface: surface as never,
+      connectionGateway: gateway as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.getSettingsState();
+
+    const result = store.updateAgentConnectionModel("openclaw", "work", "gpt-5.3-codex");
+    await store.getSettingsState();
+
+    expect(result).toBe("gpt-5.3-codex");
+    expect(gateway.updateAgentConnectionModelCalls).toEqual([["openclaw", "work", "gpt-5.3-codex"]]);
+    expect(surface.getSettingsStateCalls).toBe(2);
+    expect(surface.getMenubarStateCalls).toBe(0);
+  });
 });
 
 class StubSurface {
@@ -230,7 +251,7 @@ class StubSurface {
       currentConnection: null,
       currentConnectionState: "none",
       liveConnection: null,
-      syncState: "synced",
+      reconciliationState: "unavailable",
       connections: [],
       currentAgentConnections: [],
       agents: [],
@@ -282,7 +303,6 @@ class StubConnectionManager {
   async describeConnectionOnboarding() {
     return {
       configurableAgents: ["codex"],
-      suggestedAgents: ["codex"],
       defaultEnabledAgents: ["codex"],
     };
   }
@@ -313,6 +333,7 @@ class StubConnectionManager {
 class StubConnectionGateway {
   bindCursorUsageCalls: Array<[string, string]> = [];
   switchConnectionCalls: Array<[string, string]> = [];
+  updateAgentConnectionModelCalls: Array<[string, string, string | null]> = [];
 
   importCurrentConnection(): DesktopConnectionSummary {
     return {
@@ -331,6 +352,11 @@ class StubConnectionGateway {
       removed: true,
       clearedAgents: [],
     };
+  }
+
+  updateAgentConnectionModel(agentId: string, connectionId: string, modelId: string | null): string | null {
+    this.updateAgentConnectionModelCalls.push([agentId, connectionId, modelId]);
+    return modelId;
   }
 
   async switchConnection(agentId: string, connectionId: string): Promise<DesktopConnection> {

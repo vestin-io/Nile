@@ -19,7 +19,7 @@ export class LocalCredentialRequestBuilder {
     if (input.authMode === "api_key") {
       return input.apiKeySource === "env_key"
         ? this.buildApiKeyEnvKey(input.envKey ?? "")
-        : this.buildApiKeyDirect(input.apiKey ?? "");
+        : this.buildApiKeyDirect(input.apiKey ?? "", input.envKey);
     }
 
     if (input.authMode === "openai_session") {
@@ -49,7 +49,7 @@ export class LocalCredentialRequestBuilder {
       }
 
       const apiKey = input.apiKey?.trim();
-      return apiKey ? this.buildApiKeyDirect(apiKey) : undefined;
+      return apiKey ? this.buildApiKeyDirect(apiKey, input.envKey) : undefined;
     }
 
     if (authMode === "openai_session") {
@@ -68,11 +68,12 @@ export class LocalCredentialRequestBuilder {
     return undefined;
   }
 
-  buildApiKeyDirect(apiKey: string): LocalCredentialRequest {
+  buildApiKeyDirect(apiKey: string, envKey?: string): LocalCredentialRequest {
     return {
       authMode: "api_key",
       source: "direct",
       apiKey,
+      ...(envKey?.trim() ? { envKey: envKey.trim() } : {}),
     };
   }
 

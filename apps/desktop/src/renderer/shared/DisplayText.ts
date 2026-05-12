@@ -1,5 +1,4 @@
 import type {
-  DesktopAgentState,
   DesktopConnection,
   DesktopHistoryEntry,
   DesktopOnboardingState,
@@ -33,19 +32,6 @@ export function formatConnectionSummary(connection: DesktopConnection | null, t:
   }
 
   return `${connection.label} · ${connection.endpointLabel}`;
-}
-
-export function formatSyncLabel(syncState: DesktopAgentState["syncState"], t: Translator): string {
-  switch (syncState) {
-    case "synced":
-      return t("sync.synced");
-    case "new_connection_detected":
-      return t("sync.new_connection_detected");
-    case "invalid_live_state":
-      return t("sync.invalid_live_state");
-    case "unverified_live_state":
-      return t("sync.unverified_live_state");
-  }
 }
 
 export function formatOnboardingSummary(onboarding: DesktopOnboardingState | null, t: Translator): string {

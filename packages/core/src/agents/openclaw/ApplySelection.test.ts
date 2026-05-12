@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { AccessRegistry } from "../../models/access";
+import { AgentConnectionSettings } from "../../models/agent-settings";
 import { EndpointRegistry } from "../../models/endpoint";
 import { AgentSelection } from "../../models/selection/Selection";
 import { type StoredCredential } from "../../services/credential/Types";
@@ -33,7 +34,6 @@ describe("OpenClaw ApplySelection", () => {
         endpointId: "gateway",
         label: "Router Work",
         authMode: "api_key",
-        openclawModelId: "gpt-4.1",
       },
       {
         kind: "api_key",
@@ -41,6 +41,8 @@ describe("OpenClaw ApplySelection", () => {
         envKey: "ROUTER_WORK_KEY",
       },
     );
+
+    setOpenClawModel(setup.dbPath, "router-work", "gpt-4.1");
 
     const apply = ApplySelection.open(setup.dbPath, {
       openclawHome: setup.openclawHome,
@@ -96,7 +98,6 @@ describe("OpenClaw ApplySelection", () => {
         endpointId: "anthropic-work",
         label: "Anthropic Work",
         authMode: "api_key",
-        openclawModelId: "claude-sonnet-4",
       },
       {
         kind: "api_key",
@@ -104,6 +105,8 @@ describe("OpenClaw ApplySelection", () => {
         envKey: "ANTHROPIC_WORK_KEY",
       },
     );
+
+    setOpenClawModel(setup.dbPath, "anthropic-work", "claude-sonnet-4");
 
     const apply = ApplySelection.open(setup.dbPath, {
       openclawHome: setup.openclawHome,
@@ -161,13 +164,14 @@ describe("OpenClaw ApplySelection", () => {
         endpointId: "gateway",
         label: "Router Direct",
         authMode: "api_key",
-        openclawModelId: "gpt-4.1",
       },
       {
         kind: "api_key",
         apiKey: "router-secret",
       },
     );
+
+    setOpenClawModel(setup.dbPath, "router-direct", "gpt-4.1");
 
     const apply = ApplySelection.open(setup.dbPath, {
       openclawHome: setup.openclawHome,
@@ -178,6 +182,59 @@ describe("OpenClaw ApplySelection", () => {
     expect(() => apply.apply("router-direct")).toThrow(
       "OpenClaw requires an env-backed api_key credential to avoid writing secrets into config files",
     );
+    apply.close();
+  });
+
+  it("accepts direct api keys when they also carry a readable env key", () => {
+    const setup = createSetup();
+    seedOpenAiEndpoint(setup.dbPath, "gateway", "Gateway", "https://router.example", "/v1");
+    seedAccess(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "router-direct-managed",
+        endpointId: "gateway",
+        label: "Router Direct Managed",
+        authMode: "api_key",
+      },
+      {
+        kind: "api_key",
+        apiKey: "router-secret",
+        envKey: "NILE_ROUTER_DIRECT_MANAGED_API_KEY",
+      },
+    );
+
+    setOpenClawModel(setup.dbPath, "router-direct-managed", "gpt-4.1");
+
+    const apply = ApplySelection.open(setup.dbPath, {
+      openclawHome: setup.openclawHome,
+      credentialStore: setup.credentialStore,
+      environment: EnvironmentSource.from({
+        NILE_ROUTER_DIRECT_MANAGED_API_KEY: "router-secret",
+      }),
+      secureSnapshotStore: setup.secureSnapshots,
+    });
+
+    apply.apply("router-direct-managed");
+
+    const config = readConfig(setup.openclawHome);
+    expect(config.models).toEqual({
+      mode: "merge",
+      providers: {
+        "nile-router-direct-managed": {
+          api: "openai-responses",
+          apiKey: "${NILE_ROUTER_DIRECT_MANAGED_API_KEY}",
+          baseUrl: "https://router.example/v1",
+          models: [
+            {
+              id: "gpt-4.1",
+              name: "gpt-4.1",
+            },
+          ],
+        },
+      },
+    });
+
     apply.close();
   });
 
@@ -192,7 +249,6 @@ describe("OpenClaw ApplySelection", () => {
         endpointId: "openai",
         label: "OpenAI Session",
         authMode: "openai_session",
-        openclawModelId: "gpt-5.3-codex",
       },
       {
         kind: "openai_session",
@@ -202,6 +258,8 @@ describe("OpenClaw ApplySelection", () => {
         accountId: "acct-123",
       },
     );
+
+    setOpenClawModel(setup.dbPath, "openai-session", "gpt-5.3-codex");
 
     const apply = ApplySelection.open(setup.dbPath, {
       openclawHome: setup.openclawHome,
@@ -256,6 +314,15 @@ function createSetup(): {
     credentialStore: new StubCredentialStore(),
     secureSnapshots: new MemorySecureSnapshotStore(),
   };
+}
+
+function setOpenClawModel(dbPath: string, connectionId: string, modelId: string): void {
+  const settings = AgentConnectionSettings.open(dbPath);
+  try {
+    settings.setModelId("openclaw", connectionId, modelId);
+  } finally {
+    settings.close();
+  }
 }
 
 function seedOpenAiEndpoint(
@@ -334,7 +401,6 @@ function seedAccess(
     endpointId: string;
     label: string;
     authMode: "api_key" | "openai_session";
-    openclawModelId: string;
   },
   credential: StoredCredential,
 ): void {

@@ -115,6 +115,20 @@ export class AccessRegistry {
     return this.getOrThrow(accessId);
   }
 
+  syncCredential(accessId: string, credential: StoredCredential): AccessRecord {
+    const current = this.getOrThrow(accessId);
+    const updatedRecord = {
+      ...current,
+      credentialSyncIssue: undefined,
+      credentialSyncState: "pending_write" as const,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.accessStore.update(updatedRecord);
+    this.credentials.syncUpdated(updatedRecord, credential);
+    return this.getOrThrow(accessId);
+  }
+
   get(accessId: string): AccessRecord | null {
     return this.accessStore.get(accessId);
   }

@@ -4,12 +4,13 @@ import type {
   RemoveConnectionResult,
   UpdateConnectionInput,
 } from "../application/local/ConnectionInputs";
+import type { ConnectionModelCatalogResult } from "../application/local/ConnectionModelCatalog";
 import type { CursorUsageSessionProbe } from "../application/local/CursorUsageSessionProbe";
 import {
   type ImportDetectedSetupsInput,
   type ImportDetectedSetupsResult,
   type ScanLocalSetupsResult,
-} from "../actions/local-state";
+} from "../actions/local-setup";
 import type {
   AgentCapabilitySupport,
   ApplyAgentSelectionResult,
@@ -32,8 +33,9 @@ import type { NileLogger } from "../services/NileLogger";
 import type { ConnectionUsageResult } from "../actions/usage/Result";
 import type { BindCursorUsageResult } from "../actions/usage/cursor/Binder";
 import type { CursorUsageAutoBindResult } from "../application/local/CursorUsageAutoBinder";
-import type { AgentStatusView } from "../actions/local-state";
+import type { AgentStatusView } from "../actions/local-setup";
 import { CursorUsageConnectionFollowUp } from "./CursorUsageConnectionFollowUp";
+import type { MatchedImportStateSnapshot } from "./ImportState";
 import { SessionRuntime } from "./SessionRuntime";
 
 export type NileSessionOpenOptions = {
@@ -89,6 +91,10 @@ export class NileSession {
     return this.runtime.getSavedConnections().readCredential(connectionId);
   }
 
+  setConnectionDirectApiKeyEnvKey(connectionId: string, envKey: string | null): SavedConnectionSummary {
+    return this.runtime.setConnectionDirectApiKeyEnvKey(connectionId, envKey);
+  }
+
   removeConnection(connectionId: string): RemoveConnectionResult {
     this.runtime.clearConnectionArtifacts(connectionId);
     return this.runtime.getSavedConnections().remove(connectionId);
@@ -114,12 +120,16 @@ export class NileSession {
     return this.runtime.scanLocalSetups(agentIds);
   }
 
-  importDetectedSetups(input: ImportDetectedSetupsInput): ImportDetectedSetupsResult {
-    return this.runtime.importDetectedSetups(input);
+  async importDetectedSetups(input: ImportDetectedSetupsInput): Promise<ImportDetectedSetupsResult> {
+    return await this.runtime.importDetectedSetups(input);
   }
 
   getConnectionUsage(connectionId: string): Promise<ConnectionUsageResult> {
     return this.runtime.getConnectionUsage(connectionId);
+  }
+
+  getConnectionModelCatalog(connectionId: string): Promise<ConnectionModelCatalogResult> {
+    return this.runtime.getConnectionModelCatalog(connectionId);
   }
 
   bindCursorUsage(connectionId: string, sessionToken: string): BindCursorUsageResult {
@@ -132,6 +142,22 @@ export class NileSession {
 
   autoBindAllCursorUsage(): CursorUsageAutoBindResult[] {
     return this.runtime.autoBindAllCursorUsage();
+  }
+
+  getAgentConnectionModel(agentId: AgentId, connectionId: string): string | null {
+    return this.runtime.getAgentConnectionModel(agentId, connectionId);
+  }
+
+  setAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): string | null {
+    return this.runtime.setAgentConnectionModel(agentId, connectionId, modelId);
+  }
+
+  captureMatchedImportState(agentId: AgentId, connectionId: string): MatchedImportStateSnapshot {
+    return this.runtime.captureMatchedImportState(agentId, connectionId);
+  }
+
+  restoreMatchedImportState(snapshot: MatchedImportStateSnapshot): void {
+    this.runtime.restoreMatchedImportState(snapshot);
   }
 
   async describeConnectionOnboarding(input: CreateConnectionInput): Promise<ConnectionOnboardingSuggestion> {
@@ -169,12 +195,12 @@ export class NileSession {
     return await this.runtime.getLocalConnectionWorkflows().describeLocalOnboardingWithResolver(input, localCredentialResolver);
   }
 
-  importCurrentConnection(agentId: AgentId): ImportCurrentConnectionResult {
-    return this.runtime.importCurrentConnection(agentId);
+  async importCurrentConnection(agentId: AgentId): Promise<ImportCurrentConnectionResult> {
+    return await this.runtime.importCurrentConnection(agentId);
   }
 
-  importCurrentConnectionWithLocalEffects(agentId: AgentId): ImportCurrentConnectionResult {
-    return this.cursorUsageFollowUp.applyAfterResolvedConnectionChange(
+  async importCurrentConnectionWithLocalEffects(agentId: AgentId): Promise<ImportCurrentConnectionResult> {
+    return await this.cursorUsageFollowUp.applyAfterConnectionChange(
       this.importCurrentConnection(agentId),
     );
   }

@@ -65,8 +65,8 @@ Own:
 
 The main product actions are grouped under `packages/core/src/actions/` and the runtime-local session layer:
 
-- `local-state`
-- `current-state`
+- `local-setup`
+- `live-setup`
 - `usage`
 - `apply`
 - `runtime-local/NileSession` methods for create, import, remove, and rollback

@@ -1,4 +1,4 @@
-import type { AgentStatusView } from "@nile/core/actions/local-state";
+import type { AgentStatusView } from "@nile/core/actions/local-setup";
 import { formatAgentLabel } from "../formatters";
 
 export class StatusPresenter {
@@ -58,14 +58,14 @@ export class StatusPresenter {
       return "saved connection removed";
     }
 
-    const { syncState } = status;
-    if (syncState === "new_connection_detected") {
+    const { state } = status.reconciliation;
+    if (state === "new") {
       return "new connection detected";
     }
-    if (syncState === "invalid_live_state") {
+    if (state === "invalid" || state === "unavailable") {
       return "invalid live state";
     }
-    if (syncState === "unverified_live_state") {
+    if (state === "unverified") {
       return "unverified live state";
     }
     return "synced";
@@ -75,20 +75,20 @@ export class StatusPresenter {
     if (status.currentConnectionState === "orphaned") {
       const orphanHint =
         `Last applied ${agentLabel} connection was removed from Nile. Select "Change ${agentLabel} connection" to repair the saved state.`;
-      if (status.syncState === "new_connection_detected") {
+      if (status.reconciliation.state === "new") {
         return `${orphanHint} Current ${agentLabel} setup is still valid and can be saved again with ${this.formatImportCommand(status.agent)}.`;
       }
       return orphanHint;
     }
 
-    const { syncState } = status;
-    if (syncState === "synced") {
+    const { state } = status.reconciliation;
+    if (state === "already_saved") {
       return `Current ${agentLabel} setup matches a saved Nile connection.`;
     }
-    if (syncState === "new_connection_detected") {
+    if (state === "new") {
       return `Current ${agentLabel} setup is valid but not yet saved in Nile. Run: ${this.formatImportCommand(status.agent)}`;
     }
-    if (syncState === "invalid_live_state") {
+    if (state === "invalid" || state === "unavailable") {
       return `Nile could not safely match the current ${agentLabel} setup.`;
     }
     return `Nile could read the current ${agentLabel} setup, but it is not yet safe to match or import.`;

@@ -8,6 +8,7 @@ export type {
   DesktopDiscardPreparedConnectionDraftInput,
   DesktopPreparedConnectionDraft,
   DesktopSavePreparedConnectionInput,
+  DesktopUpdateAgentConnectionModelInput,
   DesktopUpdateConnectionInput,
 } from "./connections/contracts";
 export type { DesktopBridge } from "./Bridge";

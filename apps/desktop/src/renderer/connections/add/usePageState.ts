@@ -117,7 +117,7 @@ export function useAddConnectionPageState({
     setGatewayTrustConfirmed,
     shouldProbeEnabledAgents,
     shouldShowEnabledAgents,
-    suggestedAgents,
+    detectedAgents,
   } = useAddConnectionOnboardingState({
     selectedDefinition: selectedDefinition ?? null,
     authMode: formState.authMode,
@@ -239,7 +239,7 @@ export function useAddConnectionPageState({
     shouldShowEnabledAgents,
     showPostPreparationFields,
     submit,
-    suggestedAgents,
+    detectedAgents,
     supportsCurrentCodexImport,
     chooseAuthJsonPath,
     prepareDraft,

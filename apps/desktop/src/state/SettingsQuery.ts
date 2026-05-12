@@ -45,6 +45,18 @@ export class DesktopSettingsStateQuery {
       throw new Error("Codex agent state is missing from desktop settings state");
     }
     const codexSelectionOverride = this.connections.createSelectionDisplayOverride(CODEX_AGENT_ID, codexState.currentConnection);
+    const codexAgentModelIdsByConnectionId = new Map(
+      savedConnections.map((connection) => {
+        const savedModelId = session.getAgentConnectionModel(CODEX_AGENT_ID, connection.id);
+        const liveModelId = codexState.liveConnection?.id === connection.id
+          ? codexState.liveConnection.agentModelId?.trim() ?? null
+          : null;
+        return [
+          connection.id,
+          savedModelId ?? liveModelId,
+        ] as const;
+      }),
+    );
     const connections = this.connections.buildConnections(
       savedConnections,
       codexState.currentConnection?.id ?? null,
@@ -52,10 +64,12 @@ export class DesktopSettingsStateQuery {
       codexSelectionOverride,
     );
     const currentAgentConnections = this.connections.buildConnections(
-      savedConnections.filter((connection) => connection.enabledAgents.includes(CODEX_AGENT_ID)),
+      savedConnections.filter((connection) => connection.configurableAgents.includes(CODEX_AGENT_ID)),
       codexState.currentConnection?.id ?? null,
       usageByConnectionId,
       codexSelectionOverride,
+      codexAgentModelIdsByConnectionId,
+      CODEX_AGENT_ID,
     );
 
     const state: SettingsState = {
@@ -63,7 +77,7 @@ export class DesktopSettingsStateQuery {
       currentConnection: codexState.currentConnection,
       currentConnectionState: codexState.currentConnectionState,
       liveConnection: codexState.liveConnection,
-      syncState: codexState.syncState,
+      reconciliationState: codexState.reconciliationState,
       connections,
       currentAgentConnections,
       agents: agentStates,
@@ -85,10 +99,9 @@ export class DesktopSettingsStateQuery {
       agentId: item.agentId,
       title: item.title,
       subtitle: item.subtitle,
-      state: item.state,
+      reconciliationState: item.state,
       importable: item.importable,
       defaultSelected: item.defaultSelected,
-      matchedConnectionLabel: item.matchedConnectionLabel,
       issues: [...item.issues],
     }));
 
@@ -112,11 +125,25 @@ export class DesktopSettingsStateQuery {
       const currentConnection = this.connections.resolveEffectiveCurrentConnection(status, savedConnections);
       const liveConnection = this.connections.resolveLiveConnection(status.liveConnection, savedConnections, currentConnection);
       const selectionOverride = this.connections.createSelectionDisplayOverride(agentId, currentConnection);
+      const agentModelIdsByConnectionId = new Map(
+        savedConnections.map((connection) => {
+          const savedModelId = session.getAgentConnectionModel(agentId, connection.id);
+          const liveModelId = status.liveConnection?.id === connection.id
+            ? status.liveConnection.modelId?.trim() ?? null
+            : null;
+          return [
+            connection.id,
+            savedModelId ?? liveModelId,
+          ] as const;
+        }),
+      );
       const connections = this.connections.buildConnections(
-        savedConnections.filter((connection) => connection.enabledAgents.includes(agentId)),
+        savedConnections.filter((connection) => connection.configurableAgents.includes(agentId)),
         currentConnection?.id ?? null,
         usageByConnectionId,
         selectionOverride,
+        agentModelIdsByConnectionId,
+        agentId,
       );
       const state: DesktopAgentState = {
         agentId,
@@ -127,7 +154,7 @@ export class DesktopSettingsStateQuery {
         currentUsage: currentConnection ? (usageByConnectionId.get(currentConnection.id) ?? null) : null,
         currentConnectionState: this.connections.resolveEffectiveCurrentConnectionState(status, currentConnection),
         liveConnection,
-        syncState: status.syncState,
+        reconciliationState: status.reconciliation.state,
         connections,
       };
       if (status.liveIssues && status.liveIssues.length > 0) {

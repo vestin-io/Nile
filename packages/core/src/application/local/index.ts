@@ -1,4 +1,6 @@
 export type { CreateLocalConnectionInput, RemoveConnectionResult, UpdateConnectionInput } from "./ConnectionInputs";
+export type { ConnectionModelCatalogResult } from "./ConnectionModelCatalog";
+export { ConnectionModelCatalog } from "./ConnectionModelCatalog";
 export type { CursorUsageAutoBindResult } from "./CursorUsageAutoBinder";
 export type { CursorUsageSessionCandidate, CursorUsageSessionProbe } from "./CursorUsageSessionProbe";
 export { LocalCredentialRequestBuilder } from "./LocalCredentialRequestBuilder";

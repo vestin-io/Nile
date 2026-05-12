@@ -15,7 +15,6 @@ export type UpdateConnectionInput = {
   connectionId: string;
   label?: string;
   enabledAgents?: AgentId[];
-  openclawModelId?: string | null;
   endpointUrl?: string;
   credential?: StoredCredential;
   probeCredential?: StoredCredential;
@@ -84,10 +83,6 @@ export class ConnectionUpdater {
         endpointId: endpoint.id,
         label: input.label ?? currentAccess.label,
         identityKey: nextIdentityKey === undefined ? undefined : nextIdentityKey,
-        openclawModelId:
-          input.openclawModelId === undefined
-            ? currentAccess.openclawModelId
-            : input.openclawModelId,
         enabledAgents: nextEnabledAgents,
       },
       nextCredential,
@@ -121,9 +116,7 @@ export class ConnectionUpdater {
     const onboarding = this.onboardingPolicy.suggest(preset, endpointCandidate);
     return {
       endpointCandidate,
-      supportedAgents: onboarding.suggestedAgents.length > 0
-        ? onboarding.suggestedAgents
-        : onboarding.defaultEnabledAgents,
+      supportedAgents: onboarding.defaultEnabledAgents,
     };
   }
 

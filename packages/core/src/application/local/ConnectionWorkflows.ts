@@ -73,7 +73,6 @@ export class LocalConnectionWorkflows {
       probeCredential: this.resolveProbeCredential(input.credentialRequest, credential, localCredentialResolver),
       endpointUrl: input.endpointUrl,
       label: input.label?.trim() || undefined,
-      openclawModelId: input.openclawModelId?.trim() || undefined,
       enabledAgents,
       allowUndetectedGateway: input.allowUndetectedGateway,
     };

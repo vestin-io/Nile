@@ -20,19 +20,23 @@ describe("DesktopStateReset", () => {
   it("removes desktop-local state files in addition to delegating workspace reset", () => {
     const root = mkdtempSync(join(tmpdir(), "nile-desktop-reset-"));
     tempDirs.push(root);
-    const homesPath = join(root, "desktop-agent-homes.json");
-    const notificationMutePath = join(root, "desktop-notification-mute.json");
-    const profilesPath = join(root, "desktop-profiles.json");
-    const profileFeaturePath = join(root, "desktop-profile-feature.json");
+    const homesPath = join(root, "local-a.state");
+    const notificationMutePath = join(root, "local-b.state");
+    const profilesPath = join(root, "local-c.state");
+    const profileFeaturePath = join(root, "local-d.state");
     writeFileSync(homesPath, "{}\n", "utf8");
     writeFileSync(notificationMutePath, "{}\n", "utf8");
     writeFileSync(profilesPath, "{}\n", "utf8");
     writeFileSync(profileFeaturePath, "{}\n", "utf8");
 
     const delegate = new StubStateReset();
+    let beforeResetLocalStateCalls = 0;
     let resetLocalStateCalls = 0;
     const reset = new DesktopStateReset({
       localStatePaths: [homesPath, notificationMutePath, profilesPath, profileFeaturePath],
+      onBeforeResetLocalState: () => {
+        beforeResetLocalStateCalls += 1;
+      },
       onResetLocalState: () => {
         resetLocalStateCalls += 1;
       },
@@ -47,6 +51,7 @@ describe("DesktopStateReset", () => {
     expect(existsSync(notificationMutePath)).toBe(false);
     expect(existsSync(profilesPath)).toBe(false);
     expect(existsSync(profileFeaturePath)).toBe(false);
+    expect(beforeResetLocalStateCalls).toBe(1);
     expect(resetLocalStateCalls).toBe(1);
   });
 });

@@ -242,6 +242,7 @@ const DEFAULT_CREDENTIAL_VALIDATORS: Record<string, CredentialValidator> = {
     const source = requireOptionalStringField(credential, "source");
     if (!source || source === "direct") {
       requireStringField(credential, "apiKey");
+      requireOptionalStringField(credential, "envKey");
       return;
     }
     if (source === "env_key") {

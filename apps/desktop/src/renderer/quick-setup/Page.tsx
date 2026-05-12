@@ -1,10 +1,16 @@
+import { useMemo, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/types";
 import { ArrowRight } from "lucide-react";
 
-import type { SettingsState } from "../shared/DesktopData";
+import {
+  hasCompatibleConnections,
+  readCompatibleConnections,
+  type SettingsState,
+} from "../shared/DesktopData";
 import type { Translator } from "../shared/I18n";
 import { nileMarkSvg } from "../shared/NileMark";
 import { QuickSetupAgentCard } from "./AgentCard";
+import { QuickSetupConnectionDialog } from "./ConnectionDialog";
 import { QuickSetupGuide } from "./Guide";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
@@ -16,6 +22,9 @@ type QuickSetupPageProps = {
   onConfigureAgent(agentId: AgentId): void;
   onConfirmAgent(agentId: AgentId): Promise<void>;
   onDone(): void;
+  onOpenModelSetup(agentId: AgentId): void;
+  onUpdateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): Promise<void>;
+  onUseExistingConnection(agentId: AgentId, connectionId: string): Promise<void>;
 };
 
 export function QuickSetupPage({
@@ -25,9 +34,22 @@ export function QuickSetupPage({
   onConfigureAgent,
   onConfirmAgent,
   onDone,
+  onOpenModelSetup,
+  onUpdateAgentConnectionModel,
+  onUseExistingConnection,
 }: QuickSetupPageProps) {
+  const [configureAgentId, setConfigureAgentId] = useState<AgentId | null>(null);
   const detectedSetupsByAgent = new Map(
     state.detectedSetups.items.map((item) => [item.agentId, item]),
+  );
+  const existingCompatibleConnections = useMemo(
+    () => {
+      if (!configureAgentId) {
+        return [];
+      }
+      return readCompatibleConnections(state, configureAgentId);
+    },
+    [configureAgentId, state],
   );
 
   return (
@@ -56,7 +78,13 @@ export function QuickSetupPage({
               detectedSetup={detectedSetupsByAgent.get(agent.agentId) ?? null}
               t={t}
               onConfirm={onConfirmAgent}
-              onConfigure={onConfigureAgent}
+              onConfigure={(agentId) => {
+                if (!hasCompatibleConnections(state, agentId)) {
+                  onConfigureAgent(agentId);
+                  return;
+                }
+                setConfigureAgentId(agentId);
+              }}
             />
           ))}
         </div>
@@ -68,6 +96,24 @@ export function QuickSetupPage({
           </Button>
         </div>
       </div>
+
+      <QuickSetupConnectionDialog
+        agentId={configureAgentId}
+        connections={existingCompatibleConnections}
+        open={configureAgentId !== null}
+        t={t}
+        onAddNew={(agentId) => {
+          onConfigureAgent(agentId);
+        }}
+        onOpenModelSetup={onOpenModelSetup}
+        onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfigureAgentId(null);
+          }
+        }}
+        onUseExistingConnection={onUseExistingConnection}
+      />
     </div>
   );
 }

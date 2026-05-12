@@ -16,15 +16,15 @@ export type OpenClawDetectedEndpoint = {
 export type OpenClawDetectedAccess = {
   authMode: Extract<AuthMode, "api_key" | "openai_session" | "claude_session">;
   labelHint: string;
-  openclawModelId: string;
   identityKey?: string;
 };
 
-export type OpenClawDetectedCurrentState = {
+export type OpenClawDetectedLiveSetup = {
   agentId: AgentId;
   validity: AgentLiveStateValidity;
   issues: string[];
   endpoint: OpenClawDetectedEndpoint | null;
   access: OpenClawDetectedAccess | null;
+  modelId?: string;
   matchedConnection: MatchedAgentConnection | null;
 };

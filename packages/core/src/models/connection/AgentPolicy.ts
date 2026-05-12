@@ -1,6 +1,6 @@
-import { SUPPORTED_AGENT_IDS, type AgentId } from "../agent";
+import { AGENT_CAPABILITIES, SUPPORTED_AGENT_IDS, type AgentId } from "../agent";
 import type { AuthMode } from "../access";
-import type { EndpointFamily, EndpointProtocols, EndpointRegistryInput } from "../endpoint";
+import type { EndpointProtocols, EndpointRegistryInput } from "../endpoint";
 import type { ConnectionPresetFamily } from "./setup/PresetTypes";
 import type { ConnectionOnboardingSuggestion } from "./setup/OnboardingPolicy";
 
@@ -29,34 +29,12 @@ export class ConnectionAgentPolicy {
   }
 
   readSavedConnectionConfig(input: {
-    endpointFamily: EndpointFamily | null;
     protocols: EndpointProtocols;
     authMode: AuthMode;
-    openclawModelId?: string | null;
   }): ConnectionAgentConfig {
-    if (input.endpointFamily === "gateway") {
-      return this.buildConfigurableResult([...SUPPORTED_AGENT_IDS]);
-    }
-
-    if (input.endpointFamily === "cursor") {
-      return this.buildConfigurableResult(["cursor"]);
-    }
-
-    const configurableAgents: AgentId[] = [];
-    if (input.protocols.openai) {
-      configurableAgents.push("codex");
-    }
-    if (input.protocols.anthropic) {
-      configurableAgents.push("claude");
-    }
-    if (
-      input.openclawModelId?.trim()
-      && this.supportsOpenClawSavedConnection(input)
-    ) {
-      configurableAgents.push("openclaw");
-    }
-
-    return this.buildConfigurableResult(configurableAgents);
+    return this.buildConfigurableResult(
+      SUPPORTED_AGENT_IDS.filter((agentId) => AGENT_CAPABILITIES.supportsSavedConnection(agentId, input)),
+    );
   }
 
   readSelectableAgents(input: {
@@ -66,10 +44,12 @@ export class ConnectionAgentPolicy {
   }): AgentId[] {
     const baseAgents = input.onboarding?.configurableAgents
       ?? this.readDefinitionConfig(input.preset).configurableAgents;
-    if (!this.supportsOpenClaw(input)) {
-      return [...new Set<AgentId>(baseAgents)];
-    }
-    return [...new Set<AgentId>([...baseAgents, "openclaw"])];
+    return [...new Set<AgentId>(
+      baseAgents.filter((agentId) => AGENT_CAPABILITIES.supportsSelectableConnection(agentId, {
+        preset: input.preset,
+        authMode: input.authMode,
+      })),
+    )];
   }
 
   supportsAgent(input: {
@@ -99,9 +79,9 @@ export class ConnectionAgentPolicy {
         return [...SUPPORTED_AGENT_IDS];
       case "openai":
       case "azure-openai":
-        return ["codex"];
+        return ["codex", "openclaw"];
       case "anthropic":
-        return ["claude"];
+        return ["claude", "openclaw"];
       default:
         return [];
     }
@@ -112,16 +92,8 @@ export class ConnectionAgentPolicy {
     protocols?: Pick<EndpointProtocols, "openai" | "anthropic" | "cursor">,
   ): AgentId[] {
     if (preset === "gateway" && protocols) {
-      const detectedAgents: AgentId[] = [];
-      if (protocols.openai) {
-        detectedAgents.push("codex");
-      }
-      if (protocols.anthropic) {
-        detectedAgents.push("claude");
-      }
-      if (protocols.cursor) {
-        detectedAgents.push("cursor");
-      }
+      const detectedAgents = SUPPORTED_AGENT_IDS.filter((agentId) =>
+        AGENT_CAPABILITIES.supportsDetectedProtocols(agentId, protocols));
       if (detectedAgents.length > 0) {
         return [...new Set(detectedAgents)];
       }
@@ -152,46 +124,8 @@ export class ConnectionAgentPolicy {
     };
   }
 
-  private supportsOpenClaw(input: {
-    preset: ConnectionPresetFamily;
-    authMode: AuthMode;
-    onboarding?: ConnectionOnboardingSuggestion;
-  }): boolean {
-    if (input.authMode === "api_key") {
-      if (input.preset === "gateway") {
-        return Boolean(input.onboarding?.suggestedAgents.some((agentId) => agentId === "codex" || agentId === "claude"));
-      }
-      return input.preset === "openai"
-        || input.preset === "azure-openai"
-        || input.preset === "anthropic";
-    }
-    if (input.authMode === "openai_session") {
-      return input.preset === "openai";
-    }
-    if (input.authMode === "claude_session") {
-      return input.preset === "anthropic";
-    }
-    return false;
-  }
-
   private supportsAgentEnvKey(agentId: AgentId): boolean {
-    return agentId === "codex" || agentId === "claude" || agentId === "openclaw";
-  }
-
-  private supportsOpenClawSavedConnection(input: {
-    protocols: EndpointProtocols;
-    authMode: AuthMode;
-  }): boolean {
-    if (input.authMode === "api_key") {
-      return Boolean(input.protocols.openai || input.protocols.anthropic);
-    }
-    if (input.authMode === "openai_session") {
-      return Boolean(input.protocols.openai);
-    }
-    if (input.authMode === "claude_session") {
-      return Boolean(input.protocols.anthropic);
-    }
-    return false;
+    return AGENT_CAPABILITIES.read(agentId).supportsManagedEnvBackedApiKey;
   }
 }
 

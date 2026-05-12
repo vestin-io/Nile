@@ -25,4 +25,22 @@ describe("ConnectionAgentPolicy", () => {
     expect(policy.supportsEnvKeySource({ preset: "openai", authMode: "openai_session" })).toBe(false);
     expect(policy.supportsEnvKeySource({ preset: "anthropic", authMode: "claude_session" })).toBe(false);
   });
+
+  it("derives saved gateway configurable agents from detected protocols", () => {
+    const policy = new ConnectionAgentPolicy();
+
+    expect(policy.readSavedConnectionConfig({
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+      authMode: "api_key",
+    })).toEqual({
+      configurableAgents: ["codex", "openclaw"],
+      defaultEnabledAgents: ["codex", "openclaw"],
+    });
+  });
 });

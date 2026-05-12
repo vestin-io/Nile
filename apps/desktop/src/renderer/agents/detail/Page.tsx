@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent";
+import type { AgentId } from "@nile/core/models/agent/types";
 
 import type { DesktopAgentState, DesktopHistoryEntry } from "../../../state/Types";
 import { AgentHomeSection } from "./HomeSection";
@@ -31,6 +31,7 @@ type AgentDetailPageProps = {
   onOpenConnection(connectionId: string): void;
   onRefresh(): Promise<void>;
   onRollback(agentId: DesktopAgentState["agentId"]): Promise<void>;
+  onUpdateAgentConnectionModel(agentId: DesktopAgentState["agentId"], connectionId: string, modelId: string | null): Promise<void>;
   onSwitch(agentId: DesktopAgentState["agentId"], connectionId: string): Promise<void>;
 };
 
@@ -48,6 +49,7 @@ export function AgentDetailPage({
   onOpenConnection,
   onRefresh,
   onRollback,
+  onUpdateAgentConnectionModel,
   onSwitch,
 }: AgentDetailPageProps) {
   return (
@@ -93,6 +95,7 @@ export function AgentDetailPage({
             onOpenAddPage={onOpenAddPage}
             onOpenConnection={onOpenConnection}
             onRefresh={onRefresh}
+            onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
             onSwitch={onSwitch}
           />
         </TabsContent>

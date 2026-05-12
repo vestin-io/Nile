@@ -3,6 +3,7 @@ import { CursorUsageBinder, CursorUsageBindingRegistry, CursorUsageSnapshotStore
 import { CursorUsageAutoBinder } from "./CursorUsageAutoBinder";
 import type { CursorUsageSessionProbe } from "./CursorUsageSessionProbe";
 import { AccessRegistry } from "../../models/access";
+import { AgentConnectionSettings } from "../../models/agent-settings";
 import { ConnectionCreator } from "../../models/connection/Creator";
 import { SavedConnections } from "../../models/connection/SavedConnections";
 import { EndpointRegistry } from "../../models/endpoint";
@@ -61,6 +62,7 @@ export class LocalWorkspaceState {
       this.endpointRegistry,
       this.accessRegistry,
       agentSelection,
+      AgentConnectionSettings.fromDatabase(this.database),
     );
   }
 

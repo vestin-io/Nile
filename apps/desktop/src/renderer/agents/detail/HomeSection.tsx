@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
-import type { AgentId } from "@nile/core/models/agent";
+import type { AgentId } from "@nile/core/models/agent/types";
 
 import { formatLiveIssue } from "../../shared/DisplayText";
 import type { Translator } from "../../shared/I18n";

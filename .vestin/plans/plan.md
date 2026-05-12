@@ -20,8 +20,8 @@ Nile currently ships a local-first connection switcher with:
 ## Near-Term Rules
 
 - New behavior should land in the existing core action clusters:
-  - `actions/local-state`
-  - `actions/current-state`
+  - `actions/local-setup`
+  - `actions/live-setup`
   - `actions/usage`
   - `actions/apply`
 - New agent work should stay inside `packages/core/src/agents/<agent>/`.

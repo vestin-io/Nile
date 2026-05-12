@@ -1,14 +1,17 @@
 import type { AgentHomes, AgentId, ImportCurrentConnectionResult, RollbackLatestAgentResult } from "@nile/core/models/agent";
 import type { CursorUsageAutoBindResult, RemoveConnectionResult } from "@nile/core/application/local";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-state";
+import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 import { NileSession } from "@nile/core/runtime-local";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import type { CredentialStore } from "@nile/core/services/credential";
+import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 
 import { DesktopConnectionPresenter } from "../../state/ConnectionPresenter";
 import type { DesktopConnection } from "../../state/Types";
+import { DesktopManagedConnectionImports } from "./Imports";
+import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 import { SessionRunner } from "./SessionRunner";
 import type { DesktopConnectionSummary } from "./contracts";
 
@@ -16,6 +19,7 @@ type DesktopConnectionGatewayOptions = {
   databasePath: string;
   agentHomes?: AgentHomes;
   environment: EnvironmentSource;
+  managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
   credentialStore: CredentialStore;
 };
 
@@ -23,24 +27,36 @@ export class DesktopConnectionGateway {
   private readonly cursorUsageSessionProbe = CursorUsageSessionSourceProbe.createDefault();
   private readonly sessions: SessionRunner;
   private readonly connections = new DesktopConnectionPresenter();
+  private readonly managedApiKeyEnvironment: ManagedApiKeyEnvironment | NoopManagedApiKeyEnvironment;
+  private readonly imports: DesktopManagedConnectionImports;
 
   constructor(private readonly options: DesktopConnectionGatewayOptions) {
+    this.managedApiKeyEnvironment = this.options.managedApiKeyEnvironment ?? new NoopManagedApiKeyEnvironment();
+    this.imports = new DesktopManagedConnectionImports(this.managedApiKeyEnvironment);
     this.sessions = new SessionRunner(this);
   }
 
-  importCurrentConnection(agentId: AgentId): DesktopConnectionSummary {
-    return this.sessions.run((session) => {
-      const imported = session.importCurrentConnectionWithLocalEffects(agentId);
+  async importCurrentConnection(agentId: AgentId): Promise<DesktopConnectionSummary> {
+    return await this.sessions.runAsync(async (session) => {
+      const imported = await this.imports.importCurrentConnection(session, agentId);
       return this.buildConnectionSummary(imported);
     });
   }
 
   removeConnection(connectionId: string): RemoveConnectionResult {
-    return this.sessions.run((session) => session.removeConnection(connectionId));
+    return this.sessions.run((session) => {
+      this.managedApiKeyEnvironment.removeForConnection(session, connectionId);
+      return session.removeConnection(connectionId);
+    });
+  }
+
+  updateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): string | null {
+    return this.sessions.run((session) => session.setAgentConnectionModel(agentId, connectionId, modelId));
   }
 
   async switchConnection(agentId: AgentId, connectionId: string): Promise<DesktopConnection> {
     return await this.sessions.runAsync(async (session) => {
+      await this.enableAgentForConnectionIfNeeded(session, agentId, connectionId);
       const applied = session.useConnection(agentId, connectionId);
       const status = session.getAgentStatus(agentId);
       const currentConnection = this.connections.resolveCurrentConnection(
@@ -54,10 +70,29 @@ export class DesktopConnectionGateway {
     });
   }
 
-  importDetectedSetups(scanIds: AgentId[]): ImportDetectedSetupsResult {
-    return this.sessions.run((session) => session.importDetectedSetups({
-      selections: scanIds.map((scanId) => ({ scanId })),
-    }));
+  private async enableAgentForConnectionIfNeeded(
+    session: NileSession,
+    agentId: AgentId,
+    connectionId: string,
+  ): Promise<void> {
+    const connection = session.listSavedConnections().find((candidate) => candidate.id === connectionId);
+    if (!connection) {
+      throw new Error(`Connection not found: ${connectionId}`);
+    }
+    if (connection.enabledAgents.includes(agentId) || !connection.configurableAgents.includes(agentId)) {
+      return;
+    }
+
+    await session.updateConnection({
+      connectionId,
+      enabledAgents: [...connection.enabledAgents, agentId],
+    });
+  }
+
+  async importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult> {
+    return await this.sessions.runAsync(async (session) => {
+      return await this.imports.importDetectedSetups(session, scanIds);
+    });
   }
 
   rollbackLatestMutation(agentId: AgentId): RollbackLatestAgentResult {
@@ -83,7 +118,7 @@ export class DesktopConnectionGateway {
   }
 
   private buildConnectionSummary(
-    result: ImportCurrentConnectionResult,
+    result: ImportCurrentConnectionResult | SavedConnectionSummary,
   ): DesktopConnectionSummary {
     return {
       id: result.id,
@@ -92,7 +127,7 @@ export class DesktopConnectionGateway {
       endpointLabel: result.endpointLabel,
       endpointFamily: result.endpointFamily ?? "unknown",
       authMode: result.authMode,
-      ...(result.reused ? { reused: true } : {}),
+      ...("reused" in result && result.reused ? { reused: true } : {}),
     };
   }
 }

@@ -534,8 +534,8 @@ Current-aligned module layout:
 - `packages/core/src/models/endpoint`
 - `packages/core/src/models/access`
 - `packages/core/src/projection`
-- `packages/core/src/actions/current-state`
-- `packages/core/src/actions/local-state`
+- `packages/core/src/actions/live-setup`
+- `packages/core/src/actions/local-setup`
 - `packages/core/src/actions/apply`
 
 Suggested main classes:

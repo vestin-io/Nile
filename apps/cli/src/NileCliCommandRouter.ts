@@ -149,8 +149,8 @@ export class NileCliCommandRouter {
       : this.options.resultFactory.okText(this.options.statusPresenter.formatStatus(status));
   }
 
-  private runAgentImport(agentId: AgentId, options: ResolvedCliOptions): CommandResult {
-    const result = this.options.connectionCommands.importCurrentConnection(options, agentId);
+  private async runAgentImport(agentId: AgentId, options: ResolvedCliOptions): Promise<CommandResult> {
+    const result = await this.options.connectionCommands.importCurrentConnection(options, agentId);
     return this.options.resultFactory.okText(this.options.connectionPresenter.formatImportSummary(result));
   }
 

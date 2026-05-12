@@ -18,8 +18,8 @@ The core module owns shared state, shared actions, and agent-facing orchestratio
 
 - `actions/`
   - user-facing product action clusters:
-    - `local-state`
-    - `current-state`
+    - `local-setup`
+    - `live-setup`
     - `usage`
     - `apply`
 - `models/`

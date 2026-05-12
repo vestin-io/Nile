@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 
 import { EnvironmentSource } from "../../services/EnvironmentSource";
 import type { ClaudeSessionCredential } from "../../services/credential/Types";
-import { CurrentCredentialReader } from "./current-state/CredentialReader";
+import { CurrentCredentialReader } from "./live-setup/CredentialReader";
 
 type SpawnResult = {
   error?: Error;

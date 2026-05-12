@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { AccessRegistry } from "../../models/access";
+import { AgentConnectionSettings } from "../../models/agent-settings";
 import { EndpointRegistry } from "../../models/endpoint";
 import { type StoredCredential } from "../../services/credential/Types";
 import { KeychainCredentialStore } from "../../services/credential/KeychainCredentialStore";
@@ -18,7 +19,7 @@ afterEach(() => {
 });
 
 describe("OpenClaw ImportCurrentConnection", () => {
-  it("imports an unknown live provider into endpoint/access state", () => {
+  it("imports an unknown live provider into endpoint/access state", async () => {
     const setup = createSetup();
     writeFileSync(
       join(setup.openclawHome, "openclaw.json"),
@@ -50,7 +51,7 @@ describe("OpenClaw ImportCurrentConnection", () => {
       credentialStore: setup.credentialStore,
     });
 
-    const result = importer.importCurrent();
+    const result = await importer.importCurrent();
 
     expect(result).toEqual({
       id: "gateway-router-example-gpt-4-1",
@@ -65,14 +66,14 @@ describe("OpenClaw ImportCurrentConnection", () => {
     expect(endpoints.get("imported")?.rootUrl).toBe("https://router.example");
     endpoints.close();
 
-    const accesses = AccessRegistry.open(setup.dbPath, setup.credentialStore);
-    expect(accesses.get("gateway-router-example-gpt-4-1")?.openclawModelId).toBe("gpt-4.1");
-    accesses.close();
+    const settings = AgentConnectionSettings.open(setup.dbPath);
+    expect(settings.get("openclaw", "gateway-router-example-gpt-4-1")?.modelId).toBe("gpt-4.1");
+    settings.close();
 
     importer.close();
   });
 
-  it("imports an OpenAI oauth auth-profile as a session connection", () => {
+  it("imports an OpenAI oauth auth-profile as a session connection", async () => {
     const setup = createSetup();
     writeFileSync(
       join(setup.openclawHome, "openclaw.json"),
@@ -135,7 +136,7 @@ describe("OpenClaw ImportCurrentConnection", () => {
       credentialStore: setup.credentialStore,
     });
 
-    const result = importer.importCurrent();
+    const result = await importer.importCurrent();
 
     expect(result).toEqual(expect.objectContaining({
       endpointId: "openai",
@@ -147,9 +148,13 @@ describe("OpenClaw ImportCurrentConnection", () => {
     const accesses = AccessRegistry.open(setup.dbPath, setup.credentialStore);
     const imported = accesses.get(result.id);
     expect(imported?.authMode).toBe("openai_session");
-    expect(imported?.openclawModelId).toBe("gpt-5.3-codex");
     expect(imported?.identityKey).toBe("account:acct-123");
+    expect(imported?.enabledAgents).toEqual(["codex", "openclaw"]);
     accesses.close();
+
+    const settings = AgentConnectionSettings.open(setup.dbPath);
+    expect(settings.get("openclaw", result.id)?.modelId).toBe("gpt-5.3-codex");
+    settings.close();
 
     importer.close();
   });

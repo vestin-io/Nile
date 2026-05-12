@@ -134,20 +134,20 @@ export function ConnectionMethodSelector({
 
 export function ConnectionCapabilityField({
   configurableAgents,
+  detectedAgents,
   editable,
   enabledAgents,
   isProbingSupport,
   showDetectionState,
-  suggestedAgents,
   t,
   onEnabledAgentsChange,
 }: {
   configurableAgents: AgentId[];
+  detectedAgents: AgentId[];
   editable: boolean;
   enabledAgents: AgentId[];
   isProbingSupport: boolean;
   showDetectionState: boolean;
-  suggestedAgents: AgentId[];
   t: Translator;
   onEnabledAgentsChange?(nextAgents: AgentId[]): void;
 }) {
@@ -156,17 +156,17 @@ export function ConnectionCapabilityField({
   return (
     <FormField label={editable ? t("dialog.enabledAgents") : t("common.capability")}>
       <div className="rounded-xl border bg-muted/30 p-4">
-        <CapabilitySummary
-          configurableAgents={configurableAgents}
-          editable={editable}
-          enabledAgents={enabledAgents}
-          enabledAgentsSelectionInvalid={enabledAgentsSelectionInvalid}
-          isProbingSupport={isProbingSupport}
-          showDetectionState={showDetectionState}
-          suggestedAgents={suggestedAgents}
-          t={t}
-          onEnabledAgentsChange={onEnabledAgentsChange}
-        />
+      <CapabilitySummary
+        configurableAgents={configurableAgents}
+        detectedAgents={detectedAgents}
+        editable={editable}
+        enabledAgents={enabledAgents}
+        enabledAgentsSelectionInvalid={enabledAgentsSelectionInvalid}
+        isProbingSupport={isProbingSupport}
+        showDetectionState={showDetectionState}
+        t={t}
+        onEnabledAgentsChange={onEnabledAgentsChange}
+      />
       </div>
     </FormField>
   );
@@ -174,22 +174,22 @@ export function ConnectionCapabilityField({
 
 function CapabilitySummary({
   configurableAgents,
+  detectedAgents,
   editable,
   enabledAgents,
   enabledAgentsSelectionInvalid,
   isProbingSupport,
   showDetectionState,
-  suggestedAgents,
   t,
   onEnabledAgentsChange,
 }: {
   configurableAgents: AgentId[];
+  detectedAgents: AgentId[];
   editable: boolean;
   enabledAgents: AgentId[];
   enabledAgentsSelectionInvalid: boolean;
   isProbingSupport: boolean;
   showDetectionState: boolean;
-  suggestedAgents: AgentId[];
   t: Translator;
   onEnabledAgentsChange?(nextAgents: AgentId[]): void;
 }) {
@@ -199,9 +199,9 @@ function CapabilitySummary({
         <div className="text-sm text-muted-foreground">
           {isProbingSupport
             ? t("dialog.probingSupport")
-            : suggestedAgents.length > 0
+            : detectedAgents.length > 0
               ? t("dialog.detectedAgents", {
-                  agents: formatAgentsList(suggestedAgents, t),
+                  agents: formatAgentsList(detectedAgents, t),
                 })
               : t("dialog.noDetectedAgents")}
         </div>
@@ -231,7 +231,7 @@ function CapabilitySummary({
           ) : null}
         </>
       ) : (
-        <div className="text-sm">{formatAgentsList(suggestedAgents.length > 0 ? suggestedAgents : enabledAgents, t)}</div>
+        <div className="text-sm">{formatAgentsList(detectedAgents.length > 0 ? detectedAgents : enabledAgents, t)}</div>
       )}
     </div>
   );

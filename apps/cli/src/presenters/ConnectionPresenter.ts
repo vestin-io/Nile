@@ -2,7 +2,7 @@ import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type {
   ImportDetectedSetupsResult,
   ScanLocalSetupsResult,
-} from "@nile/core/actions/local-state";
+} from "@nile/core/actions/local-setup";
 import type { CursorUsageAutoBindResult } from "@nile/core/application/local";
 import type { ConnectionUsageResult } from "@nile/core/actions/usage";
 import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
@@ -231,9 +231,6 @@ export class ConnectionPresenter {
         `${formatAgentLabel(item.agentId)} · ${item.title.replace(`${formatAgentLabel(item.agentId)} · `, "")}`,
         `${this.formatScanState(item.state)} · ${item.subtitle}`,
       ];
-      if (item.matchedConnectionLabel) {
-        lines.push(`saved: ${item.matchedConnectionLabel}`);
-      }
       if (item.issues.length > 0) {
         lines.push(`note: ${item.issues[0]}`);
       }
@@ -305,9 +302,6 @@ export class ConnectionPresenter {
     }
     if (state === "already_saved") {
       return "already saved";
-    }
-    if (state === "unsupported") {
-      return "unsupported";
     }
     if (state === "unavailable") {
       return "unavailable";

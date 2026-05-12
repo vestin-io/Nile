@@ -89,7 +89,7 @@ function createAgent(agentId: AgentId, connectionId: string): DesktopAgentState 
     currentUsage: null,
     currentConnectionState: "saved",
     liveConnection: null,
-    syncState: "synced",
+    reconciliationState: "already_saved",
     connections: [],
   };
 }

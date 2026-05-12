@@ -82,14 +82,6 @@ export class DesktopSurface {
     return await this.withSession("settings-state", async (session) => await this.settings.read(session, options));
   }
 
-  async importDetectedSetups(scanIds: AgentId[]) {
-    return await this.withSession("import-detected-setups", async (session) =>
-      session.importDetectedSetups({
-        selections: scanIds.map((scanId) => ({ scanId })),
-      }),
-    );
-  }
-
   async getHistoryState(): Promise<HistoryState> {
     return await this.withSession("history-state", async (session) => this.history.read(session));
   }

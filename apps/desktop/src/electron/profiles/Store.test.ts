@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SqliteDatabase } from "@nile/core/services/database";
@@ -116,34 +116,6 @@ describe("WorkspaceProfileStore", () => {
     ]);
   });
 
-  it("drops invalid persisted assignments while preserving valid ones", () => {
-    const { databasePath, legacyPath } = createStorePaths();
-    writeFileSync(legacyPath, JSON.stringify({
-      profiles: [
-        {
-          id: "profile-1",
-          name: "Work",
-          assignments: [
-            { agentId: "codex", connectionId: "work" },
-            { agentId: "unknown", connectionId: "bad" },
-            { agentId: "claude", homePath: "" },
-          ],
-        },
-      ],
-    }), "utf8");
-
-    const store = new WorkspaceProfileStore(databasePath, legacyPath);
-
-    expect(store.list()).toEqual([
-      {
-        id: "profile-1",
-        name: "Work",
-        assignments: [{ agentId: "codex", connectionId: "work" }],
-      },
-    ]);
-    expect(existsSync(legacyPath)).toBe(false);
-  });
-
   it("upgrades early sqlite assignment rows that predate home_path_kind", () => {
     const { databasePath } = createStorePaths();
     const database = SqliteDatabase.open(databasePath);
@@ -216,11 +188,10 @@ describe("WorkspaceProfileStore", () => {
   });
 });
 
-function createStorePaths(): { databasePath: string; legacyPath: string } {
+function createStorePaths(): { databasePath: string } {
   const dir = mkdtempSync(join(tmpdir(), "nile-desktop-profiles-"));
   tempDirs.push(dir);
   return {
     databasePath: join(dir, "desktop.sqlite"),
-    legacyPath: join(dir, "profiles.json"),
   };
 }

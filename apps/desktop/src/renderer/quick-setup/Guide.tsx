@@ -2,6 +2,7 @@ import mascotImage from "../../../../../assets/mascot/image.png";
 
 import type { DesktopOnboardingState } from "../../state/Types";
 import type { Translator } from "../shared/I18n";
+import { LOCAL_SETUP_PRESENTATION } from "../shared/LocalSetup";
 import { cn } from "../ui/cn";
 
 type QuickSetupGuideProps = {
@@ -10,7 +11,7 @@ type QuickSetupGuideProps = {
 };
 
 export function QuickSetupGuide({ onboarding, t }: QuickSetupGuideProps) {
-  const content = readGuideContent(onboarding, t);
+  const content = LOCAL_SETUP_PRESENTATION.readGuideContent(onboarding, t);
 
   return (
     <div className="max-w-[54rem] rounded-2xl bg-white/96 px-5 py-4 shadow-[0_18px_36px_rgba(15,23,42,0.08)] ring-1 ring-black/5 dark:bg-slate-950/96 dark:ring-white/10">
@@ -38,48 +39,4 @@ export function QuickSetupGuide({ onboarding, t }: QuickSetupGuideProps) {
       </div>
     </div>
   );
-}
-
-function readGuideContent(onboarding: DesktopOnboardingState, t: Translator): {
-  description: string;
-  descriptionClassName: string;
-  title: string;
-  titleClassName: string;
-} {
-  const hasNewSetup = onboarding.items.some((item) => item.state === "new");
-  if (hasNewSetup) {
-    return {
-      description: t("quickSetup.guide.unsavedDescription"),
-      descriptionClassName: "text-slate-700 dark:text-slate-300",
-      title: t("quickSetup.guide.unsavedTitle"),
-      titleClassName: "text-amber-700 dark:text-amber-300",
-    };
-  }
-
-  const hasInvalidSetup = onboarding.items.some((item) => item.state === "invalid");
-  if (hasInvalidSetup) {
-    return {
-      description: t("quickSetup.guide.invalidDescription"),
-      descriptionClassName: "text-slate-700 dark:text-slate-300",
-      title: t("quickSetup.guide.invalidTitle"),
-      titleClassName: "text-rose-700 dark:text-rose-300",
-    };
-  }
-
-  const hasSavedSetup = onboarding.items.some((item) => item.state === "already_saved");
-  if (hasSavedSetup) {
-    return {
-      description: t("quickSetup.guide.savedDescription"),
-      descriptionClassName: "text-slate-700 dark:text-slate-300",
-      title: t("quickSetup.guide.savedTitle"),
-      titleClassName: "text-emerald-700 dark:text-emerald-300",
-    };
-  }
-
-  return {
-    description: t("quickSetup.guide.emptyDescription"),
-    descriptionClassName: "text-slate-700 dark:text-slate-300",
-    title: t("quickSetup.guide.emptyTitle"),
-    titleClassName: "text-sky-700 dark:text-sky-300",
-  };
 }

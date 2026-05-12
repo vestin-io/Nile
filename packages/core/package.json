@@ -28,9 +28,17 @@
       "types": "./dist/application/local/index.d.ts",
       "default": "./dist/application/local/index.js"
     },
-    "./actions/local-state": {
-      "types": "./dist/actions/local-state/index.d.ts",
-      "default": "./dist/actions/local-state/index.js"
+    "./actions/live-setup": {
+      "types": "./dist/actions/live-setup/index.d.ts",
+      "default": "./dist/actions/live-setup/index.js"
+    },
+    "./actions/local-setup": {
+      "types": "./dist/actions/local-setup/index.d.ts",
+      "default": "./dist/actions/local-setup/index.js"
+    },
+    "./actions/local-setup/reconciliation": {
+      "types": "./dist/actions/local-setup/Reconciliation.d.ts",
+      "default": "./dist/actions/local-setup/Reconciliation.js"
     },
     "./actions/usage": {
       "types": "./dist/actions/usage/index.d.ts",
@@ -55,6 +63,10 @@
     "./models/connection/enabled-agents-policy": {
       "types": "./dist/models/connection/EnabledAgentsPolicy.d.ts",
       "default": "./dist/models/connection/EnabledAgentsPolicy.js"
+    },
+    "./models/connection/requirements": {
+      "types": "./dist/models/connection/Requirements.d.ts",
+      "default": "./dist/models/connection/Requirements.js"
     },
     "./models/*": {
       "types": "./dist/models/*/index.d.ts",

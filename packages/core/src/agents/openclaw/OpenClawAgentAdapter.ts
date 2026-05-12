@@ -8,7 +8,7 @@ import { NileLogger } from "../../services/NileLogger";
 import type { AgentAdapter, RollbackLatestAgentResult } from "../../models/agent";
 import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { ApplySelection } from "./ApplySelection";
-import { CurrentStateDetector } from "./current-state/Detector";
+import { LiveSetupDetector } from "./live-setup/Detector";
 import { ImportCurrentConnection } from "./ImportCurrentConnection";
 import { RollbackLatestMutation } from "./RollbackLatestMutation";
 import { OPENCLAW_AGENT_ID } from "./types";
@@ -31,7 +31,7 @@ export class OpenClawAgentAdapter implements AgentAdapter {
   private readonly openApplyOperation: () => ApplySelection;
   private readonly openImportOperation: () => ImportCurrentConnection;
   private readonly openRollbackOperation: () => RollbackLatestMutation;
-  private readonly openDetectOperation: () => CurrentStateDetector;
+  private readonly openDetectOperation: () => LiveSetupDetector;
 
   constructor(options: OpenClawAgentAdapterOptions) {
     const databasePath = options.databasePath;
@@ -87,17 +87,17 @@ export class OpenClawAgentAdapter implements AgentAdapter {
           logger: logger.child({ scope: "rollback-latest-mutation" }),
         });
     this.openDetectOperation = () => sharedContext
-      ? CurrentStateDetector.fromContext(sharedContext, {
+      ? LiveSetupDetector.fromContext(sharedContext, {
           openclawHome,
           codexHome,
           credentialStore,
-          logger: logger.child({ scope: "current-state-detector" }),
+          logger: logger.child({ scope: "live-setup-detector" }),
         })
-      : CurrentStateDetector.open(databasePath, {
+      : LiveSetupDetector.open(databasePath, {
           openclawHome,
           codexHome,
           credentialStore,
-          logger: logger.child({ scope: "current-state-detector" }),
+          logger: logger.child({ scope: "live-setup-detector" }),
         });
   }
 
@@ -119,10 +119,10 @@ export class OpenClawAgentAdapter implements AgentAdapter {
     }
   }
 
-  importCurrentConnection() {
+  async importCurrentConnection() {
     const importer = this.openImportOperation();
     try {
-      return importer.importCurrent();
+      return await importer.importCurrent();
     } finally {
       importer.close();
     }

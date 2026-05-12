@@ -145,7 +145,7 @@ The new flow should sit above that and orchestrate a batch view.
 
 Add one new action-oriented capability in core:
 
-- `actions/local-state/`
+- `actions/local-setup/`
 
 Suggested responsibilities:
 

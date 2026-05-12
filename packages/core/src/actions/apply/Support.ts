@@ -12,6 +12,7 @@ import type { CredentialStore } from "../../services/credential/Store";
 import type { StoredCredential } from "../../services/credential/Types";
 import type { NileLogger } from "../../services/NileLogger";
 import type { ApplyAgentSelectionResult } from "../../models/agent";
+import type { AgentConnectionSettings } from "../../models/agent-settings";
 
 export type PreparedAgentApplySelection = {
   connectionId: string;
@@ -30,6 +31,7 @@ export class AgentApplySupport {
     private readonly endpointRegistry: EndpointRegistry,
     private readonly accessRegistry: AccessRegistry,
     private readonly agentSelection: AgentSelection,
+    private readonly agentConnectionSettings: AgentConnectionSettings,
     private readonly credentialStore: CredentialStore,
     private readonly logger: NileLogger,
     private readonly buildValidationError: BuildValidationError,
@@ -41,12 +43,14 @@ export class AgentApplySupport {
     const endpoint = this.requireEndpoint(access.endpointId);
 
     const credential = this.credentialStore.get(access.credentialSource.reference);
+    const modelId = this.readModelId(connectionId, access);
     let projection: AgentProjection;
     try {
       projection = this.projectionResolver.resolve(this.agentId, {
         endpoint,
         access,
         credential,
+        ...(modelId ? { modelId } : {}),
       });
     } catch (error) {
       throw this.buildValidationError(error instanceof Error ? error.message : String(error));
@@ -76,6 +80,10 @@ export class AgentApplySupport {
       prepared.connectionId,
       prepared.appliedAt,
     );
+    const modelId = this.readProjectionModelId(prepared.projection);
+    if (modelId) {
+      this.agentConnectionSettings.setModelId(this.agentId, prepared.connectionId, modelId);
+    }
     this.logger.info(`${this.agentId}.apply.success`, {
       endpointId: prepared.endpoint.id,
       accessId: prepared.access.id,
@@ -115,5 +123,18 @@ export class AgentApplySupport {
       throw this.buildValidationError(`Endpoint not found: ${endpointId}`);
     }
     return endpoint;
+  }
+
+  private readModelId(connectionId: string, access: AccessRecord): string | undefined {
+    return this.agentConnectionSettings.get(this.agentId, connectionId.trim())?.modelId?.trim() || undefined;
+  }
+
+  private readProjectionModelId(projection: AgentProjection): string | undefined {
+    if (!("modelId" in projection)) {
+      return undefined;
+    }
+    return typeof projection.modelId === "string" && projection.modelId.trim()
+      ? projection.modelId.trim()
+      : undefined;
   }
 }

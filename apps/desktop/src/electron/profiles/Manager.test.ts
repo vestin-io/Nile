@@ -133,7 +133,7 @@ function createSettingsState(): SettingsState {
     currentConnection: codexWork,
     currentConnectionState: "saved",
     liveConnection: codexWork,
-    syncState: "synced",
+    reconciliationState: "already_saved",
     connections: [codexWork, claudeWork],
     currentAgentConnections: [codexWork],
     agents: [
@@ -220,7 +220,7 @@ function createAgent(
     currentUsage: null,
     currentConnectionState: currentConnection ? "saved" : "none",
     liveConnection: currentConnection,
-    syncState: "synced",
+    reconciliationState: currentConnection ? "already_saved" : "unavailable",
     connections,
   };
 }

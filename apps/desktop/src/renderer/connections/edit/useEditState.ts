@@ -75,7 +75,7 @@ export function useConnectionEditState({
     setAgentsDirty,
     setGatewayTrustConfirmed,
     shouldProbeGatewaySupport,
-    suggestedAgents,
+    detectedAgents,
   } = useGatewaySupportState({
     apiKey,
     apiKeySource,
@@ -228,7 +228,7 @@ export function useConnectionEditState({
     setLabel,
     setSessionSource,
     shouldShowAuthJsonPath,
-    suggestedAgents,
+    detectedAgents,
     submit,
     trimmedLabel,
     endpointUrl,

@@ -34,4 +34,5 @@ export {
 } from "./Store";
 export type { CredentialStore } from "./Store";
 export { KeychainCredentialStore } from "./KeychainCredentialStore";
+export { GenericPasswordWriter } from "./GenericPasswordWriter";
 export { SecurityCli, type SecurityCliResult } from "./SecurityCli";

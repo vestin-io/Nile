@@ -19,6 +19,7 @@
     "desktop:build": "npm run build -w @nile/desktop",
     "desktop:dev": "npm run dev -w @nile/desktop",
     "desktop:start": "npm run start -w @nile/desktop",
+    "scaffold:agent": "node ./scripts/scaffold-agent.mjs",
     "test:core": "vitest run packages/core/src",
     "test:host-local": "npm run build:host-local && vitest run packages/host-local/src",
     "test:cli": "npm run build:host-local && vitest run apps/cli/src",

@@ -8,7 +8,7 @@ import { NileLogger } from "../../services/NileLogger";
 import type { AgentAdapter, RollbackLatestAgentResult } from "../../models/agent";
 import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { ApplySelection } from "./apply/ApplySelection";
-import { CurrentStateDetector } from "./current-state/Detector";
+import { LiveSetupDetector } from "./live-setup/Detector";
 import { ImportCurrentConnection } from "./import/ImportCurrentConnection";
 import { RollbackLatestMutation } from "./rollback/RollbackLatestMutation";
 import { CODEX_AGENT_ID } from "./types";
@@ -30,7 +30,7 @@ export class CodexAgentAdapter implements AgentAdapter {
   private readonly openApplyOperation: () => ApplySelection;
   private readonly openImportOperation: () => ImportCurrentConnection;
   private readonly openRollbackOperation: () => RollbackLatestMutation;
-  private readonly openDetectOperation: () => CurrentStateDetector;
+  private readonly openDetectOperation: () => LiveSetupDetector;
 
   constructor(options: CodexAgentAdapterOptions) {
     const databasePath = options.databasePath;
@@ -81,17 +81,17 @@ export class CodexAgentAdapter implements AgentAdapter {
           logger: logger.child({ scope: "rollback-latest-mutation" }),
         });
     this.openDetectOperation = () => sharedContext
-      ? CurrentStateDetector.fromContext(sharedContext, {
+      ? LiveSetupDetector.fromContext(sharedContext, {
           codexHome,
           credentialStore,
           environment,
-          logger: logger.child({ scope: "current-state-detector" }),
+          logger: logger.child({ scope: "live-setup-detector" }),
         })
-      : CurrentStateDetector.open(databasePath, {
+      : LiveSetupDetector.open(databasePath, {
           codexHome,
           credentialStore,
           environment,
-          logger: logger.child({ scope: "current-state-detector" }),
+          logger: logger.child({ scope: "live-setup-detector" }),
         });
   }
 
@@ -113,10 +113,10 @@ export class CodexAgentAdapter implements AgentAdapter {
     }
   }
 
-  importCurrentConnection() {
+  async importCurrentConnection() {
     const importer = this.openImportOperation();
     try {
-      return importer.importCurrent();
+      return await importer.importCurrent();
     } finally {
       importer.close();
     }

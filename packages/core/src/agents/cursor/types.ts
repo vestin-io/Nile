@@ -37,7 +37,7 @@ export type CursorDetectedAccess = {
   identityKey?: string;
 };
 
-export type CursorDetectedCurrentState = {
+export type CursorDetectedLiveSetup = {
   agentId: AgentId;
   validity: AgentLiveStateValidity;
   issues: string[];

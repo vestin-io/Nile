@@ -372,6 +372,405 @@ describe("DesktopConnectionManager", () => {
     );
   });
 
+  it("auto-enables a configurable connection for an agent before switching", async () => {
+    const updateCalls: Array<{ connectionId: string; enabledAgents?: string[] }> = [];
+    const useCalls: Array<[string, string]> = [];
+    const sessionStub = {
+      listSavedConnections: () => [{
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        endpointUrl: "https://llmfk.dpdns.org/v1",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway",
+        authMode: "api_key",
+        apiKeySource: "direct" as const,
+        envKey: "NILE_GATEWAY_LLMFK_DPDNS_ORG_API_KEY_API_KEY",
+        enabledAgents: ["codex", "claude"],
+        configurableAgents: ["codex", "claude", "openclaw"],
+        selectedByAgents: ["claude"],
+      }],
+      updateConnection: async (input: { connectionId: string; enabledAgents?: string[] }) => {
+        updateCalls.push(input);
+        return {
+          id: "gateway-shared-api-key",
+          endpointId: "gateway-shared",
+          endpointUrl: "https://llmfk.dpdns.org/v1",
+          label: "Gateway (llmfk.dpdns.org) API Key",
+          endpointLabel: "Gateway (llmfk.dpdns.org)",
+          endpointFamily: "gateway",
+          authMode: "api_key",
+          apiKeySource: "direct" as const,
+          envKey: "NILE_GATEWAY_LLMFK_DPDNS_ORG_API_KEY_API_KEY",
+          enabledAgents: ["codex", "claude", "openclaw"],
+          configurableAgents: ["codex", "claude", "openclaw"],
+          selectedByAgents: ["claude"],
+        };
+      },
+      useConnection: (agentId: string, connectionId: string) => {
+        useCalls.push([agentId, connectionId]);
+        return {
+          agentId,
+          connectionId,
+          connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
+          endpointId: "gateway-shared",
+          endpointLabel: "Gateway (llmfk.dpdns.org)",
+          appliedAt: "2026-05-11T00:00:00.000Z",
+        };
+      },
+      getAgentStatus: () => ({
+        agent: "openclaw",
+        currentConnection: {
+          id: "gateway-shared-api-key",
+          label: "Gateway (llmfk.dpdns.org) API Key",
+          endpointId: "gateway-shared",
+          endpointLabel: "Gateway (llmfk.dpdns.org)",
+          endpointFamily: "gateway",
+          authMode: "api_key",
+        },
+        currentConnectionState: "saved" as const,
+        liveConnection: null,
+        reconciliation: { state: "already_saved", validity: "valid_matched" } as const,
+      }),
+      close: () => {},
+    };
+
+    class SessionStubbedDesktopConnectionGateway extends DesktopConnectionGateway {
+      override openSession(): never {
+        return sessionStub as never;
+      }
+    }
+
+    const setup = createSetup();
+    const gateway = new SessionStubbedDesktopConnectionGateway({
+      databasePath: setup.dbPath,
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+    });
+
+    await gateway.switchConnection("openclaw", "gateway-shared-api-key");
+
+    expect(updateCalls).toEqual([{
+      connectionId: "gateway-shared-api-key",
+      enabledAgents: ["codex", "claude", "openclaw"],
+    }]);
+    expect(useCalls).toEqual([["openclaw", "gateway-shared-api-key"]]);
+  });
+
+  it("ensures managed env keys for batch detected-setup imports", async () => {
+    const ensureCalls: string[] = [];
+    const sessionStub = {
+      scanLocalSetups: () => ({ items: [] }),
+      captureMatchedImportState: vi.fn(),
+      restoreMatchedImportState: vi.fn(),
+      importDetectedSetups: async () => ({
+        results: [
+          {
+            scanId: "claude",
+            status: "created" as const,
+            connectionId: "gateway-shared-api-key",
+            connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
+          },
+          {
+            scanId: "codex",
+            status: "created" as const,
+            connectionId: "work-session",
+            connectionLabel: "Work Session",
+          },
+        ],
+      }),
+      close: () => {},
+    };
+
+    class SessionStubbedDesktopConnectionGateway extends DesktopConnectionGateway {
+      override openSession(): never {
+        return sessionStub as never;
+      }
+    }
+
+    const setup = createSetup();
+    const gateway = new SessionStubbedDesktopConnectionGateway({
+      databasePath: setup.dbPath,
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+      managedApiKeyEnvironment: {
+        ensureForConnection: async (_session: unknown, connectionId: string) => {
+          ensureCalls.push(connectionId);
+          return null;
+        },
+        removeForConnection: () => {},
+      } as never,
+    });
+
+    const result = await gateway.importDetectedSetups(["claude", "codex"]);
+
+    expect(result.results).toEqual([
+      {
+        scanId: "claude",
+        status: "created",
+        connectionId: "gateway-shared-api-key",
+        connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
+      },
+      {
+        scanId: "codex",
+        status: "created",
+        connectionId: "work-session",
+        connectionLabel: "Work Session",
+      },
+    ]);
+    expect(ensureCalls).toEqual(["gateway-shared-api-key", "work-session"]);
+  });
+
+  it("rolls back a newly imported connection when managed env promotion fails", async () => {
+    const removeConnection = vi.fn();
+    const restoreMatchedImportState = vi.fn();
+    const sessionStub = {
+      scanLocalSetups: () => ({ items: [] }),
+      captureMatchedImportState: vi.fn(),
+      restoreMatchedImportState,
+      importCurrentConnectionWithLocalEffects: async () => ({
+        id: "gateway-shared-api-key",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointId: "gateway-shared",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway" as const,
+        authMode: "api_key" as const,
+      }),
+      removeConnection,
+      close: () => {},
+    };
+
+    class SessionStubbedDesktopConnectionGateway extends DesktopConnectionGateway {
+      override openSession(): never {
+        return sessionStub as never;
+      }
+    }
+
+    const setup = createSetup();
+    const gateway = new SessionStubbedDesktopConnectionGateway({
+      databasePath: setup.dbPath,
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+      managedApiKeyEnvironment: {
+        ensureForConnection: async () => {
+          throw new Error("keychain unavailable");
+        },
+        removeForConnection: () => {},
+      } as never,
+    });
+
+    await expect(gateway.importCurrentConnection("claude")).rejects.toThrow("keychain unavailable");
+    expect(removeConnection).toHaveBeenCalledWith("gateway-shared-api-key");
+    expect(restoreMatchedImportState).not.toHaveBeenCalled();
+  });
+
+  it("restores a reused import when managed env promotion fails", async () => {
+    const restoreMatchedImportState = vi.fn();
+    const snapshot = {
+      agentId: "claude",
+      connectionId: "gateway-shared-api-key",
+      endpointId: "gateway-shared",
+      endpointProtocols: {
+        anthropic: {
+          authSchemes: ["x-api-key"],
+        },
+      },
+      identityKey: null,
+      credential: {
+        kind: "api_key",
+        source: "direct",
+        apiKey: "gateway-secret",
+      },
+      selection: null,
+      modelSetting: null,
+    };
+    const sessionStub = {
+      getAgentStatus: () => ({
+        agentId: "claude",
+        liveConnection: {
+          id: "gateway-shared-api-key",
+          label: "Gateway (llmfk.dpdns.org) API Key",
+        },
+        currentSelection: null,
+        currentConnection: null,
+        currentConnectionState: "none" as const,
+        rollback: "unsupported" as const,
+        supportsHistory: false,
+        detectedSetup: null,
+        issues: [],
+        reconciliation: { state: "already_saved" as const },
+      }),
+      captureMatchedImportState: vi.fn(() => snapshot),
+      restoreMatchedImportState,
+      importCurrentConnectionWithLocalEffects: async () => ({
+        id: "gateway-shared-api-key",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointId: "gateway-shared",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway" as const,
+        authMode: "api_key" as const,
+        reused: true,
+      }),
+      close: () => {},
+    };
+
+    class SessionStubbedDesktopConnectionGateway extends DesktopConnectionGateway {
+      override openSession(): never {
+        return sessionStub as never;
+      }
+    }
+
+    const setup = createSetup();
+    const gateway = new SessionStubbedDesktopConnectionGateway({
+      databasePath: setup.dbPath,
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+      managedApiKeyEnvironment: {
+        ensureForConnection: async () => {
+          throw new Error("keychain unavailable");
+        },
+        removeForConnection: () => {},
+      } as never,
+    });
+
+    await expect(gateway.importCurrentConnection("claude")).rejects.toThrow("keychain unavailable");
+    expect(restoreMatchedImportState).toHaveBeenCalledWith(snapshot);
+  });
+
+  it("marks batch imports as failed when managed env promotion fails for a created connection", async () => {
+    const removeConnection = vi.fn();
+    const removeForConnection = vi.fn();
+    const sessionStub = {
+      scanLocalSetups: () => ({ items: [] }),
+      captureMatchedImportState: vi.fn(),
+      restoreMatchedImportState: vi.fn(),
+      importDetectedSetups: async () => ({
+        results: [
+          {
+            scanId: "claude",
+            status: "created" as const,
+            connectionId: "gateway-shared-api-key",
+            connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
+          },
+        ],
+      }),
+      removeConnection,
+      close: () => {},
+    };
+
+    class SessionStubbedDesktopConnectionGateway extends DesktopConnectionGateway {
+      override openSession(): never {
+        return sessionStub as never;
+      }
+    }
+
+    const setup = createSetup();
+    const gateway = new SessionStubbedDesktopConnectionGateway({
+      databasePath: setup.dbPath,
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+      managedApiKeyEnvironment: {
+        ensureForConnection: async () => {
+          throw new Error("keychain unavailable");
+        },
+        removeForConnection,
+      } as never,
+    });
+
+    const result = await gateway.importDetectedSetups(["claude"]);
+
+    expect(result.results).toEqual([
+      {
+        scanId: "claude",
+        status: "failed",
+        message: "keychain unavailable",
+      },
+    ]);
+    expect(removeForConnection).toHaveBeenCalledWith(sessionStub, "gateway-shared-api-key");
+    expect(removeConnection).toHaveBeenCalledWith("gateway-shared-api-key");
+  });
+
+  it("restores reused batch imports when managed env promotion fails", async () => {
+    const restoreMatchedImportState = vi.fn();
+    const snapshot = {
+      agentId: "claude",
+      connectionId: "gateway-shared-api-key",
+      endpointId: "gateway-shared",
+      endpointProtocols: {
+        anthropic: {
+          authSchemes: ["x-api-key"],
+        },
+      },
+      identityKey: null,
+      credential: {
+        kind: "api_key",
+        source: "direct",
+        apiKey: "gateway-secret",
+      },
+      selection: null,
+      modelSetting: null,
+    };
+    const sessionStub = {
+      getAgentStatus: () => ({
+        agentId: "claude",
+        liveConnection: {
+          id: "gateway-shared-api-key",
+          label: "Gateway (llmfk.dpdns.org) API Key",
+        },
+        currentSelection: null,
+        currentConnection: null,
+        currentConnectionState: "none" as const,
+        rollback: "unsupported" as const,
+        supportsHistory: false,
+        detectedSetup: null,
+        issues: [],
+        reconciliation: { state: "already_saved" as const },
+      }),
+      captureMatchedImportState: vi.fn(() => snapshot),
+      restoreMatchedImportState,
+      importDetectedSetups: async () => ({
+        results: [
+          {
+            scanId: "claude",
+            status: "reused" as const,
+            connectionId: "gateway-shared-api-key",
+            connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
+          },
+        ],
+      }),
+      close: () => {},
+    };
+
+    class SessionStubbedDesktopConnectionGateway extends DesktopConnectionGateway {
+      override openSession(): never {
+        return sessionStub as never;
+      }
+    }
+
+    const setup = createSetup();
+    const gateway = new SessionStubbedDesktopConnectionGateway({
+      databasePath: setup.dbPath,
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+      managedApiKeyEnvironment: {
+        ensureForConnection: async () => {
+          throw new Error("keychain unavailable");
+        },
+      } as never,
+    });
+
+    const result = await gateway.importDetectedSetups(["claude"]);
+
+    expect(result.results).toEqual([
+      {
+        scanId: "claude",
+        status: "failed",
+        message: "keychain unavailable",
+      },
+    ]);
+    expect(restoreMatchedImportState).toHaveBeenCalledWith(snapshot);
+  });
+
   it("re-applies updated connection to selected agents when syncSelectedAgents is enabled", async () => {
     const useCalls: Array<[string, string]> = [];
     const sessionStub = {

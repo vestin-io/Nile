@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -91,35 +91,6 @@ describe("ConnectionAlertStore", () => {
     })).toThrow("Connection alert already exists");
   });
 
-  it("reads legacy low-percent alerts without a stored type", () => {
-    const dir = mkdtempSync(join(tmpdir(), "nile-connection-alerts-"));
-    tempDirs.push(dir);
-    const databasePath = join(dir, "desktop.sqlite");
-    const legacyPath = join(dir, "desktop-connection-alerts.json");
-    writeFileSync(legacyPath, `${JSON.stringify({
-      alertsByConnectionId: {
-        "codex-work": [{
-          id: "legacy-alert",
-          metricKey: "5h",
-          thresholdPercent: 65,
-          enabled: true,
-        }],
-      },
-    }, null, 2)}\n`, "utf8");
-
-    const store = new ConnectionAlertStore(databasePath, legacyPath);
-
-    expect(store.list("codex-work")).toEqual([{
-      id: "legacy-alert",
-      type: "low-percent",
-      metricKey: "5h",
-      metricLabel: "5h",
-      thresholdPercent: 65,
-      enabled: true,
-    }]);
-    expect(existsSync(legacyPath)).toBe(false);
-  });
-
   it("persists renewed alerts with their type", () => {
     const dir = mkdtempSync(join(tmpdir(), "nile-connection-alerts-"));
     tempDirs.push(dir);
@@ -158,29 +129,6 @@ describe("ConnectionAlertStore", () => {
     }
   });
 
-  it("treats invalid config shapes as empty alerts", () => {
-    const dir = mkdtempSync(join(tmpdir(), "nile-connection-alerts-"));
-    tempDirs.push(dir);
-    const databasePath = join(dir, "desktop.sqlite");
-    const legacyPath = join(dir, "desktop-connection-alerts.json");
-    writeFileSync(legacyPath, "[]\n", "utf8");
-    const store = new ConnectionAlertStore(databasePath, legacyPath);
-
-    expect(store.list("codex-work")).toEqual([]);
-    expect(existsSync(legacyPath)).toBe(false);
-  });
-
-  it("treats invalid json as empty alerts", () => {
-    const dir = mkdtempSync(join(tmpdir(), "nile-connection-alerts-"));
-    tempDirs.push(dir);
-    const databasePath = join(dir, "desktop.sqlite");
-    const legacyPath = join(dir, "desktop-connection-alerts.json");
-    writeFileSync(legacyPath, "{ invalid }\n", "utf8");
-    const store = new ConnectionAlertStore(databasePath, legacyPath);
-
-    expect(store.list("codex-work")).toEqual([]);
-    expect(existsSync(legacyPath)).toBe(false);
-  });
 });
 
 function createStore(tempDirs: string[]): ConnectionAlertStore {

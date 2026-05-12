@@ -173,11 +173,6 @@ export function ProfilesPage({
               <EmptyTitle>{t("profiles.emptyTitle")}</EmptyTitle>
               <EmptyDescription>{t("profiles.emptyDescription")}</EmptyDescription>
             </EmptyHeader>
-            <div className="pt-4">
-              <Button onClick={() => setIsCreatePageOpen(true)}>
-                {t("profiles.createAction")}
-              </Button>
-            </div>
           </Empty>
         ) : profiles.map((profile) => (
           <ProfileCard

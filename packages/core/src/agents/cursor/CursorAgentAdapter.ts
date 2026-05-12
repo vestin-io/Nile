@@ -7,7 +7,7 @@ import { NileLogger } from "../../services/NileLogger";
 import type { AgentAdapter, RollbackLatestAgentResult } from "../../models/agent";
 import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { ApplySelection } from "./ApplySelection";
-import { CurrentStateDetector } from "./current-state/Detector";
+import { LiveSetupDetector } from "./live-setup/Detector";
 import { ImportCurrentConnection } from "./ImportCurrentConnection";
 import { RollbackLatestMutation } from "./RollbackLatestMutation";
 import { CURSOR_AGENT_ID } from "./types";
@@ -29,7 +29,7 @@ export class CursorAgentAdapter implements AgentAdapter {
   private readonly openApplyOperation: () => ApplySelection;
   private readonly openImportOperation: () => ImportCurrentConnection;
   private readonly openRollbackOperation: () => RollbackLatestMutation;
-  private readonly openDetectOperation: () => CurrentStateDetector;
+  private readonly openDetectOperation: () => LiveSetupDetector;
 
   constructor(options: CursorAgentAdapterOptions) {
     const databasePath = options.databasePath;
@@ -80,17 +80,17 @@ export class CursorAgentAdapter implements AgentAdapter {
           logger: logger.child({ scope: "rollback-latest-mutation" }),
         });
     this.openDetectOperation = () => sharedContext
-      ? CurrentStateDetector.fromContext(sharedContext, {
+      ? LiveSetupDetector.fromContext(sharedContext, {
           cursorHome,
           credentialStore,
           environment,
-          logger: logger.child({ scope: "current-state-detector" }),
+          logger: logger.child({ scope: "live-setup-detector" }),
         })
-      : CurrentStateDetector.open(databasePath, {
+      : LiveSetupDetector.open(databasePath, {
           cursorHome,
           credentialStore,
           environment,
-          logger: logger.child({ scope: "current-state-detector" }),
+          logger: logger.child({ scope: "live-setup-detector" }),
         });
   }
 
@@ -112,10 +112,10 @@ export class CursorAgentAdapter implements AgentAdapter {
     }
   }
 
-  importCurrentConnection() {
+  async importCurrentConnection() {
     const importer = this.openImportOperation();
     try {
-      return importer.importCurrent();
+      return await importer.importCurrent();
     } finally {
       importer.close();
     }

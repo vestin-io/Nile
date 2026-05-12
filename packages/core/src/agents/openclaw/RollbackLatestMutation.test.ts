@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { AccessRegistry } from "../../models/access";
+import { AgentConnectionSettings } from "../../models/agent-settings";
 import { EndpointRegistry } from "../../models/endpoint";
 import { AgentSelection } from "../../models/selection/Selection";
 import { type StoredCredential } from "../../services/credential/Types";
@@ -34,7 +35,6 @@ describe("OpenClaw RollbackLatestMutation", () => {
         endpointId: "gateway",
         label: "Gateway gpt-4.1",
         authMode: "api_key",
-        openclawModelId: "gpt-4.1",
       },
       {
         kind: "api_key",
@@ -42,6 +42,7 @@ describe("OpenClaw RollbackLatestMutation", () => {
         envKey: "ROUTER_WORK_KEY",
       },
     );
+    setOpenClawModel(setup.dbPath, "router-work", "gpt-4.1");
 
     const apply = ApplySelection.open(setup.dbPath, {
       openclawHome: setup.openclawHome,
@@ -123,13 +124,21 @@ function seedAccess(
     endpointId: string;
     label: string;
     authMode: "api_key";
-    openclawModelId: string;
   },
   credential: StoredCredential,
 ): void {
   const registry = AccessRegistry.open(dbPath, credentialStore);
   registry.add(input, credential);
   registry.close();
+}
+
+function setOpenClawModel(dbPath: string, connectionId: string, modelId: string): void {
+  const settings = AgentConnectionSettings.open(dbPath);
+  try {
+    settings.setModelId("openclaw", connectionId, modelId);
+  } finally {
+    settings.close();
+  }
 }
 
 class StubCredentialStore extends KeychainCredentialStore {

@@ -56,7 +56,7 @@ Relevant files:
 
 - `apps/desktop/src/electron/shell/DesktopMain.ts`
 - `apps/desktop/src/state/Surface.ts`
-- `packages/core/src/actions/local-state/Status.ts`
+- `packages/core/src/actions/local-setup/Status.ts`
 
 ### Agent status detection is synchronous and can be expensive
 

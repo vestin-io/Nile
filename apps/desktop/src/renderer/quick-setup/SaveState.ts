@@ -1,4 +1,6 @@
-export type SavePhase = "idle" | "pending-confirmation";
+export type SavePhase =
+  | "idle"
+  | "saving";
 
 type SaveStateInput = {
   confirmed: boolean;
@@ -16,4 +18,13 @@ export function shouldKeepPendingSave({
   }
 
   return !confirmed && hasLocalSetup;
+}
+
+export function readPendingSaveMessageKey(phase: SavePhase): string | null {
+  switch (phase) {
+    case "saving":
+      return "quickSetup.saveProgress.saving";
+    default:
+      return null;
+  }
 }

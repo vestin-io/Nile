@@ -21,7 +21,7 @@ export type ConnectionAddInput = {
   endpointUrl?: string;
   id?: string;
   label?: string;
-  openclawModelId?: string;
+  selectedModelId?: string;
   preset: ConnectionPresetFamily;
 };
 
@@ -86,7 +86,7 @@ export class ConnectionAddFlow {
       id: this.readFlagString(flags, "id") ?? undefined,
       label,
       ...(agentSelection.enabledAgents ? { enabledAgents: agentSelection.enabledAgents } : {}),
-      ...(agentSelection.openclawModelId ? { openclawModelId: agentSelection.openclawModelId } : {}),
+      ...(agentSelection.selectedModelId ? { selectedModelId: agentSelection.selectedModelId } : {}),
       preset: definition.preset,
     };
   }
@@ -123,7 +123,7 @@ export class ConnectionAddFlow {
           endpointUrl,
           label: label || undefined,
           ...(agentSelection.enabledAgents ? { enabledAgents: agentSelection.enabledAgents } : {}),
-          ...(agentSelection.openclawModelId ? { openclawModelId: agentSelection.openclawModelId } : {}),
+          ...(agentSelection.selectedModelId ? { selectedModelId: agentSelection.selectedModelId } : {}),
           preset: definition.preset,
         };
       } catch (error) {
@@ -182,10 +182,10 @@ export class ConnectionAddFlow {
     flags: Map<string, string | boolean>,
     definition: ConnectionDefinition,
     input: DescribeOnboardingInput,
-  ): Promise<{ enabledAgents?: AgentId[]; openclawModelId?: string }> {
+  ): Promise<{ enabledAgents?: AgentId[]; selectedModelId?: string }> {
     const requestedAgents = this.readRequestedAgents(flags);
-    const openclawModelId = this.readOpenClawModelId(flags);
-    const onboarding = !requestedAgents && definition.configurableAgents.length <= 1 && !openclawModelId
+    const selectedModelId = this.readSelectedModelId(flags);
+    const onboarding = !requestedAgents && definition.configurableAgents.length <= 1 && !selectedModelId
       ? undefined
       : await this.describeOnboarding(options, input);
 
@@ -193,7 +193,7 @@ export class ConnectionAddFlow {
       authMode: input.authMode,
       definition,
       onboarding,
-      openclawModelId,
+      selectedModelId,
       requestedAgents,
     });
   }
@@ -202,12 +202,11 @@ export class ConnectionAddFlow {
     options: ResolvedCliOptions,
     definition: ConnectionDefinition,
     input: DescribeOnboardingInput,
-  ): Promise<{ enabledAgents?: AgentId[]; openclawModelId?: string }> {
+  ): Promise<{ enabledAgents?: AgentId[]; selectedModelId?: string }> {
     const onboarding = definition.suggestEnabledAgents
       ? await this.describeOnboarding(options, input)
       : {
         configurableAgents: definition.configurableAgents,
-        suggestedAgents: definition.defaultEnabledAgents,
         defaultEnabledAgents: definition.defaultEnabledAgents,
       };
     return await this.agentSelection.promptForSelection(definition, input.authMode, onboarding);
@@ -225,8 +224,8 @@ export class ConnectionAddFlow {
     return value ? this.agentSelection.parseRequestedAgents(value) : undefined;
   }
 
-  private readOpenClawModelId(flags: Map<string, string | boolean>): string | undefined {
-    return this.readFlagString(flags, "openclaw-model-id")?.trim() || undefined;
+  private readSelectedModelId(flags: Map<string, string | boolean>): string | undefined {
+    return this.readFlagString(flags, "model-id")?.trim() || undefined;
   }
 
   private requireFlagString(flags: Map<string, string | boolean>, name: string): string {

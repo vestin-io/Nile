@@ -13,11 +13,6 @@ import type { AgentDetailTab } from "./detail/Page";
 import type { Translator } from "../shared/I18n";
 import { AgentListView } from "./list/View";
 
-const AGENT_LIST_ORDER: AgentId[] = ["codex", "claude", "cursor", "openclaw"];
-const AGENT_LIST_ORDER_INDEX = new Map(
-  AGENT_LIST_ORDER.map((agentId, index) => [agentId, index]),
-);
-
 type AgentPageProps = {
   agents: DesktopAgentState[];
   agentHomes: DesktopAdvancedState["agentHomes"];
@@ -38,6 +33,7 @@ type AgentPageProps = {
   onOpenConnection(connectionId: string, agentId: DesktopAgentState["agentId"]): void;
   onRefresh(): Promise<void>;
   onRollback(agentId: DesktopAgentState["agentId"]): Promise<void>;
+  onUpdateAgentConnectionModel(agentId: DesktopAgentState["agentId"], connectionId: string, modelId: string | null): Promise<void>;
   onSelectedDetailAgentIdChange(agentId: AgentId | null): void;
   onSelectedDetailTabChange(tab: AgentDetailTab): void;
   onSwitch(agentId: DesktopAgentState["agentId"], connectionId: string): Promise<void>;
@@ -63,15 +59,20 @@ export function AgentPage({
   onOpenConnection,
   onRefresh,
   onRollback,
+  onUpdateAgentConnectionModel,
   onSelectedDetailAgentIdChange,
   onSelectedDetailTabChange,
   onSwitch,
 }: AgentPageProps) {
+  const fallbackOrderIndex = useMemo(
+    () => new Map(agents.map((agent, index) => [agent.agentId, index])),
+    [agents],
+  );
   const orderedAgents = useMemo(
     () => [...agents].sort((left, right) =>
-      (agentOrder.indexOf(left.agentId) >= 0 ? agentOrder.indexOf(left.agentId) : (AGENT_LIST_ORDER_INDEX.get(left.agentId) ?? Number.MAX_SAFE_INTEGER))
-      - (agentOrder.indexOf(right.agentId) >= 0 ? agentOrder.indexOf(right.agentId) : (AGENT_LIST_ORDER_INDEX.get(right.agentId) ?? Number.MAX_SAFE_INTEGER))),
-    [agentOrder, agents],
+      (agentOrder.indexOf(left.agentId) >= 0 ? agentOrder.indexOf(left.agentId) : (fallbackOrderIndex.get(left.agentId) ?? Number.MAX_SAFE_INTEGER))
+      - (agentOrder.indexOf(right.agentId) >= 0 ? agentOrder.indexOf(right.agentId) : (fallbackOrderIndex.get(right.agentId) ?? Number.MAX_SAFE_INTEGER))),
+    [agentOrder, agents, fallbackOrderIndex],
   );
 
   useEffect(() => {
@@ -115,6 +116,7 @@ export function AgentPage({
           onSelectedDetailAgentIdChange(agentId);
         }}
         onRefresh={onRefresh}
+        onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
         onSwitch={onSwitch}
       />
     );
@@ -144,6 +146,7 @@ export function AgentPage({
       onOpenConnection={(connectionId) => onOpenConnection(connectionId, agent.agentId)}
       onRefresh={onRefresh}
       onRollback={onRollback}
+      onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
       onSwitch={onSwitch}
     />
   );

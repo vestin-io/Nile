@@ -164,8 +164,7 @@ function ProfileAssignmentRow({
 
 function shouldShowMissingSetupState(agent: DesktopAgentState): boolean {
   return agent.connections.length === 0
-    && agent.currentConnectionState === "none"
-    && agent.liveConnection === null;
+    && agent.reconciliationState === "unavailable";
 }
 
 function readAvailableConnectionId(

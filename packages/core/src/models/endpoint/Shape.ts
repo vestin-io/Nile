@@ -87,10 +87,9 @@ export class EndpointShape {
 
     const leftAuthSchemes = new Set(left.authSchemes);
     const leftWireApis = new Set(left.wireApis);
-    return left.basePath === right.basePath
+    return (right.basePath === undefined || left.basePath === right.basePath)
       && right.authSchemes.every((scheme) => leftAuthSchemes.has(scheme))
-      && right.wireApis.every((wireApi) => leftWireApis.has(wireApi))
-      && (right.envKeyOverride === undefined || left.envKeyOverride === right.envKeyOverride);
+      && right.wireApis.every((wireApi) => leftWireApis.has(wireApi));
   }
 
   private static anthropicEqual(
@@ -115,10 +114,9 @@ export class EndpointShape {
     }
 
     const leftAuthSchemes = new Set(left.authSchemes);
-    return left.basePath === right.basePath
+    return (right.basePath === undefined || left.basePath === right.basePath)
       && left.versionHeader === right.versionHeader
-      && right.authSchemes.every((scheme) => leftAuthSchemes.has(scheme))
-      && (right.envKeyOverride === undefined || left.envKeyOverride === right.envKeyOverride);
+      && right.authSchemes.every((scheme) => leftAuthSchemes.has(scheme));
   }
 
   private static cursorEqual(

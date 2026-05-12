@@ -7,7 +7,7 @@ import { MutationHistory } from "../../../services/history/MutationHistory";
 import { SecureSnapshotStore } from "../../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../../services/NileLogger";
 import { RollbackLatest } from "../../RollbackLatest";
-import { CurrentStateDetector } from "../current-state/Detector";
+import { LiveSetupDetector } from "../live-setup/Detector";
 import {
   AgentWorkspaceSession,
 } from "../../../runtime-local/AgentWorkspaceSession";
@@ -41,10 +41,10 @@ export class RollbackLatestMutation {
           logger.child({ scope: "mutation-history" }),
         ),
         context.agentSelection,
-        CurrentStateDetector.fromContext(context.sharedContext, {
+        LiveSetupDetector.fromContext(context.sharedContext, {
           codexHome: options?.codexHome ?? join(homedir(), ".codex"),
           credentialStore: options.credentialStore,
-          logger: logger.child({ scope: "codex-current-state-detector" }),
+          logger: logger.child({ scope: "codex-live-setup-detector" }),
         }),
         logger,
       ),
@@ -71,10 +71,10 @@ export class RollbackLatestMutation {
           logger.child({ scope: "mutation-history" }),
         ),
         context.agentSelection,
-        CurrentStateDetector.fromContext(context, {
+        LiveSetupDetector.fromContext(context, {
           codexHome: options?.codexHome ?? join(homedir(), ".codex"),
           credentialStore: options.credentialStore,
-          logger: logger.child({ scope: "codex-current-state-detector" }),
+          logger: logger.child({ scope: "codex-live-setup-detector" }),
         }),
         logger,
       ),

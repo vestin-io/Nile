@@ -72,6 +72,9 @@ type SettingsPageContentProps = {
   onConfigureAgent(agentId: AgentId): void;
   onConfirmImportAgent(agentId: AgentId): Promise<void>;
   onCompleteQuickSetup(): void;
+  onOpenQuickSetupModelSetup(agentId: AgentId): void;
+  onUseExistingQuickSetupConnection(agentId: AgentId, connectionId: string): Promise<void>;
+  onUpdateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): Promise<void>;
   onCreateProfile(name: string, emoji: string, assignments: WorkspaceProfileAssignment[]): Promise<string>;
   onDeleteProfile(profileId: string): Promise<void>;
   onInstallUpdate(): Promise<void>;
@@ -163,6 +166,8 @@ export function SettingsPageContent({
   onConfigureAgent,
   onConfirmImportAgent,
   onCompleteQuickSetup,
+  onOpenQuickSetupModelSetup,
+  onUseExistingQuickSetupConnection,
   onCreateProfile,
   onDeleteProfile,
   onInstallUpdate,
@@ -191,6 +196,7 @@ export function SettingsPageContent({
   onSelectProfile,
   onThemeChange,
   onUpdateAgentHome,
+  onUpdateAgentConnectionModel,
   onSaveProfile,
   onDeleteConnectionAlert,
   onUpdateConnectionAlert,
@@ -206,6 +212,9 @@ export function SettingsPageContent({
         onConfigureAgent={onConfigureAgent}
         onConfirmAgent={onConfirmImportAgent}
         onDone={onCompleteQuickSetup}
+        onOpenModelSetup={onOpenQuickSetupModelSetup}
+        onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
+        onUseExistingConnection={onUseExistingQuickSetupConnection}
       />
     );
   }
@@ -232,6 +241,7 @@ export function SettingsPageContent({
         onOpenConnection={onOpenConnection}
         onRefresh={onRefresh}
         onRollback={onRollbackAgent}
+        onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
         onSelectedDetailAgentIdChange={onSelectAgentDetail}
         onSelectedDetailTabChange={onSelectAgentDetailTab}
         onSwitch={onUseConnection}

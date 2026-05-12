@@ -2,6 +2,433 @@
 
 ## 2026-05-06
 
+### Step 79: Expose live agent models in desktop settings state
+
+- Added missing `common.model` translations so the agent detail model UI no longer falls back to the raw key.
+- Extended shared current-state/status shapes to carry optional live `modelId` metadata for agents that expose it:
+  - Codex reads `model = "..."` from `config.toml`
+  - Claude reads `model` from `settings.json`
+  - OpenClaw forwards its current primary model
+- Updated desktop state assembly so agent connection lists fall back to the live model for the currently active saved connection when no agent-specific model override has been saved yet.
+- Kept the storage boundary unchanged:
+  - saved `(agent, connection) -> modelId` overrides still remain the explicit persisted source
+  - live model fallback only fills the current settings view
+- Result:
+  - current Codex agent connections now show the real active model without requiring a manual model save first
+  - shared model UI keeps working for explicit per-agent overrides
+
+### Verification
+
+- `npm run typecheck`
+
+### Desktop build fix for browser-safe core imports
+
+- Fixed the desktop renderer build after the recent core refactors:
+  - added an exact `@nile/core/models/connection/requirements` export
+  - added `packages/core/src/models/connection/Requirements.ts` as a built dist entry
+  - moved browser/runtime imports off the broad `@nile/core/models/connection` barrel
+- Kept the fix narrow instead of changing the whole core build strategy:
+  - `renderer/shared/ApplyRequirements.ts` now imports the browser-safe requirements entry directly
+  - `state/connection/List.ts` now imports `CONNECTION_APPLY_REQUIREMENTS` from that exact entry and uses `@nile/core/models/agent/types` for label formatting
+- This avoids dragging node-only core chunks like `node:sqlite`, `node:fs`, and `node:crypto` into the renderer bundle.
+
+### Verification
+
+- `npm run typecheck`
+- `node --import tsx ./build.ts` (from `apps/desktop`)
+
+### Browser-safe core import guardrails
+
+- Removed `ConnectionApplyRequirements` exports from the broad `@nile/core/models/connection` barrel so the browser-safe `requirements` subpath is the only runtime entry for that behavior.
+- Switched remaining browser-safe desktop files to narrower imports:
+  - renderer/detail/quick-setup agent types now use `@nile/core/models/agent/types`
+  - desktop state types now use `@nile/core/models/connection/requirements`
+- Hardened the core build against export drift:
+  - `packages/core/build.mjs` now validates that every exact `package.json` export points at a real built dist artifact
+  - added the missing `actions/*` and `models/connection/Requirements.ts` entries to the core build graph so those exports are genuinely produced
+- Added a desktop static boundary test at:
+  - `apps/desktop/src/renderer/CoreImportBoundaries.test.ts`
+  - it prevents browser-safe sources from importing the broad `@nile/core/models/agent` or `@nile/core/models/connection` barrels at runtime
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/CoreImportBoundaries.test.ts`
+- `npm run typecheck`
+- `node --import tsx ./build.ts` (from `apps/desktop`)
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts`
+
+### Agent card section split
+
+- Split the agent-list card body into smaller renderer pieces:
+  - `renderer/agents/list/LocalSetupSection.tsx`
+  - `renderer/agents/list/CurrentConnectionPanel.tsx`
+- Reduced `renderer/agents/list/Card.tsx` to card-shell composition plus agent-specific routing decisions.
+- Kept the shared switch/model-save orchestration in `useConnectionSwitchFlow.ts`, so the new list sections remain presentational.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts`
+
+### Quick setup env-key helper and save progress
+
+- Fixed desktop managed-environment writes in source/dev runtime by resolving the keychain helper from the workspace `packages/core/dist/...` path before falling back to colocated helper locations.
+- This removes the half-finished `Save to Nile` state where a connection could be imported but the follow-up `NILE_*` managed env key failed to persist because the helper binary could not be found.
+- Added lightweight quick-setup save progress hints so long-running `Save to Nile` actions can show staged feedback:
+  - `Saving this setup in Nile`
+  - `Checking connection support`
+  - `Preparing managed environment key`
+- Kept the progress UI renderer-only and time-based; no new IPC progress channel was introduced.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/environment/Store.test.ts apps/desktop/src/renderer/quick-setup/SaveState.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts`
+- `npm run typecheck`
+
+### Action cluster rename
+
+- Renamed the shared core action clusters to make their scope clearer:
+  - `packages/core/src/actions/current-state` -> `packages/core/src/actions/live-setup`
+  - `packages/core/src/actions/local-state` -> `packages/core/src/actions/local-setup`
+- Updated core exports, runtime imports, desktop imports, CLI imports, and active architecture/spec references to use the new names.
+- Kept the rename narrow: old historical build-log prose was not mass-rewritten.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts packages/core/src/actions/live-setup/Matcher.test.ts packages/core/src/actions/local-setup/Status.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+### Unified apply requirements and import semantics
+
+- Removed the stale `DesktopSurface.importDetectedSetups(...)` path so desktop detected-setup imports now go through the same gateway-managed import semantics everywhere.
+- Added a core `ConnectionApplyRequirementsReader` and exposed per-agent apply requirements on desktop agent connection rows.
+- Switched the OpenClaw-specific UI gating in:
+  - agent detail connection switching
+  - agent list card switching
+  - quick-setup existing-connection selection
+  to consume the shared requirement object instead of repeating `if openclaw` checks inline.
+- Replaced the ad hoc imported-enabled-agent logic in current-state import with `SHARED_CONNECTION_AGENT_POLICY.readSavedConnectionConfig(...)` so gateway/shared-agent defaults come from the same policy source as the rest of the connection model.
+- Kept the `current-state` / `local-state` split intact:
+  - `current-state`: match/import one agent's live setup against saved connections
+  - `local-state`: scan and summarize local setups across agents/machine state
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/Requirements.test.ts packages/core/src/actions/live-setup/Import.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+### Save-to-Nile matched import semantics
+
+- Narrowed the matched `Save to Nile` path so it no longer rewrites user-managed connection metadata.
+- Matched saves now:
+  - refresh endpoint protocols/capabilities
+  - update the stored credential
+  - preserve the existing connection label and enabled-agent list
+  - persist the current agent model when present
+  - clear a previously saved model when the live setup no longer has one
+- Aligned desktop `currentAgentConnections` with configurable-agent semantics so Codex-compatible shared connections appear consistently before they are explicitly enabled.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts packages/core/src/actions/live-setup/Matcher.test.ts packages/core/src/models/connection/SavedConnections.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+### Save-to-Nile matched import fixes
+
+- Changed current-state import so `valid_matched` setups no longer short-circuit before import enrichment.
+- Matched `Save to Nile` now still:
+  - runs gateway capability refresh/probe for importable gateway setups
+  - reuses/upserts the existing connection
+  - persists the current agent-level selected model
+- Added support for carrying `modelId` through resolved import candidates instead of only legacy `openclawModelId`.
+- Updated current-state matching so legacy `access.openclawModelId` only affects OpenClaw matching; Claude/Codex API-key matching now ignores stale OpenClaw-only model metadata.
+- Aligned `SavedConnections.listForAgent()` with configurable-agent semantics so core callers no longer disagree with the desktop UI about which shared connections are available to an agent.
+
+### Verification
+
+- `node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts packages/core/src/actions/live-setup/Matcher.test.ts packages/core/src/models/connection/SavedConnections.test.ts`
+- `npm run typecheck`
+
+### Gateway OpenClaw capability consistency
+
+- Fixed generic gateway onboarding so detected `openai` or `anthropic` protocols also suggest `openclaw`, preventing follow-up direct-key env updates from silently dropping `openclaw` out of `enabledAgents`.
+- Tightened saved-connection capability derivation for gateway endpoints to use detected protocols instead of treating every gateway as universally configurable for all agents.
+- Updated the Connections list UI to show `configurableAgents` in the `Capability` column rather than `enabledAgents`, so the page reflects what a connection supports instead of only what is currently enabled.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/SavedConnections.test.ts packages/core/src/models/connection/setup/OnboardingPolicy.test.ts packages/core/src/models/connection/AgentPolicy.test.ts`
+- `npm run typecheck`
+
+### Gateway live-setup matching
+
+- Fixed Claude gateway live-setup reconciliation so saved generic-gateway connections are not treated as "new setup" solely because the current local config uses `ANTHROPIC_API_KEY` while the saved endpoint metadata was probed/merged with `ANTHROPIC_AUTH_TOKEN`.
+- Relaxed endpoint subset matching to ignore env-var-name overrides when comparing current live setup against saved endpoint capability.
+- Further relaxed gateway subset matching so a saved probed endpoint with `/v1` protocol base paths still matches a live Claude setup that only records the root gateway URL and omits the protocol path.
+- Added `packages/core/src/actions/live-setup/Matcher.test.ts` to cover the gateway env override mismatch case.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Matcher.test.ts`
+- `npm run typecheck`
+
+### Save-to-Nile gateway import performance
+
+- Removed the redundant second generic-gateway capability probe that used to happen immediately after `Save to Nile` for direct API-key connections.
+- Direct API-key imports still keep the original key and still get a managed `NILE_*` env key, but attaching that `envKey` now updates only credential metadata instead of going back through the full connection update/probe pipeline.
+- Added a narrow saved-connections path for updating `envKey` on direct API-key credentials without changing endpoint capability metadata.
+- This specifically speeds up `Claude -> Save to Nile` for gateway API-key setups because the post-import managed-env step no longer re-runs `/v1/models`, `/v1/responses`, and anthropic capability checks.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/SavedConnections.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts`
+- `npm run typecheck`
+
+### Save-to-Nile credential semantics and shared-connection consistency
+
+- Matched `Save to Nile` no longer downgrades user-managed API-key credential mode while refreshing a saved connection from live state.
+- Added a narrow credential sync path that updates secret material without rebuilding `apiKeySource` / `envKey` metadata.
+- Aligned menubar agent connection availability with `configurableAgents`, matching the desktop settings surfaces.
+- Made batch detected-setup imports run the same managed `NILE_*` env-key ensure step as single-agent `Save to Nile`.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+### Managed env-backed API keys for OpenClaw
+
+- Added a desktop-managed environment store for `NILE_*` API-key entries backed by keychain storage.
+- Direct API-key connections now keep their original direct credential while also recording an optional `envKey`.
+- Desktop add/update/import flows now auto-provision a managed `NILE_*` env entry for direct API-key connections and persist the `envKey` onto the saved connection.
+- OpenClaw apply now accepts API-key credentials when an `envKey` is present and readable, even if the credential source remains `direct`.
+- Agent and quick-setup OpenClaw gating now checks for `envKey` presence instead of requiring `apiKeySource === "env_key"`.
+- Reset now clears managed `NILE_*` entries before workspace state is deleted.
+- Saved connection summaries now surface `envKey` for direct API-key connections so renderer state can distinguish “direct only” from “direct plus managed env”.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run packages/core/src/agents/openclaw/ApplySelection.test.ts packages/core/src/models/connection/SavedConnections.test.ts apps/desktop/src/electron/state/Reset.test.ts`
+
+### Detected model ordering
+
+- Changed merged gateway model catalogs to surface OpenAI/Codex probe results before Claude gateway cache results.
+- Prioritized the current/closest selected model in the OpenClaw model picker so switching flows do not bury `gpt-*` or `codex-*` beneath a long `claude-*` list.
+- Reordered the connection detail `Detected models` preview and full modal so OpenAI/Codex families appear first when both families are available on the same gateway connection.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/application/local/ConnectionModelCatalog.test.ts`
+- `npm run typecheck`
+
+### OpenClaw list switch model gate
+
+- Wired the agent list view through `onUpdateAgentConnectionModel(...)` so OpenClaw list-card connection switching now uses the same model-before-switch dialog path as agent detail.
+- Fixed the missing `DesktopConnection` type import in the list card after reusing the shared model dialog state there.
+
+### Model switch dialog refresh
+
+- Forced the agent model selection dialog to request a fresh connection model catalog when it opens instead of reusing the 10-minute detected-model cache.
+- Kept the 10-minute cache for passive browsing surfaces such as connection detail, but model-before-switch now prioritizes live capability data.
+
+### OpenClaw env-key gating
+
+- Added a renderer-side gate for `OpenClaw + direct API key` so save-and-switch no longer falls through to the raw `ApplySelectionValidationError`.
+- The model dialog now explains that OpenClaw requires env-backed API key connections and, in agent detail, offers an `Edit connection` path to fix the key source.
+- Applied the same guard to quick setup and the agent list-card switch flow.
+
+### OpenClaw switch model selection
+
+- Changed the OpenClaw agent connections list so non-current connections always keep the `Switch` action.
+- When OpenClaw tries to switch to a connection without a saved model, the switch action now opens the existing model dialog instead of throwing an apply validation error.
+- Saving the model from that dialog immediately continues the pending switch, so model selection and apply happen in one flow.
+- Renamed the agent-detail model label to `Selected model` to distinguish it from connection-level `Detected models`.
+
+### Verification
+
+- `npm run typecheck`
+
+### Generic gateway model detection merge
+
+- Found that older generic-gateway connections imported before capability re-probe only carried `anthropic` in saved endpoint metadata.
+- `Detected models` was therefore stopping at the Claude gateway cache and never probing live OpenAI-compatible `/v1/models`, even on refresh.
+- Updated `ConnectionModelCatalog` so generic-gateway API-key connections:
+  - always try the Claude gateway cache
+  - also probe OpenAI-compatible `/v1/models` when credentials are readable, even if saved metadata has no `openai` protocol yet
+  - merge and de-duplicate both model sources in the UI
+- This makes Refresh meaningful for mixed-protocol gateways like `llmfk.dpdns.org`.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/application/local/ConnectionModelCatalog.test.ts`
+- `npm run typecheck`
+
+### Detected models refresh state
+
+- Made the Detected models refresh button show a dedicated manual refresh state instead of reusing only the initial-loading flag.
+- The button now enters a visible rotating state immediately on click and stays disabled until the forced refresh finishes.
+
+### Verification
+
+- `npm run typecheck`
+
+### OpenClaw model-required switch guard
+
+- Confirmed the OpenClaw connections list was exposing a raw apply validation error when switching to a non-current connection without a saved model.
+- The list now treats `modelId` as a required precondition for OpenClaw:
+  - non-current connections without a saved model show `Set model` instead of `Switch`
+  - clicking that action opens the existing model editor rather than attempting apply
+- Removed the duplicate inline switch error because the page-level action error already covers apply failures.
+
+### Verification
+
+- `npm run typecheck`
+
+### Generic gateway current-setup import capability re-probe
+
+- Changed current-setup import to re-probe `generic-gateway + api_key` candidates before upsert instead of trusting the source agent's partial local-state protocol view.
+- This lets imports from Claude/OpenClaw current setup discover OpenAI-compatible capability on the same gateway and save the merged endpoint protocols.
+- For probed gateway imports, enabled agents are now derived from detected protocols:
+  - `openai` -> `codex`
+  - `anthropic` -> `claude`
+  - either protocol -> `openclaw`
+- Kept the import path tolerant: if the gateway probe fails, import falls back to the original candidate instead of blocking the user.
+- Async-widened the `import current connection` and `import detected setups` chain so the probe can run without leaking resources across adapter/session boundaries.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts packages/core/src/agents/codex/import/ImportCurrentConnection.test.ts packages/core/src/agents/openclaw/ImportCurrentConnection.test.ts apps/desktop/src/state/Surface.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+
+### Gateway model catalogs in shared connection flows
+
+- Extended `ConnectionModelCatalog` with a second source for gateway-backed connections.
+- Claude/OpenClaw-compatible gateway API-key connections now first consult Claude's local `gateway-models.json` cache before falling back to protocol-specific network model detection.
+- This fixes shared gateway connections that support OpenClaw but do not expose an OpenAI `/models` route from being shown as undetectable in quick setup.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/application/local/ConnectionModelCatalog.test.ts`
+- `npm run typecheck`
+
+### Quick setup OpenClaw model fallback
+
+- Updated the quick-setup existing-connection modal for OpenClaw so model detection failure no longer blocks the flow.
+- When detected models are available, the modal still uses a model selector.
+- When models cannot be detected, the modal now falls back to a manual model input and still allows `Use` once a model is provided.
+- Kept the explicit `Set model` fallback entry for users who want to finish setup from the full agent detail page instead.
+
+### Verification
+
+- `npm run typecheck`
+
+### Agent model editor recommendations
+
+- Split the agent-detail model editor out of `ConnectionsSection.tsx` to keep the connections list component under the 500-line repo limit.
+- Replaced the plain freeform model dialog input with a recommended-but-editable editor:
+  - it fetches detected models for the selected connection
+  - exposes them as native datalist suggestions
+  - keeps freeform typing available for models outside the detected catalog
+- Kept model changes agent-specific and preserved current-only apply behavior:
+  - saving a model still updates `(agent, connection) -> modelId`
+  - only the agent's current connection is re-applied immediately after save
+  - non-current connections are updated without triggering apply
+
+### Verification
+
+- `npm run typecheck`
+
+### Connection detected models
+
+- Wired the existing core `ConnectionModelCatalog` service through runtime, desktop IPC, and preload so renderer code can fetch detected models on demand for a specific saved connection.
+- Kept model detection out of global `SettingsState`; connection detail now queries it lazily instead of bloating the full desktop state refresh path.
+- Updated connection detail to render `Quota left` and `Detected models` as side-by-side half-width cards on large layouts.
+- Added a dedicated `Detected models` card with:
+  - refresh action
+  - comma-separated preview
+  - `...More` expansion into a modal for the full model list
+- Added coverage for the model-catalog fetch path for:
+  - `openai_session`
+  - env-backed `api_key`
+- Added translation keys for the new detected-models UI across all supported desktop languages.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run packages/core/src/application/local/ConnectionModelCatalog.test.ts packages/core/src/models/connection/GatewayProbe.test.ts`
+
+### OpenAI session model detection
+
+- Corrected official `openai_session` model detection so it no longer probes `https://api.openai.com/v1/models` with a ChatGPT/Codex session token.
+- Official OpenAI session-backed connections now use the Codex session catalog endpoint:
+  - `https://chatgpt.com/backend-api/codex/models?client_version=1.0.0`
+- Kept API key and env-key connections on the existing OpenAI-compatible `/v1/models` path.
+- Updated `ConnectionModelCatalog` parsing so official session responses read model `slug` values from the Codex catalog payload.
+- Verified against the real `jay-ji-spotto-ai` connection after the code change:
+  - previous result: `403` from `api.openai.com/v1/models`
+  - intermediate result with old `client_version=0.27.0`: `available`, but only `gpt-5.2`
+  - current result with `client_version=1.0.0`: `available`, returning the full modern Codex model set
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run packages/core/src/application/local/ConnectionModelCatalog.test.ts`
+
+### Cached model catalogs and quick setup model selection
+
+- Added a desktop-side `ConnectionModelCatalog` cache with a 10-minute TTL so detected models are not re-fetched on every routine renderer open.
+- Kept cache invalidation explicit:
+  - connection detail uses cached results by default
+  - the `Refresh` button forces a fresh fetch
+  - quick setup forces a fresh fetch for OpenClaw model selection so setup uses the latest catalog
+- Extended the desktop connection-model IPC to accept `{ connectionId, forceRefresh? }` instead of a bare id.
+- Updated quick setup so OpenClaw can now complete the shared-connection path inline:
+  - choose an existing compatible connection
+  - fetch detected models for that connection
+  - select a model in the same modal
+  - save `(openclaw, connection) -> modelId`
+  - immediately use/apply the connection
+- Kept a fallback path for connections that still do not expose a readable model catalog:
+  - the modal shows a clear unavailable message
+  - the user can jump to the full agent model setup flow
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/connections/ModelCatalog.test.ts packages/core/src/application/local/ConnectionModelCatalog.test.ts`
+
+### Shared session import enabled agents
+
+- Fixed current-state import so official shared session connections do not stay source-agent-only after quick setup.
+- `openai_session` imports now default-enable `codex` and `openclaw` together when the imported endpoint is OpenAI-compatible.
+- `claude_session` imports now default-enable `claude` and `openclaw` together when the imported endpoint is Anthropic-compatible.
+- Kept `api_key` and gateway imports on the existing conservative path so we do not implicitly enable unrelated agents there.
+- Added regression coverage at:
+  - `packages/core/src/actions/live-setup/Import.test.ts`
+  - `packages/core/src/agents/codex/import/ImportCurrentConnection.test.ts`
+  - `packages/core/src/agents/openclaw/ImportCurrentConnection.test.ts`
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts packages/core/src/agents/codex/import/ImportCurrentConnection.test.ts packages/core/src/agents/openclaw/ImportCurrentConnection.test.ts`
+- `npm run typecheck`
+
+### Quick setup existing connection modal
+
+- Changed quick setup `Configure now` to prefer existing compatible saved connections before sending the user straight into add-connection.
+- Added a quick setup modal that appears when an agent has compatible saved connections but no detected local setup.
+- The modal offers two paths:
+  - use an existing compatible connection
+  - add a new connection
+- Using an existing connection now ensures the chosen agent is added to `enabledAgents` before applying, so older shared connections do not land in a half-enabled state.
+- Kept the change scoped to quick setup for now; the main Agents page still uses the previous direct add flow.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/actions/local-setup/Status.test.ts packages/core/src/agents/codex/current-state/Detector.test.ts packages/core/src/agents/claude/current-state/Reader.test.ts packages/core/src/agents/openclaw/current-state/Detector.test.ts`
+
 ### Step 78: Align desktop source versioning with released builds
 
 - Updated `apps/desktop/package.json` and `apps/desktop/package-lock.json` to `0.15.1` so the checked-in desktop package version now matches the latest shipped desktop release instead of staying on the long-lived `0.0.0` placeholder.
@@ -53,7 +480,7 @@
   - `electron/shell/DesktopMain.ts`
   - `state/Surface.ts`
   - `renderer/app/settings/App.tsx`
-  - `actions/local-state/Status.ts`
+  - `actions/local-setup/Status.ts`
 - Updated the state-layer notes so they now reference the current desktop ownership boundaries under:
   - `electron/state`
   - `shell/DesktopMain`
@@ -475,6 +902,52 @@
 
 ### Verification
 
+- `npm run typecheck`
+
+### Agent detail model settings
+
+- Added a first-class agent-specific model setting path to the desktop bridge:
+  - core runtime now exposes `getAgentConnectionModel(...)` / `setAgentConnectionModel(...)`
+  - desktop main/preload now exposes `desktop:update-agent-connection-model`
+- Kept model ownership attached to `(agentId, connectionId)` instead of the shared connection record.
+- Started surfacing that setting in desktop settings state:
+  - `SettingsState.agents[].connections[]` now carries `agentModelId` for the active agent context
+  - the global Connections page and menubar state stay unchanged
+- Added a lightweight model editor to Agent detail → Connections:
+  - new `Model` column on desktop
+  - mobile cards also show/edit the same value
+  - edit goes through a small dialog and supports clearing the setting
+- Kept this out of connection add/edit flows so model selection is no longer required during shared connection creation.
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+
+### Agent-specific model settings
+
+- Added a shared `agent_connection_settings` SQLite table for per-agent model choices instead of treating `openclawModelId` as a connection-owned source of truth.
+- Wired core apply/current-state/import flows to read and persist model settings through the new agent/connection layer while keeping legacy access-field migration compatibility.
+- Expanded shared-session connection capability reporting so OpenAI and Claude session families advertise OpenClaw as configurable without requiring a legacy connection-level model field up front.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/agent-settings/Settings.test.ts packages/core/src/models/connection/SavedConnections.test.ts packages/core/src/actions/live-setup/Import.test.ts packages/core/src/agents/openclaw/ImportCurrentConnection.test.ts packages/core/src/agents/openclaw/ApplySelection.test.ts packages/core/src/agents/openclaw/current-state/Detector.test.ts packages/core/src/agents/claude/RollbackLatestMutation.test.ts packages/core/src/agents/cursor/RollbackLatestMutation.test.ts packages/core/src/projection/Resolver.test.ts packages/core/src/models/connection/Catalog.test.ts`
+- `npm run typecheck`
+
+### Shared session connection capability
+
+- Traced the `configurableAgents / enabledAgents` chain through `ConnectionAgentPolicy`, onboarding, and saved-connection summaries.
+- Removed the `openclawModelId` gate from shared-connection capability detection so compatible OpenAI / Azure OpenAI / Anthropic connections now advertise `OpenClaw` as a configurable agent even when the saved connection does not yet persist an OpenClaw model.
+- Updated connection catalog definitions so the desktop add/edit flows understand `OpenClaw` as a compatible agent for:
+  - `openai`
+  - `azure-openai`
+  - `anthropic`
+- Kept default enabled agents conservative (`Codex` / `Claude`) because the desktop connection UI still has no `openclawModelId` field, so capability exposure is now decoupled from immediate OpenClaw apply readiness.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/Catalog.test.ts packages/core/src/models/connection/SavedConnections.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts`
 - `npm run typecheck`
 
 ### Desktop architecture cleanup
@@ -3200,7 +3673,7 @@
 
 ### Verification
 
-- `./node_modules/.bin/vitest run packages/core/src/actions/current-state/Import.test.ts packages/core/src/models/connection/Creator.test.ts packages/core/src/models/connection/Updater.test.ts packages/core/src/models/connection/SavedConnections.test.ts`
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts packages/core/src/models/connection/Creator.test.ts packages/core/src/models/connection/Updater.test.ts packages/core/src/models/connection/SavedConnections.test.ts`
 - `npm run typecheck`
 
 ### Shared connection upsert path
@@ -3217,7 +3690,7 @@
 
 ### Verification
 
-- `./node_modules/.bin/vitest run packages/core/src/actions/current-state/Import.test.ts packages/core/src/models/connection/Creator.test.ts packages/core/src/models/connection/Updater.test.ts packages/core/src/models/connection/SavedConnections.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts`
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts packages/core/src/models/connection/Creator.test.ts packages/core/src/models/connection/Updater.test.ts packages/core/src/models/connection/SavedConnections.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts`
 - `npm run typecheck`
 
 ### Gateway add latency reduction
@@ -3265,7 +3738,7 @@
 ### Verification
 
 - `npm run typecheck`
-- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts packages/core/src/actions/current-state/Import.test.ts`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts packages/core/src/actions/live-setup/Import.test.ts`
 
 ### Claude gateway current-state labels
 
@@ -3278,7 +3751,7 @@
 ### Verification
 
 - `npm run typecheck`
-- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/agents/claude/current-state/Reader.test.ts packages/core/src/actions/current-state/Import.test.ts`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/agents/claude/current-state/Reader.test.ts packages/core/src/actions/live-setup/Import.test.ts`
 
 ### Connection save refresh latency
 
@@ -3301,6 +3774,110 @@
   - the Agent detail Connections table
 - Applied the same shared cell in the responsive card variants so small viewports do not drift visually.
 - Stopped quota tooltip clicks from bubbling into the parent row/card open action.
+
+### Verification
+
+- `npm run typecheck`
+
+### Managed env promotion hardening
+
+- Made desktop managed `NILE_*` env-key promotion safer and less misleading:
+  - env-backed direct API-key promotion now updates connection metadata first and rolls it back if the environment-store write fails
+  - single-connection imports roll back newly created connections if managed env promotion fails
+  - batch detected-setup imports mark the affected item as failed and remove newly created connections if promotion fails
+- Hardened desktop env resolution to fall back to the plain process environment when the keychain-backed environment store throws instead of treating that as fatal.
+- Removed synthetic quick-setup progress phases:
+  - `Save to Nile` now shows a single truthful saving state instead of timer-driven “checking support” / “preparing env” phases
+- Added a shared renderer helper for connection apply requirements and moved quick-setup / agent model flows to consume that instead of hand-rolling OpenClaw requirement checks in multiple places.
+- Renamed the action directories to clarify scope:
+  - `packages/core/src/actions/current-state` -> `packages/core/src/actions/live-setup`
+  - `packages/core/src/actions/local-state` -> `packages/core/src/actions/local-setup`
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/environment/Source.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/desktop/src/renderer/quick-setup/SaveState.test.ts`
+- `npm run typecheck`
+
+### Quick setup state consistency cleanup
+
+- Made quick-setup confirmation depend on the onboarding scan result only instead of mixing:
+  - scan item state
+  - current saved selection state
+  - sync state
+- Removed the agent-card `Saved in Nile: ...` helper text from the local-setup panel because it mixed current saved selection semantics into detected-setup messaging.
+- Narrowed matched `Save to Nile` endpoint refresh so it only merges newly detected protocol capabilities and no longer overwrites general endpoint metadata like label/root URL/profile.
+- Removed the now-dead `agents.savedInNile` translation key from all desktop locale files.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts`
+- `npm run typecheck`
+
+### Live setup rollback and requirement cleanup
+
+- Added a matched-import rollback snapshot for desktop `Save to Nile` flows:
+  - reused imports now snapshot selection, per-agent model choice, credential, and endpoint protocol state before import
+  - if managed `NILE_*` env-key promotion fails, desktop restores that snapshot instead of leaving partial reused-import side effects behind
+  - batch detected-setup imports now restore reused items on the same failure path instead of only cleaning up newly created connections
+- Removed duplicate local live detection during quick-setup scanning by letting `ScanLocalSetups` reuse the already-read detection when asking `Status` for the same agent.
+- Refactored connection apply requirements into a small policy registry:
+  - kept the current OpenClaw rules
+  - stopped encoding them directly inside a generic reader method body
+  - preserved the existing boolean helpers while also exposing the concrete requirement list for future growth
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts packages/core/src/models/connection/Requirements.test.ts packages/core/src/actions/local-setup/Status.test.ts`
+- `npm run typecheck`
+
+### Reconciliation and alert store simplification
+
+- Simplified connection apply requirements to a single source of truth:
+  - removed duplicated `needsModelSelection` / `needsEnvBackedApiKey` booleans from the core DTO
+  - renderer now derives those checks from the concrete `requirements[]` list through a shared helper
+- Reduced agent-list local-setup drift by making the detected-setup section depend only on the onboarding scan item instead of mixing onboarding state with current-selection state.
+- Split the desktop connection alert store into smaller responsibilities:
+  - `Store.ts` now owns SQLite orchestration and caching
+  - `Codec.ts` owns alert normalization, sorting, duplicate validation, and row/legacy decoding
+  - `Legacy.ts` owns legacy JSON migration into SQLite
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/Requirements.test.ts apps/desktop/src/electron/alerts/Store.test.ts`
+- `npm run typecheck`
+
+### Model catalog and connection presenter cleanup
+
+- Reduced duplicated model-catalog UI logic across quick setup and agent model editing:
+  - added a shared connection-model selection view helper
+  - reused the same catalog fetch, default-selection, preview, and ordered-option logic in both dialogs
+- Split desktop connection presentation responsibilities:
+  - `state/connection/List.ts` now owns list/item assembly
+  - `state/connection/Status.ts` now owns current/live connection resolution
+  - `ConnectionPresenter.ts` is now a thin coordinator instead of a mixed policy + DTO assembler
+- Split desktop connection import orchestration out of the gateway:
+  - `electron/connections/Imports.ts` now owns managed-env-aware single/batch import orchestration and rollback
+  - `DesktopConnectionGateway.ts` now stays focused on session wiring and public desktop actions
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/live-setup/Import.test.ts packages/core/src/models/connection/Requirements.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+### Agent switch flow cleanup
+
+- Extracted the shared agent connection switch/model-save orchestration into:
+  - `renderer/agents/useConnectionSwitchFlow.ts`
+- Reused that flow in both:
+  - `renderer/agents/detail/ConnectionsSection.tsx`
+  - `renderer/agents/list/Card.tsx`
+- Centralized the repeated behaviors:
+  - open model dialog when selected-model is required
+  - block apply when env-backed API key is still required
+  - save `(agent, connection) -> modelId`
+  - continue switching after model save when appropriate
+  - optionally highlight the just-activated connection in detail view
+- This also reduced `ConnectionsSection.tsx` from a state-heavy orchestration file to a small composition wrapper.
 
 ### Verification
 

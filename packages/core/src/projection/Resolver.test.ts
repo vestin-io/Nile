@@ -208,11 +208,9 @@ describe("AgentProjectionResolver", () => {
 
     const gatewayOpenAi = resolver.resolve("openclaw", {
       endpoint: gatewayEndpoint(),
-      access: {
-        ...apiKeyAccess("gateway-openclaw"),
-        openclawModelId: "gpt-4.1",
-      },
+      access: apiKeyAccess("gateway-openclaw"),
       credential: apiKeyCredential(),
+      modelId: "gpt-4.1",
     });
     const anthropicSession = resolver.resolve("openclaw", {
       endpoint: {
@@ -232,7 +230,6 @@ describe("AgentProjectionResolver", () => {
       access: {
         ...apiKeyAccess("claude-openclaw"),
         authMode: "claude_session",
-        openclawModelId: "claude-sonnet-4",
       },
       credential: {
         kind: "claude_session",
@@ -240,6 +237,7 @@ describe("AgentProjectionResolver", () => {
         refreshToken: "claude-refresh",
         email: "team@example.com",
       },
+      modelId: "claude-sonnet-4",
     });
 
     expect(gatewayOpenAi).toEqual({
@@ -308,7 +306,7 @@ describe("AgentProjectionResolver", () => {
       endpoint: gatewayEndpoint(),
       access: apiKeyAccess("openclaw-missing-model"),
       credential: apiKeyCredential(),
-    })).toThrow("OpenClaw requires a saved openclawModelId");
+    })).toThrow("OpenClaw requires a saved modelId");
   });
 });
 

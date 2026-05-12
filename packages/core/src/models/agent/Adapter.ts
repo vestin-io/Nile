@@ -40,6 +40,7 @@ export type DetectedAgentState = {
   issues: string[];
   endpoint: DetectedAgentEndpoint | null;
   access: DetectedAgentAccess | null;
+  modelId?: string;
   matchedConnection: MatchedAgentConnection | null;
 };
 
@@ -80,7 +81,7 @@ export interface AgentAdapter {
 
   detectAgentSelection(): AgentDetectionResult;
   applySelection(connectionId: string): ApplyAgentSelectionResult;
-  importCurrentConnection(): ImportCurrentConnectionResult;
+  importCurrentConnection(): Promise<ImportCurrentConnectionResult>;
   rollbackLatestMutation(): RollbackLatestAgentResult;
 }
 

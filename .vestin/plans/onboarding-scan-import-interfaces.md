@@ -34,7 +34,7 @@ This draft does not cover:
 
 Add a new action-oriented module:
 
-- `packages/core/src/actions/local-state/`
+- `packages/core/src/actions/local-setup/`
 
 Suggested first-version files:
 

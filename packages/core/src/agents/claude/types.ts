@@ -18,7 +18,7 @@ export type ClaudeDetectedAccess = {
   identityKey?: string;
 };
 
-export type ClaudeDetectedCurrentState = {
+export type ClaudeDetectedLiveSetup = {
   agentId: AgentId;
   validity: AgentLiveStateValidity;
   issues: string[];

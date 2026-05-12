@@ -85,7 +85,7 @@ export function AddConnectionPage({
     shouldShowEnabledAgents,
     showPostPreparationFields,
     submit,
-    suggestedAgents,
+    detectedAgents,
   } = useAddConnectionPageState({
     defaultOpenAiAuthJsonPath,
     definitions,
@@ -219,7 +219,7 @@ export function AddConnectionPage({
                 shouldProbeEnabledAgents={shouldProbeEnabledAgents}
                 shouldShowAuthJsonPath={shouldShowAuthJsonPath}
                 shouldShowEnabledAgents={shouldShowEnabledAgents}
-                suggestedAgents={suggestedAgents}
+                detectedAgents={detectedAgents}
                 t={t}
                 onApiKeyChange={setApiKey}
                 onAuthJsonChoose={() => void chooseAuthJsonPath()}

@@ -138,6 +138,22 @@ export function useSettingsConnectionActions({
     }
   };
 
+  const useExistingConnectionForAgent = async (agentId: AgentId, connectionId: string) => {
+    const connection = settingsState.connections.find((entry) => entry.id === connectionId);
+    if (!connection) {
+      throw new Error(`Connection not found: ${connectionId}`);
+    }
+
+    if (!connection.enabledAgents.includes(agentId)) {
+      await updateConnection({
+        connectionId,
+        enabledAgents: [...new Set([...connection.enabledAgents, agentId])],
+      });
+    }
+
+    await useConnection(agentId, connectionId);
+  };
+
   const continueReusedConnection = () => {
     if (!reusedConnectionDialog) {
       return;
@@ -170,6 +186,7 @@ export function useSettingsConnectionActions({
     savePreparedConnection,
     continueReusedConnection,
     updateConnection,
+    useExistingConnectionForAgent,
     useConnection,
   };
 }

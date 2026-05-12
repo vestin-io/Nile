@@ -200,6 +200,7 @@ export function SettingsApp() {
     removeConnection,
     rollbackAgent,
     savePreparedConnection,
+    useExistingConnectionForAgent,
     updateConnection,
     useConnection,
   } = useSettingsConnectionActions({
@@ -330,6 +331,11 @@ export function SettingsApp() {
           await window.nileDesktop.app.openExternalUrl(url);
         }}
         onOpenQuickSetup={openQuickSetup}
+        onOpenQuickSetupModelSetup={(agentId) => {
+          setSelectedAgentDetailId(agentId);
+          setSelectedAgentDetailTab("connections");
+          setCurrentPage("agents");
+        }}
         onProfileFeatureEnabledChange={setProfileFeatureEnabled}
         onPrepareConnectionDraft={prepareConnectionDraft}
         onRefresh={refresh}
@@ -338,6 +344,7 @@ export function SettingsApp() {
         onReset={() => setResetDialogOpen(true)}
         onRollbackAgent={rollbackAgent}
         onSavePreparedConnection={savePreparedConnection}
+        onUseExistingQuickSetupConnection={useExistingConnectionForAgent}
         onSelectAgentDetail={(agentId) => {
           setSelectedAgentDetailId(agentId);
           if (!agentId) {
@@ -351,6 +358,18 @@ export function SettingsApp() {
         onThemeChange={(theme) => setPreferences((current) => ({ ...current, theme }))}
         onUpdateAgentHome={async (agentId, path) => {
           await window.nileDesktop.app.updateAgentHome(agentId, path);
+        }}
+        onUpdateAgentConnectionModel={async (agentId, connectionId, modelId) => {
+          await window.nileDesktop.connections.updateAgentConnectionModel({
+            agentId,
+            connectionId,
+            modelId,
+          });
+          const agent = settingsState.agents.find((entry) => entry.agentId === agentId) ?? null;
+          if (agent?.currentConnection?.id === connectionId) {
+            await window.nileDesktop.connections.switchConnection(agentId, connectionId);
+          }
+          await refresh();
         }}
         onUpdateConnectionAlert={async (input) => {
           await window.nileDesktop.connections.updateUsageAlert(input);

@@ -12,7 +12,7 @@ import {
 import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { CURSOR_AGENT_ID } from "./types";
 import { CursorHistoryTargets } from "./HistoryTargets";
-import { CurrentStateDetector } from "./current-state/Detector";
+import { LiveSetupDetector } from "./live-setup/Detector";
 import { CursorConfigStore } from "./stores/CursorConfigStore";
 import { CursorCredentialStore } from "./stores/CursorCredentialStore";
 
@@ -44,10 +44,10 @@ export class RollbackLatestMutation {
       new FileSnapshotStore(join(dirname(databasePath), "history")),
       options?.secureSnapshotStore ?? new SecureSnapshotStore(),
       context.agentSelection,
-      CurrentStateDetector.fromContext(context.sharedContext, {
+      LiveSetupDetector.fromContext(context.sharedContext, {
         cursorHome,
         credentialStore: options.credentialStore,
-        logger: logger.child({ scope: "cursor-current-state-detector" }),
+        logger: logger.child({ scope: "cursor-live-setup-detector" }),
       }),
       new CursorConfigStore(cursorHome),
       new CursorCredentialStore(),
@@ -77,10 +77,10 @@ export class RollbackLatestMutation {
       new FileSnapshotStore(join(dirname(context.databasePath), "history")),
       options?.secureSnapshotStore ?? new SecureSnapshotStore(),
       context.agentSelection,
-      CurrentStateDetector.fromContext(context, {
+      LiveSetupDetector.fromContext(context, {
         cursorHome,
         credentialStore: options.credentialStore,
-        logger: logger.child({ scope: "cursor-current-state-detector" }),
+        logger: logger.child({ scope: "cursor-live-setup-detector" }),
       }),
       new CursorConfigStore(cursorHome),
       new CursorCredentialStore(),
@@ -93,7 +93,7 @@ export class RollbackLatestMutation {
     private readonly fileSnapshots: FileSnapshotStore,
     private readonly secureSnapshots: SecureSnapshotStore,
     private readonly agentSelection: AgentWorkspaceContext["agentSelection"],
-    private readonly currentStateDetector: CurrentStateDetector,
+    private readonly currentStateDetector: LiveSetupDetector,
     private readonly configStore: CursorConfigStore,
     private readonly credentialStore: CursorCredentialStore,
     private readonly logger: NileLogger,

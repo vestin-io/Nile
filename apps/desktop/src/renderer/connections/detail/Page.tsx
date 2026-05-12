@@ -5,6 +5,7 @@ import { CircleHelp } from "lucide-react";
 import { ConnectionActionGroup } from "./ActionGroup";
 import { ConnectionAlertsSection } from "../alerts/Section";
 import { ConnectionQuotaSection } from "../ConnectionQuotaSection";
+import { ConnectionModelCatalogSection } from "./Models";
 import { ConfirmDialog } from "../../shared/ConfirmDialog";
 import { formatAgentLabel, formatAgentsList } from "../../shared/AgentSelection";
 import { authModeLabel } from "../../shared/DisplayText";
@@ -171,12 +172,19 @@ export function ConnectionDetailPage({
         />
       </section>
 
-      <ConnectionQuotaSection
-        connection={connection}
-        showPlanLabel
-        t={t}
-        title={t("common.usage")}
-      />
+      <section className="grid items-start gap-4 lg:grid-cols-2">
+        <ConnectionQuotaSection
+          className="h-full"
+          connection={connection}
+          showPlanLabel
+          t={t}
+          title={t("common.usage")}
+        />
+        <ConnectionModelCatalogSection
+          connectionId={connection.id}
+          t={t}
+        />
+      </section>
 
       <ConnectionAlertsSection
         alerts={connection.alerts ?? []}

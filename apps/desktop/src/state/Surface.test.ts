@@ -75,7 +75,7 @@ describe("DesktopSurface", () => {
             authMode: "api_key",
             isCurrent: true,
             enabledAgents: ["codex"],
-            configurableAgents: ["codex"],
+            configurableAgents: ["codex", "openclaw"],
             selectedByAgents: ["codex"],
             endpointUrl: "https://api.openai.com/v1",
             envKey: null,
@@ -92,7 +92,7 @@ describe("DesktopSurface", () => {
               isCurrent: true,
               usage: null,
               enabledAgents: ["codex"],
-              configurableAgents: ["codex"],
+              configurableAgents: ["codex", "openclaw"],
               selectedByAgents: ["codex"],
               endpointUrl: "https://api.openai.com/v1",
               envKey: null,
@@ -106,7 +106,7 @@ describe("DesktopSurface", () => {
               isCurrent: false,
               usage: null,
               enabledAgents: ["codex"],
-              configurableAgents: ["codex"],
+              configurableAgents: ["codex", "openclaw"],
               selectedByAgents: [],
               endpointUrl: "https://api.openai.com/v1",
             }),
@@ -131,7 +131,36 @@ describe("DesktopSurface", () => {
           agentLabel: "OpenClaw",
           currentConnection: null,
           currentUsage: null,
-          connections: [],
+          connections: expect.arrayContaining([
+            expect.objectContaining({
+              apiKeySource: "direct",
+              id: "work",
+              label: "Work",
+              endpointLabel: "OpenAI Official",
+              endpointFamily: "openai",
+              authMode: "api_key",
+              isCurrent: false,
+              usage: null,
+              enabledAgents: ["codex"],
+              configurableAgents: ["codex", "openclaw"],
+              selectedByAgents: ["codex"],
+              endpointUrl: "https://api.openai.com/v1",
+              envKey: null,
+            }),
+            expect.objectContaining({
+              id: "personal",
+              label: "Personal",
+              endpointLabel: "OpenAI Official",
+              endpointFamily: "openai",
+              authMode: "openai_session",
+              isCurrent: false,
+              usage: null,
+              enabledAgents: ["codex"],
+              configurableAgents: ["codex", "openclaw"],
+              selectedByAgents: [],
+              endpointUrl: "https://api.openai.com/v1",
+            }),
+          ]),
         },
       ],
     });
@@ -181,6 +210,7 @@ describe("DesktopSurface", () => {
       onboarding: null,
       currentConnection: {
         activeAlertCount: 0,
+        agentModelId: "gpt-5.4",
         apiKeySource: "direct",
         id: "azure-account",
         label: "Azure Account",
@@ -189,7 +219,7 @@ describe("DesktopSurface", () => {
         authMode: "api_key",
         isCurrent: true,
         enabledAgents: ["codex"],
-        configurableAgents: ["codex"],
+        configurableAgents: ["codex", "openclaw"],
         selectedByAgents: [],
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         envKey: null,
@@ -197,6 +227,7 @@ describe("DesktopSurface", () => {
       currentConnectionState: "saved",
       liveConnection: {
         activeAlertCount: 0,
+        agentModelId: "gpt-5.4",
         apiKeySource: "direct",
         id: "azure-account",
         label: "Azure Account",
@@ -205,12 +236,12 @@ describe("DesktopSurface", () => {
         authMode: "api_key",
         isCurrent: true,
         enabledAgents: ["codex"],
-        configurableAgents: ["codex"],
+        configurableAgents: ["codex", "openclaw"],
         selectedByAgents: [],
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         envKey: null,
       },
-      syncState: "synced",
+      reconciliationState: "already_saved",
       connections: [
         expect.objectContaining({
           apiKeySource: "direct",
@@ -222,7 +253,7 @@ describe("DesktopSurface", () => {
           isCurrent: true,
           usage: null,
           enabledAgents: ["codex"],
-          configurableAgents: ["codex"],
+          configurableAgents: ["codex", "openclaw"],
           selectedByAgents: ["codex"],
           endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
           envKey: null,
@@ -230,6 +261,7 @@ describe("DesktopSurface", () => {
       ],
       currentAgentConnections: [
         expect.objectContaining({
+          agentModelId: "gpt-5.4",
           apiKeySource: "direct",
           id: "azure-account",
           label: "Azure Account",
@@ -239,7 +271,7 @@ describe("DesktopSurface", () => {
           isCurrent: true,
           usage: null,
           enabledAgents: ["codex"],
-          configurableAgents: ["codex"],
+          configurableAgents: ["codex", "openclaw"],
           selectedByAgents: ["codex"],
           endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
           envKey: null,
@@ -249,7 +281,7 @@ describe("DesktopSurface", () => {
         expect.objectContaining({
           agentId: "codex",
           connections: expect.arrayContaining([
-            expect.objectContaining({ id: "azure-account" }),
+            expect.objectContaining({ id: "azure-account", agentModelId: "gpt-5.4" }),
           ]),
         }),
       ]),
@@ -313,6 +345,7 @@ describe("DesktopSurface", () => {
       currentConnectionState: "none",
       liveConnection: {
         activeAlertCount: 0,
+        agentModelId: "gpt-5.4",
         id: "OpenAI API Key",
         label: "OpenAI API Key",
         endpointLabel: "OpenAI",
@@ -324,7 +357,7 @@ describe("DesktopSurface", () => {
         selectedByAgents: [],
         endpointUrl: null,
       },
-      syncState: "new_connection_detected",
+      reconciliationState: "new",
       connections: [],
       currentAgentConnections: [],
       agents: expect.arrayContaining([
@@ -332,7 +365,7 @@ describe("DesktopSurface", () => {
           agentId: "codex",
           currentConnection: null,
           currentConnectionState: "none",
-          syncState: "new_connection_detected",
+          reconciliationState: "new",
         }),
       ]),
       detectedSetups: expect.objectContaining({
@@ -405,8 +438,7 @@ describe("DesktopSurface", () => {
       expect.objectContaining({
         agentId: "codex",
         importable: false,
-        state: "already_saved",
-        matchedConnectionLabel: "Gateway (gateway.example.test) API Key",
+        reconciliationState: "already_saved",
       }),
       expect.objectContaining({
         agentId: "cursor",
@@ -424,13 +456,68 @@ describe("DesktopSurface", () => {
     expect(state.agents).toEqual(expect.arrayContaining([
       expect.objectContaining({
         agentId: "codex",
-        syncState: "synced",
+        reconciliationState: "already_saved",
         liveConnection: expect.objectContaining({
           id: "gateway-work",
           label: "Gateway (gateway.example.test) API Key",
         }),
       }),
     ]));
+  });
+
+  it("shows configurable gateway connections in the OpenClaw agent list even before OpenClaw is enabled", async () => {
+    const setup = createSetup();
+    const endpointRegistry = EndpointRegistry.open(setup.dbPath);
+    endpointRegistry.add({
+      id: "gateway-shared",
+      label: "Gateway (llmfk.dpdns.org)",
+      rootUrl: "https://llmfk.dpdns.org",
+      profile: "generic-gateway",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+          envKeyOverride: "OPENAI_API_KEY",
+        },
+        anthropic: {
+          basePath: "/v1",
+          authSchemes: ["bearer"],
+          envKeyOverride: "ANTHROPIC_AUTH_TOKEN",
+          versionHeader: "2023-06-01",
+        },
+      },
+    });
+    endpointRegistry.close();
+    seedBinding(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        authMode: "api_key",
+      },
+      {
+        kind: "api_key",
+        source: "direct",
+        apiKey: "gateway-secret",
+        envKey: "NILE_GATEWAY_LLMFK_DPDNS_ORG_API_KEY_API_KEY",
+      },
+    );
+    await updateConnectionEnabledAgents(setup, "gateway-shared-api-key", ["codex", "claude"]);
+
+    const surface = createSurface(setup);
+    const state = await surface.getSettingsState();
+    const openClawState = state.agents.find((agent) => agent.agentId === "openclaw");
+
+    expect(openClawState?.connections).toEqual([
+      expect.objectContaining({
+        id: "gateway-shared-api-key",
+        enabledAgents: ["codex", "claude"],
+        configurableAgents: ["codex", "claude", "openclaw"],
+      }),
+    ]);
   });
 
   it("filters current-agent connections to Codex-compatible entries only", async () => {
@@ -478,6 +565,68 @@ describe("DesktopSurface", () => {
     expect(state.agents.find((agent) => agent.agentId === "claude")?.connections.map((connection) => connection.id)).toEqual(["claude-team"]);
   });
 
+  it("includes configurable Codex connections in current-agent connections even before they are enabled", async () => {
+    const setup = createSetup();
+    seedProvider(setup.dbPath, {
+      id: "openai-official",
+      label: "OpenAI Official",
+      endpointFamily: "openai",
+      supportedAuthModes: ["api_key"],
+    });
+    seedBinding(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "shared-openai",
+        endpointId: "openai-official",
+        label: "Shared OpenAI",
+        authMode: "api_key",
+      },
+      { kind: "api_key", apiKey: "shared-secret" },
+    );
+    await updateConnectionEnabledAgents(setup, "shared-openai", ["openclaw"]);
+
+    const state = await createSurface(setup).getSettingsState();
+    expect(state.currentAgentConnections.map((connection) => connection.id)).toEqual(["shared-openai"]);
+  });
+
+  it("includes agent-specific model settings in agent connection lists", async () => {
+    const setup = createSetup();
+    seedProvider(setup.dbPath, {
+      id: "openai-official",
+      label: "OpenAI Official",
+      endpointFamily: "openai",
+      supportedAuthModes: ["openai_session", "api_key"],
+    });
+    seedBinding(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "shared-work",
+        endpointId: "openai-official",
+        label: "Shared Work",
+        authMode: "openai_session",
+      },
+      openAiSessionCredential(),
+    );
+    await updateConnectionEnabledAgents(setup, "shared-work", ["codex", "openclaw"]);
+    setAgentConnectionModel(setup, "openclaw", "shared-work", "gpt-5.3-codex");
+
+    const state = await createSurface(setup).getSettingsState();
+
+    expect(
+      state.agents.find((agent) => agent.agentId === "openclaw")?.connections.find((connection) => connection.id === "shared-work"),
+    ).toEqual(
+      expect.objectContaining({
+        id: "shared-work",
+        agentModelId: "gpt-5.3-codex",
+      }),
+    );
+    expect(
+      state.agents.find((agent) => agent.agentId === "codex")?.connections.find((connection) => connection.id === "shared-work")?.agentModelId,
+    ).toBeNull();
+  });
+
   it("returns a first-run onboarding state when no saved connections exist yet", async () => {
     const setup = createSetup();
     const state = await createSurface(setup).getSettingsState();
@@ -491,29 +640,26 @@ describe("DesktopSurface", () => {
           agentId: "codex",
           title: "Codex · OpenAI API Key",
           subtitle: "OpenAI • api_key",
-          state: "new",
+          reconciliationState: "new",
           importable: true,
           defaultSelected: true,
-          matchedConnectionLabel: undefined,
           issues: [],
         },
         expect.objectContaining({
           scanId: "cursor",
           agentId: "cursor",
-          state: "invalid",
+          reconciliationState: "invalid",
           importable: false,
           defaultSelected: false,
-          matchedConnectionLabel: undefined,
         }),
         {
           scanId: "claude",
           agentId: "claude",
           title: "Claude · No local setup",
           subtitle: "Claude settings.json has no ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN",
-          state: "invalid",
+          reconciliationState: "invalid",
           importable: false,
           defaultSelected: false,
-          matchedConnectionLabel: undefined,
           issues: ["Claude settings.json has no ANTHROPIC_API_KEY or ANTHROPIC_AUTH_TOKEN"],
         },
       ]),
@@ -526,39 +672,6 @@ describe("DesktopSurface", () => {
         importableSetupCount: 1,
       }),
     );
-  });
-
-  it("imports detected setups through the desktop first-run surface", async () => {
-    const setup = createSetup({
-      configToml: [
-        'model = "gpt-5.4"',
-        'model_provider = "azure"',
-        "",
-        '[model_providers.azure]',
-        'base_url = "https://example-eu-resource.cognitiveservices.azure.com/openai/v1"',
-        'wire_api = "responses"',
-        'env_key = "OPENAI_API_KEY3"',
-        "",
-      ].join("\n"),
-      authFile: { OPENAI_API_KEY: null },
-    });
-    process.env.OPENAI_API_KEY3 = "azure-secret";
-    const surface = createSurface(setup);
-
-    const result = await surface.importDetectedSetups(["codex"]);
-    const state = await surface.getSettingsState();
-
-    expect(result.results).toEqual([
-      {
-        scanId: "codex",
-        status: "created",
-        connectionId: "example-eu-resource-api-key",
-        connectionLabel: "example-eu-resource API Key",
-      },
-    ]);
-    expect(state.onboarding).toBeNull();
-    expect(state.connections.map((connection) => connection.id)).toEqual(["example-eu-resource-api-key"]);
-    expect(state.detectedSetups.importableCount).toBe(0);
   });
 
   it("shows live drift in menubar when the current codex setup is not saved yet", async () => {
@@ -920,7 +1033,7 @@ describe("DesktopSurface", () => {
     expect(state.currentConnection?.id).toBe("active");
     expect(state.currentConnection?.label).toBe("active@example.com");
     expect(state.liveConnection?.id).toBe("active");
-    expect(state.syncState).toBe("synced");
+    expect(state.reconciliationState).toBe("already_saved");
     expect(state.connections[0]?.id).toBe("active");
     expect(state.connections[0]?.isCurrent).toBe(true);
     expect(state.connections[0]?.selectedByAgents).toEqual(["codex"]);
@@ -1045,6 +1158,74 @@ function applySavedConnection(
   });
   try {
     session.useConnection(agentId, connectionId);
+  } finally {
+    session.close();
+  }
+}
+
+function setAgentConnectionModel(
+  setup: {
+    dbPath: string;
+    codexHome: string;
+    cursorHome: string;
+    claudeHome: string;
+    openclawHome: string;
+    credentialStore: StubCredentialStore;
+    secureSnapshots: MemorySecureSnapshotStore;
+  },
+  agentId: "codex" | "cursor" | "claude" | "openclaw",
+  connectionId: string,
+  modelId: string,
+): void {
+  const session = NileSession.open({
+    databasePath: setup.dbPath,
+    credentialStore: setup.credentialStore,
+    secureSnapshotStore: setup.secureSnapshots,
+    logger: NileLogger.silent().child({ module: "desktop-surface-test" }),
+    agentHomes: {
+      codex: setup.codexHome,
+      cursor: setup.cursorHome,
+      claude: setup.claudeHome,
+      openclaw: setup.openclawHome,
+    },
+  });
+  try {
+    session.setAgentConnectionModel(agentId, connectionId, modelId);
+  } finally {
+    session.close();
+  }
+}
+
+async function updateConnectionEnabledAgents(
+  setup: {
+    dbPath: string;
+    codexHome: string;
+    cursorHome: string;
+    claudeHome: string;
+    openclawHome: string;
+    credentialStore: StubCredentialStore;
+    secureSnapshots: MemorySecureSnapshotStore;
+  },
+  connectionId: string,
+  enabledAgents: Array<"codex" | "cursor" | "claude" | "openclaw">,
+): Promise<void> {
+  const session = NileSession.open({
+    databasePath: setup.dbPath,
+    credentialStore: setup.credentialStore,
+    secureSnapshotStore: setup.secureSnapshots,
+    logger: NileLogger.silent().child({ module: "desktop-surface-test" }),
+    agentHomes: {
+      codex: setup.codexHome,
+      cursor: setup.cursorHome,
+      claude: setup.claudeHome,
+      openclaw: setup.openclawHome,
+    },
+  });
+  try {
+    await session.updateConnection({
+      connectionId,
+      enabledAgents,
+    });
   } finally {
     session.close();
   }

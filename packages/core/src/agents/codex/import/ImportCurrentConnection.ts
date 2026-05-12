@@ -5,9 +5,9 @@ import type { CredentialStore } from "../../../services/credential/Store";
 import { EnvironmentSource } from "../../../services/EnvironmentSource";
 import { NileLogger } from "../../../services/NileLogger";
 import {
-  CurrentStateImportSupport,
+  LiveSetupImportSupport,
   requireResolvedImportCandidate,
-} from "../../../actions/current-state/Import";
+} from "../../../actions/live-setup/Import";
 import { CodexAuthStore } from "../stores/CodexAuthStore";
 import { CodexConfigStore } from "../stores/CodexConfigStore";
 import {
@@ -15,9 +15,9 @@ import {
 } from "../../../runtime-local/AgentWorkspaceSession";
 import type { AgentWorkspaceContext } from "../../../runtime-local/AgentWorkspaceContext";
 import { CODEX_AGENT_ID } from "../types";
-import { CurrentStateMatcher } from "../../../actions/current-state/Matcher";
-import { CurrentStateReader } from "../current-state/Reader";
-import { CurrentStateDetector } from "../current-state/Detector";
+import { LiveSetupMatcher } from "../../../actions/live-setup/Matcher";
+import { LiveSetupReader } from "../live-setup/Reader";
+import { LiveSetupDetector } from "../live-setup/Detector";
 
 export class ImportCurrentConnection {
   static open(
@@ -36,24 +36,26 @@ export class ImportCurrentConnection {
     const context = AgentWorkspaceSession.open(databasePath, credentialStore);
     const authStore = new CodexAuthStore({ codexHome });
     const configStore = new CodexConfigStore(codexHome);
-    const reader = new CurrentStateReader(authStore, configStore, environment);
+    const reader = new LiveSetupReader(authStore, configStore, environment);
 
     return new ImportCurrentConnection(
-      new CurrentStateImportSupport(
+      new LiveSetupImportSupport(
         CODEX_AGENT_ID,
         "Codex",
         context.sharedContext.endpointRegistry,
         context.sharedContext.accessRegistry,
         context.agentSelection,
+        context.sharedContext.agentConnectionSettings,
         logger,
       ),
-      new CurrentStateDetector(
+      new LiveSetupDetector(
         reader,
-        new CurrentStateMatcher(
+        new LiveSetupMatcher(
           context.sharedContext.endpointRegistry,
           context.sharedContext.accessRegistry,
           context.agentSelection,
           CODEX_AGENT_ID,
+          context.sharedContext.agentConnectionSettings,
         ),
         logger.child({ scope: "detector" }),
       ),
@@ -75,22 +77,23 @@ export class ImportCurrentConnection {
     const credentialStore = options.credentialStore;
     const environment = options?.environment ?? EnvironmentSource.from(process.env);
     const logger = options?.logger ?? NileLogger.silent().child({ module: "codex-import-current-connection" });
-    const reader = new CurrentStateReader(
+    const reader = new LiveSetupReader(
       new CodexAuthStore({ codexHome }),
       new CodexConfigStore(codexHome),
       environment,
     );
 
     return new ImportCurrentConnection(
-      new CurrentStateImportSupport(
+      new LiveSetupImportSupport(
         CODEX_AGENT_ID,
         "Codex",
         context.endpointRegistry,
         context.accessRegistry,
         context.agentSelection,
+        context.agentConnectionSettings,
         logger,
       ),
-      CurrentStateDetector.fromContext(context, {
+      LiveSetupDetector.fromContext(context, {
         codexHome,
         credentialStore,
         environment,
@@ -101,14 +104,14 @@ export class ImportCurrentConnection {
   }
 
   constructor(
-    private readonly importSupport: CurrentStateImportSupport,
-    private readonly detector: CurrentStateDetector,
-    private readonly reader: CurrentStateReader,
+    private readonly importSupport: LiveSetupImportSupport,
+    private readonly detector: LiveSetupDetector,
+    private readonly reader: LiveSetupReader,
     private readonly ownedContext: AgentWorkspaceSession | null = null,
   ) {}
 
-  importCurrent() {
-    return this.importSupport.importDetected(
+  async importCurrent() {
+    return await this.importSupport.importDetected(
       this.detector.detect(),
       () => requireResolvedImportCandidate("Codex", this.reader.read()),
     );

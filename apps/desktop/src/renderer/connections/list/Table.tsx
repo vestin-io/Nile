@@ -42,7 +42,7 @@ export function ConnectionTable({
                 <Field label={t("common.alerts")} value={readAlertCountValue(connection.activeAlertCount)} />
                 <Field
                   label={t("common.capability")}
-                  value={connection.enabledAgents.length === 0 ? t("common.none") : formatAgentsList(connection.enabledAgents, t)}
+                  value={connection.configurableAgents.length === 0 ? t("common.none") : formatAgentsList(connection.configurableAgents, t)}
                 />
               </div>
             </CardContent>
@@ -75,7 +75,7 @@ export function ConnectionTable({
                 <TableCell className="font-medium">{connection.label}</TableCell>
                 <TableCell>{readProviderLabel(connection.endpointFamily, t)}</TableCell>
                 <TableCell><ConnectionUsageCell connection={connection} t={t} /></TableCell>
-                <TableCell>{connection.enabledAgents.length === 0 ? t("common.none") : formatAgentsList(connection.enabledAgents, t)}</TableCell>
+                <TableCell>{connection.configurableAgents.length === 0 ? t("common.none") : formatAgentsList(connection.configurableAgents, t)}</TableCell>
                 <TableCell>{readAlertCountValue(connection.activeAlertCount)}</TableCell>
               </TableRow>
             ))}

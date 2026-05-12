@@ -147,6 +147,7 @@ export class OpenClawConfigStore {
     mkdirSync(dirname(this.configPath), { recursive: true });
     writeFileSync(this.configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
   }
+
 }
 
 function ensureObject(value: unknown): JsonObject {
@@ -165,4 +166,11 @@ function ensureChildObject(parent: JsonObject, key: string): JsonObject {
   const next: JsonObject = {};
   parent[key] = next;
   return next;
+}
+
+function asObject(value: unknown): JsonObject | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as JsonObject;
 }

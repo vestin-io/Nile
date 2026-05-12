@@ -1,6 +1,6 @@
 import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent";
 import { StateReset, type CursorUsageAutoBindResult, type RemoveConnectionResult, type ResetStateResult } from "@nile/core/application/local";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-state";
+import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 
 import { DesktopSurface } from "../../state/Surface";
@@ -172,16 +172,16 @@ export class DesktopStateStore {
 
   async importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult> {
     return await this.runAsyncMutation(
-      async () => this.options.connectionGateway.importDetectedSetups(scanIds),
+      async () => await this.options.connectionGateway.importDetectedSetups(scanIds),
       this.menubarState,
       this.settingsState,
       this.historyState,
     );
   }
 
-  importCurrentConnection(agentId: AgentId): DesktopConnectionSummary {
-    return this.runMutation(
-      () => this.options.connectionGateway.importCurrentConnection(agentId),
+  async importCurrentConnection(agentId: AgentId): Promise<DesktopConnectionSummary> {
+    return await this.runAsyncMutation(
+      async () => await this.options.connectionGateway.importCurrentConnection(agentId),
       this.menubarState,
       this.settingsState,
       this.historyState,
@@ -194,6 +194,13 @@ export class DesktopStateStore {
       this.menubarState,
       this.settingsState,
       this.historyState,
+    );
+  }
+
+  updateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): string | null {
+    return this.runMutation(
+      () => this.options.connectionGateway.updateAgentConnectionModel(agentId, connectionId, modelId),
+      this.settingsState,
     );
   }
 

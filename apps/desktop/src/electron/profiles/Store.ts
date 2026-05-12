@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, rmSync } from "node:fs";
 
 import { isAgentId, type AgentId } from "@nile/core/models/agent";
 import { SqliteDatabase } from "@nile/core/services/database";
@@ -15,10 +14,6 @@ export type WorkspaceProfile = {
   name: string;
   emoji?: string;
   assignments: WorkspaceProfileAssignment[];
-};
-
-type WorkspaceProfileFile = {
-  profiles?: unknown;
 };
 
 type WorkspaceProfileRow = {
@@ -48,16 +43,12 @@ type UpdateWorkspaceProfileInput = {
 };
 
 export class WorkspaceProfileStore {
-  constructor(
-    private readonly databasePath: string,
-    private readonly legacyFilePath?: string,
-  ) {}
+  constructor(private readonly databasePath: string) {}
 
   list(): WorkspaceProfile[] {
     const database = SqliteDatabase.open(this.databasePath);
     try {
       this.initialize(database);
-      this.migrateLegacyFile(database);
       return this.readProfiles(database);
     } finally {
       database.close();
@@ -69,7 +60,6 @@ export class WorkspaceProfileStore {
     try {
       return database.transaction(() => {
         this.initialize(database);
-        this.migrateLegacyFile(database);
         const normalizedName = this.normalizeName(input.name);
         const profiles = this.readProfiles(database);
         this.assertNameAvailable(profiles, normalizedName);
@@ -93,7 +83,6 @@ export class WorkspaceProfileStore {
     try {
       return database.transaction(() => {
         this.initialize(database);
-        this.migrateLegacyFile(database);
         const profiles = this.readProfiles(database);
         const current = profiles.find((profile) => profile.id === profileId);
         if (!current) {
@@ -137,7 +126,6 @@ export class WorkspaceProfileStore {
     try {
       database.transaction(() => {
         this.initialize(database);
-        this.migrateLegacyFile(database);
         const deleted = database
           .query<{ id: string }>("SELECT id FROM desktop_workspace_profiles WHERE id = ?")
           .get(profileId);
@@ -156,7 +144,6 @@ export class WorkspaceProfileStore {
     const database = SqliteDatabase.open(this.databasePath);
     try {
       this.initialize(database);
-      this.migrateLegacyFile(database);
       const profile = this.readProfiles(database).find((entry) => entry.id === profileId);
       if (!profile) {
         throw new Error(`Workspace profile not found: ${profileId}`);
@@ -295,84 +282,6 @@ export class WorkspaceProfileStore {
         assignment.homePath === null ? null : assignment.homePath ?? null,
       );
     }
-  }
-
-  private migrateLegacyFile(database: SqliteDatabase): void {
-    if (!this.legacyFilePath || !existsSync(this.legacyFilePath)) {
-      return;
-    }
-
-    const raw = readFileSync(this.legacyFilePath, "utf8");
-    if (!raw.trim()) {
-      rmSync(this.legacyFilePath, { force: true });
-      return;
-    }
-
-    let parsed: WorkspaceProfileFile;
-    try {
-      parsed = JSON.parse(raw) as WorkspaceProfileFile;
-    } catch {
-      rmSync(this.legacyFilePath, { force: true });
-      return;
-    }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      rmSync(this.legacyFilePath, { force: true });
-      return;
-    }
-    if (!Array.isArray(parsed.profiles)) {
-      rmSync(this.legacyFilePath, { force: true });
-      return;
-    }
-
-    for (const profile of parsed.profiles.flatMap((entry) => this.readLegacyProfile(entry))) {
-      this.insertProfile(database, profile);
-    }
-
-    rmSync(this.legacyFilePath, { force: true });
-  }
-
-  private readLegacyProfile(entry: unknown): WorkspaceProfile[] {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      return [];
-    }
-    const record = entry as Record<string, unknown>;
-    if (typeof record.id !== "string" || !record.id.trim()) {
-      return [];
-    }
-    if (typeof record.name !== "string" || !record.name.trim()) {
-      return [];
-    }
-    if (!Array.isArray(record.assignments)) {
-      return [];
-    }
-
-    return [{
-      id: record.id.trim(),
-      name: record.name.trim(),
-      ...(typeof record.emoji === "string" && record.emoji.trim() ? { emoji: record.emoji.trim() } : {}),
-      assignments: this.normalizeAssignments(record.assignments.flatMap((assignment) => this.readLegacyAssignment(assignment))),
-    }];
-  }
-
-  private readLegacyAssignment(entry: unknown): WorkspaceProfileAssignment[] {
-    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      return [];
-    }
-    const record = entry as Record<string, unknown>;
-    if (typeof record.agentId !== "string" || !isAgentId(record.agentId)) {
-      return [];
-    }
-
-    const assignment: WorkspaceProfileAssignment = { agentId: record.agentId };
-    if (typeof record.connectionId === "string" && record.connectionId.trim()) {
-      assignment.connectionId = record.connectionId.trim();
-    }
-    if (typeof record.homePath === "string" && record.homePath.trim()) {
-      assignment.homePath = record.homePath.trim();
-    } else if (record.homePath === null) {
-      assignment.homePath = null;
-    }
-    return [assignment];
   }
 
   private normalizeName(name: string): string {

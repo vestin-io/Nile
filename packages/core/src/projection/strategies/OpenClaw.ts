@@ -7,10 +7,10 @@ import { joinEndpointUrl } from "../Url";
 
 export class OpenClawProjectionStrategy {
   resolve(input: ProjectionInput): OpenClawProjection {
-    const modelId = input.access.openclawModelId?.trim();
+    const modelId = input.modelId?.trim();
     if (!modelId) {
       throw new AgentProjectionError(
-        "OpenClaw requires a saved openclawModelId on the selected connection",
+        "OpenClaw requires a saved modelId on the selected connection",
       );
     }
 

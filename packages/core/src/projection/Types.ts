@@ -7,6 +7,7 @@ export type ProjectionInput = {
   endpoint: EndpointRecord;
   access: AccessRecord;
   credential: StoredCredential;
+  modelId?: string;
 };
 
 type ProjectionCommon = {

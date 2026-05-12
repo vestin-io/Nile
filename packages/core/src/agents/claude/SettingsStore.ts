@@ -87,6 +87,13 @@ export class ClaudeSettingsStore {
     };
   }
 
+  readModel(): string | null {
+    const document = this.readDocument();
+    return typeof document.model === "string" && document.model.trim()
+      ? document.model.trim()
+      : null;
+  }
+
   applyApiKey(
     apiKey: string,
     baseUrl?: string,

@@ -12,7 +12,7 @@ import {
 } from "../../runtime-local/AgentWorkspaceSession";
 import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { OPENCLAW_AGENT_ID } from "./types";
-import { CurrentStateDetector } from "./current-state/Detector";
+import { LiveSetupDetector } from "./live-setup/Detector";
 
 export type RollbackLatestResult = {
   rolledBackMutationId: string;
@@ -41,11 +41,11 @@ export class RollbackLatestMutation {
           logger.child({ scope: "mutation-history" }),
         ),
         context.agentSelection,
-        CurrentStateDetector.fromContext(context.sharedContext, {
+        LiveSetupDetector.fromContext(context.sharedContext, {
           openclawHome: options?.openclawHome ?? join(homedir(), ".openclaw"),
           codexHome: options?.codexHome ?? join(homedir(), ".codex"),
           credentialStore: options.credentialStore,
-          logger: logger.child({ scope: "openclaw-current-state-detector" }),
+          logger: logger.child({ scope: "openclaw-live-setup-detector" }),
         }),
         logger,
       ),
@@ -73,11 +73,11 @@ export class RollbackLatestMutation {
           logger.child({ scope: "mutation-history" }),
         ),
         context.agentSelection,
-        CurrentStateDetector.fromContext(context, {
+        LiveSetupDetector.fromContext(context, {
           openclawHome: options?.openclawHome ?? join(homedir(), ".openclaw"),
           codexHome: options?.codexHome ?? join(homedir(), ".codex"),
           credentialStore: options.credentialStore,
-          logger: logger.child({ scope: "openclaw-current-state-detector" }),
+          logger: logger.child({ scope: "openclaw-live-setup-detector" }),
         }),
         logger,
       ),

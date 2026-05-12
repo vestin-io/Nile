@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 
 import { EnvironmentSource } from "../../services/EnvironmentSource";
 import type { StoredCredential } from "../../services/credential/Types";
-import { CodexCurrentCredentialReader } from "./current-state/CurrentCredentialReader";
+import { CodexCurrentCredentialReader } from "./live-setup/CurrentCredentialReader";
 
 type SpawnResult = {
   error?: Error;

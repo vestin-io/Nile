@@ -38,7 +38,7 @@ export function useAddConnectionOnboardingState({
   const [gatewayPrepared, setGatewayPrepared] = useState(false);
   const [gatewayProbeError, setGatewayProbeError] = useState<string | null>(null);
   const [gatewayTrustConfirmed, setGatewayTrustConfirmed] = useState(false);
-  const [suggestedAgents, setSuggestedAgents] = useState<AgentId[]>([]);
+  const [detectedAgents, setDetectedAgents] = useState<AgentId[]>([]);
   const [isProbingSupport, setIsProbingSupport] = useState(false);
   const [resolvedConfigurableAgents, setResolvedConfigurableAgents] = useState<AgentId[]>([]);
 
@@ -59,7 +59,7 @@ export function useAddConnectionOnboardingState({
 
   useEffect(() => {
     if (!selectedDefinition) {
-      setSuggestedAgents([]);
+      setDetectedAgents([]);
       return;
     }
 
@@ -86,7 +86,7 @@ export function useAddConnectionOnboardingState({
           selectedDefinition.configurableAgents,
           onboarding.configurableAgents,
         );
-        setSuggestedAgents(onboarding.suggestedAgents);
+        setDetectedAgents(onboarding.defaultEnabledAgents);
         setResolvedConfigurableAgents(nextConfigurableAgents);
         setEnabledAgents(resolveDetectedEnabledAgents({
           current: enabledAgents,
@@ -97,7 +97,7 @@ export function useAddConnectionOnboardingState({
       })
       .catch(() => {
         if (!cancelled) {
-          setSuggestedAgents([]);
+          setDetectedAgents([]);
           setResolvedConfigurableAgents(selectedDefinition.configurableAgents);
         }
       })
@@ -163,7 +163,7 @@ export function useAddConnectionOnboardingState({
         selectedDefinition?.configurableAgents ?? [],
         onboarding.configurableAgents,
       );
-      setSuggestedAgents(onboarding.suggestedAgents);
+      setDetectedAgents(onboarding.defaultEnabledAgents);
       setResolvedConfigurableAgents(nextConfigurableAgents);
       setEnabledAgents(resolveDetectedEnabledAgents({
         current: enabledAgents,
@@ -175,7 +175,7 @@ export function useAddConnectionOnboardingState({
       setGatewayPrepared(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      setSuggestedAgents([]);
+      setDetectedAgents([]);
       setResolvedConfigurableAgents(selectedDefinition?.configurableAgents ?? []);
       setGatewayPrepared(false);
       setGatewayProbeError(message);
@@ -195,7 +195,7 @@ export function useAddConnectionOnboardingState({
     setGatewayTrustConfirmed,
     shouldProbeEnabledAgents,
     shouldShowEnabledAgents,
-    suggestedAgents,
+    detectedAgents,
   };
 }
 

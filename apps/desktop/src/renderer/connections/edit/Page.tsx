@@ -82,7 +82,7 @@ export function ConnectionEditPage({
     setSessionSource,
     shouldShowAuthJsonPath,
     shouldProbeGatewaySupport,
-    suggestedAgents,
+    detectedAgents,
     submit,
     trimmedLabel,
     requiresGatewayTrustForSave,
@@ -281,7 +281,7 @@ export function ConnectionEditPage({
             enabledAgents={displayedEnabledAgents}
             isProbingSupport={isProbingSupport}
             showDetectionState={canEditEnabledAgents && (isProbingSupport || hasProbedSupport)}
-            suggestedAgents={suggestedAgents}
+            detectedAgents={detectedAgents}
             t={t}
             onEnabledAgentsChange={(nextAgents) => {
               setAgentsDirty(true);

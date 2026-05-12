@@ -22,6 +22,11 @@ import { ConnectionAlertOverlay } from "../alerts/Overlay";
 import { ConnectionAlertStore } from "../alerts/Store";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
+import { ManagedApiKeyEnvironment } from "../connections/ManagedApiKeyEnvironment";
+import { DesktopOpenClawEnvironmentReader } from "../environment/OpenClaw";
+import { DesktopEnvironmentSource } from "../environment/Source";
+import { DesktopShellEnvironment } from "../environment/Shell";
+import { DesktopEnvironmentStore } from "../environment/Store";
 import { DesktopIpcAppRoutes } from "../ipc/DesktopIpcAppRoutes";
 import { DesktopIpcConnectionRoutes } from "../ipc/DesktopIpcConnectionRoutes";
 import { DesktopIpcInputValidator } from "../ipc/DesktopIpcInputValidator";
@@ -57,6 +62,8 @@ export class DesktopMain {
   private readonly logger: NileLogger;
   private readonly credentialStore: CredentialStore;
   private readonly environment: EnvironmentSource;
+  private readonly environmentStore: DesktopEnvironmentStore;
+  private readonly shellEnvironment: DesktopShellEnvironment;
   private readonly agentHomesStore: AgentHomesStore;
   private readonly notificationMuteStore: DesktopNotificationMuteStore;
   private readonly profileFeatureStore: DesktopProfileFeatureStore;
@@ -82,27 +89,17 @@ export class DesktopMain {
   constructor(private readonly options: DesktopMainOptions) {
     this.logger = NileLogger.createDefault({ module: "desktop-main" });
     this.credentialStore = options.credentialStore ?? new KeychainCredentialStore();
-    this.environment = EnvironmentSource.from(new ShellEnvironment().readLoginShellEnvironment());
-    this.agentHomesStore = new AgentHomesStore(
-      options.databasePath,
-      join(dirname(options.databasePath), "desktop-agent-homes.json"),
+    this.environmentStore = new DesktopEnvironmentStore();
+    this.shellEnvironment = new DesktopShellEnvironment();
+    this.environment = new DesktopEnvironmentSource(
+      new ShellEnvironment().readLoginShellEnvironment(),
+      this.environmentStore,
     );
-    this.notificationMuteStore = new DesktopNotificationMuteStore(
-      options.databasePath,
-      join(dirname(options.databasePath), "desktop-notification-mute.json"),
-    );
-    this.profileFeatureStore = new DesktopProfileFeatureStore(
-      options.databasePath,
-      join(dirname(options.databasePath), "desktop-profile-feature.json"),
-    );
-    this.profileStore = new WorkspaceProfileStore(
-      options.databasePath,
-      join(dirname(options.databasePath), "desktop-profiles.json"),
-    );
-    this.connectionAlertStore = new ConnectionAlertStore(
-      options.databasePath,
-      join(dirname(options.databasePath), "desktop-connection-alerts.json"),
-    );
+    this.agentHomesStore = new AgentHomesStore(options.databasePath);
+    this.notificationMuteStore = new DesktopNotificationMuteStore(options.databasePath);
+    this.profileFeatureStore = new DesktopProfileFeatureStore(options.databasePath);
+    this.profileStore = new WorkspaceProfileStore(options.databasePath);
+    this.connectionAlertStore = new ConnectionAlertStore(options.databasePath);
     this.notificationHistory = new DesktopNotificationHistory(options.databasePath);
     this.agentHomes = mergeAgentHomes(options.agentHomes, this.agentHomesStore.read());
     this.surface = new DesktopSurface({
@@ -116,12 +113,14 @@ export class DesktopMain {
       databasePath: options.databasePath,
       agentHomes: this.agentHomes,
       environment: this.environment,
+      managedApiKeyEnvironment: new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment),
       credentialStore: this.credentialStore,
     });
     this.connectionGateway = new DesktopConnectionGateway({
       databasePath: options.databasePath,
       agentHomes: this.agentHomes,
       environment: this.environment,
+      managedApiKeyEnvironment: new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment),
       credentialStore: this.credentialStore,
     });
     this.stateStore = new DesktopStateStore({
@@ -130,13 +129,8 @@ export class DesktopMain {
       connectionGateway: this.connectionGateway,
       connectionManager: this.connectionManager,
       stateReset: new DesktopStateReset({
-        localStatePaths: [
-          join(dirname(options.databasePath), "desktop-agent-homes.json"),
-          join(dirname(options.databasePath), "desktop-notification-mute.json"),
-          join(dirname(options.databasePath), "desktop-profiles.json"),
-          join(dirname(options.databasePath), "desktop-profile-feature.json"),
-          join(dirname(options.databasePath), "desktop-connection-alerts.json"),
-        ],
+        localStatePaths: [],
+        onBeforeResetLocalState: () => this.clearManagedApiKeyEnvironment(),
         onResetLocalState: () => this.resetDesktopLocalState(),
         stateReset: new StateReset(this.credentialStore),
       }),
@@ -238,6 +232,7 @@ export class DesktopMain {
     this.applicationMenu.install();
     this.registerIpcRoutes();
     this.shell.attach();
+    await this.syncManagedApiKeyEnvironment();
     this.workspaceWatcher.start();
     void this.stateStore.refreshMenubarState().catch((error) => {
       this.logger.error("desktop.startup.refresh_menubar_failed", error);
@@ -328,6 +323,54 @@ export class DesktopMain {
       delete this.agentHomes[key];
     }
     Object.assign(this.agentHomes, next);
+  }
+
+  private clearManagedApiKeyEnvironment(): void {
+    const session = this.connectionGateway.openSession();
+    try {
+      const preservedEnvKeys = this.readManagedOpenClawEnvKeys();
+      const managedEnvironment = new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment);
+      for (const connection of session.listSavedConnections()) {
+        if (connection.envKey && preservedEnvKeys.has(connection.envKey)) {
+          continue;
+        }
+        managedEnvironment.removeForConnection(session, connection.id);
+      }
+      this.shellEnvironment.sync([...preservedEnvKeys].sort());
+    } finally {
+      session.close();
+    }
+  }
+
+  private async syncManagedApiKeyEnvironment(): Promise<void> {
+    const session = this.connectionGateway.openSession();
+    try {
+      const preservedEnvKeys = [...this.readManagedOpenClawEnvKeys()];
+      const managedEnvironment = new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment);
+      for (const failure of managedEnvironment.syncForSession(session, preservedEnvKeys)) {
+        this.logger.warn("desktop.managed_env.sync_failed", {
+          connectionId: failure.connectionId,
+          error: failure.error.message,
+        });
+      }
+    } finally {
+      session.close();
+    }
+  }
+
+  private readManagedOpenClawEnvKeys(): Set<string> {
+    const openclawHome = this.agentHomes.openclaw;
+    if (!openclawHome) {
+      return new Set();
+    }
+    try {
+      return new Set(new DesktopOpenClawEnvironmentReader(openclawHome).readManagedEnvKeys());
+    } catch (error) {
+      this.logger.warn("desktop.openclaw.managed_config_read_failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return new Set();
+    }
   }
 
   private async refreshDesktopState(options: {

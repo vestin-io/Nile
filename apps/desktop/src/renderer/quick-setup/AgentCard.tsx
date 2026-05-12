@@ -1,11 +1,9 @@
 import type { AgentId } from "@nile/core/models/agent/types";
-import { Check } from "lucide-react";
 
 import type { DesktopAgentState, DesktopOnboardingItem } from "../../state/Types";
 import { AgentCardHeader } from "../agents/AgentCardHeader";
 import { DetectedSetupSection } from "./DetectedSetup";
 import type { Translator } from "../shared/I18n";
-import { Button } from "../ui/button";
 import { Card } from "../ui/card";
 
 type QuickSetupAgentCardProps = {
@@ -25,8 +23,6 @@ export function QuickSetupAgentCard({
   onConfirm,
   onConfigure,
 }: QuickSetupAgentCardProps) {
-  const confirmed = isConfirmed(agent, detectedSetup);
-
   return (
     <Card className="rounded-2xl">
       <div className="space-y-4 px-5 py-5 sm:px-6">
@@ -34,7 +30,6 @@ export function QuickSetupAgentCard({
         <DetectedSetupSection
           agentId={agent.agentId}
           canConfigure={canConfigure}
-          confirmed={confirmed}
           detectedSetup={detectedSetup}
           t={t}
           onConfigure={onConfigure}
@@ -43,15 +38,4 @@ export function QuickSetupAgentCard({
       </div>
     </Card>
   );
-}
-
-function isConfirmed(
-  agent: DesktopAgentState,
-  detectedSetup: DesktopOnboardingItem | null,
-): boolean {
-  if (detectedSetup?.state === "already_saved") {
-    return true;
-  }
-
-  return agent.currentConnectionState === "saved" && agent.syncState === "synced";
 }

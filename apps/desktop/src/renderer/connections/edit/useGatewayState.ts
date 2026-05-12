@@ -31,7 +31,7 @@ export function useGatewaySupportState({
   const [gatewayTrustConfirmed, setGatewayTrustConfirmed] = useState(false);
   const [hasProbedSupport, setHasProbedSupport] = useState(false);
   const [isProbingSupport, setIsProbingSupport] = useState(false);
-  const [suggestedAgents, setSuggestedAgents] = useState<AgentId[]>([]);
+  const [detectedAgents, setDetectedAgents] = useState<AgentId[]>([]);
   const [resolvedConfigurableAgents, setResolvedConfigurableAgents] = useState<AgentId[]>(
     connection.configurableAgents,
   );
@@ -58,7 +58,7 @@ export function useGatewaySupportState({
     setGatewayTrustConfirmed(false);
     setHasProbedSupport(false);
     setIsProbingSupport(false);
-    setSuggestedAgents([]);
+    setDetectedAgents([]);
     setResolvedConfigurableAgents(connection.configurableAgents);
   }, [connection.id, connection.configurableAgents]);
 
@@ -68,7 +68,7 @@ export function useGatewaySupportState({
     }
     setGatewayTrustConfirmed(false);
     setHasProbedSupport(false);
-    setSuggestedAgents([]);
+    setDetectedAgents([]);
     setResolvedConfigurableAgents(connection.configurableAgents);
   }, [
     apiKey,
@@ -97,7 +97,7 @@ export function useGatewaySupportState({
       onEnabledAgents: onEnabledAgentsChanged,
       onProbing: setIsProbingSupport,
       onProbeRecorded: setHasProbedSupport,
-      onSuggestedAgents: setSuggestedAgents,
+      onDetectedAgents: setDetectedAgents,
     });
   };
 
@@ -113,7 +113,7 @@ export function useGatewaySupportState({
     setAgentsDirty,
     setGatewayTrustConfirmed,
     shouldProbeGatewaySupport,
-    suggestedAgents,
+    detectedAgents,
   };
 }
 
@@ -130,7 +130,7 @@ async function probeSupport(input: {
   onEnabledAgents(nextAgents: AgentId[]): void;
   onProbing(probing: boolean): void;
   onProbeRecorded?(probed: boolean): void;
-  onSuggestedAgents(nextAgents: AgentId[]): void;
+  onDetectedAgents(nextAgents: AgentId[]): void;
 }): Promise<void> {
   input.onProbing(true);
   input.onProbeRecorded?.(true);
@@ -143,7 +143,7 @@ async function probeSupport(input: {
       envKey: input.apiKeySource === "env_key" ? input.envKey.trim() || undefined : undefined,
     });
     const nextConfigurableAgents = mergeConfigurableAgents(onboarding.configurableAgents);
-    input.onSuggestedAgents(onboarding.suggestedAgents);
+    input.onDetectedAgents(onboarding.defaultEnabledAgents);
     input.onConfigurableAgents(nextConfigurableAgents);
     if (input.agentsDirty) {
       return;
@@ -157,7 +157,7 @@ async function probeSupport(input: {
       input.onEnabledAgents(nextEnabledAgents);
     }
   } catch {
-    input.onSuggestedAgents([]);
+    input.onDetectedAgents([]);
   } finally {
     input.onProbing(false);
   }

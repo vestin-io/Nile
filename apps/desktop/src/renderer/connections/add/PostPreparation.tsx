@@ -32,7 +32,7 @@ type AddConnectionPostPreparationProps = {
   shouldProbeEnabledAgents: boolean;
   shouldShowAuthJsonPath: boolean;
   shouldShowEnabledAgents: boolean;
-  suggestedAgents: AgentId[];
+  detectedAgents: AgentId[];
   t: Translator;
   onApiKeyChange(value: string): void;
   onAuthJsonChoose(): void;
@@ -60,7 +60,7 @@ export function AddConnectionPostPreparation({
   shouldProbeEnabledAgents,
   shouldShowAuthJsonPath,
   shouldShowEnabledAgents,
-  suggestedAgents,
+  detectedAgents,
   t,
   onApiKeyChange,
   onAuthJsonChoose,
@@ -173,7 +173,7 @@ export function AddConnectionPostPreparation({
         enabledAgents={displayedEnabledAgents}
         isProbingSupport={shouldProbeEnabledAgents && isProbingSupport}
         showDetectionState={showDetectionState}
-        suggestedAgents={suggestedAgents}
+        detectedAgents={detectedAgents}
         t={t}
         onEnabledAgentsChange={shouldShowEnabledAgents ? onEnabledAgentsChange : undefined}
       />

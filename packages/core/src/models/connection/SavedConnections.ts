@@ -5,10 +5,7 @@ import {
 } from "../../services/credential/Types";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import type { AgentId } from "../agent/Types";
-import { CLAUDE_AGENT_ID } from "../../agents/claude/types";
-import { CODEX_AGENT_ID } from "../../agents/codex/types";
-import { CURSOR_AGENT_ID } from "../../agents/cursor/types";
-import { OPENCLAW_AGENT_ID } from "../../agents/openclaw/types";
+import { AgentConnectionSettings, type AgentConnectionSettings as AgentConnectionSettingsStore } from "../agent-settings";
 import type { AccessRegistry, AuthMode } from "../access";
 import type { AccessRecord } from "../access";
 import { AccessRegistry as OpenAccessRegistry } from "../access";
@@ -28,7 +25,6 @@ export type SavedConnectionSummary = {
   endpointLabel: string;
   endpointFamily: EndpointFamily | null;
   authMode: AuthMode;
-  openclawModelId?: string;
   apiKeySource?: "direct" | "env_key";
   envKey?: string | null;
   enabledAgents: AgentId[];
@@ -47,6 +43,7 @@ export class SavedConnections {
       OpenEndpointRegistry.fromDatabase(database),
       OpenAccessRegistry.fromDatabase(database, credentialStore),
       AgentSelection.fromDatabase(database),
+      AgentConnectionSettings.fromDatabase(database),
       database,
     );
   }
@@ -56,6 +53,7 @@ export class SavedConnections {
     private readonly endpointRegistry: EndpointRegistry,
     private readonly accessRegistry: AccessRegistry,
     private readonly agentSelection: AgentSelection,
+    private readonly agentConnectionSettings?: AgentConnectionSettingsStore,
     private readonly ownedDatabase: SqliteDatabase | null = null,
   ) {}
 
@@ -76,8 +74,10 @@ export class SavedConnections {
     const endpointsById = this.readEndpointsById();
     return this.accessRegistry
       .list()
-      .filter((access) => access.enabledAgents.includes(agentId))
-      .filter((access) => this.endpointSupportsAgent(endpointsById.get(access.endpointId) ?? null, agentId))
+      .filter((access) => {
+        const endpoint = endpointsById.get(access.endpointId) ?? null;
+        return this.readConfigurableAgents(access, endpoint).includes(agentId);
+      })
       .map((access) =>
         this.buildSummary(
           access,
@@ -115,6 +115,7 @@ export class SavedConnections {
     for (const agentId of clearedAgents) {
       this.agentSelection.clear(agentId);
     }
+    this.agentConnectionSettings?.clearConnection(connectionId);
     this.accessRegistry.remove(connectionId);
     if (this.accessRegistry.list().every((candidate) => candidate.endpointId !== access.endpointId)) {
       this.endpointRegistry.remove(access.endpointId);
@@ -134,23 +135,32 @@ export class SavedConnections {
     return this.accessRegistry.readCredential(connectionId);
   }
 
-  private endpointSupportsAgent(endpoint: EndpointRecord | null, agentId: AgentId): boolean {
-    if (!endpoint) {
-      return false;
+  setDirectApiKeyEnvKey(connectionId: string, envKey: string | null): SavedConnectionSummary {
+    const access = this.accessRegistry.get(connectionId);
+    if (!access) {
+      throw new Error(`Connection not found: ${connectionId}`);
     }
-    if (agentId === CODEX_AGENT_ID) {
-      return Boolean(endpoint.protocols.openai);
+    if (access.authMode !== "api_key") {
+      throw new Error(`Connection ${connectionId} is not an API-key connection`);
     }
-    if (agentId === CLAUDE_AGENT_ID) {
-      return Boolean(endpoint.protocols.anthropic);
+
+    const credential = this.accessRegistry.readCredential(connectionId);
+    if (credential.kind !== "api_key" || credential.source === "env_key") {
+      throw new Error(`Connection ${connectionId} does not use a direct API key`);
     }
-    if (agentId === CURSOR_AGENT_ID) {
-      return Boolean(endpoint.protocols.cursor);
+
+    const normalizedEnvKey = envKey?.trim() || null;
+
+    const currentEnvKey = access.envKey?.trim() || credential.envKey?.trim() || null;
+    if (currentEnvKey === normalizedEnvKey) {
+      return this.buildCurrentSummary(access);
     }
-    if (agentId === OPENCLAW_AGENT_ID) {
-      return Boolean(endpoint.protocols.openai || endpoint.protocols.anthropic);
-    }
-    return false;
+
+    const updated = this.accessRegistry.update(connectionId, {}, {
+      ...credential,
+      envKey: normalizedEnvKey ?? undefined,
+    });
+    return this.buildCurrentSummary(updated);
   }
 
   private readEndpointFamily(endpoint: ReturnType<EndpointRegistry["get"]>): EndpointFamily | null {
@@ -175,12 +185,20 @@ export class SavedConnections {
       endpointLabel: endpoint?.label ?? access.endpointId,
       endpointFamily: this.readEndpointFamily(endpoint) ?? null,
       authMode: access.authMode,
-      ...(access.openclawModelId ? { openclawModelId: access.openclawModelId } : {}),
       ...(apiKeyMetadata ?? {}),
       enabledAgents: this.readEnabledAgents(access, endpoint),
       configurableAgents: this.readConfigurableAgents(access, endpoint),
       selectedByAgents,
     };
+  }
+
+  private buildCurrentSummary(access: AccessRecord): SavedConnectionSummary {
+    const endpoint = this.endpointRegistry.get(access.endpointId);
+    const selectedByAgents = this.agentSelection
+      .list()
+      .filter((selection) => selection.connectionId === access.id)
+      .map((selection) => selection.agentId);
+    return this.buildSummary(access, endpoint, selectedByAgents);
   }
 
   private readConfigurableAgents(
@@ -191,10 +209,8 @@ export class SavedConnections {
       return [];
     }
     return SHARED_CONNECTION_AGENT_POLICY.readSavedConnectionConfig({
-      endpointFamily: EndpointShape.readFamily(endpoint),
       protocols: endpoint.protocols,
       authMode: access.authMode,
-      openclawModelId: access.openclawModelId,
     }).configurableAgents;
   }
 
@@ -202,7 +218,8 @@ export class SavedConnections {
     access: AccessRecord,
     endpoint: EndpointRecord | null,
   ): AgentId[] {
-    return access.enabledAgents.filter((agentId) => this.endpointSupportsAgent(endpoint, agentId));
+    const configurableAgents = this.readConfigurableAgents(access, endpoint);
+    return access.enabledAgents.filter((agentId) => configurableAgents.includes(agentId));
   }
 
   private readEndpointUrl(endpoint: EndpointRecord | null): string | null {
@@ -236,7 +253,7 @@ export class SavedConnections {
     if (access.apiKeySource === "direct") {
       return {
         apiKeySource: "direct",
-        envKey: null,
+        envKey: access.envKey ?? null,
       };
     }
 
@@ -254,7 +271,7 @@ export class SavedConnections {
       }
       return {
         apiKeySource: "direct",
-        envKey: null,
+        envKey: credential.envKey?.trim() || null,
       };
     } catch {
       return null;

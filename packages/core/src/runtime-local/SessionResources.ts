@@ -2,6 +2,7 @@ import type { AgentId } from "../models/agent/Types";
 import type { BindCursorUsageResult } from "../actions/usage/cursor/Binder";
 import type { CursorUsageAutoBindResult } from "../application/local/CursorUsageAutoBinder";
 import type { MutationHistoryRecord } from "../services/history/MutationHistoryTypes";
+import type { MatchedImportStateSnapshot } from "./ImportState";
 import { BuiltInAgentAdapters } from "./BuiltInAdapters";
 import { AgentAdapterRegistry } from "./AgentAdapterRegistry";
 import { SessionHistoryResources } from "./SessionHistoryResources";
@@ -56,6 +57,10 @@ export class SessionResources {
     return this.workspace.getUsage();
   }
 
+  getConnectionModelCatalog(connectionId: string) {
+    return this.workspace.getConnectionModelCatalog(connectionId);
+  }
+
   getLatestRollbackableMutation(agentId: AgentId, scope?: string): MutationHistoryRecord | null {
     return this.history.getLatestRollbackableMutation(agentId, scope);
   }
@@ -76,7 +81,23 @@ export class SessionResources {
     return this.workspace.autoBindAllCursorUsage();
   }
 
+  getAgentConnectionModel(agentId: AgentId, connectionId: string): string | null {
+    return this.workspace.getAgentConnectionModel(agentId, connectionId);
+  }
+
+  setAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): string | null {
+    return this.workspace.setAgentConnectionModel(agentId, connectionId, modelId);
+  }
+
   clearConnectionArtifacts(connectionId: string): void {
     this.workspace.clearConnectionArtifacts(connectionId);
+  }
+
+  captureMatchedImportState(agentId: AgentId, connectionId: string): MatchedImportStateSnapshot {
+    return this.workspace.captureMatchedImportState(agentId, connectionId);
+  }
+
+  restoreMatchedImportState(snapshot: MatchedImportStateSnapshot): void {
+    this.workspace.restoreMatchedImportState(snapshot);
   }
 }

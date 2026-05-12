@@ -1,4 +1,3 @@
-import { existsSync, readFileSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
 
@@ -12,16 +11,12 @@ type AgentHomeRow = {
 };
 
 export class AgentHomesStore {
-  constructor(
-    private readonly databasePath: string,
-    private readonly legacyFilePath?: string,
-  ) {}
+  constructor(private readonly databasePath: string) {}
 
   read(): AgentHomes {
     const database = SqliteDatabase.open(this.databasePath);
     try {
       this.initialize(database);
-      this.migrateLegacyFile(database);
       return this.readHomes(database);
     } finally {
       database.close();
@@ -33,7 +28,6 @@ export class AgentHomesStore {
     try {
       return database.transaction(() => {
         this.initialize(database);
-        this.migrateLegacyFile(database);
         const normalizedPath = this.normalizePath(path);
         if (!normalizedPath || normalizedPath === resolveAgentHome(agentId)) {
           database.run("DELETE FROM desktop_agent_homes WHERE agent_id = ?", agentId);
@@ -82,49 +76,6 @@ export class AgentHomesStore {
         return [[row.agent_id, row.path.trim()]];
       }),
     ) as AgentHomes;
-  }
-
-  private migrateLegacyFile(database: SqliteDatabase): void {
-    if (!this.legacyFilePath || !existsSync(this.legacyFilePath)) {
-      return;
-    }
-
-    const raw = readFileSync(this.legacyFilePath, "utf8");
-    if (!raw.trim()) {
-      rmSync(this.legacyFilePath, { force: true });
-      return;
-    }
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw) as unknown;
-    } catch {
-      rmSync(this.legacyFilePath, { force: true });
-      return;
-    }
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      rmSync(this.legacyFilePath, { force: true });
-      return;
-    }
-
-    for (const [agentId, path] of Object.entries(parsed)) {
-      if (!isAgentId(agentId)) {
-        continue;
-      }
-      if (typeof path !== "string" || !path.trim()) {
-        continue;
-      }
-      database.run(
-        `
-          INSERT INTO desktop_agent_homes (agent_id, path)
-          VALUES (?, ?)
-          ON CONFLICT(agent_id) DO UPDATE SET path = excluded.path
-        `,
-        agentId,
-        path.trim(),
-      );
-    }
-    rmSync(this.legacyFilePath, { force: true });
   }
 
   private normalizePath(path: string | null | undefined): string | null {

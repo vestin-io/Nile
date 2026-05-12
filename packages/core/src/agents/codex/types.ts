@@ -19,7 +19,7 @@ export type CodexDetectedAccess = {
   identityKey?: string;
 };
 
-export type CodexDetectedCurrentState = {
+export type CodexDetectedLiveSetup = {
   agentId: AgentId;
   validity: AgentLiveStateValidity;
   issues: string[];

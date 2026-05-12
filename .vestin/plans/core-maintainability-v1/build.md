@@ -5,8 +5,8 @@
 ### Step 28: Refresh remaining active core plan docs to match the current core structure
 
 - Updated `.vestin/plans/core-endpoint-capability-refactor.md` so its recommended module layout now points at the live core clusters:
-  - `actions/current-state`
-  - `actions/local-state`
+  - `actions/live-setup`
+  - `actions/local-setup`
   - `actions/apply`
   - `projection`
 - Added `openclaw` to the projection-strategy list in that architecture plan.
@@ -25,8 +25,8 @@
 ### Step 27: Sync .vestin core architecture docs to the post-refactor structure
 
 - Updated `.vestin/architect.md` so the shared-core architecture summary now reflects the current core shape:
-  - `actions/local-state`
-  - `actions/current-state`
+  - `actions/local-setup`
+  - `actions/live-setup`
   - `actions/usage`
   - `actions/apply`
   - `projection/`
@@ -36,7 +36,7 @@
   - `openclaw` in current shipped scope
   - the current action-cluster layout
   - the current desktop/electron structural boundaries as a near-term rule
-- Updated onboarding scan/import plan docs to reference the live `actions/local-state/` cluster instead of the removed `actions/scan-local/` path.
+- Updated onboarding scan/import plan docs to reference the live `actions/local-setup/` cluster instead of the removed `actions/scan-local/` path.
 - Removed the stale `.vestin/state/features.json` entry for the deleted `docs/openclaw-switching-research.md` note.
 - Result:
   - `.vestin` top-level architecture docs now describe the current repository structure instead of the pre-refactor layout
@@ -232,7 +232,7 @@
   - `SessionWork`
   - adapter-facing runtime types
 - Added explicit package exports for the concrete non-runtime surfaces that workspace consumers actually use:
-  - `actions/local-state`
+  - `actions/local-setup`
   - `actions/usage`
   - `actions/usage/cursor`
 - Updated CLI and desktop consumers to import those DTO/result types from their real owning modules instead of the runtime facade.
@@ -394,8 +394,8 @@
 ### Step 14: Rename generic import actions into one current-state cluster
 
 - Moved the cross-agent current-state helper seam out of the vague `actions/import/` folder into:
-  - `actions/current-state/Import.ts`
-  - `actions/current-state/Matcher.ts`
+  - `actions/live-setup/Import.ts`
+  - `actions/live-setup/Matcher.ts`
 - Renamed the exported collaborators to read like the story they support:
   - `AgentImportSupport` -> `CurrentStateImportSupport`
   - `AgentStateMatcher` -> `CurrentStateMatcher`
@@ -437,7 +437,7 @@
 
 ### Step 12 (Core): Group local state actions into one use-case cluster
 
-- Moved the local-state use-case files into one `actions/local-state/` cluster:
+- Moved the local-state use-case files into one `actions/local-setup/` cluster:
   - `Status`
   - `ScanLocalSetups`
   - `ImportDetectedSetups`

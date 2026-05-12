@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe("ImportCurrentConnection", () => {
-  it("imports a valid unknown azure live state", () => {
+  it("imports a valid unknown azure live state", async () => {
     const setup = createSetup({
       configToml: [
         'model_provider = "azure"',
@@ -40,7 +40,7 @@ describe("ImportCurrentConnection", () => {
       credentialStore: setup.credentialStore,
     });
 
-    const result = importer.importCurrent();
+    const result = await importer.importCurrent();
     const endpointRegistry = EndpointRegistry.open(setup.dbPath);
     const endpoint = endpointRegistry.get("azure");
     endpointRegistry.close();
@@ -64,7 +64,35 @@ describe("ImportCurrentConnection", () => {
     importer.close();
   });
 
-  it("reuses an already matched openai session connection", () => {
+  it("imports an unknown openai session connection and enables OpenClaw", async () => {
+    const setup = createSetup({
+      authFile: openAiAuthFile("work@example.com"),
+    });
+
+    const importer = ImportCurrentConnection.open(setup.dbPath, {
+      codexHome: setup.codexHome,
+      credentialStore: setup.credentialStore,
+    });
+
+    const result = await importer.importCurrent();
+    const accessRegistry = AccessRegistry.open(setup.dbPath, setup.credentialStore);
+    const access = accessRegistry.get(result.id);
+    accessRegistry.close();
+
+    expect(result).toEqual({
+      id: "work-example-com",
+      label: "work@example.com",
+      endpointId: "openai",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      authMode: "openai_session",
+    });
+    expect(access?.enabledAgents).toEqual(["codex", "openclaw"]);
+
+    importer.close();
+  });
+
+  it("reuses an already matched openai session connection", async () => {
     const setup = createSetup({
       authFile: openAiAuthFile("work@example.com"),
     });
@@ -99,7 +127,7 @@ describe("ImportCurrentConnection", () => {
       credentialStore: setup.credentialStore,
     });
 
-    const result = importer.importCurrent();
+    const result = await importer.importCurrent();
 
     expect(result).toEqual({
       id: "work-example-com",
@@ -114,7 +142,7 @@ describe("ImportCurrentConnection", () => {
     importer.close();
   });
 
-  it("reuses the default saved connection when multiple connections share the same binding", () => {
+  it("reuses the default saved connection when multiple connections share the same binding", async () => {
     const setup = createSetup({
       authFile: openAiAuthFile("work@example.com"),
     });
@@ -161,7 +189,7 @@ describe("ImportCurrentConnection", () => {
       credentialStore: setup.credentialStore,
     });
 
-    const result = importer.importCurrent();
+    const result = await importer.importCurrent();
 
     expect(result).toEqual({
       id: "default-session",

@@ -2,6 +2,7 @@ export type DirectApiKeyCredential = {
   kind: "api_key";
   source?: "direct";
   apiKey: string;
+  envKey?: string;
 };
 
 export type EnvKeyApiKeyCredential = {

@@ -1,10 +1,11 @@
 import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-state";
+import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { RemoveConnectionResult, ResetStateResult } from "@nile/core/application/local";
 import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 import type { AuthMode } from "@nile/core/models/access";
 import type { ConnectionOnboardingSuggestion, ConnectionPresetFamily } from "@nile/core/models/connection";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
+import type { ConnectionModelCatalogResult } from "@nile/core/application/local";
 
 import type { DesktopConnectionAlert, DesktopConnection } from "../../state/Types";
 import type { CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../alerts/Store";
@@ -46,7 +47,13 @@ export type DesktopPreparedConnectionDraft = {
   labelSuggestion: string;
   configurableAgents: AgentId[];
   defaultEnabledAgents: AgentId[];
-  suggestedAgents: AgentId[];
+};
+
+export type DesktopConnectionModelCatalog = ConnectionModelCatalogResult;
+
+export type DesktopGetConnectionModelCatalogInput = {
+  connectionId: string;
+  forceRefresh?: boolean;
 };
 
 export type DesktopSavePreparedConnectionInput = {
@@ -72,6 +79,12 @@ export type DesktopDescribeSavedConnectionOnboardingInput = DesktopConnectionCre
   endpointUrl?: string;
 };
 
+export type DesktopUpdateAgentConnectionModelInput = {
+  agentId: AgentId;
+  connectionId: string;
+  modelId: string | null;
+};
+
 export type DesktopConnectionBridge = {
   listConnectionDefinitions(): Promise<import("@nile/core/models/connection").ConnectionDefinition[]>;
   chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null>;
@@ -87,6 +100,8 @@ export type DesktopConnectionBridge = {
   importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult>;
   importCurrentConnection(agentId: AgentId): Promise<DesktopConnectionSummary>;
   removeConnection(connectionId: string): Promise<RemoveConnectionResult>;
+  updateAgentConnectionModel(input: DesktopUpdateAgentConnectionModelInput): Promise<string | null>;
+  getConnectionModelCatalog(input: DesktopGetConnectionModelCatalogInput): Promise<DesktopConnectionModelCatalog>;
   bindCursorUsage(connectionId: string, sessionToken: string): Promise<BindCursorUsageResult>;
   createUsageAlert(input: CreateConnectionAlertInput): Promise<DesktopConnectionAlert>;
   updateUsageAlert(input: UpdateConnectionAlertInput): Promise<DesktopConnectionAlert>;

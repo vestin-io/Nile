@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { build } from "esbuild";
-import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -16,15 +16,20 @@ const entryPoints = unique([
   join(srcDir, "index.ts"),
   join(srcDir, "application", "index.ts"),
   join(srcDir, "application", "local", "index.ts"),
+  ...readIndexEntries(join(srcDir, "actions")),
+  join(srcDir, "actions", "local-setup", "Reconciliation.ts"),
+  join(srcDir, "actions", "usage", "cursor", "index.ts"),
   join(srcDir, "models", "agent", "index.ts"),
   join(srcDir, "models", "agent", "Homes.ts"),
   join(srcDir, "models", "agent", "Types.ts"),
   join(srcDir, "models", "connection", "EnabledAgentsPolicy.ts"),
+  join(srcDir, "models", "connection", "Requirements.ts"),
   join(srcDir, "projection", "index.ts"),
   join(srcDir, "runtime-local", "index.ts"),
   join(srcDir, "services", "EnvironmentSource.ts"),
   join(srcDir, "services", "NileLogger.ts"),
   join(srcDir, "agents", "index.ts"),
+  ...readIndexEntries(join(srcDir, "agents")),
   ...readIndexEntries(join(srcDir, "models")),
   ...readIndexEntries(join(srcDir, "services")),
 ]);
@@ -43,7 +48,29 @@ await build({
   sourcemap: false,
 });
 
+validateExportArtifacts();
+
 buildKeychainHelper();
+
+function validateExportArtifacts() {
+  const packageJson = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
+  const exportsField = packageJson.exports ?? {};
+  for (const [subpath, target] of Object.entries(exportsField)) {
+    if (subpath.includes("*") || typeof target !== "object" || target === null) {
+      continue;
+    }
+
+    const defaultTarget = "default" in target ? target.default : null;
+    if (typeof defaultTarget !== "string" || !defaultTarget.startsWith("./dist/")) {
+      continue;
+    }
+
+    const artifactPath = join(packageDir, defaultTarget.slice(2));
+    if (!existsSync(artifactPath)) {
+      throw new Error(`Missing built artifact for export ${subpath}: ${defaultTarget}`);
+    }
+  }
+}
 
 function readIndexEntries(parentDir) {
   return readdirSync(parentDir, { withFileTypes: true })

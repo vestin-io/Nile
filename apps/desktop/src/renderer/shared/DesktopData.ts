@@ -1,4 +1,5 @@
 import type { AgentId } from "@nile/core/models/agent/types";
+import type { DesktopConnection } from "../../state/Types";
 
 export type SettingsState = Awaited<ReturnType<typeof window.nileDesktop.state.getSettingsState>>;
 export type HistoryState = Awaited<ReturnType<typeof window.nileDesktop.state.getHistoryState>>;
@@ -16,4 +17,18 @@ export function readDefinitionsForAgent(definitions: Definition[], agentId: Agen
 
   const matchingDefinitions = definitions.filter((definition) => definition.configurableAgents.includes(agentId));
   return matchingDefinitions.length > 0 ? matchingDefinitions : definitions;
+}
+
+export function readCompatibleConnections(
+  state: Pick<SettingsState, "connections">,
+  agentId: AgentId,
+): DesktopConnection[] {
+  return state.connections.filter((connection) => connection.configurableAgents.includes(agentId));
+}
+
+export function hasCompatibleConnections(
+  state: Pick<SettingsState, "connections">,
+  agentId: AgentId,
+): boolean {
+  return readCompatibleConnections(state, agentId).length > 0;
 }

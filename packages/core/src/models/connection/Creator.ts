@@ -20,7 +20,6 @@ export type CreateConnectionInput = {
   endpointUrl?: string;
   id?: string;
   label?: string;
-  openclawModelId?: string;
   enabledAgents?: AgentId[];
   allowUndetectedGateway?: boolean;
 };
@@ -67,7 +66,6 @@ export class ConnectionCreator {
         authMode: input.authMode,
         credential: input.credential,
         identityKey,
-        openclawModelId: input.openclawModelId ?? null,
         enabledAgents: input.enabledAgents ?? onboarding.defaultEnabledAgents,
         enabledAgentsMode: "replace",
       },

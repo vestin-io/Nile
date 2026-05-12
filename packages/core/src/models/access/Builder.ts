@@ -43,10 +43,6 @@ export class AccessRecordBuilder {
         label: input.label ?? current.label,
         authMode: current.authMode,
         identityKey: input.identityKey === null ? undefined : input.identityKey ?? current.identityKey,
-        openclawModelId:
-          input.openclawModelId === null
-            ? undefined
-            : input.openclawModelId ?? current.openclawModelId,
         enabledAgents: input.enabledAgents ?? current.enabledAgents,
       },
       endpoint,
@@ -68,7 +64,6 @@ export class AccessRecordBuilder {
     const label = input.label.trim();
     const authMode = input.authMode.trim();
     const identityKey = input.identityKey?.trim();
-    const openclawModelId = input.openclawModelId?.trim();
     const enabledAgents = this.normalizeEnabledAgents(input.enabledAgents, endpoint);
 
     if (!id) {
@@ -101,7 +96,6 @@ export class AccessRecordBuilder {
       label,
       authMode: authMode as AuthMode,
       ...(identityKey ? { identityKey } : {}),
-      ...(openclawModelId ? { openclawModelId } : {}),
       ...(credentialMetadata?.apiKeySource ? { apiKeySource: credentialMetadata.apiKeySource } : {}),
       ...(credentialMetadata?.envKey ? { envKey: credentialMetadata.envKey } : {}),
       enabledAgents,
@@ -125,7 +119,10 @@ export class AccessRecordBuilder {
         envKey: credential.envKey.trim(),
       };
     }
-    return { apiKeySource: "direct" };
+    return {
+      apiKeySource: "direct",
+      ...(credential.envKey?.trim() ? { envKey: credential.envKey.trim() } : {}),
+    };
   }
 
   private readExistingCredentialMetadata(
@@ -140,7 +137,10 @@ export class AccessRecordBuilder {
         ...(current.envKey ? { envKey: current.envKey } : {}),
       };
     }
-    return { apiKeySource: "direct" };
+    return {
+      apiKeySource: "direct",
+      ...(current.envKey ? { envKey: current.envKey } : {}),
+    };
   }
 
   private requireEndpoint(endpointId: string): EndpointRecord {

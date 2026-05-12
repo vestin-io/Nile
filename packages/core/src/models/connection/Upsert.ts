@@ -17,7 +17,6 @@ export type ConnectionUpsertInput = {
     authMode: AuthMode;
     credential: StoredCredential;
     identityKey?: string | null;
-    openclawModelId?: string | null;
     enabledAgents: AgentId[];
     enabledAgentsMode: "replace" | "merge";
     apiKeyEnvKeyFallback?: string;
@@ -109,7 +108,6 @@ export class ConnectionUpsert {
         record: this.accessRegistry.update(existing.id, {
           label: input.label,
           identityKey: input.identityKey ?? null,
-          openclawModelId: input.openclawModelId ?? null,
           enabledAgents,
         }, input.credential),
         reused: true,
@@ -123,7 +121,6 @@ export class ConnectionUpsert {
         label: input.label,
         authMode: input.authMode,
         enabledAgents: input.enabledAgents,
-        ...(input.openclawModelId?.trim() ? { openclawModelId: input.openclawModelId.trim() } : {}),
         ...(input.identityKey?.trim() ? { identityKey: input.identityKey.trim() } : {}),
       }, input.credential),
       reused: false,
@@ -144,12 +141,6 @@ export class ConnectionUpsert {
     access: AccessRecord,
     input: ConnectionUpsertInput["access"],
   ): boolean {
-    const requestedOpenClawModelId = input.openclawModelId?.trim() || undefined;
-    const currentOpenClawModelId = access.openclawModelId?.trim() || undefined;
-    if (requestedOpenClawModelId !== currentOpenClawModelId) {
-      return false;
-    }
-
     if (input.credential.kind === "api_key") {
       return this.matchesApiKeyAccess(access, input);
     }

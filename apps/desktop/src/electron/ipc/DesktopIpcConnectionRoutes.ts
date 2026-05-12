@@ -30,6 +30,9 @@ export class DesktopIpcConnectionRoutes {
     ipcMain.handle("desktop:describe-saved-connection-onboarding", (_event, input: unknown) =>
       connectionManager.describeSavedConnectionOnboarding(inputs.readDescribeSavedConnectionOnboardingInput(input)),
     );
+    ipcMain.handle("desktop:get-connection-model-catalog", (_event, input: unknown) =>
+      connectionManager.getConnectionModelCatalog(inputs.readGetConnectionModelCatalogInput(input)),
+    );
     ipcMain.handle("desktop:prepare-connection-draft", (_event, input: unknown) =>
       connectionManager.prepareConnectionDraft(inputs.readAddConnectionInput(input)),
     );
@@ -51,13 +54,23 @@ export class DesktopIpcConnectionRoutes {
       this.options.refreshAll();
       return result;
     });
-    ipcMain.handle("desktop:import-current-connection", (_event, agentId: unknown) => {
-      const result = stateStore.importCurrentConnection(inputs.readAgentId(agentId));
+    ipcMain.handle("desktop:import-current-connection", async (_event, agentId: unknown) => {
+      const result = await stateStore.importCurrentConnection(inputs.readAgentId(agentId));
       this.options.refreshAll();
       return result;
     });
     ipcMain.handle("desktop:remove-connection", (_event, connectionId: unknown) => {
       const result = stateStore.removeConnection(inputs.readRequiredString(connectionId, "connectionId"));
+      this.options.refreshAll();
+      return result;
+    });
+    ipcMain.handle("desktop:update-agent-connection-model", (_event, input: unknown) => {
+      const record = inputs.readUpdateAgentConnectionModelInput(input);
+      const result = stateStore.updateAgentConnectionModel(
+        record.agentId,
+        record.connectionId,
+        record.modelId,
+      );
       this.options.refreshAll();
       return result;
     });

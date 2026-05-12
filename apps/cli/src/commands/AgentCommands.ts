@@ -1,5 +1,5 @@
 import type { AgentId } from "@nile/core/models/agent";
-import type { AgentStatusView } from "@nile/core/actions/local-state";
+import type { AgentStatusView } from "@nile/core/actions/local-setup";
 import type { CredentialStore } from "@nile/core/services/credential";
 import type { MutationHistoryRecord } from "@nile/core/services/history";
 import { NileLogger } from "@nile/core/services/NileLogger";
@@ -18,7 +18,7 @@ export class AgentCommands {
   }
 
   getStatus(options: ResolvedCliOptions, agentId: AgentId): AgentStatusView {
-    return this.sessions.run(options, `${agentId}-current-state-detector`, (session) => session.getAgentStatus(agentId));
+    return this.sessions.run(options, `${agentId}-live-setup-detector`, (session) => session.getAgentStatus(agentId));
   }
 
   getStatuses(options: ResolvedCliOptions, agentIds?: AgentId[]): AgentStatusView[] {

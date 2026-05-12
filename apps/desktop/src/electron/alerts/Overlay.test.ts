@@ -27,7 +27,7 @@ function createSettingsState(): SettingsState {
     currentConnection: null,
     currentConnectionState: "none",
     liveConnection: null,
-    syncState: "synced",
+    reconciliationState: "unavailable",
     connections: [{
       id: "codex-work",
       label: "Codex Work",

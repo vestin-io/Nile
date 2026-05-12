@@ -1,5 +1,7 @@
 import type { AgentId } from "@nile/core/models/agent/types";
 import type { AuthMode } from "@nile/core/models/access";
+import type { AgentSetupReconciliationState } from "@nile/core/actions/local-setup/reconciliation";
+import type { ConnectionApplyRequirements } from "@nile/core/models/connection/requirements";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
 import type { DesktopUsageState } from "./UsageSummary";
 
@@ -64,22 +66,17 @@ export type DesktopConnection = {
   isCurrent: boolean;
   appliedAt?: string;
   usage?: DesktopUsageState | null;
+  agentModelId?: string | null;
   alertMetrics?: DesktopConnectionAlertMetric[];
   alerts?: DesktopConnectionAlert[];
   activeAlertCount: number;
   enabledAgents: AgentId[];
   configurableAgents: AgentId[];
   selectedByAgents: AgentId[];
+  applyRequirements?: ConnectionApplyRequirements;
 };
 
-export type DesktopSyncState =
-  | "synced"
-  | "new_connection_detected"
-  | "invalid_live_state"
-  | "unverified_live_state";
-
 export type DesktopCurrentConnectionState = "none" | "saved" | "orphaned";
-
 export type MenubarAgentState = {
   agentId: AgentId;
   agentLabel: string;
@@ -97,10 +94,9 @@ export type DesktopOnboardingItem = {
   agentId: AgentId;
   title: string;
   subtitle: string;
-  state: "new" | "already_saved" | "invalid" | "unsupported" | "unavailable";
+  reconciliationState: AgentSetupReconciliationState;
   importable: boolean;
   defaultSelected: boolean;
-  matchedConnectionLabel?: string;
   issues: string[];
 };
 
@@ -117,9 +113,12 @@ export type DesktopAgentState = {
   latestRollbackableMutationId: string | null;
   currentConnection: DesktopConnection | null;
   currentUsage: DesktopUsageState | null;
+  /** Whether the persisted current selection resolves to a saved connection. */
   currentConnectionState: DesktopCurrentConnectionState;
+  /** The live setup currently detected from local agent state, if any. */
   liveConnection: DesktopConnection | null;
-  syncState: DesktopSyncState;
+  /** How the detected live setup reconciles with saved Nile state. */
+  reconciliationState: AgentSetupReconciliationState;
   liveIssues?: string[];
   connections: DesktopConnection[];
 };
@@ -139,11 +138,14 @@ export type DesktopAdvancedState = {
   importableSetupCount: number;
 };
 
-export type DesktopCurrentStateSection = {
+export type DesktopLiveSetupSection = {
   currentConnection: DesktopConnection | null;
+  /** Whether the persisted current selection resolves to a saved connection. */
   currentConnectionState: DesktopCurrentConnectionState;
+  /** The live setup currently detected from local agent state, if any. */
   liveConnection: DesktopConnection | null;
-  syncState: DesktopSyncState;
+  /** How the detected live setup reconciles with saved Nile state. */
+  reconciliationState: AgentSetupReconciliationState;
   liveIssues?: string[];
 };
 
@@ -170,7 +172,7 @@ export type DesktopInstallUpdateResult = {
   status: "started" | "unavailable";
 };
 
-export type SettingsState = DesktopCurrentStateSection & DesktopConnectionsSection & {
+export type SettingsState = DesktopLiveSetupSection & DesktopConnectionsSection & {
   onboarding: DesktopOnboardingState | null;
   agents: DesktopAgentState[];
   detectedSetups: DesktopOnboardingState;

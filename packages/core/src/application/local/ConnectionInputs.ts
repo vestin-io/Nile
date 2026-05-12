@@ -6,7 +6,6 @@ export type CreateLocalConnectionInput = {
   authMode: "api_key" | "openai_session" | "claude_session" | "cursor_session";
   label?: string;
   endpointUrl?: string;
-  openclawModelId?: string;
   enabledAgents?: AgentId[];
   allowUndetectedGateway?: boolean;
   credentialRequest: LocalCredentialRequest;
@@ -22,7 +21,6 @@ export type UpdateConnectionInput = {
   connectionId: string;
   label?: string;
   enabledAgents?: AgentId[];
-  openclawModelId?: string | null;
   endpointUrl?: string;
   credentialRequest?: LocalCredentialRequest;
 };

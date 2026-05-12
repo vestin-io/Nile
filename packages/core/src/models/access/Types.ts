@@ -8,7 +8,6 @@ export type AccessRegistryInput = {
   label: string;
   authMode: AuthMode;
   identityKey?: string;
-  openclawModelId?: string;
   enabledAgents?: AgentId[];
 };
 
@@ -16,7 +15,6 @@ export type AccessRegistryUpdate = {
   endpointId?: string;
   label?: string;
   identityKey?: string | null;
-  openclawModelId?: string | null;
   enabledAgents?: AgentId[];
 };
 
@@ -33,7 +31,6 @@ export type AccessRecord = {
   label: string;
   authMode: AuthMode;
   identityKey?: string;
-  openclawModelId?: string;
   apiKeySource?: "direct" | "env_key";
   envKey?: string;
   enabledAgents: AgentId[];

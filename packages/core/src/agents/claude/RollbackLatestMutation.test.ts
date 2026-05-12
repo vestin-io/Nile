@@ -76,6 +76,7 @@ describe("RollbackLatestMutation", () => {
       context.sharedContext.endpointRegistry,
       context.sharedContext.accessRegistry,
       context.agentSelection,
+      context.sharedContext.agentConnectionSettings,
       setup.credentialStore,
       NileLogger.silent(),
       (message: string) => new Error(message),

@@ -21,6 +21,7 @@ type AgentListViewProps = {
   ): void;
   onOpenDetails(agentId: DesktopAgentState["agentId"], tab?: AgentDetailTab): void;
   onRefresh(): Promise<void>;
+  onUpdateAgentConnectionModel(agentId: DesktopAgentState["agentId"], connectionId: string, modelId: string | null): Promise<void>;
   onSwitch(agentId: DesktopAgentState["agentId"], connectionId: string): Promise<void>;
 };
 
@@ -36,6 +37,7 @@ export function AgentListView({
   onReorderAgents,
   onOpenDetails,
   onRefresh,
+  onUpdateAgentConnectionModel,
   onSwitch,
 }: AgentListViewProps) {
   const [isEditingOrder, setIsEditingOrder] = useState(false);
@@ -96,6 +98,7 @@ export function AgentListView({
             }}
             onImport={onImport}
             onOpenDetails={onOpenDetails}
+            onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
             onSwitch={onSwitch}
           />
         ))}

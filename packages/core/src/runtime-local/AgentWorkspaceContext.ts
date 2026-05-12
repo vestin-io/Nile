@@ -1,4 +1,5 @@
 import type { AccessRegistry } from "../models/access";
+import type { AgentConnectionSettings } from "../models/agent-settings";
 import type { EndpointRegistry } from "../models/endpoint";
 import { AgentSelection } from "../models/selection/Selection";
 import { SqliteDatabase } from "../services/database/SqliteDatabase";
@@ -9,4 +10,5 @@ export type AgentWorkspaceContext = {
   endpointRegistry: EndpointRegistry;
   accessRegistry: AccessRegistry;
   agentSelection: AgentSelection;
+  agentConnectionSettings: AgentConnectionSettings;
 };

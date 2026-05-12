@@ -15,6 +15,7 @@ export type LocalCredentialRequest =
       authMode: "api_key";
       source?: "direct";
       apiKey: string;
+      envKey?: string;
     }
   | {
       authMode: "api_key";
@@ -47,7 +48,7 @@ export class LocalCredentialResolver {
     if (request.authMode === "api_key") {
       return request.source === "env_key"
         ? this.resolveApiKeyEnvKey(request.envKey)
-        : this.resolveApiKey(request.apiKey);
+        : this.resolveApiKey(request.apiKey, request.envKey);
     }
 
     if (request.authMode === "openai_session") {
@@ -81,7 +82,7 @@ export class LocalCredentialResolver {
     return this.resolve(request);
   }
 
-  private resolveApiKey(apiKey: string): StoredCredential {
+  private resolveApiKey(apiKey: string, envKey?: string): StoredCredential {
     const normalized = apiKey.trim();
     if (!normalized) {
       throw new Error("API key is required");
@@ -91,6 +92,7 @@ export class LocalCredentialResolver {
       kind: "api_key",
       source: "direct",
       apiKey: normalized,
+      ...(envKey?.trim() ? { envKey: envKey.trim() } : {}),
     };
   }
 

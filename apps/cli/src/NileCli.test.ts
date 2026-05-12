@@ -68,13 +68,15 @@ describe("NileCli", () => {
     expect(codex).toEqual(
       expect.objectContaining({
         currentConnection: null,
+        currentConnectionState: "none",
         liveConnection: {
           label: "OpenAI API Key",
           endpointLabel: "OpenAI",
           endpointFamily: "openai",
           authMode: "api_key",
+          modelId: "gpt-5.4",
         },
-        syncState: "new_connection_detected",
+        reconciliation: { state: "new", hasLiveSetup: true },
       }),
     );
   });
@@ -158,7 +160,7 @@ describe("NileCli", () => {
       "api_key",
       "--api-key",
       "secret-openai",
-      "--openclaw-model-id",
+      "--model-id",
       "gpt-4.1",
     ]);
     const list = await cli.run(["list", "--json"]);
@@ -170,7 +172,6 @@ describe("NileCli", () => {
     expect(JSON.parse(list.stdout)).toEqual([
       expect.objectContaining({
         id: "openai-api-key",
-        openclawModelId: "gpt-4.1",
         enabledAgents: ["codex", "openclaw"],
         configurableAgents: expect.arrayContaining(["codex", "openclaw"]),
       }),
@@ -194,7 +195,7 @@ describe("NileCli", () => {
     ]);
 
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toBe("add --agents openclaw requires --openclaw-model-id");
+    expect(result.stderr).toBe("add --agents openclaw requires --model-id");
   });
 
   it("adds openai_session connections by importing current codex auth", async () => {
@@ -329,6 +330,7 @@ describe("NileCli", () => {
         { type: "selected", value: "openai" },
         { type: "selected", value: "openai_session" },
         { type: "selected", value: "codex_current" },
+        { type: "selected", values: ["codex"] },
         { type: "selected", value: "done" },
       ],
       [],
@@ -391,7 +393,6 @@ describe("NileCli", () => {
     expect(JSON.parse(list.stdout)).toEqual([
       expect.objectContaining({
         id: "openai-api-key",
-        openclawModelId: "gpt-4.1",
         enabledAgents: ["openclaw"],
         configurableAgents: expect.arrayContaining(["codex", "openclaw"]),
       }),
@@ -409,6 +410,7 @@ describe("NileCli", () => {
         { type: "selected", value: "openai" },
         { type: "selected", value: "openai_session" },
         { type: "selected", value: "codex_current" },
+        { type: "selected", values: ["codex"] },
         { type: "selected", value: "done" },
       ],
       [],

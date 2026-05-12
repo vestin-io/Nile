@@ -1,5 +1,6 @@
 import {
   type LocalCredentialRequest,
+  type ConnectionModelCatalogResult,
   LocalCredentialRequestBuilder,
 } from "@nile/core/application/local";
 import type { ConnectionPresetFamily, CreateConnectionResult } from "@nile/core/models/connection";
@@ -23,18 +24,22 @@ import {
   type DesktopAddConnectionInput,
   type DesktopDiscardPreparedConnectionDraftInput,
   type DesktopDescribeSavedConnectionOnboardingInput,
+  type DesktopGetConnectionModelCatalogInput,
   type DesktopConnectionSummary,
   type DesktopPreparedConnectionDraft,
   type DesktopSavePreparedConnectionInput,
   type DesktopUpdateConnectionInput,
 } from "./contracts";
+import { DesktopConnectionModelCatalog } from "./ModelCatalog";
 import { DesktopPreparedDraftStore } from "./DesktopPreparedDraftStore";
+import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 import { SessionRunner } from "./SessionRunner";
 
 type DesktopConnectionManagerOptions = {
   databasePath: string;
   agentHomes?: AgentHomes;
   environment: EnvironmentSource;
+  managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
   credentialStore: CredentialStore;
   maxPreparedDrafts?: number;
   preparedDraftTtlMs?: number;
@@ -50,6 +55,8 @@ export class DesktopConnectionManager {
   private readonly labeler = new ConnectionLabeler();
   private readonly requestBuilder = new LocalCredentialRequestBuilder();
   private readonly preparedDrafts: DesktopPreparedDraftStore;
+  private readonly modelCatalog = new DesktopConnectionModelCatalog();
+  private readonly managedApiKeyEnvironment: ManagedApiKeyEnvironment | NoopManagedApiKeyEnvironment;
 
   constructor(
     private readonly options: DesktopConnectionManagerOptions,
@@ -62,6 +69,7 @@ export class DesktopConnectionManager {
       loginRunner,
       claudeLoginRunner,
     );
+    this.managedApiKeyEnvironment = this.options.managedApiKeyEnvironment ?? new NoopManagedApiKeyEnvironment();
     this.sessions = new SessionRunner(this);
     this.preparedDrafts = new DesktopPreparedDraftStore({
       maxPreparedDrafts: this.options.maxPreparedDrafts ?? DesktopConnectionManager.defaultMaxPreparedDrafts,
@@ -75,7 +83,8 @@ export class DesktopConnectionManager {
         this.buildLocalConnectionInput(input),
         this.localCredentialResolver,
       );
-      return this.buildConnectionSummary(created);
+      const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, created.id);
+      return this.buildConnectionSummary(ensured ?? created);
     });
   }
 
@@ -92,15 +101,16 @@ export class DesktopConnectionManager {
         endpointUrl: input.endpointUrl?.trim() || undefined,
         credentialRequest: this.resolveUpdateCredentialRequest(input, existing.authMode),
       });
+      const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, updated.id);
       if (input.syncSelectedAgents) {
-        for (const selectedAgentId of updated.selectedByAgents) {
+        for (const selectedAgentId of (ensured ?? updated).selectedByAgents) {
           if (!isAgentId(selectedAgentId)) {
             continue;
           }
-          session.useConnection(selectedAgentId, updated.id);
+          session.useConnection(selectedAgentId, (ensured ?? updated).id);
         }
       }
-      return this.buildConnectionSummary(updated);
+      return this.buildConnectionSummary(ensured ?? updated);
     });
   }
 
@@ -172,7 +182,6 @@ export class DesktopConnectionManager {
         labelSuggestion,
         configurableAgents: onboarding.configurableAgents,
         defaultEnabledAgents: onboarding.defaultEnabledAgents,
-        suggestedAgents: onboarding.suggestedAgents,
       };
     });
   }
@@ -193,7 +202,8 @@ export class DesktopConnectionManager {
           label: input.label?.trim() || undefined,
           enabledAgents: input.enabledAgents ?? draft.onboarding.defaultEnabledAgents,
         });
-        return this.buildConnectionSummary(created);
+        const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, created.id);
+        return this.buildConnectionSummary(ensured ?? created);
       });
     } finally {
       this.preparedDrafts.discard(input.draftId);
@@ -202,6 +212,17 @@ export class DesktopConnectionManager {
 
   discardPreparedConnectionDraft(input: DesktopDiscardPreparedConnectionDraftInput): void {
     this.preparedDrafts.discard(input.draftId);
+  }
+
+  async getConnectionModelCatalog(input: DesktopGetConnectionModelCatalogInput): Promise<ConnectionModelCatalogResult> {
+    return await this.modelCatalog.read(
+      input.connectionId,
+      async () =>
+        await this.sessions.runAsync(async (session) => {
+          return await session.getConnectionModelCatalog(input.connectionId);
+        }),
+      { forceRefresh: input.forceRefresh },
+    );
   }
 
   clearPreparedConnectionDrafts(): void {

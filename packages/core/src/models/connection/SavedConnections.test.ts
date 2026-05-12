@@ -9,9 +9,9 @@ import { KeychainCredentialStore } from "../../services/credential/KeychainCrede
 import type { StoredCredential } from "../../services/credential/Types";
 import { EndpointRegistry } from "../endpoint";
 import { SqliteEndpointStore } from "../endpoint/SqliteEndpointStore";
+import { AgentConnectionSettings } from "../agent-settings";
 import { AgentSelection } from "../selection/Selection";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
-import { SUPPORTED_AGENT_IDS } from "../agent";
 import { SavedConnections } from "./SavedConnections";
 
 const tempRoots: string[] = [];
@@ -58,7 +58,7 @@ describe("SavedConnections", () => {
           endpointFamily: "openai",
           authMode: "openai_session",
           enabledAgents: ["codex"],
-          configurableAgents: ["codex"],
+          configurableAgents: ["codex", "openclaw"],
           selectedByAgents: ["codex"],
         },
       ]);
@@ -108,12 +108,47 @@ describe("SavedConnections", () => {
     try {
       expect(connections.listForAgent("codex").map((entry) => entry.id)).toEqual(["frank"]);
       expect(connections.listForAgent("claude").map((entry) => entry.id)).toEqual(["frank"]);
+      expect(connections.listForAgent("openclaw").map((entry) => entry.id)).toEqual(["frank"]);
     } finally {
       connections.close();
     }
   });
 
-  test("treats saved gateway connections as configurable for all supported agents", () => {
+  test("lists configurable shared connections for agents even before they are enabled", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedConnection(dbPath, credentialStore, {
+      endpointId: "openai",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      accessId: "openai-session",
+      accountLabel: "primary@example.com",
+      authMode: "openai_session",
+      enabledAgents: ["codex"],
+      credential: {
+        kind: "openai_session",
+        accountId: "acct_123",
+        idToken: "id",
+        accessToken: "access",
+        refreshToken: "refresh",
+      },
+    });
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.listForAgent("openclaw")).toEqual([
+        expect.objectContaining({
+          id: "openai-session",
+          configurableAgents: ["codex", "openclaw"],
+          enabledAgents: ["codex"],
+        }),
+      ]);
+    } finally {
+      connections.close();
+    }
+  });
+
+  test("treats saved gateway connections as configurable for detected compatible agents", () => {
     const dbPath = createTempDatabasePath();
     const credentialStore = new StubCredentialStore();
 
@@ -151,7 +186,117 @@ describe("SavedConnections", () => {
         expect.objectContaining({
           id: "gateway-primary",
           endpointFamily: "gateway",
-          configurableAgents: [...SUPPORTED_AGENT_IDS],
+          configurableAgents: ["codex", "openclaw"],
+        }),
+      ]);
+    } finally {
+      connections.close();
+    }
+  });
+
+  test("surfaces managed env keys for direct api-key connections", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+
+    const endpointRegistry = EndpointRegistry.open(dbPath);
+    endpointRegistry.add({
+      id: "gateway-managed-direct",
+      label: "Gateway (managed direct)",
+      rootUrl: "https://gateway.example.com",
+      profile: "generic-gateway",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+    endpointRegistry.close();
+
+    const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+    accessRegistry.add({
+      id: "gateway-managed-direct",
+      endpointId: "gateway-managed-direct",
+      label: "Gateway Managed Direct",
+      authMode: "api_key",
+    }, {
+      kind: "api_key",
+      apiKey: "secret",
+      envKey: "NILE_GATEWAY_MANAGED_DIRECT_API_KEY",
+    });
+    accessRegistry.close();
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.list()).toEqual([
+        expect.objectContaining({
+          id: "gateway-managed-direct",
+          apiKeySource: "direct",
+          envKey: "NILE_GATEWAY_MANAGED_DIRECT_API_KEY",
+        }),
+      ]);
+    } finally {
+      connections.close();
+    }
+  });
+
+  test("updates direct api-key env metadata without changing endpoint capability", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+
+    const endpointRegistry = EndpointRegistry.open(dbPath);
+    endpointRegistry.add({
+      id: "gateway-managed-direct",
+      label: "Gateway (managed direct)",
+      rootUrl: "https://gateway.example.com",
+      profile: "generic-gateway",
+      protocols: {
+        openai: {
+          basePath: "/v1",
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+        anthropic: {
+          basePath: "/v1",
+          authSchemes: ["bearer"],
+          envKeyOverride: "ANTHROPIC_AUTH_TOKEN",
+          versionHeader: "2023-06-01",
+        },
+      },
+    });
+    endpointRegistry.close();
+
+    const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+    accessRegistry.add({
+      id: "gateway-managed-direct",
+      endpointId: "gateway-managed-direct",
+      label: "Gateway Managed Direct",
+      authMode: "api_key",
+      enabledAgents: ["codex", "claude"],
+    }, {
+      kind: "api_key",
+      apiKey: "secret",
+    });
+    accessRegistry.close();
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.setDirectApiKeyEnvKey("gateway-managed-direct", "NILE_GATEWAY_MANAGED_DIRECT_API_KEY")).toEqual(
+        expect.objectContaining({
+          id: "gateway-managed-direct",
+          apiKeySource: "direct",
+          envKey: "NILE_GATEWAY_MANAGED_DIRECT_API_KEY",
+          configurableAgents: ["codex", "claude", "openclaw"],
+        }),
+      );
+      expect(connections.list()).toEqual([
+        expect.objectContaining({
+          id: "gateway-managed-direct",
+          endpointUrl: "https://gateway.example.com/v1",
+          apiKeySource: "direct",
+          envKey: "NILE_GATEWAY_MANAGED_DIRECT_API_KEY",
+          configurableAgents: ["codex", "claude", "openclaw"],
         }),
       ]);
     } finally {
@@ -290,7 +435,7 @@ describe("SavedConnections", () => {
         endpointFamily: "openai",
         authMode: "openai_session",
         enabledAgents: ["codex"],
-        configurableAgents: ["codex"],
+        configurableAgents: ["codex", "openclaw"],
         selectedByAgents: ["codex"],
       });
     } finally {
@@ -388,6 +533,7 @@ describe("SavedConnections", () => {
       endpointRegistry,
       accessRegistry,
       AgentSelection.fromDatabase(database),
+      AgentConnectionSettings.fromDatabase(database),
       database,
     );
 
@@ -484,6 +630,7 @@ describe("SavedConnections", () => {
     expect(endpointRegistry.getCalls).toBe(0);
     expect(selectionStore.listCalls).toBe(1);
   });
+
 });
 
 function createTempDatabasePath(): string {
@@ -502,6 +649,7 @@ function seedConnection(
     accessId: string;
     accountLabel: string;
     authMode: "openai_session" | "api_key";
+    enabledAgents?: ("codex" | "claude" | "cursor" | "openclaw")[];
     credential: StoredCredential;
   },
 ): void {
@@ -530,6 +678,7 @@ function seedConnection(
       endpointId: input.endpointId,
       label: input.accountLabel,
       authMode: input.authMode,
+      ...(input.enabledAgents ? { enabledAgents: input.enabledAgents } : {}),
     },
     input.credential,
   );

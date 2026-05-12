@@ -12,7 +12,7 @@ import {
 } from "../../runtime-local/AgentWorkspaceSession";
 import type { AgentWorkspaceContext } from "../../runtime-local/AgentWorkspaceContext";
 import { CLAUDE_AGENT_ID } from "./types";
-import { CurrentStateDetector } from "./current-state/Detector";
+import { LiveSetupDetector } from "./live-setup/Detector";
 
 export type RollbackLatestResult = {
   rolledBackMutationId: string;
@@ -40,10 +40,10 @@ export class RollbackLatestMutation {
           logger.child({ scope: "mutation-history" }),
         ),
         context.agentSelection,
-        CurrentStateDetector.fromContext(context.sharedContext, {
+        LiveSetupDetector.fromContext(context.sharedContext, {
           claudeHome: options?.claudeHome ?? join(homedir(), ".claude"),
           credentialStore: options.credentialStore,
-          logger: logger.child({ scope: "claude-current-state-detector" }),
+          logger: logger.child({ scope: "claude-live-setup-detector" }),
         }),
         logger,
       ),
@@ -70,10 +70,10 @@ export class RollbackLatestMutation {
           logger.child({ scope: "mutation-history" }),
         ),
         context.agentSelection,
-        CurrentStateDetector.fromContext(context, {
+        LiveSetupDetector.fromContext(context, {
           claudeHome: options?.claudeHome ?? join(homedir(), ".claude"),
           credentialStore: options.credentialStore,
-          logger: logger.child({ scope: "claude-current-state-detector" }),
+          logger: logger.child({ scope: "claude-live-setup-detector" }),
         }),
         logger,
       ),

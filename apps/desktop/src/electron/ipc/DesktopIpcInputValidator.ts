@@ -9,7 +9,9 @@ import type {
   DesktopAddConnectionInput,
   DesktopDescribeSavedConnectionOnboardingInput,
   DesktopDiscardPreparedConnectionDraftInput,
+  DesktopGetConnectionModelCatalogInput,
   DesktopSavePreparedConnectionInput,
+  DesktopUpdateAgentConnectionModelInput,
   DesktopUpdateConnectionInput,
 } from "../connections/contracts";
 import type { DesktopNotificationHistoryFilterInput } from "../notifications/contracts";
@@ -99,6 +101,23 @@ export class DesktopIpcInputValidator {
       apiKeySource: this.readOptionalApiKeySource(record.apiKeySource),
       apiKey: this.readOptionalString(record.apiKey, "apiKey"),
       envKey: this.readOptionalString(record.envKey, "envKey"),
+    };
+  }
+
+  readGetConnectionModelCatalogInput(input: unknown): DesktopGetConnectionModelCatalogInput {
+    const record = this.readRecord(input, "get connection model catalog input");
+    return {
+      connectionId: this.readRequiredString(record.connectionId, "connectionId"),
+      forceRefresh: this.readOptionalBoolean(record.forceRefresh, "forceRefresh"),
+    };
+  }
+
+  readUpdateAgentConnectionModelInput(input: unknown): DesktopUpdateAgentConnectionModelInput {
+    const record = this.parseRecord(input, "update agent connection model input");
+    return {
+      agentId: this.readAgentId(record.agentId, "agentId"),
+      connectionId: this.readRequiredString(record.connectionId, "connectionId"),
+      modelId: record.modelId === undefined ? null : this.readNullableString(record.modelId, "modelId"),
     };
   }
 
@@ -201,7 +220,11 @@ export class DesktopIpcInputValidator {
     };
   }
 
-  private readRecord(input: unknown, fieldName: string): Record<string, unknown> {
+  readRecord(value: unknown, fieldName: string): Record<string, unknown> {
+    return this.parseRecord(value, fieldName);
+  }
+
+  private parseRecord(input: unknown, fieldName: string): Record<string, unknown> {
     if (!input || typeof input !== "object" || Array.isArray(input)) {
       throw new Error(`${fieldName} must be an object`);
     }

@@ -10,7 +10,6 @@ type AccessRow = {
   label: string;
   auth_mode: string;
   identity_key: string | null;
-  openclaw_model_id: string | null;
   api_key_source: string | null;
   env_key: string | null;
   enabled_agents: string;
@@ -36,7 +35,6 @@ export class SqliteAccessStore {
           label,
           auth_mode,
           identity_key,
-          openclaw_model_id,
           api_key_source,
           env_key,
           enabled_agents,
@@ -46,14 +44,13 @@ export class SqliteAccessStore {
           credential_sync_issue,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       record.id,
       record.endpointId,
       record.label,
       record.authMode,
       record.identityKey ?? null,
-      record.openclawModelId ?? null,
       record.apiKeySource ?? null,
       record.envKey ?? null,
       JSON.stringify(record.enabledAgents),
@@ -74,7 +71,6 @@ export class SqliteAccessStore {
             label = ?,
             auth_mode = ?,
             identity_key = ?,
-            openclaw_model_id = ?,
             api_key_source = ?,
             env_key = ?,
             enabled_agents = ?,
@@ -87,7 +83,6 @@ export class SqliteAccessStore {
       record.label,
       record.authMode,
       record.identityKey ?? null,
-      record.openclawModelId ?? null,
       record.apiKeySource ?? null,
       record.envKey ?? null,
       JSON.stringify(record.enabledAgents),
@@ -129,7 +124,6 @@ export class SqliteAccessStore {
             label,
             auth_mode,
             identity_key,
-            openclaw_model_id,
             api_key_source,
             env_key,
             enabled_agents,
@@ -158,7 +152,6 @@ export class SqliteAccessStore {
             label,
             auth_mode,
             identity_key,
-            openclaw_model_id,
             api_key_source,
             env_key,
             enabled_agents,
@@ -202,7 +195,6 @@ export class SqliteAccessStore {
           `,
         ],
       },
-      { version: 2, statements: ["ALTER TABLE accesses ADD COLUMN openclaw_model_id TEXT;"] },
       { version: 3, statements: ["ALTER TABLE accesses ADD COLUMN api_key_source TEXT;"] },
       { version: 4, statements: ["ALTER TABLE accesses ADD COLUMN env_key TEXT;"] },
       {
@@ -220,7 +212,6 @@ export class SqliteAccessStore {
       label: row.label,
       authMode: row.auth_mode as AuthMode,
       ...(row.identity_key ? { identityKey: row.identity_key } : {}),
-      ...(row.openclaw_model_id ? { openclawModelId: row.openclaw_model_id } : {}),
       ...(row.api_key_source === "direct" || row.api_key_source === "env_key"
         ? { apiKeySource: row.api_key_source }
         : {}),

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SqliteDatabase } from "@nile/core/services/database";
@@ -51,32 +51,12 @@ describe("AgentHomesStore", () => {
     expect(result).toEqual({});
   });
 
-  it("migrates legacy json homes into sqlite", () => {
-    const { databasePath, legacyPath } = createStorePaths();
-    writeFileSync(legacyPath, JSON.stringify({ codex: "/tmp/codex-home" }), "utf8");
-
-    const store = new AgentHomesStore(databasePath, legacyPath);
-
-    expect(store.read()).toEqual({ codex: "/tmp/codex-home" });
-    expect(existsSync(legacyPath)).toBe(false);
-  });
-
-  it("treats malformed legacy content as empty homes", () => {
-    const { databasePath, legacyPath } = createStorePaths();
-    writeFileSync(legacyPath, "SQLite format 3", "utf8");
-
-    const store = new AgentHomesStore(databasePath, legacyPath);
-
-    expect(store.read()).toEqual({});
-    expect(existsSync(legacyPath)).toBe(false);
-  });
 });
 
-function createStorePaths(): { databasePath: string; legacyPath: string } {
+function createStorePaths(): { databasePath: string } {
   const dir = mkdtempSync(join(tmpdir(), "nile-desktop-agent-homes-"));
   tempDirs.push(dir);
   return {
     databasePath: join(dir, "desktop.sqlite"),
-    legacyPath: join(dir, "agent-homes.json"),
   };
 }

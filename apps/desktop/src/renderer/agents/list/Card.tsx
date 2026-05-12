@@ -3,21 +3,16 @@ import { GripVertical } from "lucide-react";
 
 import type { DesktopAgentState, DesktopOnboardingItem } from "../../../state/Types";
 import { AgentCardHeader } from "../AgentCardHeader";
-import { DetectedSetupSection } from "../../quick-setup/DetectedSetup";
 import type { Translator } from "../../shared/I18n";
-import { UsagePanel } from "../../shared/UsagePanel";
-import { UsageIndicator } from "../../shared/UsageIndicator";
 import { Button } from "../../ui/button";
 import { Card } from "../../ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../ui/select";
 import { TextButton } from "../../ui/text-button";
 import type { AgentDetailTab } from "../detail/Page";
+import { AgentConnectionModelDialog } from "../detail/ModelEditor";
+import { AgentCurrentConnectionPanel } from "./CurrentConnectionPanel";
+import { AgentLocalSetupSection } from "./LocalSetupSection";
+import { useAgentConnectionSwitchFlow } from "../useConnectionSwitchFlow";
+import { LOCAL_SETUP_PRESENTATION } from "../../shared/LocalSetup";
 
 type AgentCardProps = {
   agent: DesktopAgentState;
@@ -34,6 +29,7 @@ type AgentCardProps = {
   onDrop: DragEventHandler<HTMLDivElement>;
   onImport(agentId: DesktopAgentState["agentId"]): Promise<void>;
   onOpenDetails(agentId: DesktopAgentState["agentId"], tab?: AgentDetailTab): void;
+  onUpdateAgentConnectionModel(agentId: DesktopAgentState["agentId"], connectionId: string, modelId: string | null): Promise<void>;
   onSwitch(agentId: DesktopAgentState["agentId"], connectionId: string): Promise<void>;
 };
 
@@ -52,121 +48,101 @@ export function AgentCard({
   onDrop,
   onImport,
   onOpenDetails,
+  onUpdateAgentConnectionModel,
   onSwitch,
 }: AgentCardProps) {
-  const hasCurrentSavedConnection = agent.connections.some((connection) => connection.isCurrent);
-  const showDetectedSetup = shouldShowDetectedSetup(agent, detectedSetup);
-  const savedConnectionLabel = agent.currentConnection?.label ?? t("support.noSavedSelection");
+  const flow = useAgentConnectionSwitchFlow({
+    agent,
+    t,
+    onSwitch,
+    onUpdateAgentConnectionModel,
+  });
+
+  const showDetectedSetup = shouldShowDetectedSetup(detectedSetup);
   const issueLink = readIssueLink(agent, t);
+  const visibleDetectedSetup = showDetectedSetup ? detectedSetup : null;
 
   return (
-    <Card
-      className={[
-        "rounded-2xl",
-        isEditingOrder ? "cursor-move select-none" : "",
-        draggedAgentId === agent.agentId ? "opacity-60" : "",
-        dropTargetAgentId === agent.agentId ? "ring-1 ring-ring" : "",
-      ].filter(Boolean).join(" ")}
-      draggable={isEditingOrder}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDragStart={onDragStart}
-      onDrop={onDrop}
-    >
-      <div className="flex">
-        {isEditingOrder ? <DragHandle /> : null}
-        <div className="min-w-0 flex-1 px-5 py-5 sm:px-6">
-          <div className="space-y-5">
-            <AgentCardHeader
-              agent={agent}
-              subtitle={t("agents.connectionCount", { count: agent.connections.length })}
-              trailing={isEditingOrder ? (
-                <div className="pt-1 text-sm text-muted-foreground text-right">
-                  {t("common.dragToReorder")}
-                </div>
-              ) : (
-                <TextButton
-                  underline
-                  onClick={() => onOpenDetails(agent.agentId, issueLink ? "home" : "connections")}
-                  className={issueLink?.toneClassName}
-                >
-                  {issueLink?.label ?? t("common.more")}
-                </TextButton>
-              )}
-            />
-
-            {showDetectedSetup ? (
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <div className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                    {t("agents.localSetup")}
+    <>
+      <AgentConnectionModelDialog
+        agentId={agent.agentId}
+        agentLabel={agent.agentLabel}
+        connection={flow.editingConnection}
+        error={flow.modelError}
+        isSaving={flow.isSavingModel}
+        mode="switch"
+        modelId={flow.draftModelId}
+        t={t}
+        onClear={flow.clearModel}
+        onModelIdChange={flow.setDraftModelId}
+        onOpenChange={(open) => {
+          if (!open) {
+            flow.closeModelEditor();
+          }
+        }}
+        onSubmit={flow.saveModel}
+      />
+      <Card
+        className={[
+          "rounded-2xl",
+          isEditingOrder ? "cursor-move select-none" : "",
+          draggedAgentId === agent.agentId ? "opacity-60" : "",
+          dropTargetAgentId === agent.agentId ? "ring-1 ring-ring" : "",
+        ].filter(Boolean).join(" ")}
+        draggable={isEditingOrder}
+        onDragEnd={onDragEnd}
+        onDragOver={onDragOver}
+        onDragStart={onDragStart}
+        onDrop={onDrop}
+      >
+        <div className="flex">
+          {isEditingOrder ? <DragHandle /> : null}
+          <div className="min-w-0 flex-1 px-5 py-5 sm:px-6">
+            <div className="space-y-5">
+              <AgentCardHeader
+                agent={agent}
+                subtitle={t("agents.connectionCount", { count: agent.connections.length })}
+                trailing={isEditingOrder ? (
+                  <div className="pt-1 text-sm text-muted-foreground text-right">
+                    {t("common.dragToReorder")}
                   </div>
-                  {hasCurrentSavedConnection ? (
-                    <div className="text-sm text-muted-foreground">
-                      {t("agents.savedInNile", { connection: savedConnectionLabel })}
-                    </div>
-                  ) : null}
-                </div>
-                <DetectedSetupSection
-                  agentId={agent.agentId}
+                ) : (
+                  <TextButton
+                    underline
+                    onClick={() => onOpenDetails(agent.agentId, issueLink ? "home" : "connections")}
+                    className={issueLink?.toneClassName}
+                  >
+                    {issueLink?.label ?? t("common.more")}
+                  </TextButton>
+                )}
+              />
+
+              {visibleDetectedSetup ? (
+                <AgentLocalSetupSection
+                  agent={agent}
                   canConfigure={canConfigure}
-                  confirmed={false}
-                  detectedSetup={detectedSetup}
+                  detectedSetup={visibleDetectedSetup}
                   t={t}
                   onConfigure={onConfigure}
-                  onSave={onImport}
+                  onImport={onImport}
                 />
-              </div>
-            ) : null}
+              ) : null}
 
-            {!showDetectedSetup ? (
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,1fr)] lg:items-start">
-                <div className="space-y-2">
-                  <div className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                    {t("agents.currentConnection")}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Select
-                      disabled={isEditingOrder || agent.connections.length === 0}
-                      value={agent.currentConnection?.id}
-                      onValueChange={(connectionId) => {
-                        void onSwitch(agent.agentId, connectionId).catch(() => undefined);
-                      }}
-                    >
-                      <SelectTrigger className="h-11 max-w-[20rem] rounded-xl">
-                        <SelectValue placeholder={t("support.noSavedSelection")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {agent.connections.map((connection) => (
-                          <SelectItem
-                            key={connection.id}
-                            value={connection.id}
-                            meta={(
-                              <UsageIndicator
-                                remainingPercent={connection.usage?.status === "available"
-                                  ? connection.usage.remainingPercent
-                                  : null}
-                                showPercent={false}
-                              />
-                            )}
-                          >
-                            {connection.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="space-y-3 lg:justify-self-stretch">
-                  <UsageSummary agent={agent} t={t} />
-                </div>
-              </div>
-            ) : null}
+              {!showDetectedSetup ? (
+                <AgentCurrentConnectionPanel
+                  agent={agent}
+                  disabled={isEditingOrder}
+                  t={t}
+                  onSwitch={(connectionId) => {
+                    void flow.switchConnection(connectionId).catch(() => undefined);
+                  }}
+                />
+              ) : null}
+            </div>
           </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </>
   );
 }
 
@@ -194,40 +170,9 @@ function readIssueLink(
 }
 
 function shouldShowDetectedSetup(
-  agent: DesktopAgentState,
   detectedSetup: DesktopOnboardingItem | null,
 ): boolean {
-  if (!detectedSetup || detectedSetup.state === "already_saved") {
-    return false;
-  }
-
-  if (detectedSetup.state === "new") {
-    return true;
-  }
-
-  return agent.currentConnectionState === "none" && agent.connections.length === 0;
-}
-
-function UsageSummary({ agent, t }: { agent: DesktopAgentState; t: Translator }) {
-  const hasCurrentSavedConnection = agent.connections.some((connection) => connection.isCurrent);
-  const visibleUsage = hasCurrentSavedConnection ? agent.currentUsage : null;
-  const visiblePlanLabel = hasCurrentSavedConnection
-    ? (agent.currentUsage?.planLabel ?? agent.currentConnection?.endpointLabel ?? t("common.usage"))
-    : t("common.usage");
-
-  return (
-    <UsagePanel
-      className="px-1 py-1"
-      framed={false}
-      maxWindows={3}
-      planLabel={visiblePlanLabel}
-      showPlanLabel={Boolean(hasCurrentSavedConnection)}
-      showRenewalAt={false}
-      t={t}
-      title={t("common.usage")}
-      usage={visibleUsage}
-    />
-  );
+  return LOCAL_SETUP_PRESENTATION.shouldShowDetectedSetup(detectedSetup);
 }
 
 function DragHandle() {
