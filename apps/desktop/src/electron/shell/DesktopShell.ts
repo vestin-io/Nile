@@ -28,11 +28,11 @@ export class DesktopShell {
   }
 
   notifyStateChanged(): void {
-    this.settingsWindow?.webContents.send("desktop:state-changed");
+    this.sendToSettingsWindow("desktop:state-changed");
   }
 
   notifyNotificationHistoryChanged(): void {
-    this.settingsWindow?.webContents.send("desktop:notification-history-changed");
+    this.sendToSettingsWindow("desktop:notification-history-changed");
   }
 
   showSettings(): void {
@@ -143,6 +143,9 @@ export class DesktopShell {
       this.options.onSettingsClose();
       this.settingsWindow?.hide();
     });
+    this.settingsWindow.on("closed", () => {
+      this.settingsWindow = null;
+    });
     void this.settingsWindow.loadFile(fileURLToPath(settingsUrl));
   }
 
@@ -155,14 +158,37 @@ export class DesktopShell {
   }
 
   private sendNotificationTarget(target: DesktopNotificationTarget): void {
-    if (!this.settingsWindow) {
+    const settingsWindow = this.readSettingsWindowForSend();
+    if (!settingsWindow) {
       return;
     }
-    if (this.settingsWindow.webContents.isLoadingMainFrame()) {
+    if (settingsWindow.webContents.isLoadingMainFrame()) {
       this.pendingNotificationTarget = target;
       return;
     }
-    this.settingsWindow.webContents.send("desktop:notification-target", target);
+    this.sendToSettingsWindow("desktop:notification-target", target);
+  }
+
+  private sendToSettingsWindow(channel: string, payload?: unknown): void {
+    const settingsWindow = this.readSettingsWindowForSend();
+    if (!settingsWindow) {
+      return;
+    }
+    if (payload === undefined) {
+      settingsWindow.webContents.send(channel);
+      return;
+    }
+    settingsWindow.webContents.send(channel, payload);
+  }
+
+  private readSettingsWindowForSend(): BrowserWindow | null {
+    if (!this.settingsWindow) {
+      return null;
+    }
+    if (this.settingsWindow.isDestroyed() || this.settingsWindow.webContents.isDestroyed()) {
+      return null;
+    }
+    return this.settingsWindow;
   }
 
   private resolveDialogPath(path: string | undefined): string | undefined {

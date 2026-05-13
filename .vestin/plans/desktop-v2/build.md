@@ -21,6 +21,22 @@
 
 - `npm run typecheck`
 
+### Update prompt polish and shutdown safety
+
+- Slimmed the global update prompt into a smaller notification-style card:
+  - reduced width, title size, icon size, shadow, and padding
+  - removed redundant downloading helper copy so the downloading state now focuses on:
+    - title
+    - version sentence
+    - subtle progress bar
+- Removed the temporary prompt preview wiring after local iteration so the settings surface stays clean.
+- Hardened `DesktopShell` state notifications so shutdown/update events do not send IPC messages to a destroyed settings window or destroyed `webContents`.
+
+### Verification
+
+- `npm run typecheck`
+- `npm run test:desktop`
+
 ### Exclude broken credential-sync connections from agent switching
 
 - Kept saved connections with failed credential synchronization visible in the general connection inventory, but removed them from per-agent switchable connection lists.
