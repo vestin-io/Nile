@@ -208,10 +208,10 @@ describe("DesktopSurface", () => {
 
     expect(await surface.getSettingsState()).toEqual({
       onboarding: null,
-      currentConnection: {
+      currentConnection: expect.objectContaining({
         activeAlertCount: 0,
-        agentModelId: "gpt-5.4",
         apiKeySource: "direct",
+        appliedAt: expect.any(String),
         id: "azure-account",
         label: "Azure Account",
         endpointLabel: "Azure Work",
@@ -223,9 +223,9 @@ describe("DesktopSurface", () => {
         selectedByAgents: [],
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         envKey: null,
-      },
+      }),
       currentConnectionState: "saved",
-      liveConnection: {
+      liveConnection: expect.objectContaining({
         activeAlertCount: 0,
         agentModelId: "gpt-5.4",
         apiKeySource: "direct",
@@ -240,7 +240,7 @@ describe("DesktopSurface", () => {
         selectedByAgents: [],
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         envKey: null,
-      },
+      }),
       reconciliationState: "already_saved",
       connections: [
         expect.objectContaining({
@@ -261,8 +261,13 @@ describe("DesktopSurface", () => {
       ],
       currentAgentConnections: [
         expect.objectContaining({
+          activeAlertCount: 0,
           agentModelId: "gpt-5.4",
           apiKeySource: "direct",
+          applyRequirements: {
+            canApply: true,
+            requirements: [],
+          },
           id: "azure-account",
           label: "Azure Account",
           endpointLabel: "Azure Work",

@@ -10,6 +10,14 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^@nile\/core$/, replacement: join(coreSrcDir, "index.ts") },
+      {
+        find: /^@nile\/core\/models\/connection\/enabled-agents-policy$/,
+        replacement: join(coreSrcDir, "models", "connection", "EnabledAgentsPolicy.ts"),
+      },
+      {
+        find: /^@nile\/core\/models\/connection\/requirements$/,
+        replacement: join(coreSrcDir, "models", "connection", "Requirements.ts"),
+      },
       { find: /^@nile\/core\/(.+)$/, replacement: `${coreSrcDir}/$1` },
       { find: /^@nile\/host-local$/, replacement: join(hostLocalSrcDir, "index.ts") },
       { find: /^@nile\/host-local\/(.+)$/, replacement: `${hostLocalSrcDir}/$1` },
