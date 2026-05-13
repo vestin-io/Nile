@@ -78,17 +78,26 @@ function readHelperText(info: DesktopReleaseInfo | null, t: Translator): string 
     return null;
   }
 
-  if (info.status === "no_update") {
-    return t("settings.updates.noUpdate");
-  }
-
-  if (info.status === "ready") {
-    return t("settings.updates.ready");
-  }
-
   switch (info.updateAvailability) {
+    case "development":
+      return t("settings.updates.unavailableDevelopment");
     case "unsupported_platform":
       return t("settings.updates.unavailablePlatform");
+  }
+
+  switch (info.status) {
+    case "checking":
+      return t("settings.updates.checking");
+    case "downloading":
+      return t("settings.updates.downloading");
+    case "up_to_date":
+      return t("settings.updates.noUpdate");
+    case "ready":
+      return t("settings.updates.ready");
+    case "error":
+      return t("settings.updates.error", {
+        message: info.errorMessage ?? t("settings.updates.errorUnknown"),
+      });
     default:
       return null;
   }

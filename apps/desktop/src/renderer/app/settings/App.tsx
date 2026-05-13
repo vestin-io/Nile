@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { readCodexAuthJsonPath } from "../../connections/AuthJsonPath";
 import type { AgentDetailTab } from "../../agents/detail/Page";
@@ -16,6 +16,7 @@ import { SettingsPageContent } from "./PageContent";
 import { ErrorShell, LoadingShell } from "./Shell";
 import { useNotificationTargetNavigation, type NotificationTargetNavigatorOptions } from "./useNotificationTargetNavigation";
 import { useDesktopReleaseInfo } from "./useReleaseInfo";
+import { UpdatePrompt } from "./UpdatePrompt";
 import { useSettingsConnectionActions } from "./useConnectionActions";
 import { useSettingsFlow } from "./useFlow";
 import { readCurrentProfile } from "../../../profiles/CurrentProfile";
@@ -82,6 +83,7 @@ export function SettingsApp() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [selectedAgentDetailTab, setSelectedAgentDetailTab] = useState<AgentDetailTab>("connections");
+  const [dismissedUpdatePromptKey, setDismissedUpdatePromptKey] = useState<string | null>(null);
   const releaseInfo = useDesktopReleaseInfo();
   const { profiles, profileError, refreshProfiles } = useWorkspaceProfiles();
   const {
@@ -163,6 +165,22 @@ export function SettingsApp() {
     setSelectedProfileId,
   ]);
   const { openNotificationTarget } = useNotificationTargetNavigation(notificationTargetNavigation);
+  const updatePromptKey = useMemo(
+    () => releaseInfo
+      ? `${releaseInfo.status}:${releaseInfo.availableVersion ?? ""}:${releaseInfo.errorMessage ?? ""}`
+      : null,
+    [releaseInfo],
+  );
+  const shouldShowUpdatePrompt =
+    releaseInfo !== null &&
+    (releaseInfo.status === "downloading" || releaseInfo.status === "ready" || releaseInfo.status === "error") &&
+    updatePromptKey !== dismissedUpdatePromptKey;
+
+  useEffect(() => {
+    setDismissedUpdatePromptKey((current) => (
+      current === null || current === updatePromptKey ? current : null
+    ));
+  }, [updatePromptKey]);
 
   if (isLoading && (!settingsState || !historyState)) {
     return <LoadingShell label={t("loading.desktop")} />;
@@ -408,6 +426,32 @@ export function SettingsApp() {
         onSetNileDialogOpen={setNileDialogOpen}
         onSetResetDialogOpen={setResetDialogOpen}
       />
+
+      {shouldShowUpdatePrompt ? (
+        <UpdatePrompt
+          info={releaseInfo}
+          t={t}
+          onCheck={async () => {
+            await window.nileDesktop.updates.checkForUpdates().catch(() => ({ status: "unavailable" as const }));
+          }}
+          onDismiss={() => {
+            if (updatePromptKey) {
+              setDismissedUpdatePromptKey(updatePromptKey);
+            }
+          }}
+          onInstall={async () => {
+            await window.nileDesktop.updates.installUpdate().catch(() => ({ status: "unavailable" as const }));
+          }}
+          onOpenReleaseNotes={async () => {
+            if (!releaseInfo?.availableVersion) {
+              return;
+            }
+            await window.nileDesktop.app.openExternalUrl(
+              `https://github.com/vestin-io/Nile/releases/tag/v${releaseInfo.availableVersion}`,
+            );
+          }}
+        />
+      ) : null}
     </SettingsChrome>
   );
 }

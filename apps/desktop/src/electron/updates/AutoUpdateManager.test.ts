@@ -45,6 +45,7 @@ describe("AutoUpdateManager", () => {
       updateAvailability: "development",
       status: "idle",
       availableVersion: null,
+      errorMessage: null,
     });
     expect(manager.checkForUpdates()).toEqual({ status: "unavailable" });
   });
@@ -63,6 +64,7 @@ describe("AutoUpdateManager", () => {
       updateAvailability: "unsupported_platform",
       status: "idle",
       availableVersion: null,
+      errorMessage: null,
     });
   });
 
@@ -89,6 +91,7 @@ describe("AutoUpdateManager", () => {
       updateAvailability: "available",
       status: "checking",
       availableVersion: null,
+      errorMessage: null,
     });
     expect(onReleaseInfoChanged).toHaveBeenCalled();
   });
@@ -111,10 +114,11 @@ describe("AutoUpdateManager", () => {
       updateAvailability: "available",
       status: "ready",
       availableVersion: "0.15.1",
+      errorMessage: null,
     });
   });
 
-  it("marks no-update checks without showing an update target", () => {
+  it("marks up-to-date checks without showing an update target", () => {
     const updater = new StubUpdater();
     const manager = new AutoUpdateManager({
       logger: new StubLogger(),
@@ -130,8 +134,31 @@ describe("AutoUpdateManager", () => {
     expect(manager.getReleaseInfo()).toEqual({
       version: "0.15.0",
       updateAvailability: "available",
-      status: "no_update",
+      status: "up_to_date",
       availableVersion: null,
+      errorMessage: null,
+    });
+  });
+
+  it("shows downloading while an update is being fetched", () => {
+    const updater = new StubUpdater();
+    const manager = new AutoUpdateManager({
+      logger: new StubLogger(),
+      isPackaged: true,
+      platform: "darwin",
+      updater,
+      version: "0.15.0",
+    });
+
+    manager.checkForUpdates();
+    updater.emit("update-available");
+
+    expect(manager.getReleaseInfo()).toEqual({
+      version: "0.15.0",
+      updateAvailability: "available",
+      status: "downloading",
+      availableVersion: null,
+      errorMessage: null,
     });
   });
 
@@ -154,7 +181,7 @@ describe("AutoUpdateManager", () => {
     expect(updater.quitAndInstallCalls).toBe(1);
   });
 
-  it("downgrades fetch failures to warnings without blocking use", () => {
+  it("surfaces fetch failures in release info", () => {
     const updater = new StubUpdater();
     const logger = new StubLogger();
     const manager = new AutoUpdateManager({
@@ -176,7 +203,13 @@ describe("AutoUpdateManager", () => {
         repo: "vestin-io/Nile",
       },
     });
-    expect(manager.getReleaseInfo().status).toBe("idle");
+    expect(manager.getReleaseInfo()).toEqual({
+      version: "0.15.0",
+      updateAvailability: "available",
+      status: "error",
+      availableVersion: null,
+      errorMessage: "repository not accessible",
+    });
   });
 });
 

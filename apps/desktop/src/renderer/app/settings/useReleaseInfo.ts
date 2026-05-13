@@ -7,6 +7,7 @@ const FALLBACK_RELEASE_INFO: DesktopReleaseInfo = {
   updateAvailability: "development",
   status: "idle",
   availableVersion: null,
+  errorMessage: null,
 };
 
 export function useDesktopReleaseInfo() {

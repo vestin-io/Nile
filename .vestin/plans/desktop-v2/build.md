@@ -21,6 +21,62 @@
 
 - `npm run typecheck`
 
+### Auto-update status UX cleanup
+
+- Expanded desktop release/update status handling to surface human-visible states instead of collapsing failures back to idle:
+  - `checking`
+  - `downloading`
+  - `up_to_date`
+  - `ready`
+  - `error`
+- Added `errorMessage` to desktop release info so the settings page can explain update failures.
+- Updated the settings update section to show:
+  - packaged-build limitations for development builds
+  - background download progress
+  - explicit failure text
+  instead of appearing inert when update checks fail.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/updates/AutoUpdateManager.test.ts`
+- `npm run typecheck`
+
+### In-app update prompt
+
+- Added a global renderer update prompt for:
+  - `downloading`
+  - `ready`
+  - `error`
+- The prompt is shown outside the Settings page surface so users do not need to manually reopen the update section to understand what is happening.
+- `ready` now offers:
+  - open release notes
+  - restart to install
+- `error` now offers a direct retry action instead of silently falling back to idle.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/updates/AutoUpdateManager.test.ts`
+- `npm run typecheck`
+
+### Update prompt polish
+
+- Refined the global update prompt into a more product-like notification card instead of a generic modal-style surface.
+- Added status-specific visual treatment for:
+  - background download
+  - ready to install
+  - update check failure
+- Kept the prompt honest to the current updater capabilities:
+  - no fake numeric percent
+  - download state is shown as an indeterminate background download
+- Added clearer copy explaining:
+  - background download continues while the user works
+  - restart installs the ready update
+  - update failures do not block normal app usage
+
+### Verification
+
+- `npm run typecheck`
+
 ### Desktop build fix for browser-safe core imports
 
 - Fixed the desktop renderer build after the recent core refactors:

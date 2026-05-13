@@ -155,13 +155,20 @@ export type DesktopConnectionsSection = {
 };
 
 export type DesktopUpdateAvailability = "available" | "development" | "unsupported_platform";
-export type DesktopReleaseStatus = "idle" | "checking" | "no_update" | "ready";
+export type DesktopReleaseStatus =
+  | "idle"
+  | "checking"
+  | "downloading"
+  | "up_to_date"
+  | "ready"
+  | "error";
 
 export type DesktopReleaseInfo = {
   version: string;
   updateAvailability: DesktopUpdateAvailability;
   status: DesktopReleaseStatus;
   availableVersion: string | null;
+  errorMessage: string | null;
 };
 
 export type DesktopUpdateCheckResult = {

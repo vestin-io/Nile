@@ -13,7 +13,6 @@ import {
   createAutoUpdaterLogger,
   extractAutoUpdateVersion,
   readDesktopUpdateAvailability,
-  readNextReleaseStatus,
 } from "./AutoUpdateSupport";
 
 type AutoUpdateLogger = Pick<NileLogger, "debug" | "info" | "warn" | "error">;
@@ -57,6 +56,7 @@ export class AutoUpdateManager {
   private listenersBound = false;
   private status: DesktopReleaseStatus = "idle";
   private availableVersion: string | null = null;
+  private errorMessage: string | null = null;
 
   constructor(options: AutoUpdateManagerOptions) {
     this.logger = options.logger;
@@ -103,6 +103,7 @@ export class AutoUpdateManager {
       updateAvailability: this.readUpdateAvailability(),
       status: this.status,
       availableVersion: this.availableVersion,
+      errorMessage: this.errorMessage,
     };
   }
 
@@ -126,6 +127,7 @@ export class AutoUpdateManager {
     this.updateReleaseState({
       status: "checking",
       availableVersion: this.availableVersion,
+      errorMessage: null,
     });
 
     try {
@@ -142,8 +144,9 @@ export class AutoUpdateManager {
         error: error instanceof Error ? error.message : String(error),
       });
       this.updateReleaseState({
-        status: readNextReleaseStatus(this.availableVersion),
+        status: "error",
         availableVersion: this.availableVersion,
+        errorMessage: error instanceof Error ? error.message : String(error),
       });
       return { status: "unavailable" };
     }
@@ -199,6 +202,11 @@ export class AutoUpdateManager {
         repo: AutoUpdateManager.repository,
         error: error instanceof Error ? error.message : String(error),
       });
+      this.updateReleaseState({
+        status: "error",
+        availableVersion: this.availableVersion,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -212,24 +220,28 @@ export class AutoUpdateManager {
       this.updateReleaseState({
         status: "checking",
         availableVersion: this.availableVersion,
+        errorMessage: null,
       });
     });
     this.updater.on("update-available", () => {
       this.updateReleaseState({
-        status: "checking",
+        status: "downloading",
         availableVersion: this.availableVersion,
+        errorMessage: null,
       });
     });
     this.updater.on("update-not-available", () => {
       this.updateReleaseState({
-        status: "no_update",
+        status: "up_to_date",
         availableVersion: null,
+        errorMessage: null,
       });
     });
     this.updater.on("update-downloaded", (_event, _releaseNotes, releaseName, _releaseDate, updateURL) => {
       this.updateReleaseState({
         status: "ready",
         availableVersion: extractAutoUpdateVersion(releaseName, updateURL),
+        errorMessage: null,
       });
     });
     this.updater.on("error", (error) => {
@@ -239,8 +251,9 @@ export class AutoUpdateManager {
         repo: AutoUpdateManager.repository,
       });
       this.updateReleaseState({
-        status: readNextReleaseStatus(this.availableVersion),
+        status: "error",
         availableVersion: this.availableVersion,
+        errorMessage: error.message,
       });
     });
   }
@@ -248,10 +261,15 @@ export class AutoUpdateManager {
   private updateReleaseState(next: {
     status: DesktopReleaseStatus;
     availableVersion: string | null;
+    errorMessage: string | null;
   }): void {
-    const changed = this.status !== next.status || this.availableVersion !== next.availableVersion;
+    const changed =
+      this.status !== next.status ||
+      this.availableVersion !== next.availableVersion ||
+      this.errorMessage !== next.errorMessage;
     this.status = next.status;
     this.availableVersion = next.availableVersion;
+    this.errorMessage = next.errorMessage;
     if (changed) {
       this.onReleaseInfoChanged();
     }

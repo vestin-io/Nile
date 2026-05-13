@@ -50,13 +50,6 @@ export function extractAutoUpdateVersion(releaseName: string, updateURL: string)
   return matchVersion(updateURL);
 }
 
-export function readNextReleaseStatus(
-  availableVersion: string | null,
-  statusWhenUnavailable: DesktopReleaseStatus = "idle",
-): DesktopReleaseStatus {
-  return availableVersion ? "ready" : statusWhenUnavailable;
-}
-
 function matchVersion(value: string): string | null {
   const match = value.match(/v?(\d+\.\d+\.\d+(?:[-.][0-9A-Za-z.-]+)?)/);
   return match?.[1] ?? null;
