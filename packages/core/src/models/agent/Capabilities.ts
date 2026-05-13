@@ -1,9 +1,9 @@
 import type { AgentId } from "./Types";
 import type { AuthMode } from "../access";
 import type { ConnectionApplyRequirementKind } from "../connection/RequirementKinds";
-import type { ConnectionPresetFamily } from "../connection/setup/PresetTypes";
 import {
   CONNECTION_SUPPORT_KINDS,
+  type ConnectionPresetFamily,
   type ConnectionSupportKind,
 } from "../connection/Support";
 

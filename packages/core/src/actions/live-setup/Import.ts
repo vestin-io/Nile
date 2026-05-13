@@ -12,7 +12,7 @@ import type { AgentSelection } from "../../models/selection/Selection";
 import type { StoredCredential } from "../../services/credential/Types";
 import type { NileLogger } from "../../services/NileLogger";
 import type { DetectedAgentState, ImportCurrentConnectionResult } from "../../models/agent";
-import { GatewayProbe, type GatewayCapabilityProbe } from "../../models/connection/setup/GatewayProbe";
+import { GatewayProbe, type GatewayCapabilityProbe } from "../../models/connection";
 import { joinEndpointUrl } from "../../projection/Url";
 
 export type AgentImportCandidate = {

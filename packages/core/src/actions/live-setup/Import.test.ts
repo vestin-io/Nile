@@ -12,8 +12,8 @@ import { KeychainCredentialStore } from "../../services/credential/KeychainCrede
 import type { StoredCredential } from "../../services/credential/Types";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { NileLogger } from "../../services/NileLogger";
+import type { GatewayCapabilityProbe, GatewayProbeResult } from "../../models/connection";
 import { LiveSetupImportSupport } from "./Import";
-import type { GatewayCapabilityProbe, GatewayProbeResult } from "../../models/connection/setup/GatewayProbe";
 
 const tempDirs: string[] = [];
 

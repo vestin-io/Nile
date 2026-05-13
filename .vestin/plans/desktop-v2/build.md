@@ -365,7 +365,7 @@
   - `https://chatgpt.com/backend-api/codex/models?client_version=1.0.0`
 - Kept API key and env-key connections on the existing OpenAI-compatible `/v1/models` path.
 - Updated `ConnectionModelCatalog` parsing so official session responses read model `slug` values from the Codex catalog payload.
-- Verified against the real `jay-ji-spotto-ai` connection after the code change:
+- Verified against the real `jay-ji` connection after the code change:
   - previous result: `403` from `api.openai.com/v1/models`
   - intermediate result with old `client_version=0.27.0`: `available`, but only `gpt-5.2`
   - current result with `client_version=1.0.0`: `available`, returning the full modern Codex model set

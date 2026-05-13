@@ -386,7 +386,7 @@ describe("ManagedApiKeyEnvironment", () => {
           id: "openai-session",
           endpointId: "openai",
           endpointUrl: "https://api.openai.com",
-          label: "jay.ji@spotto.ai",
+          label: "jay.ji@test.ai",
           endpointLabel: "OpenAI",
           endpointFamily: "openai",
           authMode: "openai_session",

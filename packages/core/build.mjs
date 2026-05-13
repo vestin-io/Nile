@@ -26,6 +26,7 @@ const entryPoints = unique([
   join(srcDir, "models", "connection", "Requirements.ts"),
   join(srcDir, "projection", "index.ts"),
   join(srcDir, "runtime-local", "index.ts"),
+  join(srcDir, "runtime-local", "ImportState.ts"),
   join(srcDir, "services", "EnvironmentSource.ts"),
   join(srcDir, "services", "NileLogger.ts"),
   join(srcDir, "agents", "index.ts"),

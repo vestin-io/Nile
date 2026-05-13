@@ -80,6 +80,10 @@
       "types": "./dist/runtime-local/index.d.ts",
       "default": "./dist/runtime-local/index.js"
     },
+    "./runtime-local/import-state": {
+      "types": "./dist/runtime-local/ImportState.d.ts",
+      "default": "./dist/runtime-local/ImportState.js"
+    },
     "./services/EnvironmentSource": {
       "types": "./dist/services/EnvironmentSource.d.ts",
       "default": "./dist/services/EnvironmentSource.js"

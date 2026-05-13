@@ -1,6 +1,7 @@
 import type { AgentId, ImportCurrentConnectionResult } from "@nile/core/models/agent";
 import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
-import { NileSession, type MatchedImportStateSnapshot } from "@nile/core/runtime-local";
+import { NileSession } from "@nile/core/runtime-local";
+import type { MatchedImportStateSnapshot } from "@nile/core/runtime-local/import-state";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 

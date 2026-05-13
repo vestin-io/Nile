@@ -1,5 +1,6 @@
 import type { AuthMode } from "../access";
 import type { EndpointProtocols } from "../endpoint";
+export type { ConnectionPresetFamily } from "./setup/PresetTypes";
 import type { ConnectionPresetFamily } from "./setup/PresetTypes";
 
 export type ConnectionSupportKind =

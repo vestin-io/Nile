@@ -18,3 +18,5 @@ export type { ConnectionOnboardingSuggestion } from "./setup/OnboardingPolicy";
 export { SavedConnections } from "./SavedConnections";
 export type { SavedConnectionSummary } from "./SavedConnections";
 export { ConnectionIdentityKeyResolver } from "./setup/IdentityKeyResolver";
+export type { GatewayCapabilityProbe, GatewayProbeResult } from "./setup/GatewayProbe";
+export { GatewayProbe } from "./setup/GatewayProbe";
