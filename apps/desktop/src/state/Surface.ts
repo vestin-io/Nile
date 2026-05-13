@@ -13,7 +13,8 @@ import {
   type MenubarState,
   type SettingsState,
 } from "./Types";
-import { DesktopConnectionPresenter } from "./ConnectionPresenter";
+import { DesktopConnectionListPresenter } from "./connection/List";
+import { DesktopConnectionStatusPresenter } from "./connection/Status";
 import { DesktopStateErrorNormalizer } from "./ErrorNormalizer";
 import { DesktopHistoryStateQuery } from "./HistoryQuery";
 import { DesktopMenubarStateQuery } from "./MenubarQuery";
@@ -36,9 +37,10 @@ type DesktopSettingsStateOptions = {
 export class DesktopSurface {
   private readonly logger: NileLogger;
   private readonly usage: DesktopUsageCache;
-  private readonly connections = new DesktopConnectionPresenter();
+  private readonly lists = new DesktopConnectionListPresenter();
+  private readonly status = new DesktopConnectionStatusPresenter();
   private readonly errors = new DesktopStateErrorNormalizer();
-  private readonly history = new DesktopHistoryStateQuery(this.connections);
+  private readonly history = new DesktopHistoryStateQuery();
   private readonly menubar: DesktopMenubarStateQuery;
   private readonly settings: DesktopSettingsStateQuery;
   private menubarUsageRefresh: Promise<void> | null = null;
@@ -48,10 +50,11 @@ export class DesktopSurface {
   ) {
     this.logger = options.logger ?? NileLogger.createDefault({ module: "desktop" });
     this.usage = new DesktopUsageCache(this.logger);
-    this.menubar = new DesktopMenubarStateQuery(this.connections, this.usage);
+    this.menubar = new DesktopMenubarStateQuery(this.lists, this.status, this.usage);
     this.settings = new DesktopSettingsStateQuery({
       resolveDesktopAgentHome: (agentId) => this.resolveDesktopAgentHome(agentId),
-    }, this.connections, this.usage);
+      resolveDefaultDesktopAgentHome: (agentId) => resolveAgentHome(agentId),
+    }, this.lists, this.status, this.usage);
   }
 
   async getMenubarState(): Promise<MenubarState> {

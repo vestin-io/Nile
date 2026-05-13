@@ -5,7 +5,7 @@ import type { InteractivePrompt } from "../InteractivePrompt";
 import type { ResolvedCliOptions } from "../types";
 import type { InfoPanel } from "./InfoPanel";
 import type { MenuNavigation } from "./navigation";
-import { formatAgentLabel } from "../formatters";
+import { formatAgentLabel } from "@nile/core/models/agent/types";
 
 export class HistoryFlow {
   constructor(

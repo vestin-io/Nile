@@ -56,7 +56,6 @@ export class BuiltInAgentAdapters {
       new OpenClawAgentAdapter({
         databasePath,
         openclawHome: resolveAgentHome("openclaw", homes),
-        codexHome: resolveAgentHome("codex", homes),
         credentialStore: options.credentialStore,
         environment: options.environment,
         secureSnapshotStore: options.secureSnapshotStore,

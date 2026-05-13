@@ -47,15 +47,21 @@ export class SessionRuntime {
   }
 
   getAgentStatus(agentId: AgentId): AgentStatusView {
-    return this.resources.getAgentActions().status.get(agentId);
+    const detections = this.resources.getAgentActions().selectionSync.run([agentId]);
+    return this.resources.getAgentActions().status.get(agentId, detections.get(agentId));
   }
 
   listAgentStatuses(agentIds?: AgentId[]): AgentStatusView[] {
-    return this.resources.getAgentActions().status.list(agentIds);
+    const detections = this.resources.getAgentActions().selectionSync.run(agentIds);
+    return this.resources.getAgentActions().status.list(
+      agentIds,
+      detections,
+    );
   }
 
   scanLocalSetups(agentIds?: AgentId[]): ScanLocalSetupsResult {
-    return this.resources.getAgentActions().scanLocal.run(agentIds);
+    const detections = this.resources.getAgentActions().selectionSync.run(agentIds);
+    return this.resources.getAgentActions().scanLocal.run(agentIds, detections);
   }
 
   async importDetectedSetups(input: ImportDetectedSetupsInput): Promise<ImportDetectedSetupsResult> {

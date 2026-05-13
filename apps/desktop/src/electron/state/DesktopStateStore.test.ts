@@ -7,8 +7,8 @@ import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 
 import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
+import type { DesktopAddConnectionInput, DesktopConnectionSummary } from "../connections/contracts";
 import { DesktopStateStore } from "./DesktopStateStore";
-import type { DesktopAddConnectionInput, DesktopConnectionSummary } from "../types";
 
 describe("DesktopStateStore", () => {
   it("caches completed state reads until invalidated", async () => {

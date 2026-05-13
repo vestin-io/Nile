@@ -6,7 +6,7 @@ import {
   FormField,
 } from "../ConnectionFormParts";
 import type { Translator } from "../../shared/I18n";
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 import { authModeLabel } from "../../shared/DisplayText";
 import { ProviderSummary } from "../../providers/ProviderSummary";
 import {

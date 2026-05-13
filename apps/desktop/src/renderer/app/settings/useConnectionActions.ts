@@ -1,7 +1,7 @@
 import type { AgentId } from "@nile/core/models/agent/types";
 
 import type { SettingsState } from "../../shared/DesktopData";
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 import type {
   AddConnectionReturnTarget,
   PageId,

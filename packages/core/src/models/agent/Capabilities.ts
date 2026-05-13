@@ -11,6 +11,7 @@ export type AgentCapability = {
   requiredApplyRequirements: ConnectionApplyRequirementKind[];
   supportsManagedEnvBackedApiKey: boolean;
   supportedConnectionKinds: ConnectionSupportKind[];
+  autoSyncMatchedSelection: boolean;
 };
 
 type AgentCapabilityProtocols = Parameters<typeof CONNECTION_SUPPORT_KINDS.readDetectedApiKeyKinds>[0];
@@ -32,12 +33,14 @@ export class AgentCapabilities {
       this.createCapability({
         supportsManagedEnvBackedApiKey: true,
         supportedConnectionKinds: ["openai-api-key", "openai-session"],
+        autoSyncMatchedSelection: true,
       }),
     ],
     [
       "cursor",
       this.createCapability({
         supportedConnectionKinds: ["cursor-api-key", "cursor-session"],
+        autoSyncMatchedSelection: true,
       }),
     ],
     [
@@ -45,6 +48,7 @@ export class AgentCapabilities {
       this.createCapability({
         supportsManagedEnvBackedApiKey: true,
         supportedConnectionKinds: ["anthropic-api-key", "claude-session"],
+        autoSyncMatchedSelection: true,
       }),
     ],
     [
@@ -58,6 +62,7 @@ export class AgentCapabilities {
           "openai-session",
           "claude-session",
         ],
+        autoSyncMatchedSelection: false,
       }),
     ],
   ]);
@@ -102,6 +107,7 @@ export class AgentCapabilities {
       requiredApplyRequirements: [],
       supportsManagedEnvBackedApiKey: false,
       supportedConnectionKinds: [],
+      autoSyncMatchedSelection: false,
       ...overrides,
     };
   }

@@ -18,7 +18,7 @@ import type {
   ThemePreference,
 } from "../../settings/Preferences";
 import type { HistoryState, NotificationHistoryState, SettingsState } from "../../shared/DesktopData";
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 import type { Translator } from "../../shared/I18n";
 import type { AgentDetailTab } from "../../agents/detail/Page";
 import type { NotificationHistoryFilter, PageId } from "./useNavigation";

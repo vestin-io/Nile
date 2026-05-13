@@ -8,7 +8,7 @@ import type { ResolvedCliOptions } from "../types";
 import type { ConnectionSelectionFlow } from "./ConnectionSelectionFlow";
 import type { InfoPanel } from "./InfoPanel";
 import type { NavigationCallbacks, MenuNavigation } from "./navigation";
-import { formatAgentLabel } from "../formatters";
+import { formatAgentLabel } from "@nile/core/models/agent/types";
 
 type ManageSelection = AgentId | "import-detected";
 

@@ -1,4 +1,4 @@
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 import type { Translator } from "../../shared/I18n";
 import { Alert, AlertDescription, AlertTitle } from "../../ui/alert";
 import { Checkbox } from "../../ui/checkbox";

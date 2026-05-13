@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 import {
   type AddConnectionPreparedSaveInput,
   type AddConnectionSubmitInput,

@@ -4,33 +4,48 @@ import { EnvironmentSource } from "../../services/EnvironmentSource";
 import { CodexSessionLogin } from "./CodexSessionLogin";
 
 describe("CodexSessionLogin", () => {
-  it("passes login-shell PATH through to the spawned codex command", () => {
+  it("prefers the current process PATH and appends login-shell PATH entries", async () => {
     let receivedPath: string | undefined;
+    const originalPath = process.env.PATH;
+    process.env.PATH = "/Users/test/.nvm/bin:/usr/bin";
     const login = new CodexSessionLogin(
-      EnvironmentSource.from({ PATH: "/opt/homebrew/bin:/usr/local/bin" }),
+      EnvironmentSource.from({ PATH: "/opt/homebrew/bin:/usr/bin:/usr/local/bin" }),
       (_command, _args, options) => {
         receivedPath = options?.env?.PATH;
         return {
-          status: 0,
-        };
+          once(event: "error" | "exit", listener: ((error: Error) => void) | ((code: number | null) => void)) {
+            if (event === "exit") {
+              (listener as (code: number | null) => void)(0);
+            }
+            return this;
+          },
+        } as never;
       },
     );
 
-    login.signIn("/tmp/.codex");
+    try {
+      await login.signIn("/tmp/.codex");
+    } finally {
+      process.env.PATH = originalPath;
+    }
 
-    expect(receivedPath).toBe("/opt/homebrew/bin:/usr/local/bin");
+    expect(receivedPath).toBe("/Users/test/.nvm/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin");
   });
 
-  it("returns a user-facing error when the codex CLI is missing from PATH", () => {
+  it("returns a user-facing error when the codex CLI is missing from PATH", async () => {
     const login = new CodexSessionLogin(
       EnvironmentSource.empty(),
       () => ({
-        status: null,
-        error: Object.assign(new Error("spawnSync codex ENOENT"), { code: "ENOENT" }),
-      }),
+        once(event: "error" | "exit", listener: ((error: Error) => void) | ((code: number | null) => void)) {
+          if (event === "error") {
+            (listener as (error: Error) => void)(Object.assign(new Error("spawn codex ENOENT"), { code: "ENOENT" }));
+          }
+          return this;
+        },
+      }) as never,
     );
 
-    expect(() => login.signIn("/tmp/.codex")).toThrow(
+    await expect(login.signIn("/tmp/.codex")).rejects.toThrow(
       "Codex CLI was not found in PATH. Install Codex CLI or add it to your shell PATH, then restart Nile.",
     );
   });

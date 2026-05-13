@@ -1,5 +1,4 @@
 import { ConnectionIdentityKeyResolver } from "../../../models/connection";
-import { CodexAuthStore } from "../../codex/stores/CodexAuthStore";
 import type {
   OpenClawAuthProfileCredential,
 } from "../AuthProfileStore";
@@ -22,7 +21,6 @@ export class LiveSetupResolver {
   private readonly stateFactory: LiveSetupFactory;
 
   constructor(
-    private readonly codexAuthStore: CodexAuthStore,
     private readonly identityKeyResolver: ConnectionIdentityKeyResolver = new ConnectionIdentityKeyResolver(),
   ) {
     this.stateFactory = new LiveSetupFactory(this.identityKeyResolver);
@@ -48,20 +46,15 @@ export class LiveSetupResolver {
         };
       }
 
-      const codexCredential = this.codexAuthStore.readCredential();
-      if (codexCredential?.kind !== "openai_session") {
-        return {
-          error: "OpenClaw uses OpenAI oauth, but Codex auth.json does not contain an OpenAI session",
-        };
-      }
-      if (!this.stateFactory.matchesOpenAiProfileCredential(credential, codexCredential)) {
-        return {
-          error: `OpenClaw auth profile ${profile.profileId} does not match the current Codex OpenAI session`,
-        };
-      }
-
       return {
-        value: this.stateFactory.buildOpenAiSessionState(modelId, codexCredential),
+        value: this.stateFactory.buildOpenAiSessionProfileState(modelId, {
+          accessToken: credential.access,
+          refreshToken: credential.refresh,
+          ...(credential.accountId?.trim() ? { accountId: credential.accountId.trim() } : {}),
+          ...((credential.email ?? profile.email)?.trim()
+            ? { email: (credential.email ?? profile.email)!.trim() }
+            : {}),
+        }),
       };
     }
 

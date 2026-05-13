@@ -16,7 +16,6 @@ import { OPENCLAW_AGENT_ID } from "./types";
 export type OpenClawAgentAdapterOptions = {
   databasePath: string;
   openclawHome?: string;
-  codexHome?: string;
   credentialStore: CredentialStore;
   environment?: EnvironmentSource;
   secureSnapshotStore?: SecureSnapshotStore;
@@ -36,7 +35,6 @@ export class OpenClawAgentAdapter implements AgentAdapter {
   constructor(options: OpenClawAgentAdapterOptions) {
     const databasePath = options.databasePath;
     const openclawHome = options.openclawHome ?? join(homedir(), ".openclaw");
-    const codexHome = options.codexHome ?? join(homedir(), ".codex");
     const credentialStore = options.credentialStore;
     const environment = options.environment ?? EnvironmentSource.from(process.env);
     const secureSnapshotStore = options.secureSnapshotStore;
@@ -61,27 +59,23 @@ export class OpenClawAgentAdapter implements AgentAdapter {
     this.openImportOperation = () => sharedContext
       ? ImportCurrentConnection.fromContext(sharedContext, {
           openclawHome,
-          codexHome,
           credentialStore,
           logger: logger.child({ scope: "import-current-connection" }),
         })
       : ImportCurrentConnection.open(databasePath, {
           openclawHome,
-          codexHome,
           credentialStore,
           logger: logger.child({ scope: "import-current-connection" }),
         });
     this.openRollbackOperation = () => sharedContext
       ? RollbackLatestMutation.fromContext(sharedContext, {
           openclawHome,
-          codexHome,
           credentialStore,
           secureSnapshotStore,
           logger: logger.child({ scope: "rollback-latest-mutation" }),
         })
       : RollbackLatestMutation.open(databasePath, {
           openclawHome,
-          codexHome,
           credentialStore,
           secureSnapshotStore,
           logger: logger.child({ scope: "rollback-latest-mutation" }),
@@ -89,13 +83,11 @@ export class OpenClawAgentAdapter implements AgentAdapter {
     this.openDetectOperation = () => sharedContext
       ? LiveSetupDetector.fromContext(sharedContext, {
           openclawHome,
-          codexHome,
           credentialStore,
           logger: logger.child({ scope: "live-setup-detector" }),
         })
       : LiveSetupDetector.open(databasePath, {
           openclawHome,
-          codexHome,
           credentialStore,
           logger: logger.child({ scope: "live-setup-detector" }),
         });

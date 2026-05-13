@@ -168,6 +168,54 @@ export class LiveSetupFactory {
     };
   }
 
+  buildOpenAiSessionProfileState(
+    modelId: string,
+    credential: {
+      accessToken: string;
+      refreshToken: string;
+      accountId?: string;
+      email?: string;
+    },
+  ): ResolvedLiveState {
+    const endpoint = this.buildOpenAiEndpoint(
+      "openai",
+      "openai",
+      DEFAULT_OPENAI_BASE_URL,
+      "responses",
+    );
+    const identityKey = this.readOpenAiSessionIdentityKey(credential.accountId, credential.email);
+    const email = credential.email?.trim();
+    const labelHint = `${email || "OpenAI Session"} ${modelId}`;
+
+    return {
+      endpoint,
+      access: {
+        authMode: "openai_session",
+        label: labelHint,
+        ...(identityKey ? { identityKey } : {}),
+      },
+      detectedEndpoint: {
+        endpointFamily: "openai",
+        endpointIdHint: endpoint.id,
+        labelHint: endpoint.label,
+        baseUrl: DEFAULT_OPENAI_BASE_URL,
+        wireApi: "responses",
+      },
+      credential: {
+        kind: "openai_session",
+        idToken: "",
+        accessToken: credential.accessToken,
+        refreshToken: credential.refreshToken,
+        ...(credential.accountId?.trim() ? { accountId: credential.accountId.trim() } : {}),
+      },
+      detectedAccess: {
+        authMode: "openai_session",
+        labelHint,
+        ...(identityKey ? { identityKey } : {}),
+      },
+    };
+  }
+
   buildAnthropicApiKeyState(
     modelId: string,
     apiKey: string,
@@ -337,6 +385,18 @@ export class LiveSetupFactory {
     const claims = this.decodeJwtPayload(credential.idToken);
     const email = claims?.email;
     return typeof email === "string" && email.trim() ? email.trim() : undefined;
+  }
+
+  private readOpenAiSessionIdentityKey(accountId?: string, email?: string): string | undefined {
+    const normalizedAccountId = accountId?.trim();
+    if (normalizedAccountId) {
+      return `account:${normalizedAccountId}`;
+    }
+    const normalizedEmail = email?.trim();
+    if (normalizedEmail) {
+      return `identity:${normalizedEmail}`;
+    }
+    return undefined;
   }
 
   private decodeJwtPayload(token: string): Record<string, unknown> | null {

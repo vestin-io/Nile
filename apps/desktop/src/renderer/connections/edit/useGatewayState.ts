@@ -4,7 +4,7 @@ import { EnabledAgentsPolicy } from "@nile/core/models/connection/enabled-agents
 
 import type { DesktopConnection } from "../../../state/Types";
 import { sameAgentSelection } from "../../shared/AgentSelection";
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 
 type UseGatewaySupportStateOptions = {
   apiKey: string;

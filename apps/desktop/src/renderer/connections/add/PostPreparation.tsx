@@ -11,7 +11,7 @@ import {
   ConnectionCapabilityField,
   FormField,
 } from "../ConnectionFormParts";
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 
 type AddConnectionPostPreparationProps = {
   apiKey: string;

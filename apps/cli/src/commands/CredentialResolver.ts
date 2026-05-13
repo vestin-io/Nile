@@ -18,11 +18,11 @@ export class ConnectionCredentialResolver {
     private readonly loginRunner: CodexSessionLogin,
   ) {}
 
-  resolveForFlags(
+  async resolveForFlags(
     options: ResolvedCliOptions,
     flags: Map<string, string | boolean>,
     authMode: AuthMode,
-  ): StoredCredential {
+  ): Promise<StoredCredential> {
     const resolver = this.createCredentialResolver(options);
     if (authMode === "api_key") {
       const apiKey = this.getFlagString(flags, "api-key");
@@ -34,7 +34,7 @@ export class ConnectionCredentialResolver {
 
     if (authMode === "openai_session") {
       if (this.hasFlag(flags, "login")) {
-        return resolver.resolve(this.requestBuilder.buildOpenAiSession("login"));
+        return await resolver.resolveAsync(this.requestBuilder.buildOpenAiSession("login"));
       }
       if (!this.hasFlag(flags, "from-codex-current")) {
         throw new Error("nile add with openai_session requires --login or --from-codex-current");
@@ -99,7 +99,7 @@ export class ConnectionCredentialResolver {
         throw new Error("Back");
       }
       if (selection.value === "sign_in") {
-        return resolver.resolve(this.requestBuilder.buildOpenAiSession("login"));
+        return await resolver.resolveAsync(this.requestBuilder.buildOpenAiSession("login"));
       }
       return resolver.resolve(this.requestBuilder.buildOpenAiSession("current_codex"));
     }

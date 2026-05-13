@@ -5,7 +5,7 @@ import { Cable } from "lucide-react";
 
 import type { Translator } from "../../shared/I18n";
 import type { SettingsState } from "../../shared/DesktopData";
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 import type { LanguagePreference } from "../../settings/Preferences";
 import { ConnectionDetailPage } from "../detail/Page";
 import { ConnectionEditPage } from "../edit/Page";

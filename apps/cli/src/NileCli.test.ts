@@ -1877,7 +1877,7 @@ const CURSOR_WEB_SESSION_TOKEN = `user_01K03K41CNGRCADY5VT0JPH69Y::${CURSOR_WEB_
 class StubCodexLoginRunner extends CodexSessionLogin {
   readonly invocations: string[] = [];
 
-  override signIn(codexHome: string): void {
+  override async signIn(codexHome: string): Promise<void> {
     this.invocations.push(codexHome);
   }
 }

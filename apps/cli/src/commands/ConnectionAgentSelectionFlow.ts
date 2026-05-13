@@ -3,7 +3,7 @@ import type { ConnectionDefinition, ConnectionOnboardingSuggestion } from "@nile
 import { AGENT_CAPABILITIES, type AgentId } from "@nile/core/models/agent";
 import type { AuthMode } from "@nile/core/models/access";
 
-import { formatAgentLabel } from "../formatters";
+import { formatAgentLabel } from "@nile/core/models/agent/types";
 import { InteractivePrompt } from "../InteractivePrompt";
 
 type AgentSelectionInput = {

@@ -7,7 +7,7 @@ import {
   readSelectedMethodKey,
 } from "../ConnectionFormParts";
 import type { Translator } from "../../shared/I18n";
-import { type Definition } from "../../shared/Definitions";
+import { type Definition } from "../../shared/DesktopData";
 import type { LanguagePreference } from "../../settings/Preferences";
 import {
   useAddConnectionPageState,

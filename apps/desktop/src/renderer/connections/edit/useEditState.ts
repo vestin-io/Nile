@@ -4,7 +4,7 @@ import type { AgentId } from "@nile/core/models/agent/types";
 import type { DesktopConnection } from "../../../state/Types";
 import { buildConnectionMethods, readSelectedMethodKey } from "../ConnectionFormParts";
 import { formatAgentsList, sameAgentSelection } from "../../shared/AgentSelection";
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 import type { Translator } from "../../shared/I18n";
 import { syncDefaultAuthJsonPath } from "../AuthJsonPath";
 import { useGatewaySupportState } from "./useGatewayState";

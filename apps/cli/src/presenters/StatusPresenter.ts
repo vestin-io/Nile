@@ -1,5 +1,5 @@
 import type { AgentStatusView } from "@nile/core/actions/local-setup";
-import { formatAgentLabel } from "../formatters";
+import { formatAgentLabel } from "@nile/core/models/agent/types";
 
 export class StatusPresenter {
   formatStatus(status: AgentStatusView | AgentStatusView[]): string {

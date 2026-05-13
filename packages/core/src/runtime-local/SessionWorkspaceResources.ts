@@ -58,6 +58,7 @@ export class SessionWorkspaceResources {
     return (this.agentActions ??= new LocalAgentWorkflows(
       this.getWorkspaceState().getEndpointRegistry(),
       this.getWorkspaceState().getAccessRegistry(),
+      this.getAgentSelection(),
       agentAdapterRegistry,
     ));
   }

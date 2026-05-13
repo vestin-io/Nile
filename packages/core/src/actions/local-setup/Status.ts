@@ -52,11 +52,14 @@ export class Status {
     return this.readStatus(agentId, undefined, undefined, detection);
   }
 
-  list(agentIds?: AgentId[]): AgentStatusView[] {
+  list(
+    agentIds?: AgentId[],
+    detections?: Map<AgentId, AgentDetectionResult>,
+  ): AgentStatusView[] {
     const ids = agentIds ?? this.agentAdapterRegistry.listAgents();
     const accessById = new Map(this.accessRegistry.list().map((access) => [access.id, access]));
     const endpointById = new Map(this.endpointRegistry.list().map((endpoint) => [endpoint.id, endpoint]));
-    return ids.map((agentId) => this.readStatus(agentId, accessById, endpointById));
+    return ids.map((agentId) => this.readStatus(agentId, accessById, endpointById, detections?.get(agentId)));
   }
 
   private readStatus(

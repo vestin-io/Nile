@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { buildConnectionMethods } from "../ConnectionFormParts";
 import { sameAgentSelection } from "./useForm";
 import { resolveDetectedEnabledAgents } from "./useOnboardingState";
 
@@ -34,5 +35,25 @@ describe("resolveDetectedEnabledAgents", () => {
       defaultEnabledAgents: ["codex", "claude"],
       preserveCurrent: true,
     })).toEqual(["codex"]);
+  });
+});
+
+describe("buildConnectionMethods", () => {
+  it("prefers importing the current Codex session before triggering sign-in", () => {
+    const methods = buildConnectionMethods({
+      preset: "openai",
+      label: "Official OpenAI",
+      supportedAuthModes: ["openai_session"],
+      requiresEndpointUrl: false,
+      configurableAgents: ["codex", "openclaw"],
+      defaultEnabledAgents: ["codex"],
+      supportsEnvKey: false,
+      suggestEnabledAgents: false,
+    }, (key) => key);
+
+    expect(methods.map((method) => method.key)).toEqual([
+      "openai_session:current_codex",
+      "openai_session:login",
+    ]);
   });
 });

@@ -2,7 +2,7 @@ import { type ReactNode } from "react";
 import type { AgentId } from "@nile/core/models/agent/types";
 
 import type { Translator } from "../shared/I18n";
-import { orderSupportedAuthModes, type Definition } from "../shared/Definitions";
+import { orderSupportedAuthModes, type Definition } from "../shared/DesktopData";
 import { authModeLabel } from "../shared/DisplayText";
 import { formatAgentLabel, formatAgentsList } from "../shared/AgentSelection";
 import { ChoiceCard } from "../ui/choice-card";
@@ -33,18 +33,18 @@ export function buildConnectionMethods(definition: Definition, t: Translator): C
   for (const authMode of orderSupportedAuthModes(definition.supportedAuthModes)) {
     if (authMode === "openai_session") {
       methods.push({
-        key: "openai_session:login",
-        authMode,
-        description: t("addConnection.signInWithOpenAiDescription"),
-        sessionSource: "login",
-        title: t("addConnection.signInWithOpenAi"),
-      });
-      methods.push({
         key: "openai_session:current_codex",
         authMode,
         description: t("addConnection.importAuthJsonDescription"),
         sessionSource: "current_codex",
         title: t("addConnection.importAuthJson"),
+      });
+      methods.push({
+        key: "openai_session:login",
+        authMode,
+        description: t("addConnection.signInWithOpenAiDescription"),
+        sessionSource: "login",
+        title: t("addConnection.signInWithOpenAi"),
       });
       continue;
     }

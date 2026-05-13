@@ -113,7 +113,7 @@ describe("LocalCredentialResolver", () => {
     });
   });
 
-  it("can sign in through the shared Codex login helper before reading current auth", () => {
+  it("can sign in through the shared Codex login helper before reading current auth", async () => {
     const codexHome = createCodexHome();
     const login = new StubCodexSessionLogin();
     const resolver = new LocalCredentialResolver(
@@ -122,12 +122,12 @@ describe("LocalCredentialResolver", () => {
       login,
     );
 
-    expect(
-      resolver.resolve({
+    await expect(
+      resolver.resolveAsync({
         authMode: "openai_session",
         source: "login",
       }),
-    ).toEqual({
+    ).resolves.toEqual({
       kind: "openai_session",
       idToken: "id-token",
       accessToken: "access-token",
@@ -163,7 +163,7 @@ describe("LocalCredentialResolver", () => {
     });
   });
 
-  it("can sign in through the shared Claude login helper before reading current auth", () => {
+  it("can sign in through the shared Claude login helper before reading current auth", async () => {
     const claudeHome = createClaudeHome();
     const login = new StubClaudeSessionLogin();
     const resolver = new LocalCredentialResolver(
@@ -173,12 +173,12 @@ describe("LocalCredentialResolver", () => {
       login,
     );
 
-    expect(
-      resolver.resolve({
+    await expect(
+      resolver.resolveAsync({
         authMode: "claude_session",
         source: "login",
       }),
-    ).toEqual({
+    ).resolves.toEqual({
       kind: "claude_session",
       accessToken: "claude-access-token",
       refreshToken: "claude-refresh-token",
@@ -232,7 +232,7 @@ function writeOpenAiSessionAtPath(authPath: string, accountId: string): void {
 class StubCodexSessionLogin extends CodexSessionLogin {
   readonly calls: string[] = [];
 
-  override signIn(codexHome: string): void {
+  override async signIn(codexHome: string): Promise<void> {
     this.calls.push(codexHome);
     writeOpenAiSession(codexHome, "acct-signed-in");
   }
@@ -241,7 +241,7 @@ class StubCodexSessionLogin extends CodexSessionLogin {
 class StubClaudeSessionLogin extends ClaudeSessionLogin {
   readonly calls: string[] = [];
 
-  override signIn(claudeHome: string): void {
+  override async signIn(claudeHome: string): Promise<void> {
     this.calls.push(claudeHome);
     writeClaudeSessionFiles(claudeHome);
   }

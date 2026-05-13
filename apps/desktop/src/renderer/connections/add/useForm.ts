@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/types";
 import { EnabledAgentsPolicy } from "@nile/core/models/connection/enabled-agents-policy";
 
-import { orderSupportedAuthModes, type Definition } from "../../shared/Definitions";
+import { orderSupportedAuthModes, type Definition } from "../../shared/DesktopData";
 import { sameAgentSelection } from "../../shared/AgentSelection";
 import { syncDefaultAuthJsonPath } from "../AuthJsonPath";
 
@@ -34,7 +34,7 @@ function createInitialFormState(defaultOpenAiAuthJsonPath: string): AddConnectio
     endpointUrl: "",
     enabledAgents: [],
     preset: "",
-    sessionSource: "login",
+    sessionSource: "current_codex",
   };
 }
 

@@ -142,7 +142,7 @@ export class DesktopConnectionManager {
         existing.authMode,
       );
       const credential = credentialRequest
-        ? this.localCredentialResolver.resolve(credentialRequest)
+        ? await this.localCredentialResolver.resolveAsync(credentialRequest)
         : session.readConnectionCredential(input.connectionId);
 
       return await session.describeConnectionOnboarding({
@@ -157,7 +157,7 @@ export class DesktopConnectionManager {
 
   async prepareConnectionDraft(input: DesktopAddConnectionInput): Promise<DesktopPreparedConnectionDraft> {
     return await this.sessions.runAsync(async (session) => {
-      const credential = this.localCredentialResolver.resolve(this.resolveCredentialRequest(input));
+      const credential = await this.localCredentialResolver.resolveAsync(this.resolveCredentialRequest(input));
       const onboarding = await session.describeConnectionOnboarding({
         preset: input.preset,
         authMode: input.authMode,

@@ -20,7 +20,7 @@ import type {
   AddConnectionResult,
   ResolvedCliOptions,
 } from "../types";
-import { formatAgentLabel } from "../formatters";
+import { formatAgentLabel } from "@nile/core/models/agent/types";
 
 export class ConnectionCommands {
   private readonly addFlow: ConnectionAddFlow;

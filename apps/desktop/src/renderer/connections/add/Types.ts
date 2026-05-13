@@ -1,6 +1,6 @@
 import type { AgentId } from "@nile/core/models/agent/types";
 
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 
 export type AddConnectionSubmitInput = {
   preset: Definition["preset"];

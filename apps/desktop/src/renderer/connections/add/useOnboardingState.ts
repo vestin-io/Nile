@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/types";
 
-import type { Definition } from "../../shared/Definitions";
+import type { Definition } from "../../shared/DesktopData";
 import type { AddConnectionSubmitInput } from "./Types";
 import type { SetEnabledAgentsOptions } from "./useForm";
 

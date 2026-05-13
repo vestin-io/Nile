@@ -134,6 +134,115 @@
 - `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/actions/local-setup/Status.test.ts`
 - `npm run typecheck`
 
+### Step 10: Desktop sign-in and browser-safe home-path cleanup
+
+- Removed browser-side dependence on `@nile/core/models/agent/homes` by resolving default agent home paths at the desktop surface boundary instead of inside `SettingsQuery`.
+- Made Codex and Claude session login prefer the current process `PATH` while still appending login-shell entries, so desktop dev runs pick the working CLI install before stale shell paths.
+- Kept the OpenAI session add flow default on `current_codex`; the login path remains explicit and now resolves the CLI more robustly.
+
+### Verification
+
+- `npm run typecheck`
+- `node --import tsx ./build.ts` in `apps/desktop`
+- `./node_modules/.bin/vitest run packages/core/src/agents/codex/CodexSessionLogin.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts`
+
+### Step 13: Auto-sync matched live selections for stable agents
+
+- Added `packages/core/src/actions/local-setup/SelectionSync.ts` to reconcile persisted agent selections with uniquely matched saved live setups before status/scan reads.
+- Extended `AgentCapabilities` with `autoSyncMatchedSelection` so only stable agents auto-follow matched live state:
+  - `codex`, `claude`, `cursor`: `true`
+  - `openclaw`: `false`
+- Updated local-setup status/scan flows to reuse synced detections instead of re-detecting after selection sync:
+  - `packages/core/src/actions/local-setup/Status.ts`
+  - `packages/core/src/actions/local-setup/ScanLocalSetups.ts`
+  - `packages/core/src/application/local/AgentWorkflows.ts`
+  - `packages/core/src/runtime-local/SessionWorkspaceResources.ts`
+  - `packages/core/src/runtime-local/SessionRuntime.ts`
+- Added regression coverage proving:
+  - Codex matched live sessions auto-update persisted selection
+  - OpenClaw does not auto-follow Codex-linked live auth
+  - `packages/core/src/actions/local-setup/SelectionSync.test.ts`
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/local-setup/SelectionSync.test.ts packages/core/src/models/agent/Capabilities.test.ts packages/core/src/actions/local-setup/Status.test.ts`
+- `npm run typecheck`
+
+### Step 14: Decouple OpenClaw steady-state detection from Codex live auth
+
+- Removed the `openai-codex` live-state dependency on `~/.codex/auth.json` from OpenClaw detection.
+- OpenClaw now treats its own saved OAuth auth-profile as the steady-state truth for OpenAI-session matching:
+  - `packages/core/src/agents/openclaw/live-setup/Resolver.ts`
+  - `packages/core/src/agents/openclaw/live-setup/StateFactory.ts`
+  - `packages/core/src/agents/openclaw/live-setup/Reader.ts`
+- Removed `codexHome` plumbing from OpenClaw detector/import/rollback wiring so OpenClaw no longer depends on Codex home just to validate local state:
+  - `packages/core/src/agents/openclaw/live-setup/Detector.ts`
+  - `packages/core/src/agents/openclaw/ImportCurrentConnection.ts`
+  - `packages/core/src/agents/openclaw/RollbackLatestMutation.ts`
+  - `packages/core/src/agents/openclaw/OpenClawAgentAdapter.ts`
+  - `packages/core/src/runtime-local/BuiltInAdapters.ts`
+- Updated OpenClaw tests to reflect independent auth-profile matching instead of Codex-auth coupling:
+  - `packages/core/src/agents/openclaw/live-setup/Detector.test.ts`
+  - `packages/core/src/agents/openclaw/ImportCurrentConnection.test.ts`
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/agents/openclaw/live-setup/Detector.test.ts packages/core/src/agents/openclaw/ImportCurrentConnection.test.ts packages/core/src/agents/openclaw/RollbackLatestMutation.test.ts packages/core/src/agents/openclaw/ApplySelection.test.ts`
+- `npm run typecheck`
+
+### Step 10: Remove thin presentation shells
+
+- Deleted the unused desktop compatibility re-export shell:
+  - `apps/desktop/src/electron/types.ts`
+- Deleted the CLI formatter re-export shell and updated callers to import the shared agent label formatter directly from core:
+  - `apps/cli/src/formatters.ts`
+- Folded the thin shared definitions wrapper back into `DesktopData`:
+  - moved `readDefinitionKeywords(...)`
+  - moved `orderSupportedAuthModes(...)`
+  - deleted `apps/desktop/src/renderer/shared/Definitions.ts`
+- Removed the desktop connection presenter pass-through shell and rewired callers directly to the focused list/status presenters:
+  - deleted `apps/desktop/src/state/ConnectionPresenter.ts`
+  - updated `Surface.ts`, `SettingsQuery.ts`, `MenubarQuery.ts`, `HistoryQuery.ts`, and `DesktopConnectionGateway.ts`
+
+### Verification
+
+- `npm run typecheck`
+
+### Step 11: Default OpenAI session onboarding to current Codex import
+
+- Restored the add-connection OpenAI session default to `current_codex` instead of `login`:
+  - `apps/desktop/src/renderer/connections/add/useForm.ts`
+- Reordered the OpenAI session method cards so the default import path appears before explicit sign-in:
+  - `apps/desktop/src/renderer/connections/ConnectionFormParts.tsx`
+- Added a renderer regression test covering the method ordering/default intent:
+  - `apps/desktop/src/renderer/connections/add/useForm.test.ts`
+
+### Verification
+
+- `npm run typecheck`
+- `node --import tsx ./build.ts` (in `apps/desktop`)
+
+### Step 12: Make session sign-in non-blocking
+
+- Switched Codex and Claude login helpers from synchronous `spawnSync(...)` to asynchronous child-process execution so desktop sign-in flows no longer block the Electron main process:
+  - `packages/core/src/agents/codex/CodexSessionLogin.ts`
+  - `packages/core/src/agents/claude/ClaudeSessionLogin.ts`
+- Added `LocalCredentialResolver.resolveAsync(...)` for session-login-backed credential resolution and updated local connection workflows plus desktop/CLI onboarding flows to await it:
+  - `packages/core/src/application/local/LocalCredentialResolver.ts`
+  - `packages/core/src/application/local/ConnectionWorkflows.ts`
+  - `apps/desktop/src/electron/connections/DesktopConnectionManager.ts`
+  - `apps/cli/src/commands/CredentialResolver.ts`
+  - `apps/cli/src/commands/ConnectionAddFlow.ts`
+- Restored add-connection OpenAI session defaults to prefer importing the current Codex session over triggering a fresh login:
+  - `apps/desktop/src/renderer/connections/add/useForm.ts`
+  - `apps/desktop/src/renderer/connections/ConnectionFormParts.tsx`
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/agents/codex/CodexSessionLogin.test.ts packages/core/src/agents/codex/live-setup/CurrentCredentialReader.test.ts packages/core/src/application/local/LocalCredentialResolver.test.ts packages/core/src/runtime-local/SessionRuntime.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/cli/src/NileCli.test.ts`
+- `npm run typecheck`
+- `node --import tsx ./build.ts` (in `apps/desktop`)
+
 ### Step 17: Restore browser-safe desktop build after managed-env reset fixes
 
 - Fixed the browser-safe `@nile/core/models/connection/requirements` entry so it no longer imports the broad `models/agent` barrel:
@@ -151,6 +260,17 @@
 
 - `node --import tsx ./build.ts` in `apps/desktop`
 - `./node_modules/.bin/vitest run apps/desktop/src/electron/environment/OpenClaw.test.ts apps/desktop/src/electron/environment/Shell.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts apps/desktop/src/electron/environment/Source.test.ts`
+- `npm run typecheck`
+
+### Step 18: Remove dead compatibility shells
+
+- Deleted `apps/desktop/src/electron/types.ts`, which had become an unused compatibility re-export layer after the bridge contracts were split by domain.
+- Deleted `apps/cli/src/formatters.ts`, which only re-exported `formatAgentLabel` with no added semantics and violated the repository rule against exact alias re-exports.
+- Updated CLI callers to import `formatAgentLabel` directly from:
+  - `@nile/core/models/agent/types`
+
+### Verification
+
 - `npm run typecheck`
 
 ### Step 15: Refine managed shell environment syncing

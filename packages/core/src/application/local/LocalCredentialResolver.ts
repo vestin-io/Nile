@@ -52,14 +52,32 @@ export class LocalCredentialResolver {
     }
 
     if (request.authMode === "openai_session") {
+      if (request.source === "login") {
+        throw new Error("OpenAI session login requires async resolution");
+      }
       return this.resolveOpenAiSession(request.source, request.authJsonPath);
     }
 
     if (request.authMode === "claude_session") {
+      if (request.source === "login") {
+        throw new Error("Claude session login requires async resolution");
+      }
       return this.resolveClaudeSession(request.source);
     }
 
     return this.resolveCurrentCursorCredential();
+  }
+
+  async resolveAsync(request: LocalCredentialRequest): Promise<StoredCredential> {
+    if (request.authMode === "openai_session" && request.source === "login") {
+      return await this.resolveOpenAiSessionWithLogin(request.authJsonPath);
+    }
+
+    if (request.authMode === "claude_session" && request.source === "login") {
+      return await this.resolveClaudeSessionWithLogin();
+    }
+
+    return this.resolve(request);
   }
 
   resolveProbeCredential(request: LocalCredentialRequest): StoredCredential {
@@ -114,9 +132,7 @@ export class LocalCredentialResolver {
     authJsonPath?: string,
   ): OpenAiSessionCredential {
     const codexHome = resolveAgentHome("codex", this.agentHomes);
-    const credential = source === "login"
-      ? this.codexSessionLogin.signInAndRead(codexHome)
-      : CodexCurrentCredentialReader.open({
+    const credential = CodexCurrentCredentialReader.open({
         codexHome,
         authPath: authJsonPath?.trim() || undefined,
       }).read();
@@ -125,6 +141,18 @@ export class LocalCredentialResolver {
       throw new Error("No OpenAI session found in current Codex setup");
     }
 
+    return credential;
+  }
+
+  private async resolveOpenAiSessionWithLogin(authJsonPath?: string): Promise<OpenAiSessionCredential> {
+    const codexHome = resolveAgentHome("codex", this.agentHomes);
+    const credential = await this.codexSessionLogin.signInAndRead(codexHome);
+    if (credential.kind !== "openai_session") {
+      throw new Error("No OpenAI session found after Codex sign-in");
+    }
+    if (authJsonPath?.trim()) {
+      return this.resolveOpenAiSession("current_codex", authJsonPath);
+    }
     return credential;
   }
 
@@ -139,16 +167,16 @@ export class LocalCredentialResolver {
   }
 
   private resolveClaudeSession(source: "current_claude" | "login"): ClaudeSessionCredential {
-    if (source === "login") {
-      const claudeHome = resolveAgentHome("claude", this.agentHomes);
-      const credential = this.claudeSessionLogin.signInAndRead(claudeHome);
-      if (credential.kind !== "claude_session") {
-        throw new Error("No Claude session found after Claude sign-in");
-      }
-      return credential;
-    }
-
     return this.resolveCurrentClaudeCredential();
+  }
+
+  private async resolveClaudeSessionWithLogin(): Promise<ClaudeSessionCredential> {
+    const claudeHome = resolveAgentHome("claude", this.agentHomes);
+    const credential = await this.claudeSessionLogin.signInAndRead(claudeHome);
+    if (credential.kind !== "claude_session") {
+      throw new Error("No Claude session found after Claude sign-in");
+    }
+    return credential;
   }
 
   private resolveCurrentCursorCredential(): StoredCredential {

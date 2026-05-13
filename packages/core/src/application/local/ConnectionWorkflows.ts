@@ -26,14 +26,15 @@ export class LocalConnectionWorkflows {
     const currentCredential = input.credentialRequest === undefined && input.endpointUrl !== undefined
       ? this.savedConnections.readCredential(input.connectionId)
       : undefined;
+    const credential = input.credentialRequest
+      ? await localCredentialResolver.resolveAsync(input.credentialRequest)
+      : currentCredential;
     return await this.savedConnections.update({
       connectionId: input.connectionId,
       label: input.label,
       enabledAgents: input.enabledAgents,
       endpointUrl: input.endpointUrl,
-      credential: input.credentialRequest
-        ? localCredentialResolver.resolve(input.credentialRequest)
-        : currentCredential,
+      credential,
       probeCredential: input.credentialRequest
         ? localCredentialResolver.resolveProbeCredential(input.credentialRequest)
         : currentCredential
@@ -47,7 +48,7 @@ export class LocalConnectionWorkflows {
     localCredentialResolver: LocalCredentialResolver,
   ): Promise<CreateConnectionResult> {
     return await this.connectionCreator.create(
-      this.buildCreateConnectionInput(input, localCredentialResolver, input.enabledAgents),
+      await this.buildCreateConnectionInput(input, localCredentialResolver, input.enabledAgents),
     );
   }
 
@@ -56,16 +57,16 @@ export class LocalConnectionWorkflows {
     localCredentialResolver: LocalCredentialResolver,
   ): Promise<ConnectionOnboardingSuggestion> {
     return await this.connectionCreator.describeOnboarding(
-      this.buildCreateConnectionInput(input, localCredentialResolver),
+      await this.buildCreateConnectionInput(input, localCredentialResolver),
     );
   }
 
-  private buildCreateConnectionInput(
+  private async buildCreateConnectionInput(
     input: CreateLocalConnectionInput,
     localCredentialResolver: LocalCredentialResolver,
     enabledAgents?: CreateLocalConnectionInput["enabledAgents"],
-  ): CreateConnectionInput {
-    const credential = localCredentialResolver.resolve(input.credentialRequest);
+  ): Promise<CreateConnectionInput> {
+    const credential = await localCredentialResolver.resolveAsync(input.credentialRequest);
     return {
       preset: input.preset,
       authMode: input.authMode,

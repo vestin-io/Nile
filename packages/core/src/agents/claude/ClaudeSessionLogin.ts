@@ -1,13 +1,13 @@
-import { spawnSync } from "node:child_process";
+import { spawn as spawnChild } from "node:child_process";
 import { dirname } from "node:path";
 
 import { EnvironmentSource } from "../../services/EnvironmentSource";
 import type { ClaudeSessionCredential } from "../../services/credential/Types";
 import { CurrentCredentialReader } from "./live-setup/CredentialReader";
 
-type SpawnResult = {
-  error?: Error;
-  status: number | null;
+type SpawnedProcess = {
+  once(event: "error", listener: (error: Error) => void): unknown;
+  once(event: "exit", listener: (code: number | null) => void): unknown;
 };
 
 type SpawnFn = (
@@ -17,34 +17,35 @@ type SpawnFn = (
     stdio: "inherit";
     env: NodeJS.ProcessEnv;
   },
-) => SpawnResult;
+) => SpawnedProcess;
 
 export class ClaudeSessionLogin {
   constructor(
     private readonly environment: EnvironmentSource = EnvironmentSource.from(process.env),
-    private readonly spawn: SpawnFn = spawnSync,
+    private readonly spawn: SpawnFn = spawnChild,
   ) {}
 
-  signIn(claudeHome: string): void {
-    const result = this.spawn("claude", ["login"], {
+  async signIn(claudeHome: string): Promise<void> {
+    const child = this.spawn("claude", ["login"], {
       stdio: "inherit",
       env: {
         ...process.env,
-        PATH: this.environment.read("PATH") ?? process.env.PATH,
+        PATH: mergePath(process.env.PATH, this.environment.read("PATH")),
         HOME: dirname(claudeHome),
       },
     });
 
-    if (result.error) {
-      throw this.buildSpawnError(result.error);
-    }
-    if (result.status !== 0) {
-      throw new Error(`claude login failed with exit code ${result.status ?? "unknown"}`);
+    const exitCode = await new Promise<number | null>((resolve, reject) => {
+      child.once("error", (error) => reject(this.buildSpawnError(error)));
+      child.once("exit", (code) => resolve(code));
+    });
+    if (exitCode !== 0) {
+      throw new Error(`claude login failed with exit code ${exitCode ?? "unknown"}`);
     }
   }
 
-  signInAndRead(claudeHome: string): ClaudeSessionCredential {
-    this.signIn(claudeHome);
+  async signInAndRead(claudeHome: string): Promise<ClaudeSessionCredential> {
+    await this.signIn(claudeHome);
     return CurrentCredentialReader.open({ claudeHome }).readSession();
   }
 
@@ -57,4 +58,15 @@ export class ClaudeSessionLogin {
     }
     return error;
   }
+}
+
+function mergePath(primary: string | undefined, secondary: string | null): string | undefined {
+  const entries = [
+    ...(primary?.split(":") ?? []),
+    ...(secondary?.split(":") ?? []),
+  ].map((entry) => entry.trim()).filter(Boolean);
+  if (entries.length === 0) {
+    return undefined;
+  }
+  return [...new Set(entries)].join(":");
 }

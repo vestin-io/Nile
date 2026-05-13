@@ -68,7 +68,7 @@ export class ConnectionAddFlow {
     }
 
     const authMode = this.options.credentialResolver.requireAuthMode(this.requireFlagString(flags, "auth-mode"));
-    const credential = this.options.credentialResolver.resolveForFlags(options, flags, authMode);
+    const credential = await this.options.credentialResolver.resolveForFlags(options, flags, authMode);
     const endpointUrl = this.readFlagString(flags, "endpoint-url") ?? undefined;
     const label = this.readFlagString(flags, "label") ?? undefined;
     const agentSelection = await this.resolveAgentSelection(options, flags, definition, {

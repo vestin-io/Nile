@@ -14,19 +14,22 @@ export class ScanLocalSetups {
     private readonly agentAdapterRegistry: AgentAdapterLookup,
   ) {}
 
-  run(agentIds?: AgentId[]): ScanLocalSetupsResult {
+  run(
+    agentIds?: AgentId[],
+    detections?: Map<AgentId, AgentDetectionResult>,
+  ): ScanLocalSetupsResult {
     const ids = agentIds ?? this.agentAdapterRegistry.listAgents();
-    const items = ids.map((agentId) => this.scanAgent(agentId));
+    const items = ids.map((agentId) => this.scanAgent(agentId, detections?.get(agentId)));
     return {
       items,
       importableCount: items.filter((item) => item.importable).length,
     };
   }
 
-  private scanAgent(agentId: AgentId): ScanItem {
-    const detection = this.agentAdapterRegistry.get(agentId).detectAgentSelection();
-    const status = this.status.get(agentId, detection);
-    const state = this.resolveState(detection, status);
+  private scanAgent(agentId: AgentId, detection?: AgentDetectionResult): ScanItem {
+    const resolvedDetection = detection ?? this.agentAdapterRegistry.get(agentId).detectAgentSelection();
+    const status = this.status.get(agentId, resolvedDetection);
+    const state = this.resolveState(resolvedDetection, status);
     const liveConnection = status.liveConnection;
 
     return {
@@ -34,11 +37,11 @@ export class ScanLocalSetups {
       agentId,
       sourceKind: "current_live_setup",
       title: this.resolveTitle(agentId, liveConnection),
-      subtitle: this.resolveSubtitle(liveConnection, detection),
+      subtitle: this.resolveSubtitle(liveConnection, resolvedDetection),
       state,
       importable: state === "new",
       defaultSelected: state === "new",
-      issues: [...detection.detectedState.issues],
+      issues: [...resolvedDetection.detectedState.issues],
     };
   }
 

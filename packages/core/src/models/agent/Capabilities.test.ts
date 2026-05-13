@@ -18,6 +18,7 @@ describe("AgentCapabilities", () => {
         "openai-session",
         "claude-session",
       ],
+      autoSyncMatchedSelection: false,
     });
   });
 
@@ -26,6 +27,7 @@ describe("AgentCapabilities", () => {
       requiredApplyRequirements: [],
       supportsManagedEnvBackedApiKey: true,
       supportedConnectionKinds: ["openai-api-key", "openai-session"],
+      autoSyncMatchedSelection: true,
     });
   });
 

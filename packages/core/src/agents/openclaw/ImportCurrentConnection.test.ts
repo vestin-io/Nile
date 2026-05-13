@@ -116,23 +116,8 @@ describe("OpenClaw ImportCurrentConnection", () => {
       }, null, 2),
       "utf8",
     );
-    writeFileSync(
-      join(setup.codexHome, "auth.json"),
-      JSON.stringify({
-        OPENAI_API_KEY: null,
-        tokens: {
-          id_token: "header.eyJlbWFpbCI6ImppcWlhbmc5MEBnbWFpbC5jb20ifQ.signature",
-          access_token: "access-token",
-          refresh_token: "refresh-token",
-          account_id: "acct-123",
-        },
-      }, null, 2),
-      "utf8",
-    );
-
     const importer = ImportCurrentConnection.open(setup.dbPath, {
       openclawHome: setup.openclawHome,
-      codexHome: setup.codexHome,
       credentialStore: setup.credentialStore,
     });
 
@@ -163,21 +148,17 @@ describe("OpenClaw ImportCurrentConnection", () => {
 function createSetup(): {
   dbPath: string;
   openclawHome: string;
-  codexHome: string;
   credentialStore: StubCredentialStore;
 } {
   const dir = mkdtempSync(join(tmpdir(), "nile-openclaw-import-"));
   tempDirs.push(dir);
   const openclawHome = join(dir, ".openclaw");
-  const codexHome = join(dir, ".codex");
   mkdirSync(openclawHome, { recursive: true });
   mkdirSync(join(openclawHome, "agents", "main", "agent"), { recursive: true });
-  mkdirSync(codexHome, { recursive: true });
 
   return {
     dbPath: join(dir, "switcher.sqlite"),
     openclawHome,
-    codexHome,
     credentialStore: new StubCredentialStore(),
   };
 }

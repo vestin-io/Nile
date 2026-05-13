@@ -9,7 +9,6 @@ import {
 } from "../../../runtime-local/AgentWorkspaceSession";
 import type { AgentWorkspaceContext } from "../../../runtime-local/AgentWorkspaceContext";
 import { LiveSetupMatcher } from "../../../actions/live-setup/Matcher";
-import { CodexAuthStore } from "../../codex/stores/CodexAuthStore";
 import { OpenClawAuthProfileStore } from "../AuthProfileStore";
 import { OpenClawConfigStore } from "../OpenClawConfigStore";
 import { OPENCLAW_AGENT_ID, type OpenClawDetectedAccess, type OpenClawDetectedEndpoint, type OpenClawDetectedLiveSetup } from "../types";
@@ -21,7 +20,6 @@ export class LiveSetupDetector extends AbstractAgentStateDetector<OpenClawDetect
     databasePath: string,
     options: {
       openclawHome?: string;
-      codexHome?: string;
       credentialStore: CredentialStore;
       logger?: NileLogger;
     },
@@ -32,7 +30,6 @@ export class LiveSetupDetector extends AbstractAgentStateDetector<OpenClawDetect
     const reader = new LiveSetupReader(
       new OpenClawConfigStore(openclawHome),
       new OpenClawAuthProfileStore(openclawHome),
-      new CodexAuthStore({ codexHome: options?.codexHome ?? join(homedir(), ".codex") }),
     );
     const matcher = new LiveSetupMatcher(
       context.sharedContext.endpointRegistry,
@@ -48,7 +45,6 @@ export class LiveSetupDetector extends AbstractAgentStateDetector<OpenClawDetect
     context: AgentWorkspaceContext,
     options: {
       openclawHome?: string;
-      codexHome?: string;
       credentialStore: CredentialStore;
       logger?: NileLogger;
     },
@@ -58,7 +54,6 @@ export class LiveSetupDetector extends AbstractAgentStateDetector<OpenClawDetect
     const reader = new LiveSetupReader(
       new OpenClawConfigStore(openclawHome),
       new OpenClawAuthProfileStore(openclawHome),
-      new CodexAuthStore({ codexHome: options?.codexHome ?? join(homedir(), ".codex") }),
     );
     const matcher = new LiveSetupMatcher(
       context.endpointRegistry,

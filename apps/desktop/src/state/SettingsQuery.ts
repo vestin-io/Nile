@@ -1,13 +1,10 @@
-import {
-  resolveAgentHome,
-  SUPPORTED_AGENT_IDS,
-  type AgentId,
-} from "@nile/core/models/agent";
+import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/types";
 import { CODEX_AGENT_ID } from "@nile/core/agents";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { NileSession } from "@nile/core/runtime-local";
 
-import { DesktopConnectionPresenter } from "./ConnectionPresenter";
+import { DesktopConnectionListPresenter } from "./connection/List";
+import { DesktopConnectionStatusPresenter } from "./connection/Status";
 import type {
   DesktopAdvancedState,
   DesktopAgentState,
@@ -20,6 +17,7 @@ import type { DesktopUsageState } from "./UsageSummary";
 
 type DesktopSettingsStateQueryOptions = {
   resolveDesktopAgentHome(agentId: AgentId): string;
+  resolveDefaultDesktopAgentHome(agentId: AgentId): string;
 };
 
 type DesktopSettingsStateReadOptions = {
@@ -29,7 +27,8 @@ type DesktopSettingsStateReadOptions = {
 export class DesktopSettingsStateQuery {
   constructor(
     private readonly options: DesktopSettingsStateQueryOptions,
-    private readonly connections: DesktopConnectionPresenter,
+    private readonly lists: DesktopConnectionListPresenter,
+    private readonly status: DesktopConnectionStatusPresenter,
     private readonly usage: DesktopUsageCache,
   ) {}
 
@@ -44,7 +43,7 @@ export class DesktopSettingsStateQuery {
     if (!codexState) {
       throw new Error("Codex agent state is missing from desktop settings state");
     }
-    const codexSelectionOverride = this.connections.createSelectionDisplayOverride(CODEX_AGENT_ID, codexState.currentConnection);
+    const codexSelectionOverride = this.lists.createSelectionDisplayOverride(CODEX_AGENT_ID, codexState.currentConnection?.id ?? null);
     const codexAgentModelIdsByConnectionId = new Map(
       savedConnections.map((connection) => {
         const savedModelId = session.getAgentConnectionModel(CODEX_AGENT_ID, connection.id);
@@ -57,13 +56,13 @@ export class DesktopSettingsStateQuery {
         ] as const;
       }),
     );
-    const connections = this.connections.buildConnections(
+    const connections = this.lists.buildConnections(
       savedConnections,
       codexState.currentConnection?.id ?? null,
       usageByConnectionId,
       codexSelectionOverride,
     );
-    const currentAgentConnections = this.connections.buildConnections(
+    const currentAgentConnections = this.lists.buildConnections(
       savedConnections.filter((connection) => connection.configurableAgents.includes(CODEX_AGENT_ID)),
       codexState.currentConnection?.id ?? null,
       usageByConnectionId,
@@ -122,9 +121,9 @@ export class DesktopSettingsStateQuery {
     );
     return SUPPORTED_AGENT_IDS.map((agentId) => {
       const status = session.getAgentStatus(agentId);
-      const currentConnection = this.connections.resolveEffectiveCurrentConnection(status, savedConnections);
-      const liveConnection = this.connections.resolveLiveConnection(status.liveConnection, savedConnections, currentConnection);
-      const selectionOverride = this.connections.createSelectionDisplayOverride(agentId, currentConnection);
+      const currentConnection = this.status.resolveEffectiveCurrentConnection(status, savedConnections);
+      const liveConnection = this.status.resolveLiveConnection(status.liveConnection, savedConnections, currentConnection);
+      const selectionOverride = this.lists.createSelectionDisplayOverride(agentId, currentConnection?.id ?? null);
       const agentModelIdsByConnectionId = new Map(
         savedConnections.map((connection) => {
           const savedModelId = session.getAgentConnectionModel(agentId, connection.id);
@@ -137,7 +136,7 @@ export class DesktopSettingsStateQuery {
           ] as const;
         }),
       );
-      const connections = this.connections.buildConnections(
+      const connections = this.lists.buildConnections(
         savedConnections.filter((connection) => connection.configurableAgents.includes(agentId)),
         currentConnection?.id ?? null,
         usageByConnectionId,
@@ -147,12 +146,12 @@ export class DesktopSettingsStateQuery {
       );
       const state: DesktopAgentState = {
         agentId,
-        agentLabel: this.connections.formatAgentLabel(agentId),
+        agentLabel: this.lists.formatAgentLabel(agentId),
         canRollback: rollbackByAgent.get(agentId) === "yes",
         latestRollbackableMutationId: session.getLatestRollbackableMutation(agentId, "settings-state")?.id ?? null,
         currentConnection,
         currentUsage: currentConnection ? (usageByConnectionId.get(currentConnection.id) ?? null) : null,
-        currentConnectionState: this.connections.resolveEffectiveCurrentConnectionState(status, currentConnection),
+        currentConnectionState: this.status.resolveEffectiveCurrentConnectionState(status, currentConnection),
         liveConnection,
         reconciliationState: status.reconciliation.state,
         connections,
@@ -171,13 +170,13 @@ export class DesktopSettingsStateQuery {
     return {
       agentHomes: SUPPORTED_AGENT_IDS.map((agentId) => ({
         agentId,
-        agentLabel: this.connections.formatAgentLabel(agentId),
+        agentLabel: this.lists.formatAgentLabel(agentId),
         path: this.options.resolveDesktopAgentHome(agentId),
-        defaultPath: resolveAgentHome(agentId),
+        defaultPath: this.options.resolveDefaultDesktopAgentHome(agentId),
       })),
       supportedAgents: SUPPORTED_AGENT_IDS.map((agentId) => ({
         agentId,
-        agentLabel: this.connections.formatAgentLabel(agentId),
+        agentLabel: this.lists.formatAgentLabel(agentId),
       })),
       savedConnectionCount: savedConnections.length,
       importableSetupCount: scan.importableCount,

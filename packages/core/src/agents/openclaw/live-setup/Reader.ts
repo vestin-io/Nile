@@ -1,4 +1,3 @@
-import { CodexAuthStore } from "../../codex/stores/CodexAuthStore";
 import {
   OpenClawAuthProfileStore,
 } from "../AuthProfileStore";
@@ -18,9 +17,8 @@ export class LiveSetupReader {
   constructor(
     private readonly configStore: OpenClawConfigStore,
     private readonly authProfileStore: OpenClawAuthProfileStore,
-    private readonly codexAuthStore: CodexAuthStore,
   ) {
-    this.stateResolver = new LiveSetupResolver(this.codexAuthStore);
+    this.stateResolver = new LiveSetupResolver();
   }
 
   read(): ReadLiveSetupResult {

@@ -460,6 +460,9 @@ describe("DesktopConnectionManager", () => {
   it("ensures managed env keys for batch detected-setup imports", async () => {
     const ensureCalls: string[] = [];
     const sessionStub = {
+      getAgentStatus: () => ({
+        reconciliation: { state: "unavailable", issues: [] },
+      }),
       scanLocalSetups: () => ({ items: [] }),
       captureMatchedImportState: vi.fn(),
       restoreMatchedImportState: vi.fn(),
@@ -525,6 +528,9 @@ describe("DesktopConnectionManager", () => {
     const removeConnection = vi.fn();
     const restoreMatchedImportState = vi.fn();
     const sessionStub = {
+      getAgentStatus: () => ({
+        reconciliation: { state: "unavailable", issues: [] },
+      }),
       scanLocalSetups: () => ({ items: [] }),
       captureMatchedImportState: vi.fn(),
       restoreMatchedImportState,
@@ -641,6 +647,9 @@ describe("DesktopConnectionManager", () => {
     const removeConnection = vi.fn();
     const removeForConnection = vi.fn();
     const sessionStub = {
+      getAgentStatus: () => ({
+        reconciliation: { state: "unavailable", issues: [] },
+      }),
       scanLocalSetups: () => ({ items: [] }),
       captureMatchedImportState: vi.fn(),
       restoreMatchedImportState: vi.fn(),
@@ -940,7 +949,7 @@ class StubCredentialStore extends KeychainCredentialStore {
 class StubCodexSessionLogin extends CodexSessionLogin {
   readonly signInCalls: string[] = [];
 
-  override signIn(codexHome: string): void {
+  override async signIn(codexHome: string): Promise<void> {
     this.signInCalls.push(codexHome);
     writeOpenAiSession(codexHome, "acct-signed-in");
   }
@@ -949,7 +958,7 @@ class StubCodexSessionLogin extends CodexSessionLogin {
 class StubClaudeSessionLogin extends ClaudeSessionLogin {
   readonly signInCalls: string[] = [];
 
-  override signIn(claudeHome: string): void {
+  override async signIn(claudeHome: string): Promise<void> {
     this.signInCalls.push(claudeHome);
     writeClaudeSession(claudeHome);
   }

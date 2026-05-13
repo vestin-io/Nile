@@ -45,11 +45,11 @@ describe("CodexCurrentCredentialReader", () => {
     });
   });
 
-  it("lets the shared login helper sign in before reading the current credential", () => {
+  it("lets the shared login helper sign in before reading the current credential", async () => {
     const codexHome = createCodexHome();
     const login = new StubCodexSessionLogin();
 
-    expect(login.signInAndRead(codexHome)).toEqual({
+    await expect(login.signInAndRead(codexHome)).resolves.toEqual({
       kind: "openai_session",
       idToken: "id-token",
       accessToken: "access-token",
@@ -93,7 +93,7 @@ function writeOpenAiSessionAtPath(authPath: string, accountId: string): void {
 class StubCodexSessionLogin extends CodexSessionLogin {
   readonly calls: string[] = [];
 
-  override signIn(codexHome: string): void {
+  override async signIn(codexHome: string): Promise<void> {
     this.calls.push(codexHome);
     writeOpenAiSession(codexHome, "acct-signed-in");
   }

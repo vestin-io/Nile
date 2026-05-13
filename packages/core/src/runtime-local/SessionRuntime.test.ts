@@ -16,7 +16,7 @@ afterEach(() => {
 });
 
 describe("SessionRuntime", () => {
-  it("uses the injected environment when building the default Codex login helper", () => {
+  it("uses the injected environment when building the default Codex login helper", async () => {
     const dir = mkdtempSync(join(tmpdir(), "nile-runtime-"));
     tempDirs.push(dir);
     const binDir = join(dir, "bin");
@@ -41,7 +41,7 @@ describe("SessionRuntime", () => {
     });
 
     try {
-      const credential = runtime.createLocalCredentialResolver().resolve({
+      const credential = await runtime.createLocalCredentialResolver().resolveAsync({
         authMode: "openai_session",
         source: "login",
       });

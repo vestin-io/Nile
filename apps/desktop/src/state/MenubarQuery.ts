@@ -1,14 +1,16 @@
-import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent";
+import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent/types";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { NileSession } from "@nile/core/runtime-local";
 
 import type { MenubarAgentState, MenubarState } from "./Types";
-import { DesktopConnectionPresenter } from "./ConnectionPresenter";
+import { DesktopConnectionListPresenter } from "./connection/List";
+import { DesktopConnectionStatusPresenter } from "./connection/Status";
 import { DesktopUsageCache } from "./UsageCache";
 
 export class DesktopMenubarStateQuery {
   constructor(
-    private readonly connections: DesktopConnectionPresenter,
+    private readonly lists: DesktopConnectionListPresenter,
+    private readonly status: DesktopConnectionStatusPresenter,
     private readonly usage: DesktopUsageCache,
   ) {}
 
@@ -24,7 +26,7 @@ export class DesktopMenubarStateQuery {
     const currentConnectionIds = new Set(
       SUPPORTED_AGENT_IDS.map((agentId) => {
         const status = session.getAgentStatus(agentId);
-        return this.connections.resolveEffectiveCurrentConnection(status, savedConnections)?.id ?? null;
+        return this.status.resolveEffectiveCurrentConnection(status, savedConnections)?.id ?? null;
       }).filter((connectionId): connectionId is string => connectionId !== null),
     );
 
@@ -37,20 +39,20 @@ export class DesktopMenubarStateQuery {
   ): MenubarAgentState[] {
     return SUPPORTED_AGENT_IDS.map((agentId) => {
       const status = session.getAgentStatus(agentId);
-      const currentConnection = this.connections.resolveEffectiveCurrentConnection(status, savedConnections);
+      const currentConnection = this.status.resolveEffectiveCurrentConnection(status, savedConnections);
       const compatibleConnections = savedConnections.filter((connection) =>
         connection.configurableAgents.includes(agentId));
-      const selectionOverride = this.connections.createSelectionDisplayOverride(agentId, currentConnection);
+      const selectionOverride = this.lists.createSelectionDisplayOverride(agentId, currentConnection?.id ?? null);
       const currentUsage = currentConnection
         ? this.usage.peek(currentConnection.id)
         : null;
 
       return {
         agentId,
-        agentLabel: this.connections.formatAgentLabel(agentId),
+        agentLabel: this.lists.formatAgentLabel(agentId),
         currentConnection,
         currentUsage,
-        connections: this.connections.buildConnections(
+        connections: this.lists.buildConnections(
           compatibleConnections,
           currentConnection?.id ?? null,
           undefined,

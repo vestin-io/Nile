@@ -10,7 +10,7 @@ import type {
   AddConnectionResult,
   HistoryListEntry,
 } from "../types";
-import { formatAgentLabel } from "../formatters";
+import { formatAgentLabel } from "@nile/core/models/agent/types";
 import { EndpointLabelFormatter } from "./EndpointLabelFormatter";
 
 export class ConnectionPresenter {

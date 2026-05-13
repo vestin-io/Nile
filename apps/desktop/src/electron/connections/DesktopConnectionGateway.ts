@@ -8,7 +8,7 @@ import type { CredentialStore } from "@nile/core/services/credential";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 
-import { DesktopConnectionPresenter } from "../../state/ConnectionPresenter";
+import { DesktopConnectionStatusPresenter } from "../../state/connection/Status";
 import type { DesktopConnection } from "../../state/Types";
 import { DesktopManagedConnectionImports } from "./Imports";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
@@ -26,7 +26,7 @@ type DesktopConnectionGatewayOptions = {
 export class DesktopConnectionGateway {
   private readonly cursorUsageSessionProbe = CursorUsageSessionSourceProbe.createDefault();
   private readonly sessions: SessionRunner;
-  private readonly connections = new DesktopConnectionPresenter();
+  private readonly status = new DesktopConnectionStatusPresenter();
   private readonly managedApiKeyEnvironment: ManagedApiKeyEnvironment | NoopManagedApiKeyEnvironment;
   private readonly imports: DesktopManagedConnectionImports;
 
@@ -59,7 +59,7 @@ export class DesktopConnectionGateway {
       await this.enableAgentForConnectionIfNeeded(session, agentId, connectionId);
       const applied = session.useConnection(agentId, connectionId);
       const status = session.getAgentStatus(agentId);
-      const currentConnection = this.connections.resolveCurrentConnection(
+      const currentConnection = this.status.resolveCurrentConnection(
         status.currentConnection,
         session.listSavedConnections(),
       );

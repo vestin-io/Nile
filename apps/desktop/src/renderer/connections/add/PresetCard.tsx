@@ -4,7 +4,7 @@ import azureAiSvg from "@lobehub/icons-static-svg/icons/azureai-color.svg";
 import claudeSvg from "@lobehub/icons-static-svg/icons/claude.svg";
 
 import type { Translator } from "../../shared/I18n";
-import { readDefinitionKeywords, type Definition } from "../../shared/Definitions";
+import { readDefinitionKeywords, type Definition } from "../../shared/DesktopData";
 import { authModeLabel } from "../../shared/DisplayText";
 import type { LanguagePreference } from "../../settings/Preferences";
 import { ProviderSummary } from "../../providers/ProviderSummary";
