@@ -17,6 +17,7 @@ afterEach(() => {
 
 describe("SessionRuntime", () => {
   it("uses the injected environment when building the default Codex login helper", async () => {
+    const originalPath = process.env.PATH;
     const dir = mkdtempSync(join(tmpdir(), "nile-runtime-"));
     tempDirs.push(dir);
     const binDir = join(dir, "bin");
@@ -24,6 +25,7 @@ describe("SessionRuntime", () => {
     const database = SqliteDatabase.open(join(dir, "db.sqlite"));
     writeFakeCodex(binDir);
 
+    process.env.PATH = "";
     const runtime = new SessionRuntime({
       agentHomes: { codex: codexHome },
       credentialStore: {
@@ -53,6 +55,7 @@ describe("SessionRuntime", () => {
         }),
       );
     } finally {
+      process.env.PATH = originalPath;
       runtime.close();
     }
   });

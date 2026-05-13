@@ -200,7 +200,7 @@ describe("ConnectionCreator", () => {
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       });
-      expect(accessRegistry.list()[0]?.enabledAgents).toEqual(["codex", "claude"]);
+      expect(accessRegistry.list()[0]?.enabledAgents).toEqual(["codex", "claude", "openclaw"]);
     } finally {
       database.close();
     }
@@ -375,7 +375,7 @@ describe("ConnectionCreator", () => {
         reused: true,
       });
       expect(endpointRegistry.list()).toHaveLength(1);
-      expect(accessRegistry.get("frank")?.enabledAgents).toEqual(["codex", "claude"]);
+      expect(accessRegistry.get("frank")?.enabledAgents).toEqual(["codex", "claude", "openclaw"]);
       expect(endpointRegistry.get("gateway-gateway-example-test")).toEqual(
         expect.objectContaining({
           protocols: {

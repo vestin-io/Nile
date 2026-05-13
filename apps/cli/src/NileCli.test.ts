@@ -538,6 +538,7 @@ describe("NileCli", () => {
         { type: "selected", value: "status" },
         { type: "selected", value: "codex" },
         { type: "back" },
+        { type: "selected", value: "back" },
         { type: "cancel" },
       ],
       [],
@@ -920,7 +921,7 @@ describe("NileCli", () => {
     ]);
   });
 
-  it("shows synced for a matched live connection without mutating saved selection during status", async () => {
+  it("shows synced for a matched live connection and auto-syncs the saved selection during status", async () => {
     const setup = createSetup({
       configToml: [
         'model_provider = "azure"',
@@ -967,7 +968,11 @@ describe("NileCli", () => {
       expect(result.stdout).toContain("State: synced");
       expect(result.stdout).toContain("Azure OpenAI (example-eu-resource)");
       expect(result.stdout).toContain("matches a saved Nile connection");
-      expect(agentSelection.get("codex")).toBeNull();
+      expect(agentSelection.get("codex")).toEqual(
+        expect.objectContaining({
+          connectionId: "example-eu-resource-api-key",
+        }),
+      );
     } finally {
       agentSelection.close();
     }
