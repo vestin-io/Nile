@@ -134,6 +134,21 @@
 - `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/actions/local-setup/Status.test.ts`
 - `npm run typecheck`
 
+### Step 10: Connection edit/add provider summary shell cleanup
+
+- Fixed the empty rounded placeholder shown on connection edit pages when a preset has no provider summary metadata.
+- Added an explicit `hasProviderSummary(...)` check in:
+  - `apps/desktop/src/renderer/providers/ProviderSummary.tsx`
+  - `apps/desktop/src/renderer/connections/edit/Page.tsx`
+  so the summary card shell is only rendered when real content exists.
+- Applied the same guard to add-connection preset summaries in:
+  - `apps/desktop/src/renderer/connections/add/PresetCard.tsx`
+  to avoid rendering a separator with no summary content for custom presets.
+
+### Verification
+
+- `npm run typecheck`
+
 ### Step 17: Tighten managed environment sync performance and shell safety
 
 - Reduced startup managed-env churn by only writing to the desktop environment store when the resolved secret actually changed:

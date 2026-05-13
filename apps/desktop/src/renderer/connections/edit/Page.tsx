@@ -8,7 +8,10 @@ import {
 import type { Translator } from "../../shared/I18n";
 import type { Definition } from "../../shared/DesktopData";
 import { authModeLabel } from "../../shared/DisplayText";
-import { ProviderSummary } from "../../providers/ProviderSummary";
+import {
+  hasProviderSummary,
+  ProviderSummary,
+} from "../../providers/ProviderSummary";
 import {
   useConnectionEditState,
   type ConnectionEditSubmitInput,
@@ -95,6 +98,10 @@ export function ConnectionEditPage({
     t,
   });
   const gatewayTrustTarget = describeGatewayTrustTarget(endpointUrl);
+  const shouldShowProviderSummary =
+    definition !== null &&
+    definition !== undefined &&
+    hasProviderSummary(definition.preset, language);
 
   return (
     <div className="space-y-5">
@@ -128,7 +135,7 @@ export function ConnectionEditPage({
         </div>
       </div>
 
-      {definition ? (
+      {definition && shouldShowProviderSummary ? (
         <Card className="rounded-2xl">
           <CardContent className="pt-6">
             <ProviderSummary

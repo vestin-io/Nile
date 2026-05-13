@@ -7,7 +7,10 @@ import type { Translator } from "../../shared/I18n";
 import { readDefinitionKeywords, type Definition } from "../../shared/DesktopData";
 import { authModeLabel } from "../../shared/DisplayText";
 import type { LanguagePreference } from "../../settings/Preferences";
-import { ProviderSummary } from "../../providers/ProviderSummary";
+import {
+  hasProviderSummary,
+  ProviderSummary,
+} from "../../providers/ProviderSummary";
 import { Card } from "../../ui/card";
 import { type ComboboxItem, Combobox } from "../../ui/combobox";
 import { Separator } from "../../ui/separator";
@@ -31,6 +34,9 @@ export function AddConnectionPresetCard({
   t,
   onPresetChange,
 }: AddConnectionPresetCardProps) {
+  const shouldShowProviderSummary =
+    selectedDefinition !== null &&
+    hasProviderSummary(selectedDefinition.preset, language);
   const presetItems = definitions.map((definition) => ({
     value: definition.preset,
     label: definition.label,
@@ -60,7 +66,7 @@ export function AddConnectionPresetCard({
           </div>
         </section>
 
-        {selectedDefinition ? (
+        {selectedDefinition && shouldShowProviderSummary ? (
           <>
             <Separator />
             <ProviderSummary

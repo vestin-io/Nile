@@ -12,6 +12,10 @@ type ProviderSummaryProps = {
   t: Translator;
 };
 
+export function hasProviderSummary(providerKey: string, language: LanguagePreference) {
+  return ProviderCatalog.shared.findByKey(providerKey, language) !== null;
+}
+
 export function ProviderSummary({ language, providerKey, t }: ProviderSummaryProps) {
   const provider = ProviderCatalog.shared.findByKey(providerKey, language);
   if (!provider) {
