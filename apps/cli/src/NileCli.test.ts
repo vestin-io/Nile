@@ -533,9 +533,6 @@ describe("NileCli", () => {
         authId: "cursor-auth",
       },
     );
-    await createCli(setup).run(["cursor", "use", "cursor-work"]);
-    await createCli(setup).run(["codex", "use", "openai-work"]);
-
     const prompt = new StubInteractivePrompt(
       [{ type: "selected", value: "openai-work" }],
       [],
