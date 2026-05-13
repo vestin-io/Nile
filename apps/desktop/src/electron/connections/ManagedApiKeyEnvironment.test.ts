@@ -27,6 +27,7 @@ describe("ManagedApiKeyEnvironment", () => {
 
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         write,
       } as never,
       {
@@ -76,6 +77,7 @@ describe("ManagedApiKeyEnvironment", () => {
     const ensureShell = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         write,
       } as never,
       {
@@ -110,6 +112,49 @@ describe("ManagedApiKeyEnvironment", () => {
     expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
     expect(ensureShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
     expect(result?.envKey).toBe("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+  });
+
+  it("skips re-writing an unchanged managed env value", async () => {
+    const read = vi.fn().mockReturnValue("gateway-secret");
+    const write = vi.fn();
+    const ensureShell = vi.fn();
+    const environment = new ManagedApiKeyEnvironment(
+      {
+        read,
+        write,
+      } as never,
+      {
+        ensure: ensureShell,
+        remove: vi.fn(),
+      } as never,
+    );
+
+    await environment.ensureForConnection({
+      listSavedConnections: () => [{
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        endpointUrl: "https://llmfk.dpdns.org/v1",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway",
+        authMode: "api_key",
+        apiKeySource: "direct",
+        envKey: "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+        enabledAgents: ["codex", "claude"],
+        configurableAgents: ["codex", "claude", "openclaw"],
+        selectedByAgents: ["claude"],
+      }],
+      readConnectionCredential: (): StoredCredential => ({
+        kind: "api_key",
+        apiKey: "gateway-secret",
+        envKey: "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+      }),
+      setConnectionDirectApiKeyEnvKey: vi.fn(),
+    } as never, "gateway-shared-api-key");
+
+    expect(read).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+    expect(write).not.toHaveBeenCalled();
+    expect(ensureShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
   });
 
   it("rolls metadata back when writing the managed env key fails", async () => {
@@ -149,6 +194,7 @@ describe("ManagedApiKeyEnvironment", () => {
 
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         write,
         remove,
       } as never,
@@ -230,6 +276,7 @@ describe("ManagedApiKeyEnvironment", () => {
 
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         write,
         remove,
       } as never,
@@ -275,6 +322,7 @@ describe("ManagedApiKeyEnvironment", () => {
     const removeShell = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         remove,
       } as never,
       {
@@ -310,6 +358,7 @@ describe("ManagedApiKeyEnvironment", () => {
     const setConnectionDirectApiKeyEnvKey = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         write,
       } as never,
       {
@@ -376,6 +425,7 @@ describe("ManagedApiKeyEnvironment", () => {
     const syncShell = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         write: vi.fn(),
       } as never,
       {
@@ -399,6 +449,7 @@ describe("ManagedApiKeyEnvironment", () => {
   it("captures shell sync failures without throwing during full-session sync", () => {
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         write: vi.fn(),
       } as never,
       {
@@ -426,6 +477,7 @@ describe("ManagedApiKeyEnvironment", () => {
     const setConnectionDirectApiKeyEnvKey = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
       {
+        read: vi.fn().mockReturnValue(null),
         write: vi.fn(() => {
           throw new Error("keychain unavailable");
         }),
@@ -470,5 +522,57 @@ describe("ManagedApiKeyEnvironment", () => {
     expect(failures).toHaveLength(1);
     expect(failures[0]?.connectionId).toBe("gateway-shared-api-key");
     expect(failures[0]?.error.message).toBe("keychain unavailable");
+  });
+
+  it("clears removed managed env keys and syncs the preserved shell set once", () => {
+    const remove = vi.fn();
+    const sync = vi.fn();
+    const environment = new ManagedApiKeyEnvironment(
+      {
+        read: vi.fn().mockReturnValue(null),
+        remove,
+      } as never,
+      {
+        ensure: vi.fn(),
+        sync,
+        remove: vi.fn(),
+      } as never,
+    );
+
+    environment.clearForSession({
+      listSavedConnections: () => [
+        {
+          id: "keep",
+          endpointId: "gateway-shared",
+          endpointUrl: "https://llmfk.dpdns.org/v1",
+          label: "Keep",
+          endpointLabel: "Gateway",
+          endpointFamily: "gateway",
+          authMode: "api_key",
+          envKey: "NILE_KEEP_API_KEY",
+          enabledAgents: ["claude"],
+          configurableAgents: ["claude", "openclaw"],
+          selectedByAgents: ["claude"],
+        },
+        {
+          id: "remove",
+          endpointId: "gateway-shared",
+          endpointUrl: "https://llmfk.dpdns.org/v1",
+          label: "Remove",
+          endpointLabel: "Gateway",
+          endpointFamily: "gateway",
+          authMode: "api_key",
+          envKey: "NILE_REMOVE_API_KEY",
+          enabledAgents: ["claude"],
+          configurableAgents: ["claude", "openclaw"],
+          selectedByAgents: ["claude"],
+        },
+      ],
+    } as never, ["NILE_KEEP_API_KEY"]);
+
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith("NILE_REMOVE_API_KEY");
+    expect(sync).toHaveBeenCalledTimes(1);
+    expect(sync).toHaveBeenCalledWith(["NILE_KEEP_API_KEY"]);
   });
 });

@@ -75,6 +75,25 @@ export class ManagedApiKeyEnvironment {
     return failures;
   }
 
+  clearForSession(session: NileSession, preservedEnvKeys: string[] = []): void {
+    const preservedKeys = new Set(
+      preservedEnvKeys
+        .map((envKey) => envKey.trim())
+        .filter((envKey) => envKey.length > 0),
+    );
+    for (const connection of session.listSavedConnections()) {
+      if (connection.authMode !== "api_key") {
+        continue;
+      }
+      const envKey = connection.envKey?.trim();
+      if (!envKey || !envKey.startsWith("NILE_") || preservedKeys.has(envKey)) {
+        continue;
+      }
+      this.store.remove(envKey);
+    }
+    this.shellEnvironment.sync([...preservedKeys].sort());
+  }
+
   removeForConnection(session: NileSession, connectionId: string): void {
     const connection = this.readConnection(session, connectionId);
     const envKey = connection?.envKey?.trim();
@@ -109,7 +128,7 @@ export class ManagedApiKeyEnvironment {
   }
 
   private writeManagedEnvironment(envKey: string, apiKey: string): void {
-    this.store.write(envKey, apiKey);
+    this.writeManagedStoreIfChanged(envKey, apiKey);
     this.shellEnvironment.ensure(envKey);
   }
 
@@ -132,18 +151,25 @@ export class ManagedApiKeyEnvironment {
     const previousEnvKey = connection.envKey?.trim() || credential.envKey?.trim() || null;
     const envKey = this.readEnvKey(connection, credential);
     if (previousEnvKey === envKey) {
-      this.store.write(envKey, apiKey);
+      this.writeManagedStoreIfChanged(envKey, apiKey);
       return envKey;
     }
 
     session.setConnectionDirectApiKeyEnvKey(connectionId, envKey);
     try {
-      this.store.write(envKey, apiKey);
+      this.writeManagedStoreIfChanged(envKey, apiKey);
     } catch (error) {
       session.setConnectionDirectApiKeyEnvKey(connectionId, previousEnvKey);
       throw error;
     }
     return envKey;
+  }
+
+  private writeManagedStoreIfChanged(envKey: string, apiKey: string): void {
+    if (this.store.read(envKey) === apiKey) {
+      return;
+    }
+    this.store.write(envKey, apiKey);
   }
 
   private removeManagedEnvironment(envKey: string): void {
@@ -168,6 +194,8 @@ export class NoopManagedApiKeyEnvironment {
   syncForSession(_session: NileSession): Array<{ connectionId: string; error: Error }> {
     return [];
   }
+
+  clearForSession(_session: NileSession, _preservedEnvKeys: string[] = []): void {}
 
   removeForConnection(_session: NileSession, _connectionId: string): void {}
 }

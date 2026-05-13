@@ -134,6 +134,28 @@
 - `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/actions/local-setup/Status.test.ts`
 - `npm run typecheck`
 
+### Step 17: Tighten managed environment sync performance and shell safety
+
+- Reduced startup managed-env churn by only writing to the desktop environment store when the resolved secret actually changed:
+  - `apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.ts`
+- Added `clearForSession(...)` so reset clears stale managed env keys in one pass and then performs a single shell sync instead of rewriting the shell bridge per connection:
+  - `apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.ts`
+  - `apps/desktop/src/electron/shell/DesktopMain.ts`
+- Added minimal shell-path hardening so Nile refuses to manage symlinked profile/script targets:
+  - `apps/desktop/src/electron/environment/Shell.ts`
+- Extended coverage for:
+  - unchanged managed secrets skipping redundant writes
+  - batched reset cleanup / shell sync
+  - symlinked profile refusal
+  in:
+  - `apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts`
+  - `apps/desktop/src/electron/environment/Shell.test.ts`
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/environment/Shell.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts`
+- `npm run typecheck`
+
 ### Step 10: Desktop sign-in and browser-safe home-path cleanup
 
 - Removed browser-side dependence on `@nile/core/models/agent/homes` by resolving default agent home paths at the desktop surface boundary instead of inside `SettingsQuery`.

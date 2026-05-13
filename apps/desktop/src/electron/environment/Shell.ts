@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -66,18 +66,15 @@ export class DesktopShellEnvironment {
   }
 
   private writeIndex(keys: string[]): void {
-    mkdirSync(dirname(this.indexPath), { recursive: true });
-    writeFileSync(this.indexPath, `${JSON.stringify(keys, null, 2)}\n`, "utf8");
+    this.writeTextFile(this.indexPath, `${JSON.stringify(keys, null, 2)}\n`);
   }
 
   private writePosixScript(keys: string[]): void {
-    mkdirSync(dirname(this.posixScriptPath), { recursive: true });
-    writeFileSync(this.posixScriptPath, this.buildPosixScript(keys), "utf8");
+    this.writeTextFile(this.posixScriptPath, this.buildPosixScript(keys));
   }
 
   private writeFishScript(keys: string[]): void {
-    mkdirSync(dirname(this.fishScriptPath), { recursive: true });
-    writeFileSync(this.fishScriptPath, this.buildFishScript(keys), "utf8");
+    this.writeTextFile(this.fishScriptPath, this.buildFishScript(keys));
   }
 
   private readManagedKeys(): string[] {
@@ -134,23 +131,24 @@ export class DesktopShellEnvironment {
 
   private ensureProfileBlocks(): void {
     for (const profile of this.posixProfiles) {
+      this.assertSafeFileTarget(profile.path);
       const current = this.readFile(profile.path);
       const next = this.replaceManagedBlock(current, this.buildPosixProfileBlock());
       if (next !== current) {
-        mkdirSync(dirname(profile.path), { recursive: true });
-        writeFileSync(profile.path, next, "utf8");
+        this.writeTextFile(profile.path, next);
       }
     }
   }
 
   private removeProfileBlocks(): void {
     for (const profile of this.posixProfiles) {
+      this.assertSafeFileTarget(profile.path);
       const current = this.readFile(profile.path);
       const next = this.replaceManagedBlock(current, "");
       if (next === current) {
         continue;
       }
-      writeFileSync(profile.path, next, "utf8");
+      this.writeTextFile(profile.path, next);
     }
   }
 
@@ -196,9 +194,9 @@ export class DesktopShellEnvironment {
   }
 
   private removeScripts(): void {
-    rmSync(this.indexPath, { force: true });
-    rmSync(this.posixScriptPath, { force: true });
-    rmSync(this.fishScriptPath, { force: true });
+    this.removeFile(this.indexPath);
+    this.removeFile(this.posixScriptPath);
+    this.removeFile(this.fishScriptPath);
   }
 
   private normalizeEnvKey(envKey: string): string {
@@ -207,6 +205,31 @@ export class DesktopShellEnvironment {
       throw new Error(`Environment variable name is invalid: ${envKey}`);
     }
     return normalizedEnvKey;
+  }
+
+  private writeTextFile(path: string, content: string): void {
+    this.assertSafeFileTarget(path);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content, "utf8");
+  }
+
+  private removeFile(path: string): void {
+    this.assertSafeFileTarget(path);
+    rmSync(path, { force: true });
+  }
+
+  private assertSafeFileTarget(path: string): void {
+    try {
+      const stat = lstatSync(path);
+      if (stat.isSymbolicLink()) {
+        throw new Error(`Refusing to manage shell environment through symlinked path: ${path}`);
+      }
+    } catch (error) {
+      if (isMissingFileError(error)) {
+        return;
+      }
+      throw error;
+    }
   }
 }
 
@@ -228,4 +251,8 @@ function escapeSingleQuotes(value: string): string {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "ENOENT";
 }

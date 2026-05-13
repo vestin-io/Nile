@@ -1,4 +1,4 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -128,6 +128,26 @@ describe("DesktopShellEnvironment", () => {
     );
 
     expect(exportedValue).toBe("resolved-secret");
+  });
+
+  it("refuses to manage shell environment through symlinked profile files", () => {
+    const setup = createSetup();
+    const targetPath = join(setup.homeDir, "linked-profile");
+    writeFileSync(targetPath, "# external profile\n", "utf8");
+    rmSync(setup.posixProfiles[0], { force: true });
+    symlinkSync(targetPath, setup.posixProfiles[0]);
+
+    const environment = new DesktopShellEnvironment({
+      homeDir: setup.homeDir,
+      indexPath: setup.indexPath,
+      posixScriptPath: setup.posixScriptPath,
+      fishScriptPath: setup.fishScriptPath,
+      posixProfilePaths: setup.posixProfiles,
+    });
+
+    expect(() => environment.ensure("NILE_GATEWAY_TEST_API_KEY")).toThrow(
+      "Refusing to manage shell environment through symlinked path",
+    );
   });
 });
 

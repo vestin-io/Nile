@@ -330,13 +330,7 @@ export class DesktopMain {
     try {
       const preservedEnvKeys = this.readManagedOpenClawEnvKeys();
       const managedEnvironment = new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment);
-      for (const connection of session.listSavedConnections()) {
-        if (connection.envKey && preservedEnvKeys.has(connection.envKey)) {
-          continue;
-        }
-        managedEnvironment.removeForConnection(session, connection.id);
-      }
-      this.shellEnvironment.sync([...preservedEnvKeys].sort());
+      managedEnvironment.clearForSession(session, [...preservedEnvKeys]);
     } finally {
       session.close();
     }
