@@ -537,7 +537,7 @@ describe("NileCli", () => {
       [
         { type: "selected", value: "status" },
         { type: "selected", value: "codex" },
-        { type: "back" },
+        { type: "selected", value: "openai-work" },
         { type: "selected", value: "back" },
         { type: "cancel" },
       ],
