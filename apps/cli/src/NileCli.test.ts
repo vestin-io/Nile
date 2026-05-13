@@ -561,8 +561,6 @@ describe("NileCli", () => {
           claude: setup.claudeHome,
           openclaw: setup.openclawHome,
         },
-        logger: NileLogger.silent(),
-        credentialStore: setup.credentialStore,
         secureSnapshotStore: setup.secureSnapshots,
       },
       "codex",
