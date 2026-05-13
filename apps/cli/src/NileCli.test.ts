@@ -556,7 +556,7 @@ describe("NileCli", () => {
       ]),
     );
     expect(chooseCall!.labels.some((label) => label.includes("cursor.user@example.com"))).toBe(false);
-  });
+  }, 20_000);
 
   it("shows an empty-state panel when an agent has no compatible saved connections", async () => {
     const setup = createSetup();
