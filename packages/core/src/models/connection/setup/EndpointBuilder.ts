@@ -52,7 +52,7 @@ export class ConnectionEndpointBuilder {
       case "anthropic":
         return this.buildAnthropic(input.endpointUrl, input.authMode);
       default:
-        throw new Error(`Unsupported connection preset: ${input.preset}`);
+        return assertNever(input.preset);
     }
   }
 
@@ -211,4 +211,8 @@ export class ConnectionEndpointBuilder {
     }
     return normalized;
   }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unsupported connection preset: ${String(value)}`);
 }

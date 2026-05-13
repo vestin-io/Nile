@@ -12,7 +12,6 @@ export {
 } from "./apply/ApplySelection";
 export { CodexSessionLogin } from "./CodexSessionLogin";
 export { LiveSetupDetector } from "./live-setup/Detector";
-export { LiveSetupMatcher } from "../../actions/live-setup/Matcher";
 export { LiveSetupReader } from "./live-setup/Reader";
 export { ImportCurrentConnection } from "./import/ImportCurrentConnection";
 export { RollbackLatestMutation } from "./rollback/RollbackLatestMutation";

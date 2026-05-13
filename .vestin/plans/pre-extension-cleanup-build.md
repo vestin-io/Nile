@@ -146,6 +146,30 @@
 - `node --import tsx ./build.ts` in `apps/desktop`
 - `./node_modules/.bin/vitest run packages/core/src/agents/codex/CodexSessionLogin.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts`
 
+### Step 16: Adopt low-risk review fixes for expansion safety
+
+- Added exhaustive `never` checks to extension-sensitive switches in:
+  - `packages/core/src/models/connection/Support.ts`
+  - `packages/core/src/models/connection/AgentPolicy.ts`
+  - `packages/core/src/models/connection/setup/EndpointBuilder.ts`
+  - `packages/core/src/projection/Resolver.ts`
+- Extracted shared JWT payload decoding to:
+  - `packages/core/src/services/JwtPayloadDecoder.ts`
+  and reused it from Codex/OpenClaw session readers plus connection labeling/identity resolution.
+- Extracted shared `ApplySelectionValidationError` to:
+  - `packages/core/src/agents/ApplySelectionValidationError.ts`
+  and reused it across Codex, Claude, Cursor, and OpenClaw apply flows.
+- Removed dead `LiveSetupMatcher` re-exports from:
+  - `packages/core/src/agents/codex/index.ts`
+  - `packages/core/src/agents/cursor/index.ts`
+- Added direct tests for connection support-kind behavior:
+  - `packages/core/src/models/connection/Support.test.ts`
+
+### Verification
+
+- `npm run typecheck`
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/Support.test.ts packages/core/src/models/connection/AgentPolicy.test.ts packages/core/src/projection/Resolver.test.ts packages/core/src/agents/codex/apply/ApplySelection.test.ts packages/core/src/agents/claude/ApplySelection.test.ts packages/core/src/agents/cursor/ApplySelection.test.ts packages/core/src/agents/openclaw/ApplySelection.test.ts`
+
 ### Step 13: Auto-sync matched live selections for stable agents
 
 - Added `packages/core/src/actions/local-setup/SelectionSync.ts` to reconcile persisted agent selections with uniquely matched saved live setups before status/scan reads.

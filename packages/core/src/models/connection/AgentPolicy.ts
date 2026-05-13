@@ -83,7 +83,7 @@ export class ConnectionAgentPolicy {
       case "anthropic":
         return ["claude", "openclaw"];
       default:
-        return [];
+        return assertNever(preset);
     }
   }
 
@@ -130,3 +130,7 @@ export class ConnectionAgentPolicy {
 }
 
 export const SHARED_CONNECTION_AGENT_POLICY = new ConnectionAgentPolicy();
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled connection preset family: ${String(value)}`);
+}

@@ -6,6 +6,7 @@ import { FileSnapshotStore } from "../../../services/history/FileSnapshotStore";
 import { MutationHistory } from "../../../services/history/MutationHistory";
 import { SecureSnapshotStore } from "../../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../../services/NileLogger";
+import { ApplySelectionValidationError } from "../../ApplySelectionValidationError";
 import { AgentApplySupport } from "../../../actions/apply/Support";
 import type { PreparedAgentApplySelection } from "../../../actions/apply/Support";
 import { ApplyMutation } from "../../ApplyMutation";
@@ -18,12 +19,7 @@ import { CODEX_AGENT_ID } from "../types";
 import { CodexAuthStore } from "../stores/CodexAuthStore";
 import { CodexConfigStore } from "../stores/CodexConfigStore";
 
-export class ApplySelectionValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ApplySelectionValidationError";
-  }
-}
+export { ApplySelectionValidationError };
 
 export class ApplySelection {
   static open(

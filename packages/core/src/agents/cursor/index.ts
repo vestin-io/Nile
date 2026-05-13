@@ -10,7 +10,6 @@ export { CURSOR_AGENT_ID } from "./types";
 export { ApplySelection, ApplySelectionValidationError } from "./ApplySelection";
 export { CurrentCredentialReader } from "./live-setup/CredentialReader";
 export { LiveSetupDetector } from "./live-setup/Detector";
-export { LiveSetupMatcher } from "../../actions/live-setup/Matcher";
 export { LiveSetupReader } from "./live-setup/Reader";
 export { ImportCurrentConnection } from "./ImportCurrentConnection";
 export { RollbackLatestMutation } from "./RollbackLatestMutation";

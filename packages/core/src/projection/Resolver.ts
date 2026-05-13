@@ -23,7 +23,11 @@ export class AgentProjectionResolver {
       case "openclaw":
         return this.openclaw.resolve(input);
       default:
-        throw new AgentProjectionError(`No projection strategy is registered for ${agentId}`);
+        return assertNever(agentId);
     }
   }
+}
+
+function assertNever(value: never): never {
+  throw new AgentProjectionError(`No projection strategy is registered for ${String(value)}`);
 }

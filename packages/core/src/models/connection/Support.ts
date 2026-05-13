@@ -48,7 +48,7 @@ export class ConnectionSupportKinds {
       case "cursor_session":
         return input.protocols.cursor ? ["cursor-session"] : [];
       default:
-        return [];
+        return assertNever(input.authMode);
     }
   }
 
@@ -63,7 +63,7 @@ export class ConnectionSupportKinds {
       case "cursor_session":
         return input.preset === "gateway" ? ["cursor-session"] : [];
       default:
-        return [];
+        return assertNever(input.authMode);
     }
   }
 
@@ -79,9 +79,13 @@ export class ConnectionSupportKinds {
       case "gateway":
         return ["openai-api-key", "anthropic-api-key", "cursor-api-key"];
       default:
-        return [];
+        return assertNever(preset);
     }
   }
 }
 
 export const CONNECTION_SUPPORT_KINDS = new ConnectionSupportKinds();
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled connection support input: ${String(value)}`);
+}

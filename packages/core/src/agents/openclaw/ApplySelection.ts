@@ -7,6 +7,8 @@ import { FileSnapshotStore } from "../../services/history/FileSnapshotStore";
 import { MutationHistory } from "../../services/history/MutationHistory";
 import { SecureSnapshotStore } from "../../services/history/SecureSnapshotStore";
 import { NileLogger } from "../../services/NileLogger";
+import { JWT_PAYLOAD_DECODER } from "../../services/JwtPayloadDecoder";
+import { ApplySelectionValidationError } from "../ApplySelectionValidationError";
 import { AgentApplySupport, type PreparedAgentApplySelection } from "../../actions/apply/Support";
 import { ApplyMutation } from "../ApplyMutation";
 import type { OpenClawAuthProfileProjection, OpenClawProjection, OpenClawProviderProjection } from "../../projection";
@@ -19,12 +21,7 @@ import { OPENCLAW_AGENT_ID } from "./types";
 import { OpenClawAuthProfileStore, type OpenClawAuthProfileCredential } from "./AuthProfileStore";
 import { OpenClawConfigStore } from "./OpenClawConfigStore";
 
-export class ApplySelectionValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ApplySelectionValidationError";
-  }
-}
+export { ApplySelectionValidationError };
 
 export class ApplySelection {
   static open(
@@ -339,22 +336,7 @@ export class ApplySelection {
   }
 
   private decodeJwtPayload(token: string): Record<string, unknown> | null {
-    const parts = token.split(".");
-    if (parts.length < 2) {
-      return null;
-    }
-
-    try {
-      const encoded = parts[1]
-        .replace(/-/g, "+")
-        .replace(/_/g, "/")
-        .padEnd(Math.ceil(parts[1].length / 4) * 4, "=");
-      const payload = Buffer.from(encoded, "base64").toString("utf8");
-      const parsed = JSON.parse(payload);
-      return parsed && typeof parsed === "object" ? parsed as Record<string, unknown> : null;
-    } catch {
-      return null;
-    }
+    return JWT_PAYLOAD_DECODER.decode(token);
   }
 
   private static createApplySupport(
