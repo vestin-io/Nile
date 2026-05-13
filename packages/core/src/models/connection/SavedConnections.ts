@@ -75,6 +75,9 @@ export class SavedConnections {
     return this.accessRegistry
       .list()
       .filter((access) => {
+        if (!this.isSelectableByAgent(access)) {
+          return false;
+        }
         const endpoint = endpointsById.get(access.endpointId) ?? null;
         return this.readConfigurableAgents(access, endpoint).includes(agentId);
       })
@@ -220,6 +223,10 @@ export class SavedConnections {
   ): AgentId[] {
     const configurableAgents = this.readConfigurableAgents(access, endpoint);
     return access.enabledAgents.filter((agentId) => configurableAgents.includes(agentId));
+  }
+
+  private isSelectableByAgent(access: AccessRecord): boolean {
+    return (access.credentialSyncState ?? "ready") === "ready";
   }
 
   private readEndpointUrl(endpoint: EndpointRecord | null): string | null {

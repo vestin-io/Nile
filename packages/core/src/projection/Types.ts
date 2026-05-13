@@ -47,7 +47,7 @@ export type CursorProjection = ProjectionCommon & {
 type OpenClawProjectionCommon = ProjectionCommon & {
   agentId: "openclaw";
   protocol: "openai" | "anthropic";
-  authMode: "api_key" | "openai_session" | "claude_session";
+  authMode: "api_key" | "openai_session" | "openclaw_openai_session" | "claude_session";
   modelId: string;
 };
 

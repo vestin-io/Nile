@@ -44,6 +44,11 @@ export class ConnectionLabeler {
     if (authMode === "openai_session" && credential.kind === "openai_session") {
       return this.readOpenAiSessionLabel(credential.idToken) ?? `${this.suggestEndpointLabel(preset, input)} Session`;
     }
+    if (authMode === "openclaw_openai_session" && credential.kind === "openclaw_openai_session") {
+      return credential.email?.trim()
+        || credential.accountId?.trim()
+        || `${this.suggestEndpointLabel(preset, input)} Session`;
+    }
     if (authMode === "claude_session" && credential.kind === "claude_session") {
       return credential.email?.trim()
         || credential.displayName?.trim()
@@ -66,7 +71,12 @@ export class ConnectionLabeler {
     input?: ConnectionLabelerInput,
   ): string | null {
     const suggested = this.suggestAccessLabel(preset, authMode, credential, input);
-    if (authMode === "openai_session" || authMode === "claude_session" || authMode === "cursor_session") {
+    if (
+      authMode === "openai_session"
+      || authMode === "openclaw_openai_session"
+      || authMode === "claude_session"
+      || authMode === "cursor_session"
+    ) {
       const fallback = `${this.suggestEndpointLabel(preset, input)} Session`;
       return suggested === fallback ? null : suggested;
     }

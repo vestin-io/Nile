@@ -35,7 +35,11 @@ export class LocalCredentialRequestBuilder {
       );
     }
 
-    return this.buildCursorSession();
+    if (input.authMode === "cursor_session") {
+      return this.buildCursorSession();
+    }
+
+    throw new Error(`Unsupported auth mode for local credential request build: ${input.authMode}`);
   }
 
   buildUpdate(

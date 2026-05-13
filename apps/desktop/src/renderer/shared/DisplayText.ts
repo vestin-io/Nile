@@ -55,6 +55,8 @@ export function authModeLabel(authMode: string, t: Translator): string {
       return t("auth.api_key");
     case "openai_session":
       return t("auth.openai_session");
+    case "openclaw_openai_session":
+      return t("auth.openclaw_openai_session");
     case "claude_session":
       return t("auth.claude_session");
     case "cursor_session":

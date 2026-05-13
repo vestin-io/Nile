@@ -10,6 +10,23 @@ describe("ConnectionAgentPolicy", () => {
     expect(policy.supportsAgent({ preset: "anthropic", authMode: "claude_session", agentId: "openclaw" })).toBe(true);
   });
 
+  it("treats OpenClaw-only OpenAI sessions as saved connections for OpenClaw only", () => {
+    const policy = new ConnectionAgentPolicy();
+
+    expect(policy.readSavedConnectionConfig({
+      protocols: {
+        openai: {
+          authSchemes: ["bearer"],
+          wireApis: ["responses"],
+        },
+      },
+      authMode: "openclaw_openai_session",
+    })).toEqual({
+      configurableAgents: ["openclaw"],
+      defaultEnabledAgents: ["openclaw"],
+    });
+  });
+
   it("allows env-backed api keys for supported api-key providers", () => {
     const policy = new ConnectionAgentPolicy();
 

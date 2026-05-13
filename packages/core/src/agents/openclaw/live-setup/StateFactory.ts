@@ -174,6 +174,7 @@ export class LiveSetupFactory {
     credential: {
       accessToken: string;
       refreshToken: string;
+      expiresAt?: number;
       accountId?: string;
       email?: string;
     },
@@ -191,7 +192,7 @@ export class LiveSetupFactory {
     return {
       endpoint,
       access: {
-        authMode: "openai_session",
+        authMode: "openclaw_openai_session",
         label: labelHint,
         ...(identityKey ? { identityKey } : {}),
       },
@@ -203,14 +204,15 @@ export class LiveSetupFactory {
         wireApi: "responses",
       },
       credential: {
-        kind: "openai_session",
-        idToken: "",
+        kind: "openclaw_openai_session",
         accessToken: credential.accessToken,
         refreshToken: credential.refreshToken,
+        ...(typeof credential.expiresAt === "number" ? { expiresAt: credential.expiresAt } : {}),
         ...(credential.accountId?.trim() ? { accountId: credential.accountId.trim() } : {}),
+        ...(credential.email?.trim() ? { email: credential.email.trim() } : {}),
       },
       detectedAccess: {
-        authMode: "openai_session",
+        authMode: "openclaw_openai_session",
         labelHint,
         ...(identityKey ? { identityKey } : {}),
       },

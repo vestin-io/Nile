@@ -60,6 +60,7 @@ export class AgentCapabilities {
           "openai-api-key",
           "anthropic-api-key",
           "openai-session",
+          "openclaw-openai-session",
           "claude-session",
         ],
         autoSyncMatchedSelection: false,

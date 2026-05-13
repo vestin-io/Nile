@@ -141,10 +141,17 @@ describe("OpenClaw LiveSetupDetector", () => {
         id: "openai-session",
         endpointId: "openai",
         label: "jiqiang90@gmail.com gpt-5.3-codex",
-        authMode: "openai_session",
+        authMode: "openclaw_openai_session",
         identityKey: "account:acct-123",
       },
-      openAiSessionCredential(),
+      {
+        kind: "openclaw_openai_session",
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        expiresAt: 1770000000000,
+        accountId: "acct-123",
+        email: "jiqiang90@gmail.com",
+      },
     );
     setOpenClawModel(setup.dbPath, "openai-session", "gpt-5.3-codex");
 
@@ -200,7 +207,7 @@ describe("OpenClaw LiveSetupDetector", () => {
 
     expect(result.validity).toBe("valid_matched");
     expect(result.access).toEqual({
-      authMode: "openai_session",
+      authMode: "openclaw_openai_session",
       labelHint: "jiqiang90@gmail.com gpt-5.3-codex",
       identityKey: "account:acct-123",
     });
@@ -268,7 +275,7 @@ function seedAccess(
     id: string;
     endpointId: string;
     label: string;
-    authMode: "api_key" | "openai_session";
+    authMode: "api_key" | "openai_session" | "openclaw_openai_session";
     identityKey?: string;
   },
   credential: StoredCredential,

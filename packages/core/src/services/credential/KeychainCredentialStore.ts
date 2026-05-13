@@ -267,6 +267,13 @@ const DEFAULT_CREDENTIAL_VALIDATORS: Record<string, CredentialValidator> = {
     requireOptionalStringField(credential, "accountId");
     requireOptionalStringField(credential, "lastRefresh");
   },
+  openclaw_openai_session: (credential) => {
+    requireStringField(credential, "accessToken");
+    requireStringField(credential, "refreshToken");
+    requireOptionalNumberField(credential, "expiresAt");
+    requireOptionalStringField(credential, "accountId");
+    requireOptionalStringField(credential, "email");
+  },
   cursor_session: (credential) => {
     requireStringField(credential, "accessToken");
     requireStringField(credential, "refreshToken");

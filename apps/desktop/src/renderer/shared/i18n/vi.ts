@@ -57,6 +57,7 @@ export const VI_MESSAGES: Messages = {
     "support.importableLocalSetups": "Phát hiện {count} cấu hình cục bộ có thể nhập.",
     "auth.api_key": "API key",
     "auth.openai_session": "Phiên OpenAI",
+    "auth.openclaw_openai_session": "Phiên OpenAI của OpenClaw",
     "auth.claude_session": "Phiên Claude",
     "auth.cursor_session": "Phiên Cursor",
     "history.applied": "Đã áp dụng",

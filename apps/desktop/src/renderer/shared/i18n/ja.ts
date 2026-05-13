@@ -60,6 +60,7 @@ export const JA_MESSAGES: Messages = {
     "support.importableLocalSetups": "取り込み可能なローカル設定が {count} 件見つかりました。",
     "auth.api_key": "API キー",
     "auth.openai_session": "OpenAI セッション",
+    "auth.openclaw_openai_session": "OpenClaw OpenAI セッション",
     "auth.claude_session": "Claude セッション",
     "auth.cursor_session": "Cursor セッション",
     "history.applied": "適用済み",

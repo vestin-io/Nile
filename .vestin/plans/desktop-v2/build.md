@@ -21,6 +21,17 @@
 
 - `npm run typecheck`
 
+### Exclude broken credential-sync connections from agent switching
+
+- Kept saved connections with failed credential synchronization visible in the general connection inventory, but removed them from per-agent switchable connection lists.
+- This prevents agent pages and quick-switch selectors from offering connections that are already known to be unusable because their credential material never successfully reached Keychain.
+- Added regression coverage so `write_failed` connections still appear in the saved inventory but no longer show up as selectable Codex/OpenClaw targets.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/SavedConnections.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
 ### Auto-update status UX cleanup
 
 - Expanded desktop release/update status handling to surface human-visible states instead of collapsing failures back to idle:

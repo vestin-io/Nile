@@ -23,9 +23,18 @@ export class OpenClawProjectionStrategy {
         endpointLabel: input.endpoint.label,
         accessId: input.access.id,
         accessLabel: input.access.label,
-        authMode: input.access.authMode === "openai_session" ? "openai_session" : "api_key",
-        providerId: input.access.authMode === "openai_session" ? "openai-codex" : "openai",
-        profileMode: input.access.authMode === "openai_session" ? "oauth" : "api_key",
+        authMode:
+          input.access.authMode === "openai_session" || input.access.authMode === "openclaw_openai_session"
+            ? input.access.authMode
+            : "api_key",
+        providerId:
+          input.access.authMode === "openai_session" || input.access.authMode === "openclaw_openai_session"
+            ? "openai-codex"
+            : "openai",
+        profileMode:
+          input.access.authMode === "openai_session" || input.access.authMode === "openclaw_openai_session"
+            ? "oauth"
+            : "api_key",
         modelId,
       };
     }
@@ -105,6 +114,12 @@ export class OpenClawProjectionStrategy {
     if (access.authMode === "openai_session") {
       if (credential.kind !== "openai_session") {
         throw new AgentProjectionError("OpenClaw openai_session access requires an openai_session credential");
+      }
+      return true;
+    }
+    if (access.authMode === "openclaw_openai_session") {
+      if (credential.kind !== "openclaw_openai_session") {
+        throw new AgentProjectionError("OpenClaw openclaw_openai_session access requires an openclaw_openai_session credential");
       }
       return true;
     }

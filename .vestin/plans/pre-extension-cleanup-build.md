@@ -134,6 +134,38 @@
 - `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts packages/core/src/actions/local-setup/Status.test.ts`
 - `npm run typecheck`
 
+### Step 18: Make OpenClaw local OpenAI sessions save as OpenClaw-only connections
+
+- Investigated why `Save to Nile` stopped working for an OpenClaw local setup after reset:
+  - the remaining OpenClaw local `openai-codex` profile only stored `access + refresh + accountId + email`
+  - Nile's shared `openai_session` credential validator still required a non-empty `idToken`
+  - so re-importing the local OpenClaw setup failed after the old saved connection had been cleared
+- Added a dedicated `openclaw_openai_session` auth mode and credential kind for this case instead of pretending the local OpenClaw profile is a full shared Codex-style OpenAI session.
+- Kept the scope intentionally narrow:
+  - OpenClaw local profile imports now save as OpenClaw-only connections
+  - these connections keep using the official OpenAI endpoint and model catalog path
+  - but they no longer appear as Codex-compatible shared sign-in connections
+- Updated the affected core paths:
+  - `packages/core/src/agents/openclaw/live-setup/StateFactory.ts`
+  - `packages/core/src/agents/openclaw/live-setup/Resolver.ts`
+  - `packages/core/src/agents/openclaw/ApplySelection.ts`
+  - `packages/core/src/projection/strategies/OpenClaw.ts`
+  - `packages/core/src/models/connection/Support.ts`
+  - `packages/core/src/models/agent/Capabilities.ts`
+  - `packages/core/src/models/connection/Upsert.ts`
+  - `packages/core/src/application/local/ConnectionModelCatalog.ts`
+  - `packages/core/src/actions/usage/Usage.ts`
+- Updated list/presentation text so the new auth mode renders as an OpenClaw-specific OpenAI sign-in rather than a generic OpenAI session.
+- Added regression coverage to ensure:
+  - importing an OpenClaw oauth profile produces an `openclaw_openai_session`
+  - the resulting saved connection is enabled/configurable only for `openclaw`
+  - support/policy logic recognizes the new saved-connection kind
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/agents/openclaw/ImportCurrentConnection.test.ts packages/core/src/models/connection/Support.test.ts packages/core/src/models/connection/AgentPolicy.test.ts packages/core/src/models/connection/SavedConnections.test.ts packages/core/src/agents/openclaw/ApplySelection.test.ts`
+- `npm run typecheck`
+
 ### Step 10: Connection edit/add provider summary shell cleanup
 
 - Fixed the empty rounded placeholder shown on connection edit pages when a preset has no provider summary metadata.

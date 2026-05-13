@@ -63,7 +63,7 @@ export class DesktopSettingsStateQuery {
       codexSelectionOverride,
     );
     const currentAgentConnections = this.lists.buildConnections(
-      savedConnections.filter((connection) => connection.configurableAgents.includes(CODEX_AGENT_ID)),
+      session.listSavedConnectionsForAgent(CODEX_AGENT_ID),
       codexState.currentConnection?.id ?? null,
       usageByConnectionId,
       codexSelectionOverride,
@@ -137,7 +137,7 @@ export class DesktopSettingsStateQuery {
         }),
       );
       const connections = this.lists.buildConnections(
-        savedConnections.filter((connection) => connection.configurableAgents.includes(agentId)),
+        session.listSavedConnectionsForAgent(agentId),
         currentConnection?.id ?? null,
         usageByConnectionId,
         selectionOverride,

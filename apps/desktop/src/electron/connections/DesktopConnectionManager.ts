@@ -242,6 +242,10 @@ export class DesktopConnectionManager {
   }
 
   private buildLocalConnectionInput(input: DesktopAddConnectionInput) {
+    if (input.authMode === "openclaw_openai_session") {
+      throw new Error("OpenClaw-only OpenAI sessions cannot be created from the add-connection form");
+    }
+
     return {
       preset: input.preset,
       authMode: input.authMode,

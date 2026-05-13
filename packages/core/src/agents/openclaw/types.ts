@@ -14,7 +14,7 @@ export type OpenClawDetectedEndpoint = {
 };
 
 export type OpenClawDetectedAccess = {
-  authMode: Extract<AuthMode, "api_key" | "openai_session" | "claude_session">;
+  authMode: Extract<AuthMode, "api_key" | "openai_session" | "openclaw_openai_session" | "claude_session">;
   labelHint: string;
   identityKey?: string;
 };

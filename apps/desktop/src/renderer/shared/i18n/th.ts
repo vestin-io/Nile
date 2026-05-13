@@ -57,6 +57,7 @@ export const TH_MESSAGES: Messages = {
     "support.importableLocalSetups": "พบการตั้งค่าภายในเครื่องที่นำเข้าได้ {count} รายการ",
     "auth.api_key": "API key",
     "auth.openai_session": "เซสชัน OpenAI",
+    "auth.openclaw_openai_session": "เซสชัน OpenAI ของ OpenClaw",
     "auth.claude_session": "เซสชัน Claude",
     "auth.cursor_session": "เซสชัน Cursor",
     "history.applied": "นำไปใช้แล้ว",

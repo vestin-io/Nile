@@ -193,9 +193,9 @@ export class ApplySelection {
     projection: OpenClawAuthProfileProjection,
     credential: PreparedAgentApplySelection["credential"],
   ): OpenClawAuthProfileCredential {
-    if (projection.authMode === "openai_session") {
-      if (credential.kind !== "openai_session") {
-        throw new ApplySelectionValidationError("OpenClaw openai_session access requires an openai_session credential");
+    if (projection.authMode === "openai_session" || projection.authMode === "openclaw_openai_session") {
+      if (credential.kind !== "openai_session" && credential.kind !== "openclaw_openai_session") {
+        throw new ApplySelectionValidationError("OpenClaw OpenAI session access requires an OpenAI session credential");
       }
 
       return {
@@ -295,9 +295,14 @@ export class ApplySelection {
   }
 
   private requireOpenAiSessionExpiry(
-    credential: Extract<PreparedAgentApplySelection["credential"], { kind: "openai_session" }>,
+    credential: Extract<PreparedAgentApplySelection["credential"], { kind: "openai_session" | "openclaw_openai_session" }>,
   ): number {
-    const expiry = this.readJwtExpiryMs(credential.idToken) ?? this.readJwtExpiryMs(credential.accessToken);
+    const explicitExpiry = "expiresAt" in credential ? credential.expiresAt : undefined;
+    if (typeof explicitExpiry === "number" && Number.isFinite(explicitExpiry)) {
+      return explicitExpiry;
+    }
+    const idToken = "idToken" in credential ? credential.idToken : undefined;
+    const expiry = (idToken ? this.readJwtExpiryMs(idToken) : null) ?? this.readJwtExpiryMs(credential.accessToken);
     if (expiry) {
       return expiry;
     }
@@ -318,8 +323,14 @@ export class ApplySelection {
   }
 
   private readOpenAiSessionEmail(
-    credential: Extract<PreparedAgentApplySelection["credential"], { kind: "openai_session" }>,
+    credential: Extract<PreparedAgentApplySelection["credential"], { kind: "openai_session" | "openclaw_openai_session" }>,
   ): string | undefined {
+    if ("email" in credential && credential.email?.trim()) {
+      return credential.email.trim();
+    }
+    if (!("idToken" in credential)) {
+      return undefined;
+    }
     const claims = this.decodeJwtPayload(credential.idToken);
     const email = claims?.email;
     return typeof email === "string" && email.trim() ? email.trim() : undefined;

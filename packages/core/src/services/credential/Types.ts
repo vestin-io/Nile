@@ -24,6 +24,15 @@ export type OpenAiSessionCredential = {
   lastRefresh?: string;
 };
 
+export type OpenClawOpenAiSessionCredential = {
+  kind: "openclaw_openai_session";
+  accessToken: string;
+  refreshToken: string;
+  expiresAt?: number;
+  accountId?: string;
+  email?: string;
+};
+
 export type ClaudeSessionCredential = {
   kind: "claude_session";
   accessToken: string;
@@ -55,6 +64,7 @@ export type StoredCredential =
   | ApiKeyCredential
   | ClaudeSessionCredential
   | OpenAiSessionCredential
+  | OpenClawOpenAiSessionCredential
   | CursorSessionCredential
   | CursorWebSessionCredential;
 

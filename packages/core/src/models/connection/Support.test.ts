@@ -23,6 +23,16 @@ describe("ConnectionSupportKinds", () => {
         },
       },
     })).toEqual(["openai-session"]);
+
+    expect(CONNECTION_SUPPORT_KINDS.readSavedKinds({
+      authMode: "openclaw_openai_session",
+      protocols: {
+        openai: {
+          authSchemes: ["bearer"],
+          wireApis: ["responses"],
+        },
+      },
+    })).toEqual(["openclaw-openai-session"]);
   });
 
   it("derives selectable kinds for onboarding flows", () => {

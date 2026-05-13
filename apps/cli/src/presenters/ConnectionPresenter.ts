@@ -331,6 +331,9 @@ export class ConnectionPresenter {
     if (authMode === "openai_session") {
       return "OpenAI sign-in";
     }
+    if (authMode === "openclaw_openai_session") {
+      return "OpenClaw OpenAI sign-in";
+    }
     if (authMode === "claude_session") {
       return "Claude sign-in";
     }

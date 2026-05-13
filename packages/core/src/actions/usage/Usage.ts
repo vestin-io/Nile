@@ -82,10 +82,13 @@ export class Usage {
     access: AccessRecord,
     endpoint: EndpointRecord,
   ): Promise<ConnectionUsageResult | null> {
-    if (endpoint.protocols.openai && access.authMode === "openai_session") {
+    if (
+      endpoint.protocols.openai
+      && (access.authMode === "openai_session" || access.authMode === "openclaw_openai_session")
+    ) {
       const credential = this.accessRegistry.readCredential(access.id);
-      if (credential.kind !== "openai_session") {
-        return this.buildCredentialError(access, endpoint, "Expected openai_session credential");
+      if (credential.kind !== "openai_session" && credential.kind !== "openclaw_openai_session") {
+        return this.buildCredentialError(access, endpoint, "Expected OpenAI session credential");
       }
 
       return await this.openAiReader.read({

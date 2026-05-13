@@ -60,6 +60,7 @@ export const KO_MESSAGES: Messages = {
     "support.importableLocalSetups": "가져올 수 있는 로컬 설정 {count}개를 찾았습니다.",
     "auth.api_key": "API 키",
     "auth.openai_session": "OpenAI 세션",
+    "auth.openclaw_openai_session": "OpenClaw OpenAI 세션",
     "auth.claude_session": "Claude 세션",
     "auth.cursor_session": "Cursor 세션",
     "history.applied": "적용됨",

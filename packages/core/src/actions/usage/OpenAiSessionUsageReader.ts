@@ -1,4 +1,7 @@
-import type { OpenAiSessionCredential } from "../../services/credential/Types";
+import type {
+  OpenAiSessionCredential,
+  OpenClawOpenAiSessionCredential,
+} from "../../services/credential/Types";
 import type { ConnectionUsageResult, ConnectionUsageWindow } from "./Result";
 
 const CHATGPT_USAGE_URL = "https://chatgpt.com/backend-api/wham/usage";
@@ -9,7 +12,7 @@ type OpenAiSessionUsageReaderInput = {
   connectionId: string;
   connectionLabel: string;
   endpointLabel: string;
-  credential: OpenAiSessionCredential;
+  credential: OpenAiSessionCredential | OpenClawOpenAiSessionCredential;
 };
 
 type OpenAiUsagePayload = {

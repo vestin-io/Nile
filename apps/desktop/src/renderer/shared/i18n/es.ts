@@ -60,6 +60,7 @@ export const ES_MESSAGES: Messages = {
     "support.importableLocalSetups": "Se detectaron {count} configuraciones locales importables.",
     "auth.api_key": "API key",
     "auth.openai_session": "Sesión de OpenAI",
+    "auth.openclaw_openai_session": "Sesión OpenAI de OpenClaw",
     "auth.claude_session": "Sesión de Claude",
     "auth.cursor_session": "Sesión de Cursor",
     "history.applied": "Aplicado",

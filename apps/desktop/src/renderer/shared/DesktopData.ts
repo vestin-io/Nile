@@ -46,6 +46,7 @@ export function orderSupportedAuthModes(
 function readAuthModePriority(authMode: Definition["supportedAuthModes"][number]): number {
   switch (authMode) {
     case "openai_session":
+    case "openclaw_openai_session":
     case "claude_session":
     case "cursor_session":
       return 0;

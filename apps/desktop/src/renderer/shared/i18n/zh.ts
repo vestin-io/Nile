@@ -77,6 +77,7 @@ export const ZH_MESSAGES: Messages = {
     "support.importableLocalSetups": "检测到 {count} 个可导入的本地配置。",
     "auth.api_key": "API Key",
     "auth.openai_session": "OpenAI 会话",
+    "auth.openclaw_openai_session": "OpenClaw OpenAI 会话",
     "auth.claude_session": "Claude 会话",
     "auth.cursor_session": "Cursor 会话",
     "history.applied": "已切换",

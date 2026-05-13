@@ -8,6 +8,7 @@ export type ConnectionSupportKind =
   | "anthropic-api-key"
   | "cursor-api-key"
   | "openai-session"
+  | "openclaw-openai-session"
   | "claude-session"
   | "cursor-session";
 
@@ -44,6 +45,8 @@ export class ConnectionSupportKinds {
         return this.readDetectedApiKeyKinds(input.protocols);
       case "openai_session":
         return input.protocols.openai ? ["openai-session"] : [];
+      case "openclaw_openai_session":
+        return input.protocols.openai ? ["openclaw-openai-session"] : [];
       case "claude_session":
         return input.protocols.anthropic ? ["claude-session"] : [];
       case "cursor_session":
@@ -59,6 +62,8 @@ export class ConnectionSupportKinds {
         return this.readSelectableApiKeyKinds(input.preset);
       case "openai_session":
         return input.preset === "openai" ? ["openai-session"] : [];
+      case "openclaw_openai_session":
+        return [];
       case "claude_session":
         return input.preset === "anthropic" ? ["claude-session"] : [];
       case "cursor_session":

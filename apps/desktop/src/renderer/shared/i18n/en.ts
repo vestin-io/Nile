@@ -74,6 +74,7 @@ export const EN_MESSAGES: Messages = {
     "support.importableLocalSetups": "{count} importable local setup{suffix} detected.",
     "auth.api_key": "API key",
     "auth.openai_session": "OpenAI session",
+    "auth.openclaw_openai_session": "OpenClaw OpenAI session",
     "auth.claude_session": "Claude session",
     "auth.cursor_session": "Cursor session",
     "history.applied": "Applied",

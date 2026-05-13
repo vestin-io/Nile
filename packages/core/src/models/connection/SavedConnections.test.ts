@@ -148,6 +148,78 @@ describe("SavedConnections", () => {
     }
   });
 
+  test("keeps OpenClaw-only OpenAI sessions out of Codex agent lists", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedConnection(dbPath, credentialStore, {
+      endpointId: "openai",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      accessId: "openclaw-session",
+      accountLabel: "jay.ji@spotto.ai gpt-5.5",
+      authMode: "openclaw_openai_session",
+      enabledAgents: ["openclaw"],
+      credential: {
+        kind: "openclaw_openai_session",
+        accountId: "acct_openclaw",
+        accessToken: "access",
+        refreshToken: "refresh",
+        email: "jay.ji@spotto.ai",
+      },
+    });
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.listForAgent("codex")).toEqual([]);
+      expect(connections.listForAgent("openclaw")).toEqual([
+        expect.objectContaining({
+          id: "openclaw-session",
+          configurableAgents: ["openclaw"],
+          enabledAgents: ["openclaw"],
+        }),
+      ]);
+    } finally {
+      connections.close();
+    }
+  });
+
+  test("keeps failed credential sync connections out of agent selection lists", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedConnection(dbPath, credentialStore, {
+      endpointId: "openai",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      accessId: "broken-openai-session",
+      accountLabel: "broken@example.com",
+      authMode: "openai_session",
+      enabledAgents: ["codex"],
+      credentialSyncState: "write_failed",
+      credentialSyncIssue: "Credential field idToken is required",
+      credential: {
+        kind: "openai_session",
+        accountId: "acct_broken",
+        idToken: "id",
+        accessToken: "access",
+        refreshToken: "refresh",
+      },
+    });
+
+    const connections = SavedConnections.open(dbPath, credentialStore);
+    try {
+      expect(connections.list()).toEqual([
+        expect.objectContaining({
+          id: "broken-openai-session",
+          configurableAgents: ["codex", "openclaw"],
+        }),
+      ]);
+      expect(connections.listForAgent("codex")).toEqual([]);
+      expect(connections.listForAgent("openclaw")).toEqual([]);
+    } finally {
+      connections.close();
+    }
+  });
+
   test("treats saved gateway connections as configurable for detected compatible agents", () => {
     const dbPath = createTempDatabasePath();
     const credentialStore = new StubCredentialStore();
@@ -648,8 +720,10 @@ function seedConnection(
     endpointFamily: "openai" | "azure-openai";
     accessId: string;
     accountLabel: string;
-    authMode: "openai_session" | "api_key";
+    authMode: "openai_session" | "openclaw_openai_session" | "api_key";
     enabledAgents?: ("codex" | "claude" | "cursor" | "openclaw")[];
+    credentialSyncIssue?: string;
+    credentialSyncState?: "ready" | "pending_write" | "write_failed" | "pending_delete" | "delete_failed";
     credential: StoredCredential;
   },
 ): void {
@@ -672,7 +746,7 @@ function seedConnection(
   endpointRegistry.close();
 
   const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
-  accessRegistry.add(
+  const access = accessRegistry.add(
     {
       id: input.accessId,
       endpointId: input.endpointId,
@@ -682,6 +756,20 @@ function seedConnection(
     },
     input.credential,
   );
+  if (input.credentialSyncState && input.credentialSyncState !== "ready") {
+    const database = SqliteDatabase.open(dbPath);
+    const accessStore = new SqliteAccessStore(database);
+    try {
+      accessStore.setCredentialSyncState(
+        access.id,
+        input.credentialSyncState,
+        input.credentialSyncIssue ?? null,
+        new Date().toISOString(),
+      );
+    } finally {
+      database.close();
+    }
+  }
   accessRegistry.close();
 }
 

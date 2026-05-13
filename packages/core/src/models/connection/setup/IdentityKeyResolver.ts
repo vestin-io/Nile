@@ -16,6 +16,16 @@ export class ConnectionIdentityKeyResolver {
       return label ? `identity:${label}` : null;
     }
 
+    if (authMode === "openclaw_openai_session" && credential.kind === "openclaw_openai_session") {
+      if (credential.accountId?.trim()) {
+        return `account:${credential.accountId.trim()}`;
+      }
+      if (credential.email?.trim()) {
+        return `identity:${credential.email.trim().toLowerCase()}`;
+      }
+      return null;
+    }
+
     if (authMode === "claude_session" && credential.kind === "claude_session") {
       if (credential.accountUuid?.trim()) {
         return `account:${credential.accountUuid.trim()}`;

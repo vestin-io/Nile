@@ -119,6 +119,9 @@ export class ConnectionCredentialResolver {
     if (authMode === "openai_session") {
       return "Use OpenAI session";
     }
+    if (authMode === "openclaw_openai_session") {
+      return "Use OpenClaw OpenAI session";
+    }
     if (authMode === "api_key") {
       return "Use API key";
     }

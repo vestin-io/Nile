@@ -149,6 +149,10 @@ export class ConnectionUpsert {
       return this.matchesOpenAiSessionAccess(access, input.credential, input.identityKey ?? null);
     }
 
+    if (input.credential.kind === "openclaw_openai_session" && input.authMode === "openclaw_openai_session") {
+      return this.matchesOpenClawOpenAiSessionAccess(access, input.credential, input.identityKey ?? null);
+    }
+
     const identityKey = input.identityKey?.trim();
     return Boolean(identityKey && access.identityKey === identityKey);
   }
@@ -199,6 +203,39 @@ export class ConnectionUpsert {
       }
 
       return credential.idToken === stored.idToken;
+    } catch {
+      return false;
+    }
+  }
+
+  private matchesOpenClawOpenAiSessionAccess(
+    access: AccessRecord,
+    credential: Extract<StoredCredential, { kind: "openclaw_openai_session" }>,
+    identityKey: string | null,
+  ): boolean {
+    if (identityKey && access.identityKey === identityKey) {
+      return true;
+    }
+
+    try {
+      const stored = this.accessRegistry.readCredential(access.id);
+      if (stored.kind !== "openclaw_openai_session") {
+        return false;
+      }
+
+      if (credential.accountId?.trim() && stored.accountId?.trim()) {
+        return credential.accountId.trim() === stored.accountId.trim();
+      }
+
+      if (credential.refreshToken && stored.refreshToken) {
+        return credential.refreshToken === stored.refreshToken;
+      }
+
+      return Boolean(
+        credential.email?.trim()
+          && stored.email?.trim()
+          && credential.email.trim().toLowerCase() === stored.email.trim().toLowerCase(),
+      );
     } catch {
       return false;
     }

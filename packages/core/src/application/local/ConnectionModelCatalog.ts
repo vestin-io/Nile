@@ -122,7 +122,10 @@ export class ConnectionModelCatalog {
   }
 
   private shouldUseCodexModelCatalog(access: AccessRecord, endpoint: EndpointRecord): boolean {
-    return access.authMode === "openai_session" && endpoint.profile === "openai-official";
+    return (
+      (access.authMode === "openai_session" || access.authMode === "openclaw_openai_session")
+      && endpoint.profile === "openai-official"
+    );
   }
 
   private async readCodexModelCatalog(
@@ -238,6 +241,10 @@ export class ConnectionModelCatalog {
       return this.readOpenAiSessionAuthorization(credential);
     }
 
+    if (access.authMode === "openclaw_openai_session" && credential.kind === "openclaw_openai_session") {
+      return this.readOpenAiSessionAuthorization(credential);
+    }
+
     if (access.authMode !== "api_key" || credential.kind !== "api_key") {
       return null;
     }
@@ -255,7 +262,7 @@ export class ConnectionModelCatalog {
   }
 
   private readOpenAiSessionAuthorization(
-    credential: OpenAiSessionCredential,
+    credential: OpenAiSessionCredential | Extract<StoredCredential, { kind: "openclaw_openai_session" }>,
   ): { token: string; accountId?: string } | null {
     const accessToken = credential.accessToken.trim();
     if (!accessToken) {

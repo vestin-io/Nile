@@ -73,7 +73,7 @@ describe("OpenClaw ImportCurrentConnection", () => {
     importer.close();
   });
 
-  it("imports an OpenAI oauth auth-profile as a session connection", async () => {
+  it("imports an OpenAI oauth auth-profile as an OpenClaw-only session connection", async () => {
     const setup = createSetup();
     writeFileSync(
       join(setup.openclawHome, "openclaw.json"),
@@ -127,14 +127,21 @@ describe("OpenClaw ImportCurrentConnection", () => {
       endpointId: "openai",
       endpointLabel: "OpenAI",
       endpointFamily: "openai",
-      authMode: "openai_session",
+      authMode: "openclaw_openai_session",
     }));
 
     const accesses = AccessRegistry.open(setup.dbPath, setup.credentialStore);
     const imported = accesses.get(result.id);
-    expect(imported?.authMode).toBe("openai_session");
+    expect(imported?.authMode).toBe("openclaw_openai_session");
     expect(imported?.identityKey).toBe("account:acct-123");
-    expect(imported?.enabledAgents).toEqual(["codex", "openclaw"]);
+    expect(imported?.enabledAgents).toEqual(["openclaw"]);
+    expect(accesses.readCredential(result.id)).toEqual({
+      kind: "openclaw_openai_session",
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      expiresAt: 1770000000000,
+      accountId: "acct-123",
+    });
     accesses.close();
 
     const settings = AgentConnectionSettings.open(setup.dbPath);

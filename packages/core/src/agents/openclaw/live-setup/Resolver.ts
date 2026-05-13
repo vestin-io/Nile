@@ -50,6 +50,7 @@ export class LiveSetupResolver {
         value: this.stateFactory.buildOpenAiSessionProfileState(modelId, {
           accessToken: credential.access,
           refreshToken: credential.refresh,
+          expiresAt: credential.expires,
           ...(credential.accountId?.trim() ? { accountId: credential.accountId.trim() } : {}),
           ...((credential.email ?? profile.email)?.trim()
             ? { email: (credential.email ?? profile.email)!.trim() }
