@@ -1,7 +1,7 @@
 {
   "name": "@nile/desktop",
   "productName": "Nile",
-  "version": "0.15.4",
+  "version": "0.15.5",
   "private": true,
   "description": "Nile desktop app",
   "author": "Nile contributors",
