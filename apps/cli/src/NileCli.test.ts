@@ -13,12 +13,15 @@ import { NileLogger } from "@nile/core/services/NileLogger";
 import { SecureSnapshotStore } from "@nile/core/services/history";
 import { CodexSessionLogin } from "@nile/core/agents";
 import { NileCli } from "./NileCli";
+import { ConnectionCommands } from "./commands/ConnectionCommands";
 import {
   InteractivePrompt,
   type CliInputResult,
   type CliMultiSelectResult,
   type CliSelectResult,
 } from "./InteractivePrompt";
+import { ConnectionSelectionFlow } from "./menu/ConnectionSelectionFlow";
+import { ConnectionPresenter } from "./presenters/ConnectionPresenter";
 
 const tempDirs: string[] = [];
 const originalFetch = globalThis.fetch;
@@ -534,29 +537,50 @@ describe("NileCli", () => {
     await createCli(setup).run(["codex", "use", "openai-work"]);
 
     const prompt = new StubInteractivePrompt(
-      [
-        { type: "selected", value: "status" },
-        { type: "selected", value: "codex" },
-        { type: "selected", value: "openai-work" },
-        { type: "selected", value: "back" },
-        { type: "cancel" },
-      ],
+      [{ type: "selected", value: "openai-work" }],
       [],
     );
-    const cli = createCli(setup, prompt);
+    const commands = new ConnectionCommands(
+      setup.credentialStore,
+      prompt,
+      new StubCodexLoginRunner(),
+      NileLogger.silent(),
+    );
+    const selection = new ConnectionSelectionFlow(
+      prompt,
+      commands,
+      new ConnectionPresenter(),
+    );
 
-    const result = await cli.run([]);
+    await selection.selectConnectionId(
+      {
+        databasePath: setup.dbPath,
+        agentHomes: {
+          codex: setup.codexHome,
+          cursor: setup.cursorHome,
+          claude: setup.claudeHome,
+          openclaw: setup.openclawHome,
+        },
+        logger: NileLogger.silent(),
+        credentialStore: setup.credentialStore,
+        secureSnapshotStore: setup.secureSnapshots,
+      },
+      "codex",
+      "Choose a connection for Codex",
+      () => new Error("Cancelled"),
+      true,
+    );
 
-    expect(result.exitCode).toBe(0);
-    const chooseCall = prompt.selectCalls.find((call) => call.message === "Choose a connection for Codex");
-    expect(chooseCall).toBeDefined();
+    expect(prompt.selectCalls).toHaveLength(1);
+    const chooseCall = prompt.selectCalls[0];
+    expect(chooseCall.message).toBe("Choose a connection for Codex");
     expect(chooseCall!.labels).toEqual(
       expect.arrayContaining([
         expect.stringContaining("work@example.com"),
       ]),
     );
     expect(chooseCall!.labels.some((label) => label.includes("cursor.user@example.com"))).toBe(false);
-  }, 20_000);
+  });
 
   it("shows an empty-state panel when an agent has no compatible saved connections", async () => {
     const setup = createSetup();
