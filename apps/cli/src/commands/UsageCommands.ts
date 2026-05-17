@@ -6,16 +6,16 @@ import type {
   CursorUsageWorkspace,
 } from "@nile/builtins/cursor-usage";
 import { runWithCursorUsageWorkspace as runWithCursorUsageWorkspaceImpl } from "@nile/builtins/cursor-usage";
-import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 import type { ConnectionUsageResult } from "@nile/core/actions/usage";
 
 import type { ResolvedCliOptions } from "../types";
+import { CursorUsageSessionProbeFactory } from "./CursorUsageSessionProbeFactory";
 import { SessionRunner } from "./SessionRunner";
 
 export class UsageCommands {
   private static readonly USAGE_READ_CONCURRENCY = 4;
   private readonly sessions: SessionRunner;
-  private readonly cursorUsageSessionProbe = CursorUsageSessionSourceProbe.createDefault();
+  private readonly cursorUsageSessionProbeFactory = new CursorUsageSessionProbeFactory();
 
   constructor(
     private readonly credentialStore: CredentialStore,
@@ -72,7 +72,7 @@ export class UsageCommands {
     return runWithCursorUsageWorkspaceImpl({
       databasePath: options.databasePath,
       credentialStore: this.credentialStore,
-      sessionProbe: this.cursorUsageSessionProbe,
+      sessionProbe: this.cursorUsageSessionProbeFactory.create(options),
     }, work);
   }
 }

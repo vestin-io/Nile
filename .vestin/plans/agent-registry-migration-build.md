@@ -1806,3 +1806,26 @@
 ### Verification
 
 - `rg -n "<sanitized personal identifiers>" .vestin apps packages --glob '!dist/**'`
+
+## 2026-05-17 - CLI Cursor usage auto-bind CI hardening
+
+### What changed
+
+- Added a CLI-owned Cursor usage session probe factory so CLI command handlers build host-local Cursor usage probes from the current parsed options instead of capturing process defaults at construction time:
+  - `apps/cli/src/commands/CursorUsageSessionProbeFactory.ts`
+  - `apps/cli/src/commands/ConnectionCommands.ts`
+  - `apps/cli/src/commands/UsageCommands.ts`
+- Hardened the CLI regression for `cursor import` auto-bind so it no longer depends on the developer machine keychain having a `Chrome Safe Storage` item:
+  - `apps/cli/src/NileCli.test.ts`
+
+### Key findings
+
+- The release failure was not just a flaky runner. CLI Cursor usage follow-up had a real ownership mismatch: session import respected `options.agentHomes.cursor`, but the follow-up probe was created once from ambient process environment.
+- The failing regression test also had a hidden host dependency. It wrote encrypted Chromium cookies but only stubbed Cursor token lookups, leaving Chrome safe-storage decryption to succeed or fail based on whatever happened to exist in the local keychain.
+- Making both the runtime probe wiring and the test fixture explicit was necessary. Fixing only the test would have left CLI subcommands with inconsistent Cursor-source resolution; fixing only the runtime would still leave CI vulnerable to host-keychain drift.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run apps/cli/src/NileCli.test.ts -t "auto-binds cursor usage after importing the current cursor session connection"`
+- `npm run test:cli`
+- `npm run typecheck`

@@ -977,6 +977,9 @@ describe("NileCli", () => {
       if (args.includes("cursor-refresh-token")) {
         return { exitCode: 0, stdout: "cursor-refresh\n", stderr: "" };
       }
+      if (args.includes("Chrome Safe Storage")) {
+        return { exitCode: 0, stdout: `${SAFE_STORAGE_SECRET}\n`, stderr: "" };
+      }
       return {
         exitCode: 44,
         stdout: "",

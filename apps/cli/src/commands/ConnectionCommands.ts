@@ -13,11 +13,11 @@ import {
   runWithCursorUsageWorkspace,
   type ConnectionChangeResult,
 } from "@nile/builtins/cursor-usage";
-import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 
 import { ConnectionCredentialResolver } from "./CredentialResolver";
 import { ConnectionAddFlow } from "./ConnectionAddFlow";
 import { ConnectionOnboardingPrompts } from "./ConnectionOnboardingPrompts";
+import { CursorUsageSessionProbeFactory } from "./CursorUsageSessionProbeFactory";
 import { SessionRunner } from "./SessionRunner";
 import { InteractivePrompt } from "../InteractivePrompt";
 import type {
@@ -30,7 +30,7 @@ import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
 export class ConnectionCommands {
   private readonly addFlow: ConnectionAddFlow;
   private readonly sessions: SessionRunner;
-  private readonly cursorUsageSessionProbe = CursorUsageSessionSourceProbe.createDefault();
+  private readonly cursorUsageSessionProbeFactory = new CursorUsageSessionProbeFactory();
 
   constructor(
     private readonly credentialStore: CredentialStore,
@@ -161,7 +161,7 @@ export class ConnectionCommands {
     return runWithCursorUsageWorkspace({
       databasePath: options.databasePath,
       credentialStore: this.credentialStore,
-      sessionProbe: this.cursorUsageSessionProbe,
+      sessionProbe: this.cursorUsageSessionProbeFactory.create(options),
       logger: this.logger,
     }, (workspace) => workspace.applyFollowUp(result));
   }
