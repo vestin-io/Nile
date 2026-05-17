@@ -1901,3 +1901,27 @@
 - `npm run test:cli`
 - `npm run test:desktop`
 - `npm run typecheck`
+
+## 2026-05-18 - Restore browser-driven Codex OpenAI sign-in
+
+### What changed
+
+- Reverted Codex desktop OpenAI sign-in away from the Gemini-style `Terminal.app` wrapper and back to direct `codex login`, while preserving isolated temporary `CODEX_HOME` handling for add-connection flows:
+  - `packages/agents/codex/src/CodexSessionLogin.ts`
+  - `packages/agents/codex/src/CodexSessionLogin.test.ts`
+- Bumped the desktop release metadata for the follow-up fix release:
+  - `apps/desktop/package.json`
+  - `release-notes/v0.16.7.md`
+
+### Key findings
+
+- The earlier Terminal-based adaptation was the wrong model for Codex. `codex login` already owns the browser OAuth flow, so wrapping it in Terminal only exposed a long shell command and regressed the user experience.
+- The real requirement was isolation, not a visible terminal. Keeping a temporary `CODEX_HOME` is enough to avoid mutating the user's existing local Codex account while still letting the CLI launch the browser itself.
+- Electron still needs a non-blocking launch mode. Running `codex login` with `stdio: "ignore"` in desktop and polling the temporary auth store preserves the browser-based login behavior without coupling desktop onboarding to an attached shell.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run packages/agents/codex/src/CodexSessionLogin.test.ts`
+- `npm run test:desktop`
+- `npm run test:cli`
+- `npm run typecheck`

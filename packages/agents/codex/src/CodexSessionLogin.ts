@@ -1,6 +1,5 @@
 import { spawn as spawnChild } from "node:child_process";
-import { existsSync } from "node:fs";
-import { delimiter, dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import { ShellPath } from "@nile/core/services/ShellPath";
@@ -39,28 +38,12 @@ export class CodexSessionLogin {
       HOME: dirname(codexHome),
     };
 
-    if (!this.isElectronProcess()) {
-      await this.waitForExit(
-        this.spawn("codex", ["login"], {
-          stdio: "inherit",
-          env,
-        }),
-        "codex login",
-      );
-      return;
-    }
-
-    const codexCommand = this.resolveCodexCommand(env.PATH ?? "");
-    if (!codexCommand) {
-      throw this.buildMissingCliError();
-    }
-
     await this.waitForExit(
-      this.spawn("osascript", ["-e", this.buildTerminalScript(env, codexCommand)], {
-        stdio: "ignore",
+      this.spawn("codex", ["login"], {
+        stdio: this.isElectronProcess() ? "ignore" : "inherit",
         env,
       }),
-      "opening Terminal for Codex sign-in",
+      "codex login",
     );
   }
 
@@ -85,43 +68,6 @@ export class CodexSessionLogin {
     );
   }
 
-  private buildTerminalScript(env: NodeJS.ProcessEnv, codexCommand: string): string {
-    const command = [
-      `export CODEX_HOME=${this.quoteForShell(env.CODEX_HOME ?? "")}`,
-      `export HOME=${this.quoteForShell(env.HOME ?? "")}`,
-      `export PATH=${this.quoteForShell(env.PATH ?? "")}`,
-      `printf '%s\\n\\n' ${this.quoteForShell(
-        "Complete Codex sign-in in this Terminal window using the OpenAI account you want to add to Nile. When Codex finishes logging in, return to Nile.",
-      )}`,
-      `${this.quoteForShell(codexCommand)} login`,
-    ].join("; ");
-
-    return [
-      'tell application "Terminal"',
-      `do script "${this.escapeForAppleScript(command)}"`,
-      "activate",
-      "end tell",
-    ].join("\n");
-  }
-
-  private resolveCodexCommand(pathValue: string): string | null {
-    for (const entry of pathValue.split(delimiter).filter((value) => value.trim().length > 0)) {
-      const candidate = join(entry, "codex");
-      if (existsSync(candidate)) {
-        return candidate;
-      }
-    }
-    return null;
-  }
-
-  private quoteForShell(value: string): string {
-    return `'${value.replaceAll("'", `'\"'\"'`)}'`;
-  }
-
-  private escapeForAppleScript(value: string): string {
-    return value.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
-  }
-
   private async waitForSignedInSession(
     authStore: CodexAuthStore,
     baseline: string | null,
@@ -139,7 +85,7 @@ export class CodexSessionLogin {
     }
 
     throw new Error(
-      "Codex sign-in did not produce a new local OpenAI session. Finish the login flow in the opened Terminal window, then try again or use Import auth.json.",
+      "Codex sign-in did not produce a new local OpenAI session. Complete the browser sign-in flow, then try again or use Import auth.json.",
     );
   }
 

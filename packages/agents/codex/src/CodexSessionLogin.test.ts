@@ -62,16 +62,11 @@ describe("CodexSessionLogin", () => {
     );
   });
 
-  it("opens Terminal and waits for a new OpenAI session in Electron", async () => {
+  it("runs codex login in the background and waits for a new OpenAI session in Electron", async () => {
     const loginRoot = mkdtempSync(join(tmpdir(), "nile-codex-login-test-"));
     tempDirs.push(loginRoot);
     const codexHome = join(loginRoot, ".codex");
-    const codexBin = join(loginRoot, "bin");
     mkdirSync(codexHome, { recursive: true });
-    mkdirSync(codexBin, { recursive: true });
-    writeFileSync(join(codexBin, "codex"), "#!/bin/sh\nexit 0\n");
-    const originalPath = process.env.PATH;
-    process.env.PATH = codexBin;
 
     let command: string | null = null;
     let receivedStdio: "inherit" | "ignore" | null = null;
@@ -80,7 +75,7 @@ describe("CodexSessionLogin", () => {
       (spawnedCommand, _args, options) => {
         command = spawnedCommand;
         receivedStdio = options.stdio;
-        if (spawnedCommand === "osascript") {
+        if (spawnedCommand === "codex") {
           writeFileSync(
             join(codexHome, "auth.json"),
             JSON.stringify({
@@ -106,18 +101,14 @@ describe("CodexSessionLogin", () => {
       () => true,
     );
 
-    try {
-      await expect(login.signInAndRead(codexHome)).resolves.toEqual(
-        expect.objectContaining({
-          kind: "openai_session",
-          accountId: "acct-electron",
-        }),
-      );
-    } finally {
-      process.env.PATH = originalPath;
-    }
+    await expect(login.signInAndRead(codexHome)).resolves.toEqual(
+      expect.objectContaining({
+        kind: "openai_session",
+        accountId: "acct-electron",
+      }),
+    );
 
-    expect(command).toBe("osascript");
+    expect(command).toBe("codex");
     expect(receivedStdio).toBe("ignore");
   });
 });
