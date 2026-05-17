@@ -1,5 +1,5 @@
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
-import type { NileSession } from "@nile/core/runtime-local";
+import type { NileSession } from "@nile/builtins/runtime";
 import type { NileLogger } from "@nile/core/services/NileLogger";
 
 import { type DesktopUsageState, UsageSummary } from "./UsageSummary";

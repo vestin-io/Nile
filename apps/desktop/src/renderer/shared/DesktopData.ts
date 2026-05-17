@@ -1,4 +1,5 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
+import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
 import type { DesktopConnection } from "../../state/Types";
 
 export type SettingsState = Awaited<ReturnType<typeof window.nileDesktop.state.getSettingsState>>;
@@ -7,7 +8,10 @@ export type NotificationHistoryState = Awaited<ReturnType<typeof window.nileDesk
 export type Definition = Awaited<ReturnType<typeof window.nileDesktop.connections.listConnectionDefinitions>>[number];
 
 export function canConfigureAgent(definitions: Definition[], agentId: AgentId): boolean {
-  return definitions.some((definition) => definition.configurableAgents.includes(agentId));
+  if (AGENT_CAPABILITIES.read(agentId).connectionEntryMode === "import") {
+    return false;
+  }
+  return readDefinitionsForAgent(definitions, agentId).length > 0;
 }
 
 export function readDefinitionsForAgent(definitions: Definition[], agentId: AgentId | null): Definition[] {
@@ -15,8 +19,7 @@ export function readDefinitionsForAgent(definitions: Definition[], agentId: Agen
     return definitions;
   }
 
-  const matchingDefinitions = definitions.filter((definition) => definition.configurableAgents.includes(agentId));
-  return matchingDefinitions.length > 0 ? matchingDefinitions : definitions;
+  return definitions.filter((definition) => definition.selectableAgents.includes(agentId));
 }
 
 export function readCompatibleConnections(
@@ -49,6 +52,7 @@ function readAuthModePriority(authMode: Definition["supportedAuthModes"][number]
     case "openclaw_openai_session":
     case "claude_session":
     case "cursor_session":
+    case "gemini_cli_session":
       return 0;
     case "api_key":
     default:

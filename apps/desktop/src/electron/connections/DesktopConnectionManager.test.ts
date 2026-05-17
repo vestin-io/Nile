@@ -1,25 +1,31 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createCipheriv, pbkdf2Sync } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
+import { DatabaseSync } from "node:sqlite";
 
-import { ClaudeSessionLogin, CodexSessionLogin } from "@nile/core/agents";
 import { AccessRegistry } from "@nile/core/models/access";
 import { EndpointRegistry } from "@nile/core/models/endpoint";
+import { CursorUsageBindingRegistry } from "@nile/builtins/cursor-usage";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
-import { KeychainCredentialStore, type StoredCredential } from "@nile/core/services/credential";
+import { KeychainCredentialStore, SecurityCli, type StoredCredential, type SecurityCliResult } from "@nile/core/services/credential";
+import type { InteractiveSessionLoginRegistry } from "@nile/builtins/session";
 
 import { DesktopConnectionGateway } from "./DesktopConnectionGateway";
 import { DesktopConnectionManager } from "./DesktopConnectionManager";
 
 const tempDirs: string[] = [];
 const originalFetch = globalThis.fetch;
+const originalSecurityCliRun = SecurityCli.prototype.run;
 
 afterEach(() => {
   while (tempDirs.length > 0) {
     rmSync(tempDirs.pop()!, { recursive: true, force: true });
   }
   globalThis.fetch = originalFetch;
+  SecurityCli.prototype.run = originalSecurityCliRun;
+  delete process.env.NILE_BROWSER_HOME;
   vi.useRealTimers();
 });
 
@@ -83,7 +89,7 @@ describe("DesktopConnectionManager", () => {
     const result = await manager.addConnection({
       preset: "openai",
       authMode: "openai_session",
-      openAiSessionSource: "current_codex",
+      sessionSource: "current_codex",
     });
 
     expect(result).toEqual(
@@ -111,8 +117,8 @@ describe("DesktopConnectionManager", () => {
     const result = await manager.addConnection({
       preset: "openai",
       authMode: "openai_session",
-      openAiSessionSource: "current_codex",
-      openAiAuthJsonPath: authPath,
+      sessionSource: "current_codex",
+      sessionAuthJsonPath: authPath,
     });
 
     expect(result).toEqual(
@@ -126,7 +132,7 @@ describe("DesktopConnectionManager", () => {
 
   it("uses the shared core login helper when desktop onboarding requests a sign-in", async () => {
     const setup = createSetup();
-    const loginRunner = new StubCodexSessionLogin();
+    const loginRunner = new StubCodexInteractiveSessionLoginRegistry(setup.codexHome);
     const manager = new DesktopConnectionManager(
       {
         databasePath: setup.dbPath,
@@ -140,7 +146,7 @@ describe("DesktopConnectionManager", () => {
     const result = await manager.addConnection({
       preset: "openai",
       authMode: "openai_session",
-      openAiSessionSource: "login",
+      sessionSource: "login",
     });
 
     expect(loginRunner.signInCalls).toEqual([setup.codexHome]);
@@ -167,6 +173,7 @@ describe("DesktopConnectionManager", () => {
     const result = await manager.addConnection({
       preset: "anthropic",
       authMode: "claude_session",
+      sessionSource: "current_claude",
     });
 
     expect(result).toEqual(
@@ -174,6 +181,61 @@ describe("DesktopConnectionManager", () => {
         endpointId: "claude",
         endpointFamily: "anthropic",
         authMode: "claude_session",
+      }),
+    );
+  });
+
+  it("adds a gemini_cli_session connection from the current Gemini CLI auth", async () => {
+    const setup = createSetup();
+    writeGeminiSession(setup.geminiHome, "gemini.user@example.com", "gemini-sub-123");
+
+    const manager = new DesktopConnectionManager({
+      databasePath: setup.dbPath,
+      agentHomes: { gemini: setup.geminiHome },
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+    });
+
+    const result = await manager.addConnection({
+      preset: "gemini",
+      authMode: "gemini_cli_session",
+      sessionSource: "current_gemini",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        endpointId: "gemini",
+        endpointFamily: "gemini",
+        authMode: "gemini_cli_session",
+      }),
+    );
+  });
+
+  it("uses the shared Gemini login helper when desktop onboarding requests a sign-in", async () => {
+    const setup = createSetup();
+    const loginRunner = new StubGeminiInteractiveSessionLoginRegistry(setup.geminiHome);
+    const manager = new DesktopConnectionManager(
+      {
+        databasePath: setup.dbPath,
+        agentHomes: { gemini: setup.geminiHome },
+        environment: EnvironmentSource.empty(),
+        credentialStore: setup.credentialStore,
+      },
+      loginRunner,
+    );
+
+    const result = await manager.addConnection({
+      preset: "gemini",
+      authMode: "gemini_cli_session",
+      sessionSource: "login",
+    });
+
+    expect(loginRunner.signInCalls).toEqual([setup.geminiHome]);
+    expect(result).toEqual(
+      expect.objectContaining({
+        endpointId: "gemini",
+        endpointFamily: "gemini",
+        authMode: "gemini_cli_session",
       }),
     );
   });
@@ -210,7 +272,7 @@ describe("DesktopConnectionManager", () => {
 
   it("uses the shared Claude login helper when desktop onboarding requests a sign-in", async () => {
     const setup = createSetup();
-    const loginRunner = new StubClaudeSessionLogin();
+    const loginRunner = new StubClaudeInteractiveSessionLoginRegistry(setup.claudeHome);
     const manager = new DesktopConnectionManager(
       {
         databasePath: setup.dbPath,
@@ -218,14 +280,13 @@ describe("DesktopConnectionManager", () => {
         environment: EnvironmentSource.empty(),
         credentialStore: setup.credentialStore,
       },
-      new CodexSessionLogin(),
       loginRunner,
     );
 
     const result = await manager.prepareConnectionDraft({
       preset: "anthropic",
       authMode: "claude_session",
-      claudeSessionSource: "login",
+      sessionSource: "login",
     });
 
     expect(loginRunner.signInCalls).toEqual([setup.claudeHome]);
@@ -235,7 +296,7 @@ describe("DesktopConnectionManager", () => {
 
   it("discards prepared drafts that are abandoned before save", async () => {
     const setup = createSetup();
-    const loginRunner = new StubCodexSessionLogin();
+    const loginRunner = new StubCodexInteractiveSessionLoginRegistry(setup.codexHome);
     const manager = new DesktopConnectionManager(
       {
         databasePath: setup.dbPath,
@@ -249,7 +310,7 @@ describe("DesktopConnectionManager", () => {
     const draft = await manager.prepareConnectionDraft({
       preset: "openai",
       authMode: "openai_session",
-      openAiSessionSource: "login",
+      sessionSource: "login",
     });
 
     manager.discardPreparedConnectionDraft({ draftId: draft.id });
@@ -262,7 +323,7 @@ describe("DesktopConnectionManager", () => {
   it("expires prepared drafts after the configured ttl", async () => {
     vi.useFakeTimers();
     const setup = createSetup();
-    const loginRunner = new StubCodexSessionLogin();
+    const loginRunner = new StubCodexInteractiveSessionLoginRegistry(setup.codexHome);
     const manager = new DesktopConnectionManager(
       {
         databasePath: setup.dbPath,
@@ -277,7 +338,7 @@ describe("DesktopConnectionManager", () => {
     const draft = await manager.prepareConnectionDraft({
       preset: "openai",
       authMode: "openai_session",
-      openAiSessionSource: "login",
+      sessionSource: "login",
     });
 
     await vi.advanceTimersByTimeAsync(1_000);
@@ -289,7 +350,7 @@ describe("DesktopConnectionManager", () => {
 
   it("evicts the oldest prepared draft when the cache reaches capacity", async () => {
     const setup = createSetup();
-    const loginRunner = new StubCodexSessionLogin();
+    const loginRunner = new StubCodexInteractiveSessionLoginRegistry(setup.codexHome);
     const manager = new DesktopConnectionManager(
       {
         databasePath: setup.dbPath,
@@ -304,12 +365,12 @@ describe("DesktopConnectionManager", () => {
     const first = await manager.prepareConnectionDraft({
       preset: "openai",
       authMode: "openai_session",
-      openAiSessionSource: "login",
+      sessionSource: "login",
     });
     const second = await manager.prepareConnectionDraft({
       preset: "openai",
       authMode: "openai_session",
-      openAiSessionSource: "login",
+      sessionSource: "login",
     });
 
     await expect(manager.savePreparedConnection({ draftId: first.id })).rejects.toThrow(
@@ -325,7 +386,7 @@ describe("DesktopConnectionManager", () => {
 
   it("clears prepared drafts when the desktop window is dismissed", async () => {
     const setup = createSetup();
-    const loginRunner = new StubCodexSessionLogin();
+    const loginRunner = new StubCodexInteractiveSessionLoginRegistry(setup.codexHome);
     const manager = new DesktopConnectionManager(
       {
         databasePath: setup.dbPath,
@@ -339,7 +400,7 @@ describe("DesktopConnectionManager", () => {
     const draft = await manager.prepareConnectionDraft({
       preset: "openai",
       authMode: "openai_session",
-      openAiSessionSource: "login",
+      sessionSource: "login",
     });
 
     manager.clearPreparedConnectionDrafts();
@@ -370,6 +431,66 @@ describe("DesktopConnectionManager", () => {
         workosUserId: "user_01K03K41CNGRCADY5VT0JPH69Y",
       }),
     );
+  });
+
+  it("auto-binds cursor usage after importing the current cursor session connection", async () => {
+    const setup = createSetup();
+    writeCursorSessionConfig(setup.cursorHome);
+    const browserHome = mkdtempSync(join(tmpdir(), "nile-browser-home-"));
+    tempDirs.push(browserHome);
+    writeChromiumCursorCookies(
+      join(browserHome, "Library", "Application Support", "Google", "Chrome", "Profile 1", "Cookies"),
+      SAFE_STORAGE_SECRET,
+    );
+    process.env.NILE_BROWSER_HOME = browserHome;
+    SecurityCli.prototype.run = function (args: string[]): SecurityCliResult {
+      if (args[0] !== "find-generic-password") {
+        return {
+          exitCode: 44,
+          stdout: "",
+          stderr: "item could not be found",
+        };
+      }
+      if (args.includes("cursor-access-token")) {
+        return { exitCode: 0, stdout: "cursor-access\n", stderr: "" };
+      }
+      if (args.includes("cursor-refresh-token")) {
+        return { exitCode: 0, stdout: "cursor-refresh\n", stderr: "" };
+      }
+      return {
+        exitCode: 44,
+        stdout: "",
+        stderr: "item could not be found",
+      };
+    };
+
+    const gateway = new DesktopConnectionGateway({
+      databasePath: setup.dbPath,
+      agentHomes: { cursor: setup.cursorHome },
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+    });
+
+    const imported = await gateway.importCurrentConnection("cursor");
+    const bindingRegistry = CursorUsageBindingRegistry.open(setup.dbPath, setup.credentialStore);
+    try {
+      expect(imported).toEqual(
+        expect.objectContaining({
+          endpointFamily: "cursor",
+          authMode: "cursor_session",
+        }),
+      );
+      expect(bindingRegistry.get(imported.id)).toEqual(
+        expect.objectContaining({
+          connectionId: imported.id,
+          accountFingerprint: expect.objectContaining({
+            workosUserId: "user_01K03K41CNGRCADY5VT0JPH69Y",
+          }),
+        }),
+      );
+    } finally {
+      bindingRegistry.close();
+    }
   });
 
   it("auto-enables a configurable connection for an agent before switching", async () => {
@@ -534,7 +655,7 @@ describe("DesktopConnectionManager", () => {
       scanLocalSetups: () => ({ items: [] }),
       captureMatchedImportState: vi.fn(),
       restoreMatchedImportState,
-      importCurrentConnectionWithLocalEffects: async () => ({
+      importCurrentConnection: async () => ({
         id: "gateway-shared-api-key",
         label: "Gateway (llmfk.dpdns.org) API Key",
         endpointId: "gateway-shared",
@@ -608,7 +729,7 @@ describe("DesktopConnectionManager", () => {
       }),
       captureMatchedImportState: vi.fn(() => snapshot),
       restoreMatchedImportState,
-      importCurrentConnectionWithLocalEffects: async () => ({
+      importCurrentConnection: async () => ({
         id: "gateway-shared-api-key",
         label: "Gateway (llmfk.dpdns.org) API Key",
         endpointId: "gateway-shared",
@@ -851,6 +972,7 @@ function createSetup(): {
   codexHome: string;
   claudeHome: string;
   cursorHome: string;
+  geminiHome: string;
   credentialStore: StubCredentialStore;
 } {
   const dir = mkdtempSync(join(tmpdir(), "nile-desktop-connection-manager-"));
@@ -858,15 +980,18 @@ function createSetup(): {
   const codexHome = join(dir, ".codex");
   const claudeHome = join(dir, ".claude");
   const cursorHome = join(dir, ".cursor");
+  const geminiHome = join(dir, ".gemini");
   mkdirSync(codexHome, { recursive: true });
   mkdirSync(claudeHome, { recursive: true });
   mkdirSync(cursorHome, { recursive: true });
+  mkdirSync(geminiHome, { recursive: true });
 
   return {
     dbPath: join(dir, "switcher.sqlite"),
     codexHome,
     claudeHome,
     cursorHome,
+    geminiHome,
     credentialStore: new StubCredentialStore(),
   };
 }
@@ -892,6 +1017,12 @@ function writeOpenAiSessionAtPath(authPath: string, accountId: string): void {
   );
 }
 
+function buildUnsignedJwt(payload: object): string {
+  const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
+  const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${header}.${body}.sig`;
+}
+
 function writeClaudeSession(claudeHome: string): void {
   writeFileSync(
     join(claudeHome, ".credentials.json"),
@@ -913,6 +1044,58 @@ function writeClaudeSession(claudeHome: string): void {
         organizationUuid: "org-claude-456",
         displayName: "Claude User",
       },
+    }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+function writeCursorSessionConfig(cursorHome: string): void {
+  writeFileSync(
+    join(cursorHome, "cli-config.json"),
+    `${JSON.stringify({
+      serverConfigCache: {
+        backendUrl: "https://api2.cursor.sh",
+        authCacheKey: "auth:auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+      },
+      authInfo: {
+        authId: "auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+        email: "cursor.user@example.com",
+        displayName: "Cursor User",
+      },
+    }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+function writeGeminiSession(geminiHome: string, email: string, subject: string): void {
+  writeFileSync(
+    join(geminiHome, "settings.json"),
+    `${JSON.stringify({
+      security: {
+        auth: {
+          selectedType: "oauth-personal",
+        },
+      },
+    }, null, 2)}\n`,
+    "utf8",
+  );
+  writeFileSync(
+    join(geminiHome, "google_accounts.json"),
+    `${JSON.stringify({
+      active: email,
+      old: [],
+    }, null, 2)}\n`,
+    "utf8",
+  );
+  writeFileSync(
+    join(geminiHome, "oauth_creds.json"),
+    `${JSON.stringify({
+      access_token: "gemini-access-token",
+      refresh_token: "gemini-refresh-token",
+      id_token: buildUnsignedJwt({
+        email,
+        sub: subject,
+      }),
     }, null, 2)}\n`,
     "utf8",
   );
@@ -946,21 +1129,84 @@ class StubCredentialStore extends KeychainCredentialStore {
   }
 }
 
-class StubCodexSessionLogin extends CodexSessionLogin {
+class StubCodexInteractiveSessionLoginRegistry implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
   readonly signInCalls: string[] = [];
 
-  override async signIn(codexHome: string): Promise<void> {
-    this.signInCalls.push(codexHome);
-    writeOpenAiSession(codexHome, "acct-signed-in");
+  constructor(private readonly codexHome: string) {}
+
+  async signInAndRead(): Promise<{
+    kind: "openai_session";
+    idToken: string;
+    accessToken: string;
+    refreshToken: string;
+    accountId: string;
+    lastRefresh: string;
+  }> {
+    this.signInCalls.push(this.codexHome);
+    writeOpenAiSession(this.codexHome, "acct-signed-in");
+    return {
+      kind: "openai_session",
+      idToken: buildUnsignedJwt({ email: "signed-in@example.com", sub: "acct-signed-in" }),
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      accountId: "acct-signed-in",
+      lastRefresh: "2026-04-27T00:00:00.000Z",
+    };
   }
 }
 
-class StubClaudeSessionLogin extends ClaudeSessionLogin {
+class StubClaudeInteractiveSessionLoginRegistry implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
   readonly signInCalls: string[] = [];
 
-  override async signIn(claudeHome: string): Promise<void> {
-    this.signInCalls.push(claudeHome);
-    writeClaudeSession(claudeHome);
+  constructor(private readonly claudeHome: string) {}
+
+  async signInAndRead(): Promise<{
+    kind: "claude_session";
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+    accountUuid: string;
+    organizationUuid: string;
+    email: string;
+    displayName: string;
+  }> {
+    this.signInCalls.push(this.claudeHome);
+    writeClaudeSession(this.claudeHome);
+    return {
+      kind: "claude_session",
+      accessToken: "claude-access-token",
+      refreshToken: "claude-refresh-token",
+      expiresAt: 1777427411000,
+      accountUuid: "acct-claude-123",
+      organizationUuid: "org-claude-456",
+      email: "claude@example.com",
+      displayName: "Claude User",
+    };
+  }
+}
+
+class StubGeminiInteractiveSessionLoginRegistry implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
+  readonly signInCalls: string[] = [];
+
+  constructor(private readonly geminiHome: string) {}
+
+  async signInAndRead(): Promise<{
+    kind: "gemini_cli_session";
+    accessToken: string;
+    refreshToken: string;
+    idToken: string;
+  }> {
+    this.signInCalls.push(this.geminiHome);
+    writeGeminiSession(this.geminiHome, "signed-in-gemini@example.com", "gemini-sub-signed-in");
+    return {
+      kind: "gemini_cli_session",
+      accessToken: "gemini-access-token",
+      refreshToken: "gemini-refresh-token",
+      idToken: buildUnsignedJwt({
+        email: "signed-in-gemini@example.com",
+        sub: "gemini-sub-signed-in",
+      }),
+    };
   }
 }
 
@@ -1016,3 +1262,39 @@ function seedCursorConnection(setup: ReturnType<typeof createSetup>): void {
 }
 
 const CURSOR_WEB_SESSION_TOKEN = "user_01K03K41CNGRCADY5VT0JPH69Y::eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhdXRoMHx1c2VyXzAxSzAzSzQxQ05HUkNBRFk1VlQwSlBINjlZIiwidHlwZSI6IndlYiIsImV4cCI6NDEwMjQ0NDgwMH0.sig";
+const SAFE_STORAGE_SECRET = "AAAAAAAAAAAAAAAAAAAAAA==";
+
+function writeChromiumCursorCookies(databasePath: string, safeStorageSecret: string): void {
+  mkdirSync(dirname(databasePath), { recursive: true });
+  const db = new DatabaseSync(databasePath);
+  try {
+    db.exec(
+      [
+        "create table cookies (",
+        "host_key text not null,",
+        "name text not null,",
+        "value text not null,",
+        "encrypted_value blob not null",
+        ");",
+      ].join(" "),
+    );
+    insertCookie(db, "cursor.com", "WorkosCursorSessionToken", encryptCookieValue(CURSOR_WEB_SESSION_TOKEN.split("::")[1]!, safeStorageSecret));
+    insertCookie(db, "cursor.com", "workos_id", encryptCookieValue("user_01K03K41CNGRCADY5VT0JPH69Y", safeStorageSecret));
+    insertCookie(db, ".cursor.com", "cursor-web-target-synced-user", encryptCookieValue("user_01K03K41CNGRCADY5VT0JPH69Y", safeStorageSecret));
+  } finally {
+    db.close();
+  }
+}
+
+function insertCookie(db: DatabaseSync, hostKey: string, name: string, encryptedValue: Buffer): void {
+  db.prepare(
+    "insert into cookies (host_key, name, value, encrypted_value) values (?, ?, '', ?)",
+  ).run(hostKey, name, encryptedValue);
+}
+
+function encryptCookieValue(value: string, safeStorageSecret: string): Buffer {
+  const key = pbkdf2Sync(safeStorageSecret, "saltysalt", 1003, 16, "sha1");
+  const iv = Buffer.alloc(16, 0x20);
+  const cipher = createCipheriv("aes-128-cbc", key, iv);
+  return Buffer.concat([Buffer.from("v10"), cipher.update(value, "utf8"), cipher.final()]);
+}

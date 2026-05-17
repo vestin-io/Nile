@@ -1,4 +1,4 @@
-import type { AgentId } from "../agent/Types";
+import type { AgentId } from "../agent/Definitions";
 
 export type AgentConnectionSettingRecord = {
   agentId: AgentId;

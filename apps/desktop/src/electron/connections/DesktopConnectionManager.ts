@@ -1,23 +1,30 @@
 import {
   type LocalCredentialRequest,
-  type ConnectionModelCatalogResult,
   LocalCredentialRequestBuilder,
-} from "@nile/core/application/local";
-import type { ConnectionPresetFamily, CreateConnectionResult } from "@nile/core/models/connection";
+} from "@nile/builtins/local";
+import type { ConnectionPresetFamily } from "@nile/core/models/connection";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
-import { ConnectionLabeler } from "@nile/core/models/connection";
+import type { ConnectionModelCatalogResult, CreateConnectionResult } from "@nile/core/models/connection";
+import { ConnectionLabeler } from "@nile/builtins/connections";
 import {
   NileSession,
-} from "@nile/core/runtime-local";
+} from "@nile/builtins/runtime";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import {
+  INTERACTIVE_SESSION_LOGIN_REGISTRY,
+  type InteractiveSessionLoginRegistry,
+} from "@nile/builtins/session";
 import {
   isEnvKeyApiKeyCredential,
   type StoredCredential,
   type CredentialStore,
 } from "@nile/core/services/credential";
 import { isAgentId, type AgentHomes } from "@nile/core/models/agent";
-import { ClaudeSessionLogin, CodexSessionLogin } from "@nile/core/agents";
-import { LocalCredentialResolver } from "@nile/core/application/local";
+import { LocalCredentialResolver } from "@nile/builtins/local";
+import {
+  runWithCursorUsageWorkspace,
+  type ConnectionChangeResult,
+} from "@nile/builtins/cursor-usage";
 import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 
 import {
@@ -60,14 +67,13 @@ export class DesktopConnectionManager {
 
   constructor(
     private readonly options: DesktopConnectionManagerOptions,
-    loginRunner: CodexSessionLogin = new CodexSessionLogin(options.environment),
-    claudeLoginRunner: ClaudeSessionLogin = new ClaudeSessionLogin(options.environment),
+    interactiveSessionLoginRegistry: Pick<InteractiveSessionLoginRegistry, "signInAndRead"> =
+      INTERACTIVE_SESSION_LOGIN_REGISTRY,
   ) {
     this.localCredentialResolver = new LocalCredentialResolver(
       this.options.agentHomes,
       this.options.environment,
-      loginRunner,
-      claudeLoginRunner,
+      interactiveSessionLoginRegistry,
     );
     this.managedApiKeyEnvironment = this.options.managedApiKeyEnvironment ?? new NoopManagedApiKeyEnvironment();
     this.sessions = new SessionRunner(this);
@@ -79,9 +85,11 @@ export class DesktopConnectionManager {
 
   async addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary> {
     return await this.sessions.runAsync(async (session) => {
-      const created = await session.createLocalConnectionWithLocalEffects(
-        this.buildLocalConnectionInput(input),
-        this.localCredentialResolver,
+      const created = this.applyCursorUsageFollowUp(
+        await session.createLocalConnection(
+          this.buildLocalConnectionInput(input),
+          this.localCredentialResolver,
+        ),
       );
       const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, created.id);
       return this.buildConnectionSummary(ensured ?? created);
@@ -194,14 +202,14 @@ export class DesktopConnectionManager {
 
     try {
       return await this.sessions.runAsync(async (session) => {
-        const created = await session.createConnectionWithLocalEffects({
+        const created = this.applyCursorUsageFollowUp(await session.createConnection({
           preset: draft.preset,
           authMode: draft.authMode,
           credential: draft.credential,
           endpointUrl: draft.endpointUrl,
           label: input.label?.trim() || undefined,
           enabledAgents: input.enabledAgents ?? draft.onboarding.defaultEnabledAgents,
-        });
+        }));
         const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, created.id);
         return this.buildConnectionSummary(ensured ?? created);
       });
@@ -235,9 +243,8 @@ export class DesktopConnectionManager {
       apiKeySource: input.apiKeySource,
       apiKey: input.apiKey,
       envKey: input.envKey,
-      openAiSessionSource: input.openAiSessionSource,
-      openAiAuthJsonPath: input.openAiAuthJsonPath,
-      claudeSessionSource: input.claudeSessionSource,
+      sessionSource: input.sessionSource,
+      sessionAuthJsonPath: input.sessionAuthJsonPath,
     });
   }
 
@@ -258,7 +265,11 @@ export class DesktopConnectionManager {
   }
 
   private resolvePresetForSavedConnection(connection: SavedConnectionSummary): ConnectionPresetFamily {
-    if (!connection.endpointFamily || connection.endpointFamily === "cursor") {
+    if (
+      !connection.endpointFamily
+      || connection.endpointFamily === "cursor"
+      || connection.endpointFamily === "gemini"
+    ) {
       throw new Error(`Connection ${connection.id} does not support capability detection`);
     }
     return connection.endpointFamily;
@@ -272,9 +283,8 @@ export class DesktopConnectionManager {
       apiKeySource: input.apiKeySource,
       apiKey: input.apiKey,
       envKey: input.envKey,
-      openAiSessionSource: input.openAiSessionSource,
-      openAiAuthJsonPath: input.openAiAuthJsonPath,
-      claudeSessionSource: input.claudeSessionSource,
+      sessionSource: input.sessionSource,
+      sessionAuthJsonPath: input.sessionAuthJsonPath,
     });
   }
 
@@ -322,7 +332,14 @@ export class DesktopConnectionManager {
       agentHomes: this.options.agentHomes,
       environment: this.options.environment,
       credentialStore: this.options.credentialStore,
-      cursorUsageSessionProbe: this.cursorUsageSessionProbe,
     });
+  }
+
+  private applyCursorUsageFollowUp<T extends ConnectionChangeResult>(result: T): T {
+    return runWithCursorUsageWorkspace({
+      databasePath: this.options.databasePath,
+      credentialStore: this.options.credentialStore,
+      sessionProbe: this.cursorUsageSessionProbe,
+    }, (workspace) => workspace.applyFollowUp(result));
   }
 }

@@ -3,19 +3,19 @@ import {
   isEnvKeyApiKeyCredential,
   type StoredCredential,
 } from "../../services/credential/Types";
-import type { ConnectionOnboardingSuggestion } from "../../models/connection";
 import type {
+  ConnectionCreatorContract,
+  ConnectionOnboardingSuggestion,
   CreateConnectionInput,
   CreateConnectionResult,
-} from "../../models/connection/Creator";
-import type { ConnectionCreator } from "../../models/connection/Creator";
+} from "../../models/connection/Runtime";
 import type { SavedConnections, SavedConnectionSummary } from "../../models/connection/SavedConnections";
 import type { CreateLocalConnectionInput, UpdateConnectionInput } from "./ConnectionInputs";
 
 export class LocalConnectionWorkflows {
   constructor(
     private readonly savedConnections: SavedConnections,
-    private readonly connectionCreator: ConnectionCreator,
+    private readonly connectionCreator: ConnectionCreatorContract,
     private readonly createLocalCredentialResolver: () => LocalCredentialResolver,
   ) {}
 

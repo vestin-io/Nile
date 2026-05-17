@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
+import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
 
 import type { Translator } from "../shared/I18n";
 import { orderSupportedAuthModes, type Definition } from "../shared/DesktopData";
@@ -14,7 +15,7 @@ export type ConnectionMethod = {
   authMode: Definition["supportedAuthModes"][number];
   apiKeySource?: "direct" | "env_key";
   description: string;
-  sessionSource?: "login" | "current_codex";
+  sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
   title: string;
 };
 
@@ -31,34 +32,6 @@ export function buildConnectionMethods(definition: Definition, t: Translator): C
   const methods: ConnectionMethod[] = [];
 
   for (const authMode of orderSupportedAuthModes(definition.supportedAuthModes)) {
-    if (authMode === "openai_session") {
-      methods.push({
-        key: "openai_session:current_codex",
-        authMode,
-        description: t("addConnection.importAuthJsonDescription"),
-        sessionSource: "current_codex",
-        title: t("addConnection.importAuthJson"),
-      });
-      methods.push({
-        key: "openai_session:login",
-        authMode,
-        description: t("addConnection.signInWithOpenAiDescription"),
-        sessionSource: "login",
-        title: t("addConnection.signInWithOpenAi"),
-      });
-      continue;
-    }
-
-    if (authMode === "claude_session") {
-      methods.push({
-        key: "claude_session",
-        authMode,
-        description: t("addConnection.signInWithClaudeDescription"),
-        title: t("addConnection.signInWithClaude"),
-      });
-      continue;
-    }
-
     if (authMode === "api_key") {
       methods.push({
         key: "api_key:direct",
@@ -79,6 +52,19 @@ export function buildConnectionMethods(definition: Definition, t: Translator): C
       continue;
     }
 
+    for (const method of SHARED_SESSION_CONNECTION_METHODS.listVisibleForAddConnectionForAuthMode(authMode)) {
+      methods.push({
+        key: method.key,
+        authMode,
+        description: method.descriptionKey ? t(method.descriptionKey) : t(method.titleKey),
+        sessionSource: method.source,
+        title: t(method.titleKey),
+      });
+    }
+    if (methods.some((method) => method.authMode === authMode)) {
+      continue;
+    }
+
     methods.push({
       key: authMode,
       authMode,
@@ -92,14 +78,18 @@ export function buildConnectionMethods(definition: Definition, t: Translator): C
 
 export function readSelectedMethodKey(
   authMode: string,
-  sessionSource: "login" | "current_codex",
+  sessionSource: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor",
   apiKeySource: "direct" | "env_key" = "direct",
 ): string {
   if (authMode === "api_key") {
     return `api_key:${apiKeySource}`;
   }
-  if (authMode === "openai_session") {
-    return `openai_session:${sessionSource}`;
+  const sessionMethodKey = SHARED_SESSION_CONNECTION_METHODS.readMethodKeyForSelection(
+    authMode,
+    sessionSource,
+  );
+  if (sessionMethodKey) {
+    return sessionMethodKey;
   }
 
   return authMode;

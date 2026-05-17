@@ -146,7 +146,7 @@ export const ES_MESSAGES: Messages = {
     "addConnection.signInWithClaudeDescription": "Inicia el flujo de inicio de sesión de Claude y luego guarda la nueva sesión en Nile.",
     "addConnection.completeSessionStep": "Completa primero el inicio de sesión",
     "addConnection.completeSessionStepDescription": "Termina primero el flujo de inicio de sesión. Después podrás revisar la etiqueta y la capacidad antes de guardar esta conexión.",
-    "addConnection.sessionReadyTitle": "Autenticación de OpenAI completada",
+    "addConnection.sessionReadyTitle": "Autenticación completada",
     "addConnection.sessionReadyDescription": "La autenticación se completó. Revisa la etiqueta y la capacidad, y luego haz clic en Guardar conexión para añadir esta conexión a Nile.",
     "addConnection.sessionReadyAction": "Siguiente paso: {action}",
     "addConnection.useApiKey": "Usar API key",

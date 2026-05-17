@@ -2,9 +2,10 @@ import type { AccessRegistry } from "../../models/access";
 import type { AccessRecord } from "../../models/access";
 import type { AccessRegistryInput } from "../../models/access";
 import type { AuthMode } from "../../models/access";
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 import type { AgentConnectionSettings } from "../../models/agent-settings";
 import { ConnectionUpsert } from "../../models/connection/Upsert";
+import { CONNECTION_RUNTIME_REGISTRY, type GatewayCapabilityProbe } from "../../models/connection";
 import type { EndpointRegistry } from "../../models/endpoint";
 import { EndpointShape, type EndpointFamily, type EndpointRegistryInput } from "../../models/endpoint";
 import { SHARED_CONNECTION_AGENT_POLICY } from "../../models/connection/AgentPolicy";
@@ -12,7 +13,6 @@ import type { AgentSelection } from "../../models/selection/Selection";
 import type { StoredCredential } from "../../services/credential/Types";
 import type { NileLogger } from "../../services/NileLogger";
 import type { DetectedAgentState, ImportCurrentConnectionResult } from "../../models/agent";
-import { GatewayProbe, type GatewayCapabilityProbe } from "../../models/connection";
 import { joinEndpointUrl } from "../../projection/Url";
 
 export type AgentImportCandidate = {
@@ -42,7 +42,7 @@ export class LiveSetupImportSupport {
     private readonly agentSelection: AgentSelection,
     private readonly agentConnectionSettings: AgentConnectionSettings,
     private readonly logger: NileLogger,
-    private readonly gatewayProbe: GatewayCapabilityProbe = new GatewayProbe(),
+    private readonly gatewayProbe: GatewayCapabilityProbe = CONNECTION_RUNTIME_REGISTRY.read().createGatewayProbe(),
   ) {
     this.upsert = new ConnectionUpsert(endpointRegistry, accessRegistry);
   }
@@ -109,6 +109,7 @@ export class LiveSetupImportSupport {
 
     const accessUpdate: {
       identityKey?: string | null;
+      enabledAgents?: AgentId[];
     } = {};
     if (candidate.access.identityKey !== undefined) {
       accessUpdate.identityKey = candidate.access.identityKey ?? null;
@@ -117,6 +118,10 @@ export class LiveSetupImportSupport {
     if (!currentAccess) {
       throw new Error(`Matched current ${this.agentLabel} access is missing from Nile`);
     }
+    accessUpdate.enabledAgents = [...new Set([
+      ...currentAccess.enabledAgents,
+      ...this.readImportedEnabledAgents(candidate.endpoint, candidate.access.authMode),
+    ])];
 
     this.accessRegistry.update(matchedConnection.accessId, accessUpdate);
     this.refreshMatchedCredential(currentAccess, candidate.credential);
@@ -226,6 +231,12 @@ export class LiveSetupImportSupport {
     currentAccess: AccessRecord,
     credential: StoredCredential,
   ): void {
+    if (
+      currentAccess.authMode === "openai_session"
+      && credential.kind === "openclaw_openai_session"
+    ) {
+      return;
+    }
     if (currentAccess.authMode !== "api_key") {
       this.accessRegistry.syncCredential(currentAccess.id, credential);
       return;

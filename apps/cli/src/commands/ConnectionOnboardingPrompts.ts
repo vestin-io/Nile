@@ -1,6 +1,4 @@
-import {
-  ConnectionLabeler,
-} from "@nile/core/models/connection";
+import { ConnectionLabeler } from "@nile/builtins/connections";
 import type { AuthMode } from "@nile/core/models/access";
 import type { ConnectionPresetFamily } from "@nile/core/models/connection";
 import type { StoredCredential } from "@nile/core/services/credential";

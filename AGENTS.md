@@ -28,10 +28,20 @@ This file defines the working rules for code changes in this repository.
 - If a field, type, or abstraction is not exercised by the current spec or implementation, do not add it yet.
 - Keep `core` free of UI concerns.
 - Keep Electron-specific code out of shared core packages.
-- Keep provider/account persistence separate from Codex apply logic.
+- Keep provider/account persistence separate from agent apply logic.
 - UI surfaces may trigger apply flows, but they must not own provider/account mutation rules.
 - Secrets must not be written into SQLite, docs, logs, or test fixtures. Store only references and non-sensitive metadata outside the credential store.
-- Do not introduce implicit switching behavior. Applying a new Codex selection must stay an explicit user action.
+- Do not introduce implicit switching behavior. Applying a new agent selection must stay an explicit user action.
+- Workspace packages must form an acyclic dependency graph at the `package.json` level. Type-only imports through narrow subpaths do not justify a runtime dependency edge. Treat any cycle as a defect.
+- Plugin packages (`packages/agents/*`, `packages/connections`, future runtime packages) depend on `@nile/core` for contracts. They must not depend on each other. If two plugin packages need to share behavior, the shared piece belongs in `@nile/core` or in a separate utility package.
+
+## Registry & Plugin Ownership Rules
+
+- Plugin identifier unions (agent ids, connection family ids, session source ids, auth modes) must be derived from manifest declarations, not maintained as hand-written union literals. If derivation would introduce a cycle, isolate the declaration metadata in a non-runtime file (see `packages/core/src/models/agent/registry/Declarations.ts`).
+- Per-id data tables (default homes, icon resolvers, projection shapes, behavior maps) belong to the plugin package, not to `@nile/core`. Core only owns the registry aggregation layer (one array per concept) and the generic shape contracts.
+- A central discriminated union that enumerates every plugin's concrete shape is an anti-pattern. Use a generic base type and let each plugin export its concrete extension (see `packages/agents/*/src/ProjectionTypes.ts`).
+- Adding a new agent or family must not require editing any union, `Record`, or switch in core other than the single aggregation array per concept (e.g. `AGENT_DECLARATIONS`, `AGENT_MODULES`, `CONNECTION_FAMILY_MODULES`).
+- A test that asserts two manually maintained lists agree is a signal that the derivation is missing. Replace the test with derivation instead of accepting the duplication.
 
 ## Parameter Passing Rules
 
@@ -46,6 +56,8 @@ This file defines the working rules for code changes in this repository.
 - Do not create a type alias that is an exact re-export of another type with no added constraints or semantics. Import and use the source type directly.
 - A directory with only one file is not a useful abstraction. Elevate the file to its parent directory, or wait until a natural second file appears.
 - Always pair `.open()` with `.close()` in a `try/finally` block. Never let an exception path skip resource cleanup.
+- Consumer modules (apps, core actions, registries, UI) must not branch on a specific agent id, connection family id, or session source id string. If behavior depends on plugin specifics, declare it as a capability or field on the manifest and read the capability. The owning plugin package may use its own id literal internally — that is local, not a leak.
+- When a registry exists for a behavior (e.g. `INTERACTIVE_SESSION_LOGIN_REGISTRY`, `CURRENT_SESSION_SOURCE_REGISTRY`, `AGENT_PROJECTION_REGISTRY`), consumer surfaces must depend on the registry interface, not on concrete plugin classes. Hardwiring specific implementation classes in composition roots defeats the registry and blocks new plugins from being picked up automatically.
 
 ## Naming Rules
 
@@ -66,6 +78,7 @@ This file defines the working rules for code changes in this repository.
 - Use `const` and early returns, but do not force a functional style.
 - Prefer explicit validation at module boundaries.
 - Keep storage row shapes and domain shapes separate when persistence needs a different representation.
+- If a list of identifiers must stay in sync with a set of implementations, derive the list and the union type from the implementations (e.g. `(typeof AGENT_DECLARATIONS)[number]["id"]`). Hand-maintained `as const` tuples that mirror another array are a guaranteed drift source.
 
 ## Electron Rules
 
@@ -91,6 +104,7 @@ This file defines the working rules for code changes in this repository.
 
 - Do not change `.vestin/specs/` or `.vestin/architect.md` during normal feature build work unless the user explicitly asks for a planning/spec revision.
 - Update the matching `.vestin/plans/.../build.md` file after implementing a feature.
+- The build log entry must include a "Key findings" subsection listing any deliberate omissions, partial fixes, judgment calls, or known follow-up gaps. "Done with caveats" recorded honestly is better than "appears done".
 - Update `.vestin/state/features.json` when a feature state becomes clear.
 - Keep comments short and only where the code is not obvious.
 - Do not add new dependencies without a concrete need.
@@ -104,4 +118,5 @@ This file defines the working rules for code changes in this repository.
 - Keep interfaces and DTOs lean. Remove unused properties instead of carrying them forward.
 - Prefer names that read clearly within their directory context. Do not repeat the parent context in every file or class name unless it removes real ambiguity.
 - Use product or feature names only when they add meaning. Avoid prefixes like `Cli*` for files already living under `apps/cli/src`.
+- When using getter properties or other lazy patterns to defer evaluation (typically to break circular initialization between packages), add a one-line comment at the declaration explaining the reason. Lazy evaluation as a workaround should be visible, not folklore.
 - If a rule would force a worse local design, keep the code simple and document the exception in the feature build log.

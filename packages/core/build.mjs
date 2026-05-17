@@ -4,11 +4,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:f
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { buildWorkspaceDistAliases } from "../../scripts/workspace-package-exports.mjs";
 
 const packageDir = dirname(fileURLToPath(import.meta.url));
 const srcDir = join(packageDir, "src");
 const distDir = join(packageDir, "dist");
 const macosHelperTargetVersion = "12.0";
+const rootDir = join(packageDir, "..", "..");
 
 rmSync(distDir, { recursive: true, force: true });
 
@@ -16,20 +18,37 @@ const entryPoints = unique([
   join(srcDir, "index.ts"),
   join(srcDir, "application", "index.ts"),
   join(srcDir, "application", "local", "index.ts"),
+  join(srcDir, "application", "local", "ModelCatalogSource.ts"),
+  join(srcDir, "session", "index.ts"),
+  join(srcDir, "session", "backend", "index.ts"),
   ...readIndexEntries(join(srcDir, "actions")),
   join(srcDir, "actions", "local-setup", "Reconciliation.ts"),
-  join(srcDir, "actions", "usage", "cursor", "index.ts"),
   join(srcDir, "models", "agent", "index.ts"),
+  join(srcDir, "models", "agent", "Ids.ts"),
   join(srcDir, "models", "agent", "Homes.ts"),
-  join(srcDir, "models", "agent", "Types.ts"),
+  join(srcDir, "models", "agent", "module", "index.ts"),
+  join(srcDir, "models", "agent", "registry", "Capabilities.ts"),
+  join(srcDir, "models", "agent", "registry", "index.ts"),
+  join(srcDir, "models", "agent", "Definitions.ts"),
   join(srcDir, "models", "connection", "EnabledAgentsPolicy.ts"),
+  join(srcDir, "models", "connection", "family", "index.ts"),
   join(srcDir, "models", "connection", "Requirements.ts"),
   join(srcDir, "projection", "index.ts"),
-  join(srcDir, "runtime-local", "index.ts"),
+  join(srcDir, "projection", "ProjectionError.ts"),
+  join(srcDir, "projection", "Url.ts"),
+  join(srcDir, "runtime-local", "AbstractAgentStateDetector.ts"),
+  join(srcDir, "runtime-local", "AgentOperationRuntime.ts"),
+  join(srcDir, "runtime-local", "AgentWorkspaceBinding.ts"),
   join(srcDir, "runtime-local", "ImportState.ts"),
+  join(srcDir, "runtime-local", "LocalConnectionSupport.ts"),
+  join(srcDir, "agents", "ApplyMutation.ts"),
+  join(srcDir, "agents", "ApplySelectionValidationError.ts"),
+  join(srcDir, "agents", "RollbackLatest.ts"),
   join(srcDir, "services", "EnvironmentSource.ts"),
+  join(srcDir, "services", "JwtPayloadDecoder.ts"),
   join(srcDir, "services", "NileLogger.ts"),
-  join(srcDir, "agents", "index.ts"),
+  join(srcDir, "services", "OptionalTextFile.ts"),
+  join(srcDir, "services", "PrivateTextFile.ts"),
   ...readIndexEntries(join(srcDir, "agents")),
   ...readIndexEntries(join(srcDir, "models")),
   ...readIndexEntries(join(srcDir, "services")),
@@ -39,6 +58,11 @@ await build({
   entryPoints,
   outbase: srcDir,
   outdir: distDir,
+  alias: {
+    "@nile/core/models/agent/module": join(srcDir, "models", "agent", "module", "index.ts"),
+    "@nile/core/models/agent/module/Types": join(srcDir, "models", "agent", "module", "Types.ts"),
+    ...buildWorkspaceDistAliases(rootDir),
+  },
   bundle: true,
   splitting: true,
   format: "esm",

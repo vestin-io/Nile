@@ -1,11 +1,10 @@
 import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent";
 import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
-import type { RemoveConnectionResult, ResetStateResult } from "@nile/core/application/local";
-import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
+import type { RemoveConnectionResult, ResetStateResult } from "@nile/builtins/local";
+import type { BindCursorUsageResult } from "@nile/builtins/cursor-usage";
 import type { AuthMode } from "@nile/core/models/access";
-import type { ConnectionOnboardingSuggestion, ConnectionPresetFamily } from "@nile/core/models/connection";
+import type { ConnectionPresetFamily, ConnectionOnboardingSuggestion, ConnectionModelCatalogResult } from "@nile/core/models/connection";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
-import type { ConnectionModelCatalogResult } from "@nile/core/application/local";
 
 import type { DesktopConnectionAlert, DesktopConnection } from "../../state/Types";
 import type { CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../alerts/Store";
@@ -14,9 +13,8 @@ export type DesktopConnectionCredentialInput = {
   apiKeySource?: "direct" | "env_key";
   apiKey?: string;
   envKey?: string;
-  openAiSessionSource?: "login" | "current_codex";
-  openAiAuthJsonPath?: string;
-  claudeSessionSource?: "login" | "current_claude";
+  sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
+  sessionAuthJsonPath?: string;
 };
 
 export type DesktopAddConnectionInput = DesktopConnectionCredentialInput & {

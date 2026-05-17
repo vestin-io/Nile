@@ -34,9 +34,9 @@ describe("SelectionSync", () => {
     const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
     const agentSelection = AgentSelection.open(dbPath);
     try {
-      seedOpenAiConnection(endpointRegistry, accessRegistry, "jay");
-      seedOpenAiConnection(endpointRegistry, accessRegistry, "jiqiang90");
-      agentSelection.setApplied("codex", "jay", "2026-05-13T00:00:00.000Z");
+      seedOpenAiConnection(endpointRegistry, accessRegistry, "primary-openai");
+      seedOpenAiConnection(endpointRegistry, accessRegistry, "secondary-openai");
+      agentSelection.setApplied("codex", "primary-openai", "2026-05-13T00:00:00.000Z");
 
       const sync = new SelectionSync(
         agentSelection,
@@ -52,12 +52,12 @@ describe("SelectionSync", () => {
             },
             access: {
               authMode: "openai_session",
-              labelHint: "jiqiang90@gmail.com",
+              labelHint: "gemini.secondary@example.test",
             },
             matchedConnection: {
-              connectionId: "jiqiang90",
+              connectionId: "secondary-openai",
               endpointId: "openai",
-              accessId: "jiqiang90",
+              accessId: "secondary-openai",
               matchesAgentSelection: false,
             },
           }),
@@ -66,7 +66,7 @@ describe("SelectionSync", () => {
 
       sync.run(["codex"]);
 
-      expect(agentSelection.get("codex")?.connectionId).toBe("jiqiang90");
+      expect(agentSelection.get("codex")?.connectionId).toBe("secondary-openai");
     } finally {
       agentSelection.close();
       accessRegistry.close();
@@ -81,9 +81,9 @@ describe("SelectionSync", () => {
     const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
     const agentSelection = AgentSelection.open(dbPath);
     try {
-      seedOpenAiConnection(endpointRegistry, accessRegistry, "jay");
-      seedOpenAiConnection(endpointRegistry, accessRegistry, "jiqiang90");
-      agentSelection.setApplied("openclaw", "jay", "2026-05-13T00:00:00.000Z");
+      seedOpenAiConnection(endpointRegistry, accessRegistry, "primary-openai");
+      seedOpenAiConnection(endpointRegistry, accessRegistry, "secondary-openai");
+      agentSelection.setApplied("openclaw", "primary-openai", "2026-05-13T00:00:00.000Z");
 
       const sync = new SelectionSync(
         agentSelection,
@@ -99,12 +99,12 @@ describe("SelectionSync", () => {
             },
             access: {
               authMode: "openai_session",
-              labelHint: "jiqiang90@gmail.com",
+              labelHint: "gemini.secondary@example.test",
             },
             matchedConnection: {
-              connectionId: "jiqiang90",
+              connectionId: "secondary-openai",
               endpointId: "openai",
-              accessId: "jiqiang90",
+              accessId: "secondary-openai",
               matchesAgentSelection: false,
             },
           }),
@@ -113,7 +113,7 @@ describe("SelectionSync", () => {
 
       sync.run(["openclaw"]);
 
-      expect(agentSelection.get("openclaw")?.connectionId).toBe("jay");
+      expect(agentSelection.get("openclaw")?.connectionId).toBe("primary-openai");
     } finally {
       agentSelection.close();
       accessRegistry.close();

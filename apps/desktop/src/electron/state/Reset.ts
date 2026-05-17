@@ -1,6 +1,6 @@
 import { rmSync } from "node:fs";
 
-import type { ResetStateResult, StateReset } from "@nile/core/application/local";
+import type { ResetStateResult, StateReset } from "@nile/builtins/local";
 
 type DesktopStateResetOptions = {
   localStatePaths: string[];

@@ -143,7 +143,7 @@ export const VI_MESSAGES: Messages = {
     "addConnection.signInWithClaudeDescription": "Khởi chạy luồng đăng nhập Claude rồi lưu phiên mới vào Nile.",
     "addConnection.completeSessionStep": "Hoàn tất đăng nhập trước",
     "addConnection.completeSessionStepDescription": "Hãy hoàn tất luồng đăng nhập trước. Sau đó bạn có thể xem lại nhãn và khả năng trước khi lưu kết nối này.",
-    "addConnection.sessionReadyTitle": "Xác thực OpenAI thành công",
+    "addConnection.sessionReadyTitle": "Xác thực thành công",
     "addConnection.sessionReadyDescription": "Xác thực đã hoàn tất. Hãy kiểm tra nhãn và khả năng, rồi bấm Lưu kết nối để thêm kết nối này vào Nile.",
     "addConnection.sessionReadyAction": "Bước tiếp theo: {action}",
     "addConnection.useApiKey": "Dùng API key",

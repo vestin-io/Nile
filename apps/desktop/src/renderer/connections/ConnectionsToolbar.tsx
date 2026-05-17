@@ -2,7 +2,7 @@ import { Plus, Search } from "lucide-react";
 
 import type { Translator } from "../shared/I18n";
 import type { DesktopConnection } from "../../state/Types";
-import { readProviderIconNode, readProviderLabel } from "./ProviderDisplay";
+import { readEndpointProviderIconNode, readProviderLabel } from "./ProviderDisplay";
 import { RefreshButton } from "../shared/RefreshButton";
 import { Button } from "../ui/button";
 import { type ComboboxItem, Combobox } from "../ui/combobox";
@@ -10,6 +10,7 @@ import { Input } from "../ui/input";
 
 type ConnectionsToolbarProps = {
   t: Translator;
+  showAddButton?: boolean;
   showSearchAndFilter?: boolean;
   providerFilter?: DesktopConnection["endpointFamily"] | "all";
   providers?: DesktopConnection["endpointFamily"][];
@@ -22,6 +23,7 @@ type ConnectionsToolbarProps = {
 
 export function ConnectionsToolbar({
   t,
+  showAddButton = true,
   showSearchAndFilter = true,
   providerFilter = "all",
   providers = [],
@@ -39,7 +41,7 @@ export function ConnectionsToolbar({
     ...providers.map((provider) => ({
       value: provider,
       label: readProviderLabel(provider, t),
-      icon: readProviderIconNode(provider),
+      icon: readEndpointProviderIconNode(provider),
     })),
   ];
 
@@ -69,10 +71,12 @@ export function ConnectionsToolbar({
         </div>
       ) : <div className="flex-1" />}
       <div className="flex shrink-0 items-center gap-2">
-        <Button className="h-11 rounded-xl px-5" onClick={onOpenAddPage}>
-          <Plus className="h-4 w-4" />
-          {t("common.addConnection")}
-        </Button>
+        {showAddButton ? (
+          <Button className="h-11 rounded-xl px-5" onClick={onOpenAddPage}>
+            <Plus className="h-4 w-4" />
+            {t("common.addConnection")}
+          </Button>
+        ) : null}
         <RefreshButton
           className="h-11 w-11 rounded-xl p-0"
           iconOnly

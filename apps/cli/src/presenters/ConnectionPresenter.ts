@@ -3,14 +3,13 @@ import type {
   ImportDetectedSetupsResult,
   ScanLocalSetupsResult,
 } from "@nile/core/actions/local-setup";
-import type { CursorUsageAutoBindResult } from "@nile/core/application/local";
 import type { ConnectionUsageResult } from "@nile/core/actions/usage";
-import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
+import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/builtins/cursor-usage";
 import type {
   AddConnectionResult,
   HistoryListEntry,
 } from "../types";
-import { formatAgentLabel } from "@nile/core/models/agent/types";
+import { formatAgentLabel } from "@nile/core/models/agent/definitions";
 import { EndpointLabelFormatter } from "./EndpointLabelFormatter";
 
 export class ConnectionPresenter {
@@ -336,6 +335,9 @@ export class ConnectionPresenter {
     }
     if (authMode === "claude_session") {
       return "Claude sign-in";
+    }
+    if (authMode === "gemini_cli_session") {
+      return "Gemini CLI sign-in";
     }
     if (authMode === "api_key") {
       return "API key";

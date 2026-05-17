@@ -1,5 +1,5 @@
-import type { AgentId } from "../models/agent/Types";
-import type { AgentAdapter, AgentCapabilitySupport } from "../models/agent";
+import type { AgentId } from "../models/agent/Ids";
+import type { AgentAdapter, AgentCapabilitySupport } from "../models/agent/Adapter";
 
 export class AgentAdapterRegistryError extends Error {
   constructor(message: string) {

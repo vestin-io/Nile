@@ -9,6 +9,7 @@ import {
 } from "../../services/credential";
 import { SqliteDatabase } from "../../services/database";
 import { SecureSnapshotStore } from "../../services/history";
+import { AGENT_MODULE_REGISTRY } from "../../models/agent/module/Registry";
 
 export type ResetStateResult = {
   databasePath: string;
@@ -62,9 +63,15 @@ export class StateReset {
     }
 
     try {
+      const agentCredentialQueries = AGENT_MODULE_REGISTRY.list()
+        .flatMap((module) =>
+          module.localConnectionSupportFactory?.credentialRefQuery
+            ? [module.localConnectionSupportFactory.credentialRefQuery]
+            : []);
+
       const credentialRefs = new Set([
         ...this.readRefs(database, "SELECT credential_source_ref AS value FROM accesses"),
-        ...this.readRefs(database, "SELECT credential_source_ref AS value FROM cursor_usage_bindings"),
+        ...agentCredentialQueries.flatMap((q) => this.readRefs(database, q)),
       ]);
       const secureSnapshotRefs = new Set(
         this.readRefs(

@@ -1,9 +1,10 @@
-import type { LocalCredentialRequest } from "./LocalCredentialResolver";
-import type { AgentId } from "../../models/agent/Types";
+import type { LocalCredentialRequest } from "./CredentialRequest";
+import type { AgentId } from "../../models/agent/Definitions";
+import type { ConnectionPresetFamily } from "../../models/connection/preset";
 
 export type CreateLocalConnectionInput = {
-  preset: "openai" | "gateway" | "azure-openai" | "anthropic";
-  authMode: "api_key" | "openai_session" | "claude_session" | "cursor_session";
+  preset: ConnectionPresetFamily;
+  authMode: "api_key" | "openai_session" | "claude_session" | "cursor_session" | "gemini_cli_session";
   label?: string;
   endpointUrl?: string;
   enabledAgents?: AgentId[];

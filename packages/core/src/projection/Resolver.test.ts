@@ -203,6 +203,47 @@ describe("AgentProjectionResolver", () => {
     });
   });
 
+  it("projects gemini cli session endpoints", () => {
+    const resolver = new AgentProjectionResolver();
+
+    const projection = resolver.resolve("gemini", {
+      endpoint: {
+        id: "gemini",
+        label: "Gemini",
+        rootUrl: "https://generativelanguage.googleapis.com",
+        profile: "gemini-cli",
+        protocols: {
+          gemini: {
+            authTypes: ["oauth-personal"],
+          },
+        },
+        createdAt: "",
+        updatedAt: "",
+      },
+      access: {
+        ...apiKeyAccess("gemini-session"),
+        authMode: "gemini_cli_session",
+      },
+      credential: {
+        kind: "gemini_cli_session",
+        accessToken: "gemini-access",
+        refreshToken: "gemini-refresh",
+        idToken: "gemini-id",
+      },
+    });
+
+    expect(projection).toEqual({
+      agentId: "gemini",
+      protocol: "gemini",
+      endpointId: "gemini",
+      endpointLabel: "Gemini",
+      accessId: "gemini-session",
+      accessLabel: "Gateway Shared",
+      authMode: "gemini_cli_session",
+      selectedAuthType: "oauth-personal",
+    });
+  });
+
   it("projects OpenClaw provider and auth-profile configs", () => {
     const resolver = new AgentProjectionResolver();
 

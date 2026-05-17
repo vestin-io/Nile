@@ -147,7 +147,7 @@ export const KO_MESSAGES: Messages = {
     "addConnection.signInWithClaudeDescription": "Claude 로그인 흐름을 시작한 뒤 새 세션을 Nile에 저장합니다.",
     "addConnection.completeSessionStep": "먼저 로그인 완료",
     "addConnection.completeSessionStepDescription": "먼저 로그인 흐름을 완료하세요. 그 후 라벨과 기능을 검토하고 이 연결을 저장할 수 있습니다.",
-    "addConnection.sessionReadyTitle": "OpenAI 인증 완료",
+    "addConnection.sessionReadyTitle": "인증 완료",
     "addConnection.sessionReadyDescription": "인증이 완료되었습니다. 연결 라벨과 기능을 확인한 뒤 연결 저장을 눌러 이 연결을 Nile에 추가하세요.",
     "addConnection.sessionReadyAction": "다음 단계: {action}",
     "addConnection.useApiKey": "API 키 사용",

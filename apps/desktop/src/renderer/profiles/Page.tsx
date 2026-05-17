@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Layers3, Workflow } from "lucide-react";
 
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { DesktopAdvancedState, DesktopAgentState } from "../../state/Types";
 import { CreateProfilePage } from "./Create";

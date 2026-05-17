@@ -10,6 +10,7 @@ import { ConnectionPresenter } from "./presenters/ConnectionPresenter";
 import { ResetPresenter } from "./presenters/ResetPresenter";
 import { StatusPresenter } from "./presenters/StatusPresenter";
 import { NileCliResultFactory } from "./NileCliResultFactory";
+import { AgentCommandExtensionRegistry } from "./commands/agent/Registry";
 
 type NileCliCommandRouterOptions = {
   agentCommands: AgentCommands;
@@ -20,6 +21,7 @@ type NileCliCommandRouterOptions = {
   resultFactory: NileCliResultFactory;
   statusPresenter: StatusPresenter;
   usageCommands: UsageCommands;
+  agentCommandExtensions: AgentCommandExtensionRegistry;
 };
 
 export class NileCliCommandRouter {
@@ -128,11 +130,9 @@ export class NileCliCommandRouter {
     if (head === "rollback") {
       return this.runAgentRollback(agentId, options);
     }
-    if (agentId === "cursor" && head === "usage" && second === "bind") {
-      return await this.runCursorUsageBind(options, third, flags, flags.get("json") === true);
-    }
-    if (agentId === "cursor" && head === "usage" && second === "auto-bind") {
-      return await this.runCursorUsageAutoBind(options, third, flags.get("json") === true);
+    const extensionResult = await this.options.agentCommandExtensions.route(agentId, options, command, flags);
+    if (extensionResult) {
+      return extensionResult;
     }
 
     throw new Error(`Unknown ${agentId} command: ${command.join(" ")}`);
@@ -179,41 +179,5 @@ export class NileCliCommandRouter {
   private runAgentRollback(agentId: AgentId, options: ResolvedCliOptions): CommandResult {
     const result = this.options.agentCommands.rollbackLatest(options, agentId);
     return this.options.resultFactory.okText(this.options.connectionPresenter.formatRollbackSummary(result));
-  }
-
-  private async runCursorUsageBind(
-    options: ResolvedCliOptions,
-    connectionId: string | undefined,
-    flags: Map<string, string | boolean>,
-    asJson: boolean,
-  ): Promise<CommandResult> {
-    if (!connectionId) {
-      throw new Error("cursor usage bind requires <connectionId>");
-    }
-
-    const sessionToken = flags.get("session-token") ?? flags.get("workos-session-token");
-    if (typeof sessionToken !== "string" || !sessionToken.trim()) {
-      throw new Error("cursor usage bind requires --session-token <token>");
-    }
-
-    const result = await this.options.usageCommands.bindCursorUsage(options, connectionId, sessionToken);
-    return asJson
-      ? this.options.resultFactory.ok(result)
-      : this.options.resultFactory.okText(this.options.connectionPresenter.formatCursorUsageBindingSummary(result));
-  }
-
-  private async runCursorUsageAutoBind(
-    options: ResolvedCliOptions,
-    connectionId: string | undefined,
-    asJson: boolean,
-  ): Promise<CommandResult> {
-    if (!connectionId) {
-      throw new Error("cursor usage auto-bind requires <connectionId>");
-    }
-
-    const result = await this.options.usageCommands.autoBindCursorUsage(options, connectionId);
-    return asJson
-      ? this.options.resultFactory.ok(result)
-      : this.options.resultFactory.okText(this.options.connectionPresenter.formatCursorUsageAutoBindSummary(result));
   }
 }

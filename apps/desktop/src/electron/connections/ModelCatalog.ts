@@ -1,4 +1,4 @@
-import type { ConnectionModelCatalogResult } from "@nile/core/application/local";
+import type { ConnectionModelCatalogResult } from "@nile/core/models/connection";
 
 type Entry = {
   result: ConnectionModelCatalogResult;

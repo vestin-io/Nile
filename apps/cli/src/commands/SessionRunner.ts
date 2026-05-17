@@ -1,5 +1,4 @@
-import { NileSession, runWithSession, runWithSessionAsync } from "@nile/core/runtime-local";
-import type { CursorUsageSessionProbe } from "@nile/core/application/local";
+import { NileSession, runWithSession, runWithSessionAsync } from "@nile/builtins/runtime";
 import type { CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 
@@ -9,7 +8,6 @@ export class SessionRunner {
   constructor(
     private readonly credentialStore: CredentialStore,
     private readonly logger: NileLogger,
-    private readonly cursorUsageSessionProbe?: CursorUsageSessionProbe,
   ) {}
 
   run<TResult>(
@@ -36,7 +34,6 @@ export class SessionRunner {
       secureSnapshotStore: options.secureSnapshotStore,
       logger: this.logger.child({ scope }),
       agentHomes: options.agentHomes,
-      cursorUsageSessionProbe: this.cursorUsageSessionProbe,
     });
   }
 }

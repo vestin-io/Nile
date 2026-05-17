@@ -1,0 +1,238 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": false,
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "paths": {
+      "@nile/agent-claude": [
+        "packages/agents/claude/types/index.d.ts"
+      ],
+      "@nile/agent-claude/module": [
+        "packages/agents/claude/types/module.d.ts"
+      ],
+      "@nile/agent-claude/manifest": [
+        "packages/agents/claude/types/manifest.d.ts"
+      ],
+      "@nile/agent-claude/declaration": [
+        "packages/agents/claude/types/declaration.d.ts"
+      ],
+      "@nile/agent-claude/runtime-factory": [
+        "packages/agents/claude/types/runtime-factory.d.ts"
+      ],
+      "@nile/agent-claude/current-session-source": [
+        "packages/agents/claude/types/current-session-source.d.ts"
+      ],
+      "@nile/agent-claude/login-source": [
+        "packages/agents/claude/types/login-source.d.ts"
+      ],
+      "@nile/agent-claude/model-catalog-source": [
+        "packages/agents/claude/types/model-catalog-source.d.ts"
+      ],
+      "@nile/agent-claude/projection": [
+        "packages/agents/claude/types/projection.d.ts"
+      ],
+      "@nile/agent-codex": [
+        "packages/agents/codex/types/index.d.ts"
+      ],
+      "@nile/agent-codex/module": [
+        "packages/agents/codex/types/module.d.ts"
+      ],
+      "@nile/agent-codex/manifest": [
+        "packages/agents/codex/types/manifest.d.ts"
+      ],
+      "@nile/agent-codex/declaration": [
+        "packages/agents/codex/types/declaration.d.ts"
+      ],
+      "@nile/agent-codex/runtime-factory": [
+        "packages/agents/codex/types/runtime-factory.d.ts"
+      ],
+      "@nile/agent-codex/current-session-source": [
+        "packages/agents/codex/types/current-session-source.d.ts"
+      ],
+      "@nile/agent-codex/login-source": [
+        "packages/agents/codex/types/login-source.d.ts"
+      ],
+      "@nile/agent-codex/projection": [
+        "packages/agents/codex/types/projection.d.ts"
+      ],
+      "@nile/agent-cursor": [
+        "packages/agents/cursor/types/index.d.ts"
+      ],
+      "@nile/agent-cursor/module": [
+        "packages/agents/cursor/types/module.d.ts"
+      ],
+      "@nile/agent-cursor/manifest": [
+        "packages/agents/cursor/types/manifest.d.ts"
+      ],
+      "@nile/agent-cursor/declaration": [
+        "packages/agents/cursor/types/declaration.d.ts"
+      ],
+      "@nile/agent-cursor/runtime-factory": [
+        "packages/agents/cursor/types/runtime-factory.d.ts"
+      ],
+      "@nile/agent-cursor/current-session-source": [
+        "packages/agents/cursor/types/current-session-source.d.ts"
+      ],
+      "@nile/agent-cursor/projection": [
+        "packages/agents/cursor/types/projection.d.ts"
+      ],
+      "@nile/agent-cursor/usage": [
+        "packages/agents/cursor/types/usage/index.d.ts"
+      ],
+      "@nile/agent-gemini": [
+        "packages/agents/gemini/types/index.d.ts"
+      ],
+      "@nile/agent-gemini/module": [
+        "packages/agents/gemini/types/module.d.ts"
+      ],
+      "@nile/agent-gemini/manifest": [
+        "packages/agents/gemini/types/manifest.d.ts"
+      ],
+      "@nile/agent-gemini/declaration": [
+        "packages/agents/gemini/types/declaration.d.ts"
+      ],
+      "@nile/agent-gemini/runtime-factory": [
+        "packages/agents/gemini/types/runtime-factory.d.ts"
+      ],
+      "@nile/agent-gemini/current-session-source": [
+        "packages/agents/gemini/types/current-session-source.d.ts"
+      ],
+      "@nile/agent-gemini/login-source": [
+        "packages/agents/gemini/types/login-source.d.ts"
+      ],
+      "@nile/agent-gemini/projection": [
+        "packages/agents/gemini/types/projection.d.ts"
+      ],
+      "@nile/agent-openclaw": [
+        "packages/agents/openclaw/types/index.d.ts"
+      ],
+      "@nile/agent-openclaw/module": [
+        "packages/agents/openclaw/types/module.d.ts"
+      ],
+      "@nile/agent-openclaw/manifest": [
+        "packages/agents/openclaw/types/manifest.d.ts"
+      ],
+      "@nile/agent-openclaw/declaration": [
+        "packages/agents/openclaw/types/declaration.d.ts"
+      ],
+      "@nile/agent-openclaw/runtime-factory": [
+        "packages/agents/openclaw/types/runtime-factory.d.ts"
+      ],
+      "@nile/agent-openclaw/projection": [
+        "packages/agents/openclaw/types/projection.d.ts"
+      ],
+      "@nile/connections/labeling": [
+        "packages/connections/types/labeling/index.d.ts"
+      ],
+      "@nile/connections/support": [
+        "packages/connections/types/support/index.d.ts"
+      ],
+      "@nile/connections/mutations": [
+        "packages/connections/types/mutations/index.d.ts"
+      ],
+      "@nile/connections/setup": [
+        "packages/connections/types/setup/index.d.ts"
+      ],
+      "@nile/connections/catalog": [
+        "packages/connections/types/catalog/index.d.ts"
+      ],
+      "@nile/connections/anthropic-api-key": [
+        "packages/connections/types/families/anthropic-api-key/index.d.ts"
+      ],
+      "@nile/connections/anthropic-api-key/module": [
+        "packages/connections/types/families/anthropic-api-key/module.d.ts"
+      ],
+      "@nile/connections/anthropic-api-key/manifest": [
+        "packages/connections/types/families/anthropic-api-key/manifest.d.ts"
+      ],
+      "@nile/connections/claude-session": [
+        "packages/connections/types/families/claude-session/index.d.ts"
+      ],
+      "@nile/connections/claude-session/module": [
+        "packages/connections/types/families/claude-session/module.d.ts"
+      ],
+      "@nile/connections/claude-session/manifest": [
+        "packages/connections/types/families/claude-session/manifest.d.ts"
+      ],
+      "@nile/connections/cursor-api-key": [
+        "packages/connections/types/families/cursor-api-key/index.d.ts"
+      ],
+      "@nile/connections/cursor-api-key/module": [
+        "packages/connections/types/families/cursor-api-key/module.d.ts"
+      ],
+      "@nile/connections/cursor-api-key/manifest": [
+        "packages/connections/types/families/cursor-api-key/manifest.d.ts"
+      ],
+      "@nile/connections/cursor-session": [
+        "packages/connections/types/families/cursor-session/index.d.ts"
+      ],
+      "@nile/connections/cursor-session/module": [
+        "packages/connections/types/families/cursor-session/module.d.ts"
+      ],
+      "@nile/connections/cursor-session/manifest": [
+        "packages/connections/types/families/cursor-session/manifest.d.ts"
+      ],
+      "@nile/connections/gemini-cli-session": [
+        "packages/connections/types/families/gemini-cli-session/index.d.ts"
+      ],
+      "@nile/connections/gemini-cli-session/module": [
+        "packages/connections/types/families/gemini-cli-session/module.d.ts"
+      ],
+      "@nile/connections/gemini-cli-session/manifest": [
+        "packages/connections/types/families/gemini-cli-session/manifest.d.ts"
+      ],
+      "@nile/connections/openai-api-key": [
+        "packages/connections/types/families/openai-api-key/index.d.ts"
+      ],
+      "@nile/connections/openai-api-key/module": [
+        "packages/connections/types/families/openai-api-key/module.d.ts"
+      ],
+      "@nile/connections/openai-api-key/manifest": [
+        "packages/connections/types/families/openai-api-key/manifest.d.ts"
+      ],
+      "@nile/connections/openai-session": [
+        "packages/connections/types/families/openai-session/index.d.ts"
+      ],
+      "@nile/connections/openai-session/module": [
+        "packages/connections/types/families/openai-session/module.d.ts"
+      ],
+      "@nile/connections/openai-session/manifest": [
+        "packages/connections/types/families/openai-session/manifest.d.ts"
+      ],
+      "@nile/connections/openclaw-openai-session": [
+        "packages/connections/types/families/openclaw-openai-session/index.d.ts"
+      ],
+      "@nile/connections/openclaw-openai-session/module": [
+        "packages/connections/types/families/openclaw-openai-session/module.d.ts"
+      ],
+      "@nile/connections/openclaw-openai-session/manifest": [
+        "packages/connections/types/families/openclaw-openai-session/manifest.d.ts"
+      ],
+      "@nile/builtins": [
+        "packages/builtins/types/index.d.ts"
+      ],
+      "@nile/builtins/agents": [
+        "packages/builtins/types/agents/index.d.ts"
+      ],
+      "@nile/builtins/connections": [
+        "packages/builtins/types/connections/index.d.ts"
+      ],
+      "@nile/builtins/cursor-usage": [
+        "packages/builtins/types/cursor-usage/index.d.ts"
+      ],
+      "@nile/builtins/local": [
+        "packages/builtins/types/local/index.d.ts"
+      ],
+      "@nile/builtins/runtime": [
+        "packages/builtins/types/runtime/index.d.ts"
+      ],
+      "@nile/builtins/session": [
+        "packages/builtins/types/session/index.d.ts"
+      ]
+    }
+  }
+}

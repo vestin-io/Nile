@@ -1,5 +1,5 @@
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
-import { isAgentId, type AgentId } from "../agent/Types";
+import { isAgentId, type AgentId } from "../agent/Definitions";
 import type { AccessRecord } from "../access/Types";
 import { SqliteAccessStore } from "../access/SqliteAccessStore";
 import { SqliteAgentSelectionStore } from "./SqliteAgentSelectionStore";

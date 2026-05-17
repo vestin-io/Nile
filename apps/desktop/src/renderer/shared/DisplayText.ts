@@ -61,6 +61,8 @@ export function authModeLabel(authMode: string, t: Translator): string {
       return t("auth.claude_session");
     case "cursor_session":
       return t("auth.cursor_session");
+    case "gemini_cli_session":
+      return t("auth.gemini_cli_session");
     default:
       return authMode;
   }

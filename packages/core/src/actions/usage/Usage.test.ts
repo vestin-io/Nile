@@ -3,9 +3,14 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+import {
+  CURSOR_LOCAL_CONNECTION_SUPPORT_FACTORY,
+  CursorUsageBindingRegistry,
+  CursorUsageSnapshotStore,
+} from "@nile/agent-cursor/usage";
 import { AccessRegistry } from "../../models/access";
 import { EndpointRegistry } from "../../models/endpoint";
-import { CursorUsageBindingRegistry, CursorUsageSnapshotStore } from "./cursor";
+import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { Usage } from "./Usage";
 
 const tempDirs: string[] = [];
@@ -447,12 +452,14 @@ function createUsage(
   endpointRegistry: EndpointRegistry,
   accessRegistry: AccessRegistry,
 ): Usage {
-  return new Usage(
+  const database = SqliteDatabase.open(dbPath);
+  const cursorOps = CURSOR_LOCAL_CONNECTION_SUPPORT_FACTORY.create(
+    database,
+    credentialStore as unknown as import("../../services/credential/Store").CredentialStore,
     endpointRegistry,
     accessRegistry,
-    CursorUsageBindingRegistry.open(dbPath, credentialStore),
-    CursorUsageSnapshotStore.open(dbPath),
   );
+  return new Usage(endpointRegistry, accessRegistry, [...cursorOps.createUsageReaders()]);
 }
 
 const CURSOR_WEB_SESSION_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhdXRoMHx1c2VyXzAxSzAzSzQxQ05HUkNBRFk1VlQwSlBINjlZIiwidHlwZSI6IndlYiIsImV4cCI6NDEwMjQ0NDgwMH0.sig";

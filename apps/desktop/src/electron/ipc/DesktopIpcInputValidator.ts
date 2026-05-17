@@ -258,9 +258,8 @@ export class DesktopIpcInputValidator {
       apiKeySource: this.readOptionalApiKeySource(record.apiKeySource),
       apiKey: this.readOptionalString(record.apiKey, "apiKey"),
       envKey: this.readOptionalString(record.envKey, "envKey"),
-      openAiSessionSource: this.readOptionalOpenAiSessionSource(record.openAiSessionSource),
-      openAiAuthJsonPath: this.readOptionalString(record.openAiAuthJsonPath, "openAiAuthJsonPath"),
-      claudeSessionSource: this.readOptionalClaudeSessionSource(record.claudeSessionSource),
+      sessionSource: this.readOptionalSessionSource(record.sessionSource),
+      sessionAuthJsonPath: this.readOptionalString(record.sessionAuthJsonPath, "sessionAuthJsonPath"),
     };
   }
 
@@ -281,22 +280,20 @@ export class DesktopIpcInputValidator {
     return value;
   }
 
-  private readOptionalOpenAiSessionSource(value: unknown): "login" | "current_codex" | undefined {
+  private readOptionalSessionSource(
+    value: unknown,
+  ): "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor" | undefined {
     if (value === undefined) {
       return undefined;
     }
-    if (value !== "login" && value !== "current_codex") {
-      throw new Error("openAiSessionSource is not supported");
-    }
-    return value;
-  }
-
-  private readOptionalClaudeSessionSource(value: unknown): "login" | "current_claude" | undefined {
-    if (value === undefined) {
-      return undefined;
-    }
-    if (value !== "login" && value !== "current_claude") {
-      throw new Error("claudeSessionSource is not supported");
+    if (
+      value !== "login"
+      && value !== "current_codex"
+      && value !== "current_claude"
+      && value !== "current_gemini"
+      && value !== "current_cursor"
+    ) {
+      throw new Error("sessionSource is not supported");
     }
     return value;
   }

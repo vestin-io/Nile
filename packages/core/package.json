@@ -13,7 +13,7 @@
     "pino": "^10.1.0"
   },
   "scripts": {
-    "build": "node ./build.mjs && tsc -p ./tsconfig.build.json"
+    "build": "node ../../scripts/build-workspace-packages.mjs && node ../../scripts/write-workspace-tsconfig-paths.mjs && node ./build.mjs && tsc -p ./tsconfig.build.json"
   },
   "exports": {
     ".": {
@@ -28,9 +28,25 @@
       "types": "./dist/application/local/index.d.ts",
       "default": "./dist/application/local/index.js"
     },
+    "./application/local/model-catalog-source": {
+      "types": "./dist/application/local/ModelCatalogSource.d.ts",
+      "default": "./dist/application/local/ModelCatalogSource.js"
+    },
+    "./session": {
+      "types": "./dist/session/index.d.ts",
+      "default": "./dist/session/index.js"
+    },
+    "./session/backend": {
+      "types": "./dist/session/backend/index.d.ts",
+      "default": "./dist/session/backend/index.js"
+    },
     "./actions/live-setup": {
       "types": "./dist/actions/live-setup/index.d.ts",
       "default": "./dist/actions/live-setup/index.js"
+    },
+    "./actions/apply": {
+      "types": "./dist/actions/apply/index.d.ts",
+      "default": "./dist/actions/apply/index.js"
     },
     "./actions/local-setup": {
       "types": "./dist/actions/local-setup/index.d.ts",
@@ -44,10 +60,6 @@
       "types": "./dist/actions/usage/index.d.ts",
       "default": "./dist/actions/usage/index.js"
     },
-    "./actions/usage/cursor": {
-      "types": "./dist/actions/usage/cursor/index.d.ts",
-      "default": "./dist/actions/usage/cursor/index.js"
-    },
     "./models/agent": {
       "types": "./dist/models/agent/index.d.ts",
       "default": "./dist/models/agent/index.js"
@@ -56,9 +68,25 @@
       "types": "./dist/models/agent/Homes.d.ts",
       "default": "./dist/models/agent/Homes.js"
     },
-    "./models/agent/types": {
-      "types": "./dist/models/agent/Types.d.ts",
-      "default": "./dist/models/agent/Types.js"
+    "./models/agent/ids": {
+      "types": "./dist/models/agent/Ids.d.ts",
+      "default": "./dist/models/agent/Ids.js"
+    },
+    "./models/agent/capabilities": {
+      "types": "./dist/models/agent/registry/Capabilities.d.ts",
+      "default": "./dist/models/agent/registry/Capabilities.js"
+    },
+    "./models/agent/registry": {
+      "types": "./dist/models/agent/registry/index.d.ts",
+      "default": "./dist/models/agent/registry/index.js"
+    },
+    "./models/agent/module": {
+      "types": "./dist/models/agent/module/index.d.ts",
+      "default": "./dist/models/agent/module/index.js"
+    },
+    "./models/agent/definitions": {
+      "types": "./dist/models/agent/Definitions.d.ts",
+      "default": "./dist/models/agent/Definitions.js"
     },
     "./models/connection/enabled-agents-policy": {
       "types": "./dist/models/connection/EnabledAgentsPolicy.d.ts",
@@ -76,29 +104,69 @@
       "types": "./dist/projection/index.d.ts",
       "default": "./dist/projection/index.js"
     },
-    "./runtime-local": {
-      "types": "./dist/runtime-local/index.d.ts",
-      "default": "./dist/runtime-local/index.js"
+    "./projection/ProjectionError": {
+      "types": "./dist/projection/ProjectionError.d.ts",
+      "default": "./dist/projection/ProjectionError.js"
+    },
+    "./projection/Url": {
+      "types": "./dist/projection/Url.d.ts",
+      "default": "./dist/projection/Url.js"
+    },
+    "./agents/ApplyMutation": {
+      "types": "./dist/agents/ApplyMutation.d.ts",
+      "default": "./dist/agents/ApplyMutation.js"
+    },
+    "./agents/ApplySelectionValidationError": {
+      "types": "./dist/agents/ApplySelectionValidationError.d.ts",
+      "default": "./dist/agents/ApplySelectionValidationError.js"
+    },
+    "./agents/RollbackLatest": {
+      "types": "./dist/agents/RollbackLatest.d.ts",
+      "default": "./dist/agents/RollbackLatest.js"
+    },
+    "./runtime-local/AbstractAgentStateDetector": {
+      "types": "./dist/runtime-local/AbstractAgentStateDetector.d.ts",
+      "default": "./dist/runtime-local/AbstractAgentStateDetector.js"
+    },
+    "./runtime-local/AgentOperationRuntime": {
+      "types": "./dist/runtime-local/AgentOperationRuntime.d.ts",
+      "default": "./dist/runtime-local/AgentOperationRuntime.js"
+    },
+    "./runtime-local/AgentWorkspaceBinding": {
+      "types": "./dist/runtime-local/AgentWorkspaceBinding.d.ts",
+      "default": "./dist/runtime-local/AgentWorkspaceBinding.js"
     },
     "./runtime-local/import-state": {
       "types": "./dist/runtime-local/ImportState.d.ts",
       "default": "./dist/runtime-local/ImportState.js"
     },
+    "./runtime-local/LocalConnectionSupport": {
+      "types": "./dist/runtime-local/LocalConnectionSupport.d.ts",
+      "default": "./dist/runtime-local/LocalConnectionSupport.js"
+    },
     "./services/EnvironmentSource": {
       "types": "./dist/services/EnvironmentSource.d.ts",
       "default": "./dist/services/EnvironmentSource.js"
+    },
+    "./services/JwtPayloadDecoder": {
+      "types": "./dist/services/JwtPayloadDecoder.d.ts",
+      "default": "./dist/services/JwtPayloadDecoder.js"
     },
     "./services/NileLogger": {
       "types": "./dist/services/NileLogger.d.ts",
       "default": "./dist/services/NileLogger.js"
     },
+    "./services/OptionalTextFile": {
+      "types": "./dist/services/OptionalTextFile.d.ts",
+      "default": "./dist/services/OptionalTextFile.js"
+    },
+    "./services/PrivateTextFile": {
+      "types": "./dist/services/PrivateTextFile.d.ts",
+      "default": "./dist/services/PrivateTextFile.js"
+    },
     "./services/*": {
       "types": "./dist/services/*/index.d.ts",
       "default": "./dist/services/*/index.js"
-    },
-    "./agents": {
-      "types": "./dist/agents/index.d.ts",
-      "default": "./dist/agents/index.js"
     }
   }
 }

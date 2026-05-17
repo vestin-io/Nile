@@ -1,17 +1,14 @@
 # Core Module
 
-The core module owns shared state, shared actions, and agent-facing orchestration.
+The core module is the stable kernel. It owns shared state, shared contracts, storage primitives, and cross-domain abstractions.
 
 ## Responsibilities
 
 - persist endpoints, accesses, saved connection views, and selections
 - persist connection-scoped usage metadata when a feature needs non-sensitive cached state
 - keep secrets out of SQLite
-- create and reuse saved connections
-- read current agent status
-- read current connection usage
-- import current local agent state
-- apply a saved connection to one agent
+- define runtime contracts for connection operations and builtin composition
+- define shared agent and connection ids, requirements, and registries
 - record mutation history and rollback state
 
 ## Current Structure
@@ -23,18 +20,20 @@ The core module owns shared state, shared actions, and agent-facing orchestratio
     - `usage`
     - `apply`
 - `models/`
-  - endpoint, access, connection, and selection storage plus rules
+  - endpoint, access, connection, and selection storage plus shared rules
 - `application/local/`
   - local workflows, state reset, and local credential support
 - `runtime-local/`
-  - local session, runtime resource ownership, and adapter registry wiring
+  - narrow runtime-local primitives used by agent packages and builtins runtime composition
 - `services/`
   - database, credential, environment, history, and logging
 
 ## Boundaries
 
 - CLI and desktop may call core, but must not own core business rules.
-- Agent-specific file and runtime mutation belongs in agent adapters.
-- Core may orchestrate apply/import flows, but it must not embed UI formatting.
+- Agent-specific file and runtime mutation belongs in agent packages.
+- Connection-family semantics belong in `packages/connections`.
+- Concrete session/runtime composition belongs in `packages/builtins`.
+- Core may expose contracts and shared orchestration primitives, but it must not embed UI formatting.
 - Core may persist references to credentials, but not raw secrets.
 - Usage features may add connection-scoped bindings or snapshots, but they must stay separate from saved connection truth unless the connection itself changes.

@@ -2,10 +2,18 @@ import {
   type AuthMode,
   SUPPORTED_AUTH_MODES,
 } from "@nile/core/models/access";
-import { LocalCredentialRequestBuilder, LocalCredentialResolver } from "@nile/core/application/local";
+import {
+  LocalCredentialRequestBuilder,
+  LocalCredentialResolver,
+} from "@nile/builtins/local";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import type { StoredCredential } from "@nile/core/services/credential";
-import { CodexSessionLogin } from "@nile/core/agents";
+import {
+  INTERACTIVE_SESSION_LOGIN_REGISTRY,
+  SHARED_SESSION_CONNECTION_METHODS,
+  type SessionConnectionAuthMode,
+  type InteractiveSessionLoginRegistry,
+} from "@nile/builtins/session";
 
 import { InteractivePrompt } from "../InteractivePrompt";
 import type { ResolvedCliOptions } from "../types";
@@ -15,7 +23,10 @@ export class ConnectionCredentialResolver {
 
   constructor(
     private readonly prompt: InteractivePrompt,
-    private readonly loginRunner: CodexSessionLogin,
+    private readonly interactiveSessionLoginRegistry: Pick<
+      InteractiveSessionLoginRegistry,
+      "signInAndRead"
+    > = INTERACTIVE_SESSION_LOGIN_REGISTRY,
   ) {}
 
   async resolveForFlags(
@@ -32,31 +43,27 @@ export class ConnectionCredentialResolver {
       return resolver.resolve(this.requestBuilder.buildApiKeyDirect(apiKey));
     }
 
-    if (authMode === "openai_session") {
-      if (this.hasFlag(flags, "login")) {
-        return await resolver.resolveAsync(this.requestBuilder.buildOpenAiSession("login"));
-      }
-      if (!this.hasFlag(flags, "from-codex-current")) {
-        throw new Error("nile add with openai_session requires --login or --from-codex-current");
-      }
-      return resolver.resolve(this.requestBuilder.buildOpenAiSession("current_codex"));
+    const sessionMethod = SHARED_SESSION_CONNECTION_METHODS.isSessionAuthMode(authMode)
+      ? this.readFlagSessionMethod(authMode, flags)
+      : null;
+    if (sessionMethod) {
+      const request = this.requestBuilder.build({
+        authMode,
+        sessionSource: sessionMethod.source,
+      });
+      return sessionMethod.source === "login"
+        ? await resolver.resolveAsync(request)
+        : resolver.resolve(request);
     }
 
-    if (authMode === "cursor_session") {
-      if (!this.hasFlag(flags, "from-cursor-current")) {
-        throw new Error("nile add with cursor_session requires --from-cursor-current");
-      }
-      return resolver.resolve(this.requestBuilder.buildCursorSession());
+    if (!SHARED_SESSION_CONNECTION_METHODS.isSessionAuthMode(authMode)) {
+      throw new Error(`Unsupported auth mode for CLI credential resolution: ${authMode}`);
     }
 
-    if (authMode === "claude_session") {
-      if (!this.hasFlag(flags, "from-claude-current")) {
-        throw new Error("nile add with claude_session requires --from-claude-current");
-      }
-      return resolver.resolve(this.requestBuilder.buildClaudeSession("current_claude"));
-    }
-
-    throw new Error(`Unsupported auth mode: ${authMode}`);
+    const supportedFlags = SHARED_SESSION_CONNECTION_METHODS.readSupportedCliFlags(authMode)
+      .map((flag) => `--${flag}`)
+      .join(" or ");
+    throw new Error(`nile add with ${authMode} requires ${supportedFlags}`);
   }
 
   async promptForCredential(
@@ -83,13 +90,18 @@ export class ConnectionCredentialResolver {
       }
     }
 
-    if (authMode === "openai_session") {
+    if (!SHARED_SESSION_CONNECTION_METHODS.isSessionAuthMode(authMode)) {
+      throw new Error(`Unsupported auth mode for CLI credential prompt: ${authMode}`);
+    }
+
+    const visibleMethods = SHARED_SESSION_CONNECTION_METHODS.listVisibleForPrompt(authMode);
+    if (visibleMethods.length > 1) {
       const selection = await this.prompt.select(
-        "How should Nile read the OpenAI session?",
-        [
-          { value: "sign_in", label: "Sign in with OpenAI" },
-          { value: "codex_current", label: "Import current Codex auth" },
-        ],
+        "Choose how Nile should read this session",
+        visibleMethods.map((method) => ({
+          value: SHARED_SESSION_CONNECTION_METHODS.readPromptValue(method),
+          label: method.promptLabel ?? method.key,
+        })),
         { allowBack: true, allowCancel: true },
       );
       if (selection.type === "cancel") {
@@ -98,38 +110,40 @@ export class ConnectionCredentialResolver {
       if (selection.type === "back") {
         throw new Error("Back");
       }
-      if (selection.value === "sign_in") {
-        return await resolver.resolveAsync(this.requestBuilder.buildOpenAiSession("login"));
+      const method = SHARED_SESSION_CONNECTION_METHODS.findByPromptValue(authMode, selection.value);
+      if (!method) {
+        throw new Error(`Unsupported session method selection: ${selection.value}`);
       }
-      return resolver.resolve(this.requestBuilder.buildOpenAiSession("current_codex"));
+      return method.source === "login"
+        ? await resolver.resolveAsync(this.requestBuilder.build({ authMode, sessionSource: method.source }))
+        : resolver.resolve(this.requestBuilder.build({ authMode, sessionSource: method.source }));
     }
 
-    if (authMode === "cursor_session") {
-      return resolver.resolve(this.requestBuilder.buildCursorSession());
-    }
+    const method = visibleMethods[0] ?? SHARED_SESSION_CONNECTION_METHODS.readDefault(authMode);
+    return method.source === "login"
+      ? await resolver.resolveAsync(this.requestBuilder.build({ authMode, sessionSource: method.source }))
+      : resolver.resolve(this.requestBuilder.build({ authMode, sessionSource: method.source }));
+  }
 
-    if (authMode === "claude_session") {
-      return resolver.resolve(this.requestBuilder.buildClaudeSession("current_claude"));
+  private readFlagSessionMethod(authMode: SessionConnectionAuthMode, flags: Map<string, string | boolean>) {
+    for (const flag of SHARED_SESSION_CONNECTION_METHODS.readSupportedCliFlags(authMode)) {
+      if (this.hasFlag(flags, flag)) {
+        return SHARED_SESSION_CONNECTION_METHODS.findByCliFlag(authMode, flag);
+      }
     }
-
-    throw new Error(`Unsupported auth mode for CLI onboarding: ${authMode}`);
+    return null;
   }
 
   formatAuthModeLabel(authMode: AuthMode): string {
-    if (authMode === "openai_session") {
-      return "Use OpenAI session";
+    const defaultMethod = SHARED_SESSION_CONNECTION_METHODS.readDefaultForAuthMode(authMode);
+    if (defaultMethod?.promptLabel) {
+      return defaultMethod.promptLabel;
     }
     if (authMode === "openclaw_openai_session") {
       return "Use OpenClaw OpenAI session";
     }
     if (authMode === "api_key") {
       return "Use API key";
-    }
-    if (authMode === "cursor_session") {
-      return "Import current Cursor session";
-    }
-    if (authMode === "claude_session") {
-      return "Import current Claude session";
     }
     return authMode;
   }
@@ -154,7 +168,7 @@ export class ConnectionCredentialResolver {
     return new LocalCredentialResolver(
       options.agentHomes,
       options.environment ?? EnvironmentSource.empty(),
-      this.loginRunner,
+      this.interactiveSessionLoginRegistry,
     );
   }
 }

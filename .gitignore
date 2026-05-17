@@ -5,19 +5,14 @@ node_modules/
 .nile-switcher/
 packages/core/dist/
 packages/host-local/dist/
+packages/agents/*/dist/
+packages/agents/*/src/**/*.d.ts
+packages/connections/dist/
+packages/connections/src/**/*.d.ts
 apps/cli/dist/
 apps/desktop/dist/
 apps/desktop/release/
 apps/desktop/.env.release
 apps/desktop/.runtime/
 
-research/cc-switch/
-research/ccs/
-research/claude-code-switch/
-research/claude-swap/
-research/claude-switcher-tray/
-research/codex-auth/
-research/codex-switch/
-research/codex-switcher/
-research/openclaw/
-research/opencode/
+research/

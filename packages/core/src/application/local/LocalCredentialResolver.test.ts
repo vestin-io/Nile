@@ -3,9 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { ClaudeSessionLogin } from "../../agents/claude/ClaudeSessionLogin";
-import { CodexSessionLogin } from "../../agents/codex/CodexSessionLogin";
 import { EnvironmentSource } from "../../services/EnvironmentSource";
+import type { InteractiveSessionLoginRegistry } from "../../session";
 import { LocalCredentialResolver } from "./LocalCredentialResolver";
 
 const tempDirs: string[] = [];
@@ -14,6 +13,8 @@ afterEach(() => {
   while (tempDirs.length > 0) {
     rmSync(tempDirs.pop()!, { recursive: true, force: true });
   }
+  currentStubCodexHome = "";
+  currentStubClaudeHome = "";
 });
 
 describe("LocalCredentialResolver", () => {
@@ -116,6 +117,7 @@ describe("LocalCredentialResolver", () => {
   it("can sign in through the shared Codex login helper before reading current auth", async () => {
     const codexHome = createCodexHome();
     const login = new StubCodexSessionLogin();
+    currentStubCodexHome = codexHome;
     const resolver = new LocalCredentialResolver(
       { codex: codexHome },
       EnvironmentSource.empty(),
@@ -166,10 +168,10 @@ describe("LocalCredentialResolver", () => {
   it("can sign in through the shared Claude login helper before reading current auth", async () => {
     const claudeHome = createClaudeHome();
     const login = new StubClaudeSessionLogin();
+    currentStubClaudeHome = claudeHome;
     const resolver = new LocalCredentialResolver(
       { claude: claudeHome },
       EnvironmentSource.empty(),
-      new CodexSessionLogin(),
       login,
     );
 
@@ -190,6 +192,28 @@ describe("LocalCredentialResolver", () => {
     });
     expect(login.calls).toEqual([claudeHome]);
   });
+
+  it("reads the current Gemini CLI session credential", () => {
+    const geminiHome = createGeminiHome();
+    writeGeminiSessionFiles(geminiHome, "gemini.user@example.com", "gemini-sub-123");
+    const resolver = new LocalCredentialResolver(
+      { gemini: geminiHome },
+      EnvironmentSource.empty(),
+    );
+
+    expect(
+      resolver.resolve({
+        authMode: "gemini_cli_session",
+        source: "current_gemini",
+      }),
+    ).toEqual({
+      kind: "gemini_cli_session",
+      accessToken: "gemini-access-token",
+      refreshToken: "gemini-refresh-token",
+      idToken: buildIdToken("gemini.user@example.com", "gemini-sub-123"),
+      expiryDate: 1777427411000,
+    });
+  });
 });
 
 function createCodexHome(): string {
@@ -206,6 +230,14 @@ function createClaudeHome(): string {
   const claudeHome = join(dir, ".claude");
   mkdirSync(claudeHome, { recursive: true });
   return claudeHome;
+}
+
+function createGeminiHome(): string {
+  const dir = mkdtempSync(join(tmpdir(), "nile-local-credential-resolver-gemini-"));
+  tempDirs.push(dir);
+  const geminiHome = join(dir, ".gemini");
+  mkdirSync(geminiHome, { recursive: true });
+  return geminiHome;
 }
 
 function writeOpenAiSession(codexHome: string, accountId: string): void {
@@ -229,23 +261,68 @@ function writeOpenAiSessionAtPath(authPath: string, accountId: string): void {
   );
 }
 
-class StubCodexSessionLogin extends CodexSessionLogin {
+class StubCodexSessionLogin implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
   readonly calls: string[] = [];
 
-  override async signIn(codexHome: string): Promise<void> {
+  async signInAndRead(
+    _context: unknown,
+    _request: unknown,
+  ): Promise<{
+    kind: "openai_session";
+    idToken: string;
+    accessToken: string;
+    refreshToken: string;
+    accountId: string;
+    lastRefresh: string;
+  }> {
+    const codexHome = currentStubCodexHome;
     this.calls.push(codexHome);
     writeOpenAiSession(codexHome, "acct-signed-in");
+    return {
+      kind: "openai_session",
+      idToken: "id-token",
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      accountId: "acct-signed-in",
+      lastRefresh: "2026-04-27T00:00:00.000Z",
+    };
   }
 }
 
-class StubClaudeSessionLogin extends ClaudeSessionLogin {
+class StubClaudeSessionLogin implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
   readonly calls: string[] = [];
 
-  override async signIn(claudeHome: string): Promise<void> {
+  async signInAndRead(
+    _context: unknown,
+    _request: unknown,
+  ): Promise<{
+    kind: "claude_session";
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: number;
+    accountUuid: string;
+    organizationUuid: string;
+    email: string;
+    displayName: string;
+  }> {
+    const claudeHome = currentStubClaudeHome;
     this.calls.push(claudeHome);
     writeClaudeSessionFiles(claudeHome);
+    return {
+      kind: "claude_session",
+      accessToken: "claude-access-token",
+      refreshToken: "claude-refresh-token",
+      expiresAt: 1777427411000,
+      accountUuid: "acct-claude-123",
+      organizationUuid: "org-claude-456",
+      email: "claude@example.com",
+      displayName: "Claude User",
+    };
   }
 }
+
+let currentStubCodexHome = "";
+let currentStubClaudeHome = "";
 
 function writeClaudeSessionFiles(claudeHome: string): void {
   writeFileSync(
@@ -271,4 +348,43 @@ function writeClaudeSessionFiles(claudeHome: string): void {
     }, null, 2)}\n`,
     "utf8",
   );
+}
+
+function writeGeminiSessionFiles(geminiHome: string, email: string, subject: string): void {
+  writeFileSync(
+    join(geminiHome, "settings.json"),
+    `${JSON.stringify({
+      security: {
+        auth: {
+          selectedType: "oauth-personal",
+        },
+      },
+    }, null, 2)}\n`,
+    "utf8",
+  );
+  writeFileSync(
+    join(geminiHome, "google_accounts.json"),
+    `${JSON.stringify({
+      active: email,
+      old: [],
+    }, null, 2)}\n`,
+    "utf8",
+  );
+  writeFileSync(
+    join(geminiHome, "oauth_creds.json"),
+    `${JSON.stringify({
+      access_token: "gemini-access-token",
+      refresh_token: "gemini-refresh-token",
+      id_token: buildIdToken(email, subject),
+      expiry_date: 1777427411000,
+    }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
+function buildIdToken(email: string, subject: string): string {
+  return `header.${Buffer.from(JSON.stringify({
+    email,
+    sub: subject,
+  })).toString("base64url")}.signature`;
 }

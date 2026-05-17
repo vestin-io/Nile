@@ -1,8 +1,14 @@
 import type { AgentHomes, AgentId, ImportCurrentConnectionResult, RollbackLatestAgentResult } from "@nile/core/models/agent";
-import type { CursorUsageAutoBindResult, RemoveConnectionResult } from "@nile/core/application/local";
 import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
-import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
-import { NileSession } from "@nile/core/runtime-local";
+import type { RemoveConnectionResult } from "@nile/builtins/local";
+import type {
+  BindCursorUsageResult,
+  CursorUsageAutoBindResult,
+  ConnectionChangeResult,
+  CursorUsageWorkspace,
+} from "@nile/builtins/cursor-usage";
+import { runWithCursorUsageWorkspace as runWithCursorUsageWorkspaceImpl } from "@nile/builtins/cursor-usage";
+import { NileSession } from "@nile/builtins/runtime";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import type { CredentialStore } from "@nile/core/services/credential";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
@@ -39,7 +45,7 @@ export class DesktopConnectionGateway {
   async importCurrentConnection(agentId: AgentId): Promise<DesktopConnectionSummary> {
     return await this.sessions.runAsync(async (session) => {
       const imported = await this.imports.importCurrentConnection(session, agentId);
-      return this.buildConnectionSummary(imported);
+      return this.buildConnectionSummary(this.applyCursorUsageFollowUp(imported));
     });
   }
 
@@ -100,11 +106,11 @@ export class DesktopConnectionGateway {
   }
 
   bindCursorUsage(connectionId: string, sessionToken: string): BindCursorUsageResult {
-    return this.sessions.run((session) => session.bindCursorUsage(connectionId, sessionToken));
+    return this.runCursorUsageWorkspace((workspace) => workspace.bind(connectionId, sessionToken));
   }
 
   autoBindAllCursorUsage(): CursorUsageAutoBindResult[] {
-    return this.sessions.run((session) => session.autoBindAllCursorUsage());
+    return this.runCursorUsageWorkspace((workspace) => workspace.autoBindAllMissing());
   }
 
   openSession(): NileSession {
@@ -113,8 +119,21 @@ export class DesktopConnectionGateway {
       agentHomes: this.options.agentHomes,
       environment: this.options.environment,
       credentialStore: this.options.credentialStore,
-      cursorUsageSessionProbe: this.cursorUsageSessionProbe,
     });
+  }
+
+  private applyCursorUsageFollowUp<T extends ConnectionChangeResult>(result: T): T {
+    return this.runCursorUsageWorkspace((workspace) => workspace.applyFollowUp(result));
+  }
+
+  private runCursorUsageWorkspace<TResult>(
+    work: (workspace: CursorUsageWorkspace) => TResult,
+  ): TResult {
+    return runWithCursorUsageWorkspaceImpl({
+      databasePath: this.options.databasePath,
+      credentialStore: this.options.credentialStore,
+      sessionProbe: this.cursorUsageSessionProbe,
+    }, work);
   }
 
   private buildConnectionSummary(

@@ -1,5 +1,5 @@
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
-import type { AgentId } from "../agent/Types";
+import type { AgentId } from "../agent/Definitions";
 import { SqliteAgentConnectionSettingsStore } from "./SqliteStore";
 import type { AgentConnectionSettingRecord } from "./Types";
 

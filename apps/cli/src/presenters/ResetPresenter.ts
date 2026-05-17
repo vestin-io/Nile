@@ -1,4 +1,4 @@
-import type { ResetStateResult } from "@nile/core/application/local";
+import type { ResetStateResult } from "@nile/builtins/local";
 
 export class ResetPresenter {
   formatResult(result: ResetStateResult): string {

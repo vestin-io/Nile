@@ -1,5 +1,5 @@
-import { AGENT_CAPABILITIES } from "../agent/Capabilities";
-import type { AgentId } from "../agent/Types";
+import { AGENT_CAPABILITIES } from "../agent/registry";
+import type { AgentId } from "../agent/Definitions";
 import type { AuthMode } from "../access";
 import type { ConnectionApplyRequirementKind } from "./RequirementKinds";
 

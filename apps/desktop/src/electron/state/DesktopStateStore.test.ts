@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { RollbackLatestAgentResult } from "@nile/core/models/agent";
-import type { CursorUsageAutoBindResult, RemoveConnectionResult, ResetStateResult } from "@nile/core/application/local";
+import type { RemoveConnectionResult, ResetStateResult } from "@nile/builtins/local";
 import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
-import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
+import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/builtins/cursor-usage";
 
 import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";

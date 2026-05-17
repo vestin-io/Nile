@@ -1,10 +1,11 @@
 import { useEffect, useMemo } from "react";
 
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type {
   DesktopAdvancedState,
   DesktopAgentState,
+  DesktopOnboardingItem,
   DesktopOnboardingState,
   HistoryState,
 } from "../../state/Types";
@@ -126,6 +127,9 @@ export function AgentPage({
   if (!agent) {
     return null;
   }
+  const detectedSetupsByAgent = new Map<AgentId, DesktopOnboardingItem>(
+    detectedSetups.items.map((item) => [item.agentId, item]),
+  );
   const agentHome = agentHomes.find((entry) => entry.agentId === agent.agentId);
   if (!agentHome) {
     return null;
@@ -135,6 +139,8 @@ export function AgentPage({
     <AgentDetailPage
       agent={agent}
       agentHomePath={agentHome.path}
+      canConfigure={canConfigureAgent(agent.agentId)}
+      detectedSetup={detectedSetupsByAgent.get(agent.agentId) ?? null}
       defaultAgentHomePath={agentHome.defaultPath}
       entries={history.entries.filter((entry) => entry.agentId === agent.agentId)}
       activeTab={selectedDetailTab}
@@ -146,6 +152,7 @@ export function AgentPage({
       onOpenConnection={(connectionId) => onOpenConnection(connectionId, agent.agentId)}
       onRefresh={onRefresh}
       onRollback={onRollback}
+      onImport={onImport}
       onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
       onSwitch={onSwitch}
     />

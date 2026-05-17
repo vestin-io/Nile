@@ -1,10 +1,18 @@
 import { defaultAgentHomes, isAgentId, mergeAgentHomes, type AgentId } from "@nile/core/models/agent";
 
-import { buildCliHelpLines, KNOWN_FLAGS } from "./CliCatalog";
+import { BASE_KNOWN_FLAGS, buildCliHelpLines } from "./CliCatalog";
 import type { CliOptions, ParsedArguments, ResolvedCliOptions } from "./types";
 
 export class ArgumentParser {
-  constructor(private readonly defaults: CliOptions) {}
+  private readonly knownFlags: Set<string>;
+
+  constructor(
+    private readonly defaults: CliOptions,
+    private readonly agentExtensionHelpLines: string[] = [],
+    agentExtensionFlags: string[] = [],
+  ) {
+    this.knownFlags = new Set([...BASE_KNOWN_FLAGS, ...agentExtensionFlags]);
+  }
 
   parse(argv: string[]): ParsedArguments {
     const command: string[] = [];
@@ -33,7 +41,7 @@ export class ArgumentParser {
       }
       if (token.startsWith("--")) {
         const name = token.slice(2);
-        if (!KNOWN_FLAGS.has(name)) {
+        if (!this.knownFlags.has(name)) {
           throw new Error(`Unknown flag: --${name}`);
         }
         const next = argv[index + 1];
@@ -52,7 +60,7 @@ export class ArgumentParser {
   }
 
   helpText(): string {
-    return buildCliHelpLines().join("\n");
+    return buildCliHelpLines(this.agentExtensionHelpLines).join("\n");
   }
 
   private requireFlagValue(flag: string, value: string | undefined): string {

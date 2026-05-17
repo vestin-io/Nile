@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { DesktopAgentState, DesktopNotificationHistoryConnection, DesktopReleaseInfo } from "../../../state/Types";
 import type { CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../../../electron/alerts/Store";
@@ -114,9 +114,8 @@ type SettingsPageContentProps = {
     apiKeySource?: "direct" | "env_key";
     apiKey?: string;
     envKey?: string;
-    openAiSessionSource?: "login" | "current_codex";
-    openAiAuthJsonPath?: string;
-    claudeSessionSource?: "login" | "current_claude";
+    sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
+    sessionAuthJsonPath?: string;
     syncSelectedAgents?: boolean;
   }): Promise<void>;
   onUseConnection(agentId: AgentId, connectionId: string): Promise<void>;
@@ -237,7 +236,7 @@ export function SettingsPageContent({
         onConfigureAgent={onConfigureAgent}
         onImport={onConfirmImportAgent}
         onOpenQuickSetup={onOpenQuickSetup}
-        onOpenAddPage={onOpenAddConnection}
+        onOpenAddPage={onConfigureAgent}
         onOpenConnection={onOpenConnection}
         onRefresh={onRefresh}
         onRollback={onRollbackAgent}

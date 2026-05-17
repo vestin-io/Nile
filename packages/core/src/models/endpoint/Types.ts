@@ -2,6 +2,7 @@ export const SUPPORTED_ENDPOINT_PROFILES = [
   "anthropic-official",
   "azure-openai",
   "cursor-backend",
+  "gemini-cli",
   "generic-gateway",
   "openai-official",
 ] as const;
@@ -9,6 +10,7 @@ export const SUPPORTED_ENDPOINT_PROFILES = [
 export const SUPPORTED_ENDPOINT_PROTOCOLS = [
   "anthropic",
   "cursor",
+  "gemini",
   "openai",
 ] as const;
 
@@ -45,10 +47,15 @@ export type EndpointCursorProtocol = {
   backendPath?: string;
 };
 
+export type EndpointGeminiProtocol = {
+  authTypes: Array<"oauth-personal">;
+};
+
 export type EndpointProtocols = {
   openai?: EndpointOpenAiProtocol;
   anthropic?: EndpointAnthropicProtocol;
   cursor?: EndpointCursorProtocol;
+  gemini?: EndpointGeminiProtocol;
 };
 
 export type EndpointRegistryInput = {

@@ -1,10 +1,19 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 import codexSvg from "@lobehub/icons-static-svg/icons/codex-color.svg";
 import cursorSvg from "@lobehub/icons-static-svg/icons/cursor.svg";
 import claudeCodeSvg from "@lobehub/icons-static-svg/icons/claudecode-color.svg";
+import geminiCliSvg from "@lobehub/icons-static-svg/icons/geminicli-color.svg";
 import openClawSvg from "@lobehub/icons-static-svg/icons/openclaw-color.svg";
 
 const cursorColorSvg = cursorSvg.replaceAll("currentColor", "#3478F6");
+const AGENT_ICON_SVGS = {
+  claude: claudeCodeSvg,
+  codex: codexSvg,
+  cursor: cursorColorSvg,
+  gemini: geminiCliSvg,
+  openclaw: openClawSvg,
+} as const;
 
 export function renderAgentIcon(agentId: AgentId, instanceId?: string): string {
   const icon = readAgentIconSvg(agentId);
@@ -15,18 +24,8 @@ export function renderAgentIcon(agentId: AgentId, instanceId?: string): string {
 }
 
 function readAgentIconSvg(agentId: AgentId): string {
-  if (agentId === "codex") {
-    return codexSvg;
-  }
-
-  if (agentId === "cursor") {
-    return cursorColorSvg;
-  }
-  if (agentId === "openclaw") {
-    return openClawSvg;
-  }
-
-  return claudeCodeSvg;
+  const iconKey = AGENT_CAPABILITIES.read(agentId).iconKey;
+  return AGENT_ICON_SVGS[iconKey as keyof typeof AGENT_ICON_SVGS] ?? claudeCodeSvg;
 }
 
 function namespaceSvgIds(svg: string, instanceId: string): string {

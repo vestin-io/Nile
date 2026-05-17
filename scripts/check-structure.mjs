@@ -5,8 +5,6 @@ const ROOT = process.cwd();
 const SOURCE_ROOTS = ["apps", "packages"];
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx"]);
 const EXCLUDED_DIRS = new Set(["node_modules", "dist", ".runtime", "release"]);
-const ALLOWED_RUNTIME_LOCAL_IMPORTS = new Set(["NileSession", "runWithSession", "runWithSessionAsync"]);
-
 const violations = [];
 
 function walk(dir, files = []) {
@@ -51,19 +49,13 @@ function checkLineLimits(files) {
   }
 }
 
-function checkRuntimeLocalExports() {
-  const runtimeIndexPath = path.join(ROOT, "packages/core/src/runtime-local/index.ts");
-  const exportLines = read(runtimeIndexPath)
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.startsWith("export * from "));
-  const expected = [
-    'export * from "./NileSession";',
-    'export * from "./SessionWork";',
-  ];
-  if (exportLines.length !== expected.length || exportLines.some((line, index) => line !== expected[index])) {
+function checkBuiltinsRuntimeExports() {
+  const runtimeIndexPath = path.join(ROOT, "packages/builtins/src/runtime/index.ts");
+  const runtimeExports = parseSourceRuntimeExports(read(runtimeIndexPath)).sort();
+  const expected = ["NileSession", "runWithSession", "runWithSessionAsync"];
+  if (runtimeExports.length !== expected.length || runtimeExports.some((name, index) => name !== expected[index])) {
     violations.push(
-      `packages/core/src/runtime-local/index.ts must export only NileSession and SessionWork; found: ${exportLines.join(", ")}`,
+      `packages/builtins/src/runtime/index.ts must export only NileSession, runWithSession, and runWithSessionAsync; found: ${runtimeExports.join(", ")}`,
     );
   }
 }
@@ -108,6 +100,27 @@ function parseNamedImports(statement) {
     .filter(Boolean);
 }
 
+function parseSourceRuntimeExports(contents) {
+  const exports = new Set();
+
+  for (const match of contents.matchAll(/export\s+(?:const|class|function)\s+([A-Za-z0-9_]+)/g)) {
+    exports.add(match[1]);
+  }
+
+  for (const match of contents.matchAll(/export(?!\s+type)\s*\{\s*([^}]+)\s*\}\s*(?:from\s+["'][^"']+["'])?;?/g)) {
+    for (const rawEntry of match[1].split(",")) {
+      const entry = rawEntry.trim();
+      if (!entry || entry.startsWith("type ")) {
+        continue;
+      }
+      const aliasParts = entry.split(/\s+as\s+/);
+      exports.add((aliasParts[1] ?? aliasParts[0]).trim());
+    }
+  }
+
+  return [...exports];
+}
+
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -126,18 +139,9 @@ function checkRuntimeLocalImports(files) {
     const content = read(filePath);
     const statements = findImportStatements(content, "@nile/core/runtime-local");
     for (const statement of statements) {
-      const names = parseNamedImports(statement);
-      if (!names) {
-        violations.push(`${repoPath} uses a non-named import from @nile/core/runtime-local`);
-        continue;
-      }
-      for (const name of names) {
-        if (!ALLOWED_RUNTIME_LOCAL_IMPORTS.has(name)) {
-          violations.push(
-            `${repoPath} imports ${name} from @nile/core/runtime-local; import it from its real owning module instead`,
-          );
-        }
-      }
+      violations.push(
+        `${repoPath} imports from @nile/core/runtime-local; use @nile/builtins/runtime for concrete session runtime or a narrow runtime-local subpath instead`,
+      );
     }
   }
 }
@@ -165,7 +169,7 @@ function checkConnectionSetupImports(files) {
 const files = SOURCE_ROOTS.flatMap((root) => walk(path.join(ROOT, root)));
 
 checkLineLimits(files);
-checkRuntimeLocalExports();
+checkBuiltinsRuntimeExports();
 checkApplicationLocalExports();
 checkRuntimeLocalImports(files);
 checkConnectionSetupImports(files);

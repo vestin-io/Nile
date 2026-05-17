@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { ResetStateResult } from "@nile/core/application/local";
+import type { ResetStateResult } from "@nile/builtins/local";
 
 import { DesktopStateReset } from "./Reset";
 

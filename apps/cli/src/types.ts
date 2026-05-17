@@ -5,7 +5,7 @@ import type { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import type { CredentialStore } from "@nile/core/services/credential";
 import type { NileLogger } from "@nile/core/services/NileLogger";
 import type { SecureSnapshotStore } from "@nile/core/services/history";
-import type { CodexSessionLogin } from "@nile/core/agents";
+import type { InteractiveSessionLoginRegistry } from "@nile/builtins/session";
 import type { InteractivePrompt } from "./InteractivePrompt";
 
 export type CliOptions = {
@@ -17,7 +17,7 @@ export type CliOptions = {
   secureSnapshotStore?: SecureSnapshotStore;
   logger?: NileLogger;
   prompt?: InteractivePrompt;
-  loginRunner?: CodexSessionLogin;
+  interactiveSessionLoginRegistry?: Pick<InteractiveSessionLoginRegistry, "signInAndRead">;
 };
 
 export type ResolvedCliOptions = {

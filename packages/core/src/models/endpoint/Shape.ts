@@ -1,6 +1,6 @@
 import type { EndpointProfile, EndpointProtocols, EndpointRecord, EndpointRegistryInput } from "./Types";
 
-export type EndpointFamily = "openai" | "gateway" | "azure-openai" | "cursor" | "anthropic";
+export type EndpointFamily = "openai" | "gateway" | "azure-openai" | "cursor" | "anthropic" | "gemini";
 
 export class EndpointShape {
   static readFamily(
@@ -8,6 +8,9 @@ export class EndpointShape {
   ): EndpointFamily {
     if (endpoint.protocols.cursor) {
       return "cursor";
+    }
+    if (endpoint.protocols.gemini) {
+      return "gemini";
     }
     if (endpoint.profile === "azure-openai") {
       return "azure-openai";
@@ -49,19 +52,24 @@ export class EndpointShape {
       ...(current.cursor || next.cursor
         ? { cursor: next.cursor ?? current.cursor }
         : {}),
+      ...(current.gemini || next.gemini
+        ? { gemini: next.gemini ?? current.gemini }
+        : {}),
     };
   }
 
   static protocolsEqual(left: EndpointProtocols, right: EndpointProtocols): boolean {
     return EndpointShape.openAiEqual(left.openai, right.openai)
       && EndpointShape.anthropicEqual(left.anthropic, right.anthropic)
-      && EndpointShape.cursorEqual(left.cursor, right.cursor);
+      && EndpointShape.cursorEqual(left.cursor, right.cursor)
+      && EndpointShape.geminiEqual(left.gemini, right.gemini);
   }
 
   static protocolsContain(left: EndpointProtocols, right: EndpointProtocols): boolean {
     return (!right.openai || EndpointShape.openAiContains(left.openai, right.openai))
       && (!right.anthropic || EndpointShape.anthropicContains(left.anthropic, right.anthropic))
-      && (!right.cursor || EndpointShape.cursorEqual(left.cursor, right.cursor));
+      && (!right.cursor || EndpointShape.cursorEqual(left.cursor, right.cursor))
+      && (!right.gemini || EndpointShape.geminiEqual(left.gemini, right.gemini));
   }
 
   private static openAiEqual(
@@ -128,6 +136,17 @@ export class EndpointShape {
     }
 
     return left.backendPath === right.backendPath;
+  }
+
+  private static geminiEqual(
+    left: EndpointProtocols["gemini"],
+    right: EndpointProtocols["gemini"],
+  ): boolean {
+    if (!left || !right) {
+      return left === right;
+    }
+
+    return left.authTypes.join("|") === right.authTypes.join("|");
   }
 
   private static mergeOpenAi(

@@ -1,9 +1,13 @@
 import type { CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
+import type {
+  BindCursorUsageResult,
+  CursorUsageAutoBindResult,
+  CursorUsageWorkspace,
+} from "@nile/builtins/cursor-usage";
+import { runWithCursorUsageWorkspace as runWithCursorUsageWorkspaceImpl } from "@nile/builtins/cursor-usage";
 import { CursorUsageSessionSourceProbe } from "@nile/host-local";
-import type { CursorUsageAutoBindResult } from "@nile/core/application/local";
 import type { ConnectionUsageResult } from "@nile/core/actions/usage";
-import type { BindCursorUsageResult } from "@nile/core/actions/usage/cursor";
 
 import type { ResolvedCliOptions } from "../types";
 import { SessionRunner } from "./SessionRunner";
@@ -11,12 +15,13 @@ import { SessionRunner } from "./SessionRunner";
 export class UsageCommands {
   private static readonly USAGE_READ_CONCURRENCY = 4;
   private readonly sessions: SessionRunner;
+  private readonly cursorUsageSessionProbe = CursorUsageSessionSourceProbe.createDefault();
 
   constructor(
-    credentialStore: CredentialStore,
+    private readonly credentialStore: CredentialStore,
     logger: NileLogger,
   ) {
-    this.sessions = new SessionRunner(credentialStore, logger, CursorUsageSessionSourceProbe.createDefault());
+    this.sessions = new SessionRunner(credentialStore, logger);
   }
 
   async getUsage(options: ResolvedCliOptions, connectionId: string): Promise<ConnectionUsageResult> {
@@ -50,21 +55,24 @@ export class UsageCommands {
     connectionId: string,
     sessionToken: string,
   ): Promise<BindCursorUsageResult> {
-    return this.sessions.run(
-      options,
-      "bind-cursor-usage",
-      (session) => session.bindCursorUsage(connectionId, sessionToken),
-    );
+    return this.runCursorUsageWorkspace(options, (workspace) => workspace.bind(connectionId, sessionToken));
   }
 
   async autoBindCursorUsage(
     options: ResolvedCliOptions,
     connectionId: string,
   ): Promise<CursorUsageAutoBindResult> {
-    return this.sessions.run(
-      options,
-      "auto-bind-cursor-usage",
-      (session) => session.autoBindCursorUsage(connectionId),
-    );
+    return this.runCursorUsageWorkspace(options, (workspace) => workspace.autoBind(connectionId));
+  }
+
+  private runCursorUsageWorkspace<TResult>(
+    options: ResolvedCliOptions,
+    work: (workspace: CursorUsageWorkspace) => TResult,
+  ): TResult {
+    return runWithCursorUsageWorkspaceImpl({
+      databasePath: options.databasePath,
+      credentialStore: this.credentialStore,
+      sessionProbe: this.cursorUsageSessionProbe,
+    }, work);
   }
 }

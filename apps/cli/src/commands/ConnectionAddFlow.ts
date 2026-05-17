@@ -1,9 +1,9 @@
-import { SHARED_CONNECTION_CATALOG } from "@nile/core/models/connection";
 import type {
   ConnectionDefinition,
-  ConnectionOnboardingSuggestion,
   ConnectionPresetFamily,
+  ConnectionOnboardingSuggestion,
 } from "@nile/core/models/connection";
+import { SHARED_CONNECTION_CATALOG } from "@nile/builtins/connections";
 import type { AgentId } from "@nile/core/models/agent";
 import type { AuthMode } from "@nile/core/models/access";
 import type { StoredCredential } from "@nile/core/services/credential";

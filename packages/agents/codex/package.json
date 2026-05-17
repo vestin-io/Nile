@@ -1,0 +1,48 @@
+{
+  "name": "@nile/agent-codex",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./types/index.d.ts",
+  "dependencies": {
+    "@nile/core": "0.0.0"
+  },
+  "scripts": {
+    "build": "node ../../../scripts/build-workspace-package.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./module": {
+      "types": "./types/module.d.ts",
+      "default": "./dist/Module.js"
+    },
+    "./manifest": {
+      "types": "./types/manifest.d.ts",
+      "default": "./dist/Manifest.js"
+    },
+    "./declaration": {
+      "types": "./types/declaration.d.ts",
+      "default": "./dist/Declaration.js"
+    },
+    "./runtime-factory": {
+      "types": "./types/runtime-factory.d.ts",
+      "default": "./dist/RuntimeFactory.js"
+    },
+    "./current-session-source": {
+      "types": "./types/current-session-source.d.ts",
+      "default": "./dist/CurrentSessionSource.js"
+    },
+    "./login-source": {
+      "types": "./types/login-source.d.ts",
+      "default": "./dist/LoginSource.js"
+    },
+    "./projection": {
+      "types": "./types/projection.d.ts",
+      "default": "./dist/Projection.js"
+    }
+  }
+}

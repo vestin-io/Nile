@@ -6,12 +6,14 @@ import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 
 import { AccessRegistry } from "@nile/core/models/access";
+import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent";
 import { EndpointRegistry, type EndpointRegistryInput } from "@nile/core/models/endpoint";
 import { AgentSelection } from "@nile/core/models/selection";
+import { CursorUsageBindingRegistry } from "@nile/builtins/cursor-usage";
 import { KeychainCredentialStore, SecurityCli, type StoredCredential, type SecurityCliResult } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { SecureSnapshotStore } from "@nile/core/services/history";
-import { CodexSessionLogin } from "@nile/core/agents";
+import type { InteractiveSessionLoginRegistry } from "@nile/builtins/session";
 import { NileCli } from "./NileCli";
 import { ConnectionCommands } from "./commands/ConnectionCommands";
 import {
@@ -66,7 +68,7 @@ describe("NileCli", () => {
 
     expect(result.exitCode).toBe(0);
     const statuses = JSON.parse(result.stdout) as Array<{ agent: string }>;
-    expect(statuses).toHaveLength(4);
+    expect(statuses).toHaveLength(SUPPORTED_AGENT_IDS.length);
     const codex = statuses.find((s) => s.agent === "codex");
     expect(codex).toEqual(
       expect.objectContaining({
@@ -230,7 +232,7 @@ describe("NileCli", () => {
     const setup = createSetup({
       authFile: openAiAuthFile("work@example.com"),
     });
-    const loginRunner = new StubCodexLoginRunner();
+    const loginRunner = new StubCodexInteractiveSessionLoginRegistry(setup.codexHome);
     const cli = createCli(setup, undefined, loginRunner);
 
     const result = await cli.run([
@@ -540,7 +542,7 @@ describe("NileCli", () => {
     const commands = new ConnectionCommands(
       setup.credentialStore,
       prompt,
-      new StubCodexLoginRunner(),
+      new StubCodexInteractiveSessionLoginRegistry(setup.codexHome),
       NileLogger.silent(),
     );
     const selection = new ConnectionSelectionFlow(
@@ -940,6 +942,144 @@ describe("NileCli", () => {
     ]);
   });
 
+  it("auto-binds cursor usage after importing the current cursor session connection", async () => {
+    const setup = createSetup({
+      cursorConfigJson: {
+        serverConfigCache: {
+          backendUrl: "https://api2.cursor.sh",
+          authCacheKey: "auth:auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+        },
+        authInfo: {
+          authId: "auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+          email: "cursor.user@example.com",
+          displayName: "Cursor User",
+        },
+      },
+    });
+    const browserHome = mkdtempSync(join(tmpdir(), "nile-browser-home-"));
+    tempDirs.push(browserHome);
+    writeChromiumCursorCookies(
+      join(browserHome, "Library", "Application Support", "Google", "Chrome", "Profile 1", "Cookies"),
+      SAFE_STORAGE_SECRET,
+    );
+    process.env.NILE_BROWSER_HOME = browserHome;
+    SecurityCli.prototype.run = function (args: string[]): SecurityCliResult {
+      if (args[0] !== "find-generic-password") {
+        return {
+          exitCode: 44,
+          stdout: "",
+          stderr: "item could not be found",
+        };
+      }
+      if (args.includes("cursor-access-token")) {
+        return { exitCode: 0, stdout: "cursor-access\n", stderr: "" };
+      }
+      if (args.includes("cursor-refresh-token")) {
+        return { exitCode: 0, stdout: "cursor-refresh\n", stderr: "" };
+      }
+      return {
+        exitCode: 44,
+        stdout: "",
+        stderr: "item could not be found",
+      };
+    };
+
+    const cli = createCli(setup);
+    const imported = await cli.run(["cursor", "import"]);
+    const list = await cli.run(["list", "--json"]);
+    const saved = JSON.parse(list.stdout) as Array<{ id: string; authMode: string }>;
+    const importedConnection = saved.find((connection) => connection.authMode === "cursor_session");
+    const bindingRegistry = CursorUsageBindingRegistry.open(setup.dbPath, setup.credentialStore);
+    try {
+      expect(imported.exitCode).toBe(0);
+      expect(imported.stdout).toContain("Imported current connection");
+      expect(importedConnection).toBeDefined();
+      expect(bindingRegistry.get(importedConnection!.id)).toEqual(
+        expect.objectContaining({
+          connectionId: importedConnection!.id,
+          accountFingerprint: expect.objectContaining({
+            workosUserId: "user_01K03K41CNGRCADY5VT0JPH69Y",
+          }),
+        }),
+      );
+    } finally {
+      bindingRegistry.close();
+    }
+  });
+
+  it("imports the current Gemini CLI live state as a Gemini-only saved connection", async () => {
+    const setup = createSetup();
+    seedGeminiSession(setup.geminiHome, "gemini.primary@example.test", "gemini-sub-123");
+    const cli = createCli(setup);
+
+    const result = await cli.run(["gemini", "import"]);
+    const status = await cli.run(["gemini", "status"]);
+    const list = await cli.run(["list", "--json"]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(
+      "Imported current connection\nendpoint: Gemini\nlabel: gemini.primary@example.test\nid: gemini-primary-example-test\n",
+    );
+    expect(status.exitCode).toBe(0);
+    expect(status.stdout).toContain("- Gemini");
+    expect(status.stdout).toContain("Endpoint: Gemini");
+    expect(status.stdout).toContain("Connection: gemini.primary@example.test");
+    expect(status.stdout).toContain("State: synced");
+    expect(JSON.parse(list.stdout)).toEqual([
+      expect.objectContaining({
+        id: "gemini-primary-example-test",
+        label: "gemini.primary@example.test",
+        endpointLabel: "Gemini",
+        endpointFamily: "gemini",
+        authMode: "gemini_cli_session",
+        selectedByAgents: ["Gemini"],
+      }),
+    ]);
+  });
+
+  it("adds a Gemini CLI connection from the current Gemini session", async () => {
+    const setup = createSetup();
+    seedGeminiSession(setup.geminiHome, "gemini.primary@example.test", "gemini-sub-123");
+    const cli = createCli(setup);
+
+    const result = await cli.run([
+      "add",
+      "--preset",
+      "gemini",
+      "--auth-mode",
+      "gemini_cli_session",
+      "--from-gemini-current",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(
+      "Connection created\nendpoint: Gemini\nlabel: gemini.primary@example.test\nid: gemini-primary-example-test\n",
+    );
+  });
+
+  it("adds a Gemini CLI connection after signing in through Gemini", async () => {
+    const setup = createSetup();
+    const cli = createCli(
+      setup,
+      undefined,
+      new StubGeminiInteractiveSessionLoginRegistry(setup.geminiHome),
+    );
+
+    const result = await cli.run([
+      "add",
+      "--preset",
+      "gemini",
+      "--auth-mode",
+      "gemini_cli_session",
+      "--login",
+    ]);
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(
+      "Connection created\nendpoint: Gemini\nlabel: signed-in-gemini@example.com\nid: signed-in-gemini-example-com\n",
+    );
+  });
+
   it("shows synced for a matched live connection and auto-syncs the saved selection during status", async () => {
     const setup = createSetup({
       configToml: [
@@ -1060,7 +1200,7 @@ describe("NileCli", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toBe(
-      "import requires an agent. Use `nile codex import`, `nile cursor import`, `nile claude import`, or `nile openclaw import`.",
+      "import requires an agent. Use `nile codex import`, `nile cursor import`, `nile claude import`, `nile gemini import`, or `nile openclaw import`.",
     );
   });
 
@@ -1072,7 +1212,7 @@ describe("NileCli", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toBe(
-      "rollback requires an agent. Use `nile codex rollback`, `nile cursor rollback`, `nile claude rollback`, or `nile openclaw rollback`.",
+      "rollback requires an agent. Use `nile codex rollback`, `nile cursor rollback`, `nile claude rollback`, `nile gemini rollback`, or `nile openclaw rollback`.",
     );
   });
 
@@ -1455,6 +1595,7 @@ function createSetup(options?: {
   codexHome: string;
   cursorHome: string;
   claudeHome: string;
+  geminiHome: string;
   openclawHome: string;
   credentialStore: StubCredentialStore;
   secureSnapshots: MemorySecureSnapshotStore;
@@ -1487,6 +1628,10 @@ function createSetup(options?: {
   mkdirSync(claudeHome, { recursive: true });
   writeFileSync(join(claudeHome, "settings.json"), "{}\n", "utf8");
 
+  const geminiHome = join(dir, ".gemini");
+  mkdirSync(geminiHome, { recursive: true });
+  writeFileSync(join(geminiHome, "settings.json"), "{}\n", "utf8");
+
   const openclawHome = join(dir, ".openclaw");
   mkdirSync(openclawHome, { recursive: true });
   writeFileSync(join(openclawHome, "openclaw.json"), "{ models: { mode: 'merge', providers: {} } }\n", "utf8");
@@ -1496,6 +1641,7 @@ function createSetup(options?: {
     codexHome,
     cursorHome,
     claudeHome,
+    geminiHome,
     openclawHome,
     credentialStore: new StubCredentialStore(),
     secureSnapshots: new MemorySecureSnapshotStore(),
@@ -1515,18 +1661,51 @@ function openAiAuthFile(email: string): Record<string, unknown> {
   };
 }
 
+function seedGeminiSession(geminiHome: string, email: string, subject: string): void {
+  writeFileSync(
+    join(geminiHome, "settings.json"),
+    `${JSON.stringify({
+      security: {
+        auth: {
+          selectedType: "oauth-personal",
+        },
+      },
+    }, null, 2)}\n`,
+    "utf8",
+  );
+  writeFileSync(
+    join(geminiHome, "google_accounts.json"),
+    `${JSON.stringify({
+      active: email,
+      old: [],
+    }, null, 2)}\n`,
+    "utf8",
+  );
+  writeFileSync(
+    join(geminiHome, "oauth_creds.json"),
+    `${JSON.stringify({
+      access_token: "gemini-access",
+      refresh_token: "gemini-refresh",
+      id_token: createJwt({ email, sub: subject }),
+      expiry_date: 1800000000000,
+    }, null, 2)}\n`,
+    "utf8",
+  );
+}
+
 function createCli(
   setup: {
     dbPath: string;
     codexHome: string;
     cursorHome: string;
     claudeHome: string;
+    geminiHome: string;
     openclawHome: string;
     credentialStore: StubCredentialStore;
     secureSnapshots: MemorySecureSnapshotStore;
   },
   prompt?: InteractivePrompt,
-  loginRunner?: CodexSessionLogin,
+  interactiveSessionLoginRegistry?: Pick<InteractiveSessionLoginRegistry, "signInAndRead">,
 ): NileCli {
   return new NileCli(
     {
@@ -1535,13 +1714,14 @@ function createCli(
         codex: setup.codexHome,
         cursor: setup.cursorHome,
         claude: setup.claudeHome,
+        gemini: setup.geminiHome,
         openclaw: setup.openclawHome,
       },
       credentialStore: setup.credentialStore,
       secureSnapshotStore: setup.secureSnapshots,
       logger: NileLogger.silent(),
       prompt,
-      loginRunner,
+      interactiveSessionLoginRegistry,
     },
     setup.credentialStore,
   );
@@ -1898,10 +2078,52 @@ const SAFE_STORAGE_SECRET = "AAAAAAAAAAAAAAAAAAAAAA==";
 const CURSOR_WEB_SESSION_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhdXRoMHx1c2VyXzAxSzAzSzQxQ05HUkNBRFk1VlQwSlBINjlZIiwidHlwZSI6IndlYiIsImV4cCI6NDEwMjQ0NDgwMH0.sig";
 const CURSOR_WEB_SESSION_TOKEN = `user_01K03K41CNGRCADY5VT0JPH69Y::${CURSOR_WEB_SESSION_JWT}`;
 
-class StubCodexLoginRunner extends CodexSessionLogin {
+class StubCodexInteractiveSessionLoginRegistry implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
   readonly invocations: string[] = [];
 
-  override async signIn(codexHome: string): Promise<void> {
-    this.invocations.push(codexHome);
+  constructor(private readonly codexHome: string) {}
+
+  async signInAndRead(): Promise<{
+    kind: "openai_session";
+    idToken: string;
+    accessToken: string;
+    refreshToken: string;
+    accountId: string;
+    lastRefresh: string;
+  }> {
+    this.invocations.push(this.codexHome);
+    return {
+      kind: "openai_session",
+      idToken: "id-token",
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+      accountId: "acct-current",
+      lastRefresh: "2026-04-27T00:00:00.000Z",
+    };
+  }
+}
+
+class StubGeminiInteractiveSessionLoginRegistry implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
+  readonly signInCalls: string[] = [];
+
+  constructor(private readonly geminiHome: string) {}
+
+  async signInAndRead(): Promise<{
+    kind: "gemini_cli_session";
+    accessToken: string;
+    refreshToken: string;
+    idToken: string;
+  }> {
+    this.signInCalls.push(this.geminiHome);
+    seedGeminiSession(this.geminiHome, "signed-in-gemini@example.com", "gemini-sub-signed-in");
+    return {
+      kind: "gemini_cli_session",
+      accessToken: "gemini-access",
+      refreshToken: "gemini-refresh",
+      idToken: createJwt({
+        email: "signed-in-gemini@example.com",
+        sub: "gemini-sub-signed-in",
+      }),
+    };
   }
 }

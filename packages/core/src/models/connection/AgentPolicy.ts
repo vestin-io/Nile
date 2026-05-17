@@ -1,8 +1,13 @@
 import { AGENT_CAPABILITIES, SUPPORTED_AGENT_IDS, type AgentId } from "../agent";
 import type { AuthMode } from "../access";
 import type { EndpointProtocols, EndpointRegistryInput } from "../endpoint";
-import type { ConnectionPresetFamily } from "./setup/PresetTypes";
-import type { ConnectionOnboardingSuggestion } from "./setup/OnboardingPolicy";
+import {
+  CONNECTION_PRESET_ONBOARDING_SUPPORT,
+  CONNECTION_PRESET_REGISTRY,
+  type ConnectionPresetFamily,
+} from "./preset";
+import type { ConnectionOnboardingSuggestion } from "./Runtime";
+import { SHARED_CONNECTION_ENV_KEY_SUPPORT } from "./EnvKeySupport";
 
 export type ConnectionAgentConfig = {
   configurableAgents: AgentId[];
@@ -11,10 +16,10 @@ export type ConnectionAgentConfig = {
 
 export class ConnectionAgentPolicy {
   readDefinitionConfig(preset: ConnectionPresetFamily): ConnectionAgentConfig {
-    const configurableAgents = this.readDefinitionConfigurableAgents(preset);
+    const configurableAgents = CONNECTION_PRESET_REGISTRY.readRequired(preset).configurableAgents;
     return {
       configurableAgents: [...new Set(configurableAgents)],
-      defaultEnabledAgents: this.readDefinitionDefaultEnabledAgents(preset, configurableAgents),
+      defaultEnabledAgents: this.readDefinitionDefaultEnabledAgents(preset),
     };
   }
 
@@ -22,10 +27,7 @@ export class ConnectionAgentPolicy {
     preset: ConnectionPresetFamily,
     endpointCandidate: Pick<EndpointRegistryInput, "protocols">,
   ): ConnectionAgentConfig {
-    return {
-      configurableAgents: this.readDefinitionConfigurableAgents(preset),
-      defaultEnabledAgents: this.readDefaultEnabledAgents(preset, endpointCandidate.protocols),
-    };
+    return CONNECTION_PRESET_ONBOARDING_SUPPORT.readConfig(preset, endpointCandidate.protocols);
   }
 
   readSavedConnectionConfig(input: {
@@ -45,7 +47,7 @@ export class ConnectionAgentPolicy {
     const baseAgents = input.onboarding?.configurableAgents
       ?? this.readDefinitionConfig(input.preset).configurableAgents;
     return [...new Set<AgentId>(
-      baseAgents.filter((agentId) => AGENT_CAPABILITIES.supportsSelectableConnection(agentId, {
+      baseAgents.filter((agentId: AgentId) => AGENT_CAPABILITIES.supportsSelectableConnection(agentId, {
         preset: input.preset,
         authMode: input.authMode,
       })),
@@ -70,50 +72,11 @@ export class ConnectionAgentPolicy {
       return false;
     }
 
-    return this.readSelectableAgents(input).some((agentId) => this.supportsAgentEnvKey(agentId));
+    return SHARED_CONNECTION_ENV_KEY_SUPPORT.supportsAny(this.readSelectableAgents(input));
   }
 
-  private readDefinitionConfigurableAgents(preset: ConnectionPresetFamily): AgentId[] {
-    switch (preset) {
-      case "gateway":
-        return [...SUPPORTED_AGENT_IDS];
-      case "openai":
-      case "azure-openai":
-        return ["codex", "openclaw"];
-      case "anthropic":
-        return ["claude", "openclaw"];
-      default:
-        return assertNever(preset);
-    }
-  }
-
-  private readDefaultEnabledAgents(
-    preset: ConnectionPresetFamily,
-    protocols?: Pick<EndpointProtocols, "openai" | "anthropic" | "cursor">,
-  ): AgentId[] {
-    if (preset === "gateway" && protocols) {
-      const detectedAgents = SUPPORTED_AGENT_IDS.filter((agentId) =>
-        AGENT_CAPABILITIES.supportsDetectedProtocols(agentId, protocols));
-      if (detectedAgents.length > 0) {
-        return [...new Set(detectedAgents)];
-      }
-      return ["codex", "claude"];
-    }
-
-    return this.readDefinitionDefaultEnabledAgents(
-      preset,
-      this.readDefinitionConfigurableAgents(preset),
-    );
-  }
-
-  private readDefinitionDefaultEnabledAgents(
-    preset: ConnectionPresetFamily,
-    configurableAgents: AgentId[],
-  ): AgentId[] {
-    if (preset === "gateway") {
-      return ["codex", "claude"];
-    }
-    return configurableAgents.length > 0 ? [configurableAgents[0]] : [];
+  private readDefinitionDefaultEnabledAgents(preset: ConnectionPresetFamily): AgentId[] {
+    return [...CONNECTION_PRESET_REGISTRY.readRequired(preset).defaultEnabledAgents];
   }
 
   private buildConfigurableResult(configurableAgents: AgentId[]): ConnectionAgentConfig {
@@ -124,13 +87,6 @@ export class ConnectionAgentPolicy {
     };
   }
 
-  private supportsAgentEnvKey(agentId: AgentId): boolean {
-    return AGENT_CAPABILITIES.read(agentId).supportsManagedEnvBackedApiKey;
-  }
 }
 
 export const SHARED_CONNECTION_AGENT_POLICY = new ConnectionAgentPolicy();
-
-function assertNever(value: never): never {
-  throw new Error(`Unhandled connection preset family: ${String(value)}`);
-}

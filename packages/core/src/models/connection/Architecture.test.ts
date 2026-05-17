@@ -9,17 +9,26 @@ const coreSrcRoot = join(packageRoot, "src");
 const repoRoot = join(packageRoot, "..", "..");
 
 describe("connection architecture guards", () => {
-  it("keeps shared-connection compatibility on the central policy path", () => {
-    const files = [
+  it("keeps shared-connection compatibility on central policy and preset support paths", () => {
+    const policyFiles = [
       join(coreSrcRoot, "actions", "live-setup", "Import.ts"),
       join(connectionDir, "SavedConnections.ts"),
-      join(connectionDir, "setup", "OnboardingPolicy.ts"),
+    ];
+    const presetSupportFiles = [
+      join(connectionDir, "PresetSupport.ts"),
+      join(connectionDir, "Catalog.ts"),
     ];
 
-    for (const path of files) {
+    for (const path of policyFiles) {
       const source = readFileSync(path, "utf8");
       expect(source).toContain("SHARED_CONNECTION_AGENT_POLICY");
     }
+    for (const path of presetSupportFiles) {
+      const source = readFileSync(path, "utf8");
+      expect(source).toContain("SHARED_CONNECTION_PRESET_SUPPORT");
+    }
+    expect(() => readFileSync(join(connectionDir, "setup", "OnboardingPolicy.ts"), "utf8")).toThrow();
+    expect(() => readFileSync(join(connectionDir, "setup", "IdentityKeyResolver.ts"), "utf8")).toThrow();
   });
 
   it("keeps renderer apply and switch flows free of hardcoded agent-id branches", () => {

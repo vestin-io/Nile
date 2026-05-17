@@ -8,11 +8,11 @@ import type { DetectedAgentState } from "../../models/agent";
 import { AgentConnectionSettings } from "../../models/agent-settings";
 import { EndpointRegistry } from "../../models/endpoint";
 import { AgentSelection } from "../../models/selection/Selection";
+import type { GatewayCapabilityProbe, GatewayProbeResult } from "../../models/connection";
 import { KeychainCredentialStore } from "../../services/credential/KeychainCredentialStore";
 import type { StoredCredential } from "../../services/credential/Types";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { NileLogger } from "../../services/NileLogger";
-import type { GatewayCapabilityProbe, GatewayProbeResult } from "../../models/connection";
 import { LiveSetupImportSupport } from "./Import";
 
 const tempDirs: string[] = [];
@@ -316,7 +316,7 @@ describe("LiveSetupImportSupport", () => {
       expect(setup.accessRegistry.get("gateway-key")).toEqual(
         expect.objectContaining({
           label: "Custom Gateway Label",
-          enabledAgents: ["claude"],
+          enabledAgents: ["claude", "codex", "openclaw"],
         }),
       );
       expect(setup.endpointRegistry.get("gateway-gateway-example-test")).toEqual(

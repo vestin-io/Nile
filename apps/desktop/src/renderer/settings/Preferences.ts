@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
 
 export const SUPPORTED_LANGUAGES = [
   "en",
@@ -25,7 +25,9 @@ export type DesktopPreferences = {
 };
 
 const STORAGE_KEY = "nile.desktop.preferences";
-const DEFAULT_AGENT_ORDER: AgentOrderPreference = ["codex", "claude", "cursor", "openclaw"];
+function readDefaultAgentOrder(): AgentOrderPreference {
+  return [...SUPPORTED_AGENT_IDS];
+}
 
 export class DesktopPreferencesStore {
   constructor(
@@ -35,7 +37,7 @@ export class DesktopPreferencesStore {
 
   load(): DesktopPreferences {
     const fallback: DesktopPreferences = {
-      agentOrder: [...DEFAULT_AGENT_ORDER],
+      agentOrder: readDefaultAgentOrder(),
       language: "en",
       quickSetupDismissed: false,
       theme: "system",
@@ -101,17 +103,18 @@ function normalizeThemePreference(value: unknown): ThemePreference {
 }
 
 function normalizeAgentOrder(value: unknown): AgentOrderPreference {
+  const defaultAgentOrder = readDefaultAgentOrder();
   if (!Array.isArray(value)) {
-    return [...DEFAULT_AGENT_ORDER];
+    return defaultAgentOrder;
   }
 
-  const knownAgents = new Set(DEFAULT_AGENT_ORDER);
+  const knownAgents = new Set(defaultAgentOrder);
   const uniqueAgents = value.filter(
     (agentId): agentId is AgentOrderPreference[number] =>
       typeof agentId === "string" && knownAgents.has(agentId as AgentOrderPreference[number]),
   ).filter((agentId, index, array) => array.indexOf(agentId) === index);
 
-  for (const agentId of DEFAULT_AGENT_ORDER) {
+  for (const agentId of defaultAgentOrder) {
     if (!uniqueAgents.includes(agentId)) {
       uniqueAgents.push(agentId);
     }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { isAgentId, type AgentId } from "@nile/core/models/agent/types";
+import { isAgentId, type AgentId } from "@nile/core/models/agent/definitions";
 
 import type { SettingsState } from "../../shared/DesktopData";
 

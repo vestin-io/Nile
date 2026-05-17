@@ -1,6 +1,6 @@
 import type { DesktopAgentState } from "../../../state/Types";
 import { useEffect, useMemo, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 import { Cable } from "lucide-react";
 
 import type { Translator } from "../../shared/I18n";
@@ -81,9 +81,8 @@ type ConnectionsPageProps = {
     apiKeySource?: "direct" | "env_key";
     apiKey?: string;
     envKey?: string;
-    openAiSessionSource?: "login" | "current_codex";
-    openAiAuthJsonPath?: string;
-    claudeSessionSource?: "login" | "current_claude";
+    sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
+    sessionAuthJsonPath?: string;
     syncSelectedAgents?: boolean;
   }): Promise<void>;
 };

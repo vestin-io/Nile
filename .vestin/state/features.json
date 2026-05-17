@@ -40,6 +40,7 @@
     { "module": "cursor", "feature": "adapter", "state": "built" },
     { "module": "cursor", "feature": "usage-binding-flow", "state": "built" },
     { "module": "claude", "feature": "adapter", "state": "built" },
+    { "module": "gemini", "feature": "adapter", "state": "completed" },
     { "module": "surfaces", "feature": "cli-surface", "state": "built" },
     { "module": "surfaces", "feature": "cli-reset-command", "state": "built" },
     { "module": "surfaces", "feature": "cli-endpoint-preset-cutover", "state": "built" },

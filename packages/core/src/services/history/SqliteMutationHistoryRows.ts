@@ -1,4 +1,4 @@
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 import type {
   MutationHistoryFileRecord,
   MutationHistoryRecord,

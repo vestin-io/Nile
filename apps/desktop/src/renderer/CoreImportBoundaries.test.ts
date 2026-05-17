@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 const rendererDir = dirname(fileURLToPath(import.meta.url));
 const desktopSrcDir = join(rendererDir, "..");
 const allowedRuntimeCoreImports = new Set([
-  "@nile/core/models/agent/types",
+  "@nile/core/models/agent/capabilities",
+  "@nile/core/models/agent/definitions",
   "@nile/core/models/connection/enabled-agents-policy",
   "@nile/core/models/connection/requirements",
 ]);

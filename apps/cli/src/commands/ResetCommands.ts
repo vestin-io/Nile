@@ -1,4 +1,4 @@
-import { StateReset } from "@nile/core/application/local";
+import { StateReset } from "@nile/builtins/local";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { InteractivePrompt } from "../InteractivePrompt";
 import type { ResolvedCliOptions } from "../types";

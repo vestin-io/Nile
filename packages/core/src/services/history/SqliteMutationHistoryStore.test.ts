@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 import { SqliteDatabase } from "../database/SqliteDatabase";
 import { SqliteMutationHistoryStore } from "./SqliteMutationHistoryStore";
 import type { MutationHistoryRecord } from "./MutationHistoryTypes";

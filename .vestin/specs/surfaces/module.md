@@ -9,7 +9,8 @@ Surfaces are thin entry points over shared core behavior.
 
 ## Rules
 
-- surfaces call shared core instead of re-implementing workflows
+- surfaces call builtins-owned concrete runtime and shared core contracts instead of re-implementing workflows
 - surfaces own presentation and interaction only
 - surfaces must not own connection persistence rules
 - surfaces must not own agent-specific config mutation
+- surfaces must not import concrete agent or connection implementation packages directly

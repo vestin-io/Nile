@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { DesktopAdvancedState, DesktopAgentState } from "../../state/Types";
 import { ConfirmDialog } from "../shared/ConfirmDialog";

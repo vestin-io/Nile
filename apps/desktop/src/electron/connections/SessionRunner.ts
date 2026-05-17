@@ -1,4 +1,4 @@
-import { NileSession, runWithSession, runWithSessionAsync } from "@nile/core/runtime-local";
+import { NileSession, runWithSession, runWithSessionAsync } from "@nile/builtins/runtime";
 
 type OpenSession = {
   openSession(): NileSession;

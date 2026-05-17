@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 import { ArrowRight } from "lucide-react";
 
 import {

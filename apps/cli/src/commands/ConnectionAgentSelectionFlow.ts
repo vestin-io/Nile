@@ -1,9 +1,11 @@
-import { SHARED_CONNECTION_AGENT_POLICY } from "@nile/core/models/connection";
-import type { ConnectionDefinition, ConnectionOnboardingSuggestion } from "@nile/core/models/connection";
+import type { ConnectionDefinition } from "@nile/core/models/connection";
+import type { ConnectionOnboardingSuggestion } from "@nile/core/models/connection";
+import { SHARED_CONNECTION_AGENT_POLICY } from "@nile/builtins/connections";
 import { AGENT_CAPABILITIES, type AgentId } from "@nile/core/models/agent";
+import { SUPPORTED_AGENT_IDS, isAgentId } from "@nile/core/models/agent/definitions";
 import type { AuthMode } from "@nile/core/models/access";
 
-import { formatAgentLabel } from "@nile/core/models/agent/types";
+import { formatAgentLabel } from "@nile/core/models/agent/definitions";
 import { InteractivePrompt } from "../InteractivePrompt";
 
 type AgentSelectionInput = {
@@ -85,11 +87,12 @@ export class ConnectionAgentSelectionFlow {
       }
 
       const enabledAgents = this.uniqueAgents(selection.values as AgentId[]);
-      if (!enabledAgents.includes("openclaw")) {
+      const requiredSelectedModelAgents = this.readSelectedModelRequirementAgents(enabledAgents);
+      if (requiredSelectedModelAgents.length === 0) {
         return { enabledAgents };
       }
 
-      const selectedModelId = await this.promptForOpenClawModelId();
+      const selectedModelId = await this.promptForSelectedModelId();
       if (selectedModelId === null) {
         continue;
       }
@@ -101,10 +104,9 @@ export class ConnectionAgentSelectionFlow {
     const agents = value
       .split(",")
       .map((item) => item.trim())
-      .filter((item): item is AgentId =>
-        item === "codex" || item === "claude" || item === "cursor" || item === "openclaw");
+      .filter((item): item is AgentId => isAgentId(item));
     if (agents.length === 0) {
-      throw new Error("add --agents requires a comma-separated list like codex,claude,openclaw");
+      throw new Error(`add --agents requires a comma-separated list like ${SUPPORTED_AGENT_IDS.join(",")}`);
     }
     return this.uniqueAgents(agents);
   }
@@ -117,34 +119,47 @@ export class ConnectionAgentSelectionFlow {
     onboarding?: ConnectionOnboardingSuggestion;
     selectedModelId?: string;
   }): { enabledAgents?: AgentId[]; selectedModelId?: string } {
-    const includesOpenClaw = input.enabledAgents?.includes("openclaw") ?? false;
-    if (!includesOpenClaw && !input.selectedModelId) {
+    const requiredSelectedModelAgents = this.readSelectedModelRequirementAgents(input.enabledAgents ?? []);
+    if (requiredSelectedModelAgents.length === 0 && !input.selectedModelId) {
       return input.enabledAgents ? { enabledAgents: input.enabledAgents } : {};
     }
-    if (!SHARED_CONNECTION_AGENT_POLICY.supportsAgent({
-      agentId: "openclaw",
-      authMode: input.authMode,
-      onboarding: input.onboarding,
-      preset: input.definition.preset,
-    })) {
-      throw new Error("OpenClaw is only available for supported OpenAI- or Anthropic-compatible connections");
+    const supportedSelectedModelAgents = this.readSupportedSelectedModelAgents(
+      input.definition,
+      input.authMode,
+      input.onboarding,
+    );
+    const unsupportedSelectedModelAgents = requiredSelectedModelAgents.filter(
+      (agentId) => !supportedSelectedModelAgents.includes(agentId),
+    );
+    if (unsupportedSelectedModelAgents.length > 0) {
+      throw new Error(
+        `${this.formatAgentList(unsupportedSelectedModelAgents)} ` +
+        "is only available for supported OpenAI- or Anthropic-compatible connections",
+      );
     }
-    if (includesOpenClaw && !input.selectedModelId) {
-      throw new Error("add --agents openclaw requires --model-id");
+    if (requiredSelectedModelAgents.length > 0 && !input.selectedModelId) {
+      throw new Error(
+        `add --agents ${this.formatAgentList(requiredSelectedModelAgents)} requires --model-id`,
+      );
     }
-    if (input.selectedModelId && input.hasExplicitAgents && !includesOpenClaw) {
-      throw new Error("add --model-id requires --agents to include openclaw");
+    if (input.selectedModelId && supportedSelectedModelAgents.length === 0) {
+      throw new Error("add --model-id is only supported for agents that require a selected model");
+    }
+    if (input.selectedModelId && input.hasExplicitAgents && requiredSelectedModelAgents.length === 0) {
+      throw new Error(
+        `add --model-id requires --agents to include ${this.formatAgentList(supportedSelectedModelAgents)}`,
+      );
     }
     if (input.selectedModelId && !input.enabledAgents) {
-      return { enabledAgents: ["openclaw"], selectedModelId: input.selectedModelId };
+      return { enabledAgents: supportedSelectedModelAgents, selectedModelId: input.selectedModelId };
     }
     return {
-      enabledAgents: this.uniqueAgents([...(input.enabledAgents ?? []), "openclaw"]),
+      enabledAgents: this.uniqueAgents([...(input.enabledAgents ?? []), ...supportedSelectedModelAgents]),
       selectedModelId: input.selectedModelId,
     };
   }
 
-  private async promptForOpenClawModelId(): Promise<string | null> {
+  private async promptForSelectedModelId(): Promise<string | null> {
     while (true) {
       const input = await this.prompt.input("Model id", { allowBack: true, allowCancel: true });
       if (input.type === "cancel") {
@@ -174,5 +189,28 @@ export class ConnectionAgentSelectionFlow {
 
     return enabledAgents.filter((agentId) =>
       !AGENT_CAPABILITIES.read(agentId).requiredApplyRequirements.includes("selected-model"));
+  }
+
+  private readSelectedModelRequirementAgents(agentIds: AgentId[]): AgentId[] {
+    return agentIds.filter((agentId) =>
+      AGENT_CAPABILITIES.read(agentId).requiredApplyRequirements.includes("selected-model"));
+  }
+
+  private readSupportedSelectedModelAgents(
+    definition: ConnectionDefinition,
+    authMode: AuthMode,
+    onboarding?: ConnectionOnboardingSuggestion,
+  ): AgentId[] {
+    return this.readSelectedModelRequirementAgents(definition.configurableAgents).filter((agentId) =>
+      SHARED_CONNECTION_AGENT_POLICY.supportsAgent({
+        agentId,
+        authMode,
+        onboarding,
+        preset: definition.preset,
+      }));
+  }
+
+  private formatAgentList(agentIds: AgentId[]): string {
+    return agentIds.join(",");
   }
 }

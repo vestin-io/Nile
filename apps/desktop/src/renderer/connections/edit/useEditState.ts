@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { DesktopConnection } from "../../../state/Types";
 import { buildConnectionMethods, readSelectedMethodKey } from "../ConnectionFormParts";
@@ -16,9 +16,8 @@ export type ConnectionEditSubmitInput = {
   apiKeySource?: "direct" | "env_key";
   apiKey?: string;
   envKey?: string;
-  openAiSessionSource?: "login" | "current_codex";
-  openAiAuthJsonPath?: string;
-  claudeSessionSource?: "login" | "current_claude";
+  sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
+  sessionAuthJsonPath?: string;
   syncSelectedAgents?: boolean;
 };
 
@@ -43,8 +42,9 @@ export function useConnectionEditState({
   const [apiKey, setApiKey] = useState("");
   const [apiKeySource, setApiKeySource] = useState<"direct" | "env_key">(connection.apiKeySource ?? "direct");
   const [envKey, setEnvKey] = useState(connection.envKey ?? "");
-  const [sessionSource, setSessionSource] = useState<"login" | "current_codex">("current_codex");
-  const [claudeSessionSource, setClaudeSessionSource] = useState<"login" | "current_claude">("login");
+  const [sessionSource, setSessionSource] = useState<
+    "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor"
+  >("current_codex");
   const [authJsonPath, setAuthJsonPath] = useState(defaultOpenAiAuthJsonPath);
   const [isChoosingAuthJsonPath, setIsChoosingAuthJsonPath] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -95,8 +95,7 @@ export function useConnectionEditState({
     setApiKey("");
     setApiKeySource(connection.apiKeySource ?? "direct");
     setEnvKey(connection.envKey ?? "");
-    setSessionSource("current_codex");
-    setClaudeSessionSource("login");
+    setSessionSource(connection.authMode === "claude_session" ? "login" : "current_codex");
     setAuthJsonPath(defaultOpenAiAuthJsonPath);
     setIsChoosingAuthJsonPath(false);
     setIsSaving(false);
@@ -123,7 +122,6 @@ export function useConnectionEditState({
     apiKeySource,
     authJsonPath,
     authUpdateRequested,
-    claudeSessionSource,
     endpointUrl,
     envKey,
     label,
@@ -156,7 +154,6 @@ export function useConnectionEditState({
       apiKeySource,
       authJsonPath,
       authUpdateRequested,
-      claudeSessionSource,
       connection,
       envKey,
       endpointUrl,
@@ -201,7 +198,6 @@ export function useConnectionEditState({
     canEditEndpointUrl,
     canUpdateCredential,
     chooseAuthJsonPath,
-    claudeSessionSource,
     configurableAgents,
     connectionMethods,
     displayedEnabledAgents,
@@ -220,7 +216,6 @@ export function useConnectionEditState({
     setApiKey,
     setApiKeySource,
     setAuthUpdateRequested,
-    setClaudeSessionSource,
     setEnabledAgents,
     setEndpointUrl,
     setEnvKey,
@@ -256,9 +251,8 @@ function hasAgentAffectingUpdates(input: ConnectionEditSubmitInput): boolean {
     || input.apiKeySource !== undefined
     || input.apiKey !== undefined
     || input.envKey !== undefined
-    || input.openAiSessionSource !== undefined
-    || input.openAiAuthJsonPath !== undefined
-    || input.claudeSessionSource !== undefined;
+    || input.sessionSource !== undefined
+    || input.sessionAuthJsonPath !== undefined;
 }
 
 function readAuthUpdateInput(input: {
@@ -266,11 +260,10 @@ function readAuthUpdateInput(input: {
   apiKeySource: "direct" | "env_key";
   authJsonPath: string;
   authUpdateRequested: boolean;
-  claudeSessionSource: "login" | "current_claude";
   connection: DesktopConnection;
   envKey: string;
   endpointUrl: string;
-  sessionSource: "login" | "current_codex";
+  sessionSource: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
 }): ConnectionEditSubmitInput {
   const endpointChanged = input.endpointUrl.trim() !== (input.connection.endpointUrl ?? "");
   const authPayload: ConnectionEditSubmitInput = {};
@@ -295,14 +288,14 @@ function readAuthUpdateInput(input: {
   }
 
   if (input.connection.authMode === "openai_session") {
-    authPayload.openAiSessionSource = input.sessionSource;
+    authPayload.sessionSource = input.sessionSource;
     if (input.sessionSource === "current_codex") {
-      authPayload.openAiAuthJsonPath = input.authJsonPath.trim() || undefined;
+      authPayload.sessionAuthJsonPath = input.authJsonPath.trim() || undefined;
     }
   }
 
   if (input.connection.authMode === "claude_session") {
-    authPayload.claudeSessionSource = input.claudeSessionSource;
+    authPayload.sessionSource = input.sessionSource;
   }
 
   return authPayload;

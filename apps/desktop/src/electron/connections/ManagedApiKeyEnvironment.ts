@@ -1,5 +1,5 @@
 import { isDirectApiKeyCredential, type StoredCredential } from "@nile/core/services/credential";
-import type { NileSession } from "@nile/core/runtime-local";
+import type { NileSession } from "@nile/builtins/runtime";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 
 import { DesktopEnvironmentStore } from "../environment/Store";

@@ -14,7 +14,7 @@ import {
   type RollbackLatestMutationResult,
   type StartMutationInput,
 } from "./MutationHistoryTypes";
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 
 export class MutationHistoryError extends Error {
   constructor(message: string) {

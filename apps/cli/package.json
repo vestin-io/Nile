@@ -12,11 +12,12 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
+    "@nile/builtins": "file:../../packages/builtins",
     "@nile/core": "file:../../packages/core",
     "@nile/host-local": "file:../../packages/host-local"
   },
   "scripts": {
-    "prebuild": "npm --prefix ../.. run build:host-local",
+    "prebuild": "npm --prefix ../.. run build -w @nile/builtins && npm --prefix ../.. run build:host-local",
     "build": "node ./build.mjs",
     "prestart": "npm run build",
     "start": "node ./dist/main.js"

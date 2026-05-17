@@ -5,7 +5,7 @@ import {
   type MutationStatus,
   type MutationType,
 } from "./MutationHistoryTypes";
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 import { initializeSqliteMutationHistorySchema } from "./SqliteMutationHistorySchema";
 import {
   mapMutationHistoryFiles,

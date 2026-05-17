@@ -1,4 +1,9 @@
-import type { AccessRecord, AccessRegistry } from "../../models/access";
+import {
+  AccessNotFoundError,
+  type AccessRecord,
+  type AccessRegistry,
+  type AuthMode,
+} from "../../models/access";
 import type {
   EndpointFamily,
   EndpointProfile,
@@ -7,31 +12,24 @@ import type {
   EndpointRegistry,
 } from "../../models/endpoint";
 import { EndpointShape } from "../../models/endpoint";
-import { AccessNotFoundError } from "../../models/access";
 import type { ConnectionUsageResult } from "./Result";
 import { ClaudeSessionUsageReader } from "./ClaudeSessionUsageReader";
 import { OpenAiSessionUsageReader } from "./OpenAiSessionUsageReader";
+import type { LocalConnectionUsageReader } from "../../runtime-local/LocalConnectionSupport";
 import {
-  CursorUsageBindingRegistry,
-  CursorUsageReader,
-  CursorUsageSnapshotStore,
-} from "./cursor";
+  CONNECTION_USAGE_READER_REGISTRY,
+  type ConnectionUsageReader,
+} from "./Registry";
 
 export class Usage {
-  private readonly openAiReader = new OpenAiSessionUsageReader();
-  private readonly claudeReader = new ClaudeSessionUsageReader();
-  private readonly cursorReader: CursorUsageReader;
+  private readonly readers: UsageReaderRegistry;
 
   constructor(
     private readonly endpointRegistry: EndpointRegistry,
     private readonly accessRegistry: AccessRegistry,
-    cursorUsageBindingRegistry: CursorUsageBindingRegistry,
-    cursorUsageSnapshotStore: CursorUsageSnapshotStore,
+    extraReaders: readonly LocalConnectionUsageReader[],
   ) {
-    this.cursorReader = new CursorUsageReader(
-      cursorUsageBindingRegistry,
-      cursorUsageSnapshotStore,
-    );
+    this.readers = CONNECTION_USAGE_READER_REGISTRY.create(extraReaders);
   }
 
   async get(connectionId: string): Promise<ConnectionUsageResult> {
@@ -54,7 +52,11 @@ export class Usage {
       };
     }
 
-    const supported = await this.readSupportedUsage(access, endpoint);
+    const supported = await this.readers.read(access.authMode).read(
+      access,
+      endpoint,
+      this.accessRegistry,
+    );
     if (supported) {
       return supported;
     }
@@ -77,52 +79,79 @@ export class Usage {
   }): EndpointFamily {
     return EndpointShape.readFamily(endpoint);
   }
+}
 
-  private async readSupportedUsage(
+type UsageReaderRegistry = ReturnType<typeof CONNECTION_USAGE_READER_REGISTRY.create>;
+
+export class OpenAiSessionConnectionUsageReader implements ConnectionUsageReader {
+  private readonly reader = new OpenAiSessionUsageReader();
+
+  constructor(readonly authMode: AuthMode) {}
+
+  async read(
     access: AccessRecord,
     endpoint: EndpointRecord,
+    accessRegistry: AccessRegistry,
   ): Promise<ConnectionUsageResult | null> {
-    if (
-      endpoint.protocols.openai
-      && (access.authMode === "openai_session" || access.authMode === "openclaw_openai_session")
-    ) {
-      const credential = this.accessRegistry.readCredential(access.id);
-      if (credential.kind !== "openai_session" && credential.kind !== "openclaw_openai_session") {
-        return this.buildCredentialError(access, endpoint, "Expected OpenAI session credential");
-      }
-
-      return await this.openAiReader.read({
-        connectionId: access.id,
-        connectionLabel: access.label,
-        endpointLabel: endpoint.label,
-        credential,
-      });
+    if (!endpoint.protocols.openai) {
+      return null;
     }
 
-    if (endpoint.protocols.anthropic && access.authMode === "claude_session") {
-      const credential = this.accessRegistry.readCredential(access.id);
-      if (credential.kind !== "claude_session") {
-        return this.buildCredentialError(access, endpoint, "Expected claude_session credential");
-      }
-
-      return await this.claudeReader.read({
-        connectionId: access.id,
-        connectionLabel: access.label,
-        endpointLabel: endpoint.label,
-        credential,
-      });
+    const credential = accessRegistry.readCredential(access.id);
+    if (credential.kind !== "openai_session" && credential.kind !== "openclaw_openai_session") {
+      return this.buildCredentialError(access, endpoint, "Expected OpenAI session credential");
     }
 
-    if (endpoint.protocols.cursor && access.authMode === "cursor_session") {
-      return await this.cursorReader.read({
-        connectionId: access.id,
-        connectionLabel: access.label,
-        endpointLabel: endpoint.label,
-        access,
-      });
+    return await this.reader.read({
+      connectionId: access.id,
+      connectionLabel: access.label,
+      endpointLabel: endpoint.label,
+      credential,
+    });
+  }
+
+  private buildCredentialError(
+    access: AccessRecord,
+    endpoint: EndpointRecord,
+    prefix: string,
+  ): ConnectionUsageResult {
+    return {
+      connectionId: access.id,
+      connectionLabel: access.label,
+      endpointFamily: EndpointShape.readFamily(endpoint),
+      endpointLabel: endpoint.label,
+      status: "error",
+      source: "remote_api",
+      message: `${prefix} for ${access.id}`,
+      windows: [],
+    };
+  }
+}
+
+export class ClaudeSessionConnectionUsageReader implements ConnectionUsageReader {
+  readonly authMode = "claude_session" satisfies AuthMode;
+  private readonly reader = new ClaudeSessionUsageReader();
+
+  async read(
+    access: AccessRecord,
+    endpoint: EndpointRecord,
+    accessRegistry: AccessRegistry,
+  ): Promise<ConnectionUsageResult | null> {
+    if (!endpoint.protocols.anthropic) {
+      return null;
     }
 
-    return null;
+    const credential = accessRegistry.readCredential(access.id);
+    if (credential.kind !== "claude_session") {
+      return this.buildCredentialError(access, endpoint, "Expected claude_session credential");
+    }
+
+    return await this.reader.read({
+      connectionId: access.id,
+      connectionLabel: access.label,
+      endpointLabel: endpoint.label,
+      credential,
+    });
   }
 
   private buildCredentialError(

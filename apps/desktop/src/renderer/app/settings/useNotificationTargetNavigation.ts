@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from "react";
 
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { DesktopNotificationTarget } from "../../../electron/notifications/contracts";
 

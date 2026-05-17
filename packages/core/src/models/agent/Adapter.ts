@@ -1,7 +1,7 @@
 import type { AuthMode } from "../access";
 import type { EndpointFamily } from "../endpoint";
 import type { AgentSelectionRecord } from "../selection/Types";
-import type { AgentId } from "./Types";
+import type { AgentId } from "./Ids";
 
 export type AgentCapabilitySupport = "yes" | "partial" | "no";
 

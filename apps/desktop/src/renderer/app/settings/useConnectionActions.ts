@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { SettingsState } from "../../shared/DesktopData";
 import type { Definition } from "../../shared/DesktopData";
@@ -54,9 +54,8 @@ export function useSettingsConnectionActions({
       apiKeySource: input.apiKeySource,
       apiKey: input.apiKey,
       envKey: input.envKey,
-      openAiSessionSource: input.openAiSessionSource,
-      openAiAuthJsonPath: input.openAiAuthJsonPath,
-      claudeSessionSource: input.claudeSessionSource,
+      sessionSource: input.sessionSource,
+      sessionAuthJsonPath: input.sessionAuthJsonPath,
     });
     await completeConnectionMutation(created.id, created.reused === true);
   };
@@ -71,9 +70,8 @@ export function useSettingsConnectionActions({
       apiKeySource: input.apiKeySource,
       apiKey: input.apiKey,
       envKey: input.envKey,
-      openAiSessionSource: input.openAiSessionSource,
-      openAiAuthJsonPath: input.openAiAuthJsonPath,
-      claudeSessionSource: input.claudeSessionSource,
+      sessionSource: input.sessionSource,
+      sessionAuthJsonPath: input.sessionAuthJsonPath,
     });
   };
 
@@ -118,9 +116,8 @@ export function useSettingsConnectionActions({
     apiKeySource?: "direct" | "env_key";
     apiKey?: string;
     envKey?: string;
-    openAiSessionSource?: "login" | "current_codex";
-    openAiAuthJsonPath?: string;
-    claudeSessionSource?: "login" | "current_claude";
+    sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
+    sessionAuthJsonPath?: string;
     syncSelectedAgents?: boolean;
   }) => {
     await window.nileDesktop.connections.updateConnection(input);

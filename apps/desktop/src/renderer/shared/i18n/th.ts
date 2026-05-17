@@ -143,7 +143,7 @@ export const TH_MESSAGES: Messages = {
     "addConnection.signInWithClaudeDescription": "เริ่มโฟลว์การลงชื่อเข้าใช้ Claude แล้วบันทึกเซสชันใหม่ไว้ใน Nile",
     "addConnection.completeSessionStep": "ลงชื่อเข้าใช้ให้เสร็จก่อน",
     "addConnection.completeSessionStepDescription": "กรุณาลงชื่อเข้าใช้ให้เสร็จก่อน จากนั้นคุณจะตรวจสอบป้ายกำกับและความสามารถก่อนบันทึกการเชื่อมต่อนี้ได้",
-    "addConnection.sessionReadyTitle": "ยืนยันตัวตน OpenAI สำเร็จแล้ว",
+    "addConnection.sessionReadyTitle": "ยืนยันตัวตนสำเร็จแล้ว",
     "addConnection.sessionReadyDescription": "การยืนยันตัวตนเสร็จสมบูรณ์แล้ว ตรวจสอบป้ายกำกับและความสามารถ จากนั้นคลิกบันทึกการเชื่อมต่อเพื่อเพิ่มการเชื่อมต่อนี้เข้า Nile",
     "addConnection.sessionReadyAction": "ขั้นถัดไป: {action}",
     "addConnection.useApiKey": "ใช้ API key",

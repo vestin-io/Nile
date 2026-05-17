@@ -76,7 +76,6 @@ export function ConnectionEditPage({
     setApiKey,
     setApiKeySource,
     setAuthUpdateRequested,
-    setClaudeSessionSource,
     setEnabledAgents,
     setEndpointUrl,
     setEnvKey,
@@ -203,7 +202,7 @@ export function ConnectionEditPage({
                   setSessionSource(method.sessionSource);
                 }
                 if (method.authMode === "claude_session") {
-                  setClaudeSessionSource("login");
+                  setSessionSource("login");
                 }
               }}
             />

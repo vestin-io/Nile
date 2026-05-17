@@ -143,7 +143,7 @@ export const IT_MESSAGES: Messages = {
     "addConnection.signInWithClaudeDescription": "Avvia il flusso di accesso Claude e salva poi la nuova sessione in Nile.",
     "addConnection.completeSessionStep": "Completa prima l’accesso",
     "addConnection.completeSessionStepDescription": "Completa prima il flusso di accesso. Poi potrai rivedere etichetta e capacità prima di salvare questa connessione.",
-    "addConnection.sessionReadyTitle": "Autenticazione OpenAI completata",
+    "addConnection.sessionReadyTitle": "Autenticazione completata",
     "addConnection.sessionReadyDescription": "L'autenticazione è riuscita. Controlla etichetta e capacità, poi fai clic su Salva connessione per aggiungere questa connessione a Nile.",
     "addConnection.sessionReadyAction": "Passaggio successivo: {action}",
     "addConnection.useApiKey": "Usa una chiave API",

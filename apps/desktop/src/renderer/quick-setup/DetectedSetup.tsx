@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { DesktopOnboardingItem } from "../../state/Types";
 import type { Translator } from "../shared/I18n";

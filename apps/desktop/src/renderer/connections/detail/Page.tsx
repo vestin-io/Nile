@@ -234,6 +234,8 @@ function readAuthTooltip(authMode: string, t: Translator): string | null {
   switch (authMode) {
     case "openai_session":
       return t("connections.authHelp.openaiSession");
+    case "gemini_cli_session":
+      return "Stored Gemini CLI Google session";
     default:
       return null;
   }

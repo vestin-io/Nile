@@ -1,5 +1,5 @@
-import { formatAgentLabel, SUPPORTED_AGENT_IDS } from "@nile/core/models/agent/types";
-import type { NileSession } from "@nile/core/runtime-local";
+import { formatAgentLabel, SUPPORTED_AGENT_IDS } from "@nile/core/models/agent/definitions";
+import type { NileSession } from "@nile/builtins/runtime";
 
 import type { DesktopHistoryAgentState, DesktopHistoryEntry, HistoryState } from "./Types";
 

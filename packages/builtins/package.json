@@ -1,0 +1,54 @@
+{
+  "name": "@nile/builtins",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./types/index.d.ts",
+  "files": [
+    "dist",
+    "types"
+  ],
+  "dependencies": {
+    "@nile/core": "0.0.0",
+    "@nile/agent-claude": "0.0.0",
+    "@nile/agent-codex": "0.0.0",
+    "@nile/agent-cursor": "0.0.0",
+    "@nile/agent-gemini": "0.0.0",
+    "@nile/agent-openclaw": "0.0.0",
+    "@nile/connections": "0.0.0"
+  },
+  "scripts": {
+    "build": "node ./build.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./agents": {
+      "types": "./types/agents/index.d.ts",
+      "default": "./dist/agents/index.js"
+    },
+    "./connections": {
+      "types": "./types/connections/index.d.ts",
+      "default": "./dist/connections/index.js"
+    },
+    "./cursor-usage": {
+      "types": "./types/cursor-usage/index.d.ts",
+      "default": "./dist/cursor-usage/index.js"
+    },
+    "./local": {
+      "types": "./types/local/index.d.ts",
+      "default": "./dist/local/index.js"
+    },
+    "./runtime": {
+      "types": "./types/runtime/index.d.ts",
+      "default": "./dist/runtime/index.js"
+    },
+    "./session": {
+      "types": "./types/session/index.d.ts",
+      "default": "./dist/session/index.js"
+    }
+  }
+}

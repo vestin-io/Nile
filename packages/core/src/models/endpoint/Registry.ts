@@ -4,6 +4,7 @@ import {
   SUPPORTED_ENDPOINT_PROFILES,
   SUPPORTED_OPENAI_WIRE_APIS,
   type EndpointAnthropicProtocol,
+  type EndpointGeminiProtocol,
   type EndpointCursorProtocol,
   type EndpointOpenAiProtocol,
   type EndpointProfile,
@@ -199,8 +200,11 @@ export class EndpointRegistry {
     if (protocols.cursor) {
       normalized.cursor = this.normalizeCursorProtocol(protocols.cursor);
     }
+    if (protocols.gemini) {
+      normalized.gemini = this.normalizeGeminiProtocol(protocols.gemini);
+    }
 
-    if (!normalized.openai && !normalized.anthropic && !normalized.cursor) {
+    if (!normalized.openai && !normalized.anthropic && !normalized.cursor && !normalized.gemini) {
       throw new EndpointRegistryValidationError("Endpoint must define at least one protocol");
     }
 
@@ -267,6 +271,16 @@ export class EndpointRegistry {
   private normalizeCursorProtocol(protocol: EndpointCursorProtocol): EndpointCursorProtocol {
     const backendPath = this.normalizePath(protocol.backendPath, "Cursor backend path");
     return backendPath ? { backendPath } : {};
+  }
+
+  private normalizeGeminiProtocol(protocol: EndpointGeminiProtocol): EndpointGeminiProtocol {
+    const authTypes = this.uniqueNonEmptyStrings(protocol.authTypes, "Gemini auth types");
+    if (!authTypes.every((authType) => authType === "oauth-personal")) {
+      throw new EndpointRegistryValidationError("Gemini protocol only supports oauth-personal auth");
+    }
+    return {
+      authTypes: authTypes as Array<"oauth-personal">,
+    };
   }
 
   private normalizePath(path: string | undefined, fieldName: string): string | undefined {

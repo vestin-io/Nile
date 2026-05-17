@@ -1,4 +1,4 @@
-import { formatAgentLabel as readAgentLabel, type AgentId } from "@nile/core/models/agent/types";
+import { formatAgentLabel as readAgentLabel, type AgentId } from "@nile/core/models/agent/definitions";
 import { CONNECTION_APPLY_REQUIREMENTS } from "@nile/core/models/connection/requirements";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 

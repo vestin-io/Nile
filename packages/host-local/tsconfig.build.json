@@ -6,7 +6,10 @@
     "declaration": true,
     "declarationMap": false,
     "rootDir": "./src",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "paths": {
+      "@nile/core/services/credential": ["packages/core/dist/services/credential/index.d.ts"]
+    }
   },
   "include": ["./src/**/*.ts", "./src/**/*.tsx"],
   "exclude": ["./src/**/*.test.ts", "./src/**/*.test.tsx"]

@@ -2,6 +2,7 @@ import { MousePointer2, Waypoints } from "lucide-react";
 import openAiSvg from "@lobehub/icons-static-svg/icons/openai.svg";
 import azureAiSvg from "@lobehub/icons-static-svg/icons/azureai-color.svg";
 import claudeSvg from "@lobehub/icons-static-svg/icons/claude.svg";
+import geminiSvg from "@lobehub/icons-static-svg/icons/gemini-color.svg";
 
 import type { Translator } from "../shared/I18n";
 import type { DesktopConnection } from "../../state/Types";
@@ -28,27 +29,30 @@ export function readProviderLabel(
   return t("common.unknown");
 }
 
-function readProviderIcon(provider: DesktopConnection["endpointFamily"]) {
-  if (provider === "openai") {
+export function readProviderIconNode(iconKey: string) {
+  if (iconKey === "openai") {
     return <BrandIcon svg={openAiSvg} />;
   }
-  if (provider === "azure-openai") {
+  if (iconKey === "azure-openai") {
     return <BrandIcon svg={azureAiSvg} />;
   }
-  if (provider === "anthropic") {
+  if (iconKey === "anthropic") {
     return <BrandIcon svg={claudeSvg} />;
   }
-  if (provider === "gateway") {
+  if (iconKey === "gemini") {
+    return <BrandIcon svg={geminiSvg} />;
+  }
+  if (iconKey === "gateway") {
     return <Waypoints className="h-4 w-4 text-muted-foreground" />;
   }
-  if (provider === "cursor") {
+  if (iconKey === "cursor") {
     return <MousePointer2 className="h-4 w-4 text-muted-foreground" />;
   }
   return <span className="text-muted-foreground">•</span>;
 }
 
-export function readProviderIconNode(provider: DesktopConnection["endpointFamily"]) {
-  return readProviderIcon(provider);
+export function readEndpointProviderIconNode(provider: DesktopConnection["endpointFamily"]) {
+  return readProviderIconNode(provider);
 }
 
 function BrandIcon({ svg }: { svg: string }) {

@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { AccessRegistry } from "@nile/core/models/access";
 import { EndpointRegistry, type EndpointRegistryInput } from "@nile/core/models/endpoint";
 import { AgentSelection } from "@nile/core/models/selection";
-import { NileSession } from "@nile/core/runtime-local";
+import { NileSession } from "@nile/builtins/runtime";
 import { KeychainCredentialStore, type StoredCredential } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { SecureSnapshotStore } from "@nile/core/services/history";
@@ -122,6 +122,13 @@ describe("DesktopSurface", () => {
         {
           agentId: "claude",
           agentLabel: "Claude",
+          currentConnection: null,
+          currentUsage: null,
+          connections: [],
+        },
+        {
+          agentId: "gemini",
+          agentLabel: "Gemini",
           currentConnection: null,
           currentUsage: null,
           connections: [],
@@ -328,12 +335,7 @@ describe("DesktopSurface", () => {
       credentialStore: setup.credentialStore,
       secureSnapshotStore: setup.secureSnapshots,
       logger: NileLogger.silent().child({ module: "desktop-surface-test" }),
-      agentHomes: {
-        codex: setup.codexHome,
-        cursor: setup.cursorHome,
-        claude: setup.claudeHome,
-        openclaw: setup.openclawHome,
-      },
+      agentHomes: createAgentHomes(setup),
     });
     try {
       session.removeConnection("openai-work");
@@ -451,6 +453,10 @@ describe("DesktopSurface", () => {
       }),
       expect.objectContaining({
         agentId: "claude",
+        importable: false,
+      }),
+      expect.objectContaining({
+        agentId: "gemini",
         importable: false,
       }),
       expect.objectContaining({
@@ -718,6 +724,13 @@ describe("DesktopSurface", () => {
         {
           agentId: "claude",
           agentLabel: "Claude",
+          currentConnection: null,
+          currentUsage: null,
+          connections: [],
+        },
+        {
+          agentId: "gemini",
+          agentLabel: "Gemini",
           currentConnection: null,
           currentUsage: null,
           connections: [],
@@ -1070,6 +1083,7 @@ function createSetup(options?: {
   codexHome: string;
   cursorHome: string;
   claudeHome: string;
+  geminiHome: string;
   openclawHome: string;
   credentialStore: StubCredentialStore;
   secureSnapshots: MemorySecureSnapshotStore;
@@ -1098,6 +1112,10 @@ function createSetup(options?: {
   mkdirSync(claudeHome, { recursive: true });
   writeFileSync(join(claudeHome, "settings.json"), "{}\n", "utf8");
 
+  const geminiHome = join(dir, ".gemini");
+  mkdirSync(geminiHome, { recursive: true });
+  writeFileSync(join(geminiHome, "settings.json"), "{}\n", "utf8");
+
   const openclawHome = join(dir, ".openclaw");
   mkdirSync(openclawHome, { recursive: true });
   writeFileSync(join(openclawHome, "openclaw.json"), "{ models: { mode: 'merge', providers: {} } }\n", "utf8");
@@ -1107,6 +1125,7 @@ function createSetup(options?: {
     codexHome,
     cursorHome,
     claudeHome,
+    geminiHome,
     openclawHome,
     credentialStore: new StubCredentialStore(),
     secureSnapshots: new MemorySecureSnapshotStore(),
@@ -1118,18 +1137,14 @@ function createSurface(setup: {
   codexHome: string;
   cursorHome: string;
   claudeHome: string;
+  geminiHome: string;
   openclawHome: string;
   credentialStore: StubCredentialStore;
   secureSnapshots: MemorySecureSnapshotStore;
 }): DesktopSurface {
   return new DesktopSurface({
     databasePath: setup.dbPath,
-    agentHomes: {
-      codex: setup.codexHome,
-      cursor: setup.cursorHome,
-      claude: setup.claudeHome,
-      openclaw: setup.openclawHome,
-    },
+    agentHomes: createAgentHomes(setup),
     credentialStore: setup.credentialStore,
     secureSnapshotStore: setup.secureSnapshots,
     logger: NileLogger.silent(),
@@ -1142,11 +1157,12 @@ function applySavedConnection(
     codexHome: string;
     cursorHome: string;
     claudeHome: string;
+    geminiHome: string;
     openclawHome: string;
     credentialStore: StubCredentialStore;
     secureSnapshots: MemorySecureSnapshotStore;
   },
-  agentId: "codex" | "cursor" | "claude" | "openclaw",
+  agentId: "codex" | "cursor" | "claude" | "gemini" | "openclaw",
   connectionId: string,
 ): void {
   const session = NileSession.open({
@@ -1154,12 +1170,7 @@ function applySavedConnection(
     credentialStore: setup.credentialStore,
     secureSnapshotStore: setup.secureSnapshots,
     logger: NileLogger.silent().child({ module: "desktop-surface-test" }),
-    agentHomes: {
-      codex: setup.codexHome,
-      cursor: setup.cursorHome,
-      claude: setup.claudeHome,
-      openclaw: setup.openclawHome,
-    },
+    agentHomes: createAgentHomes(setup),
   });
   try {
     session.useConnection(agentId, connectionId);
@@ -1174,11 +1185,12 @@ function setAgentConnectionModel(
     codexHome: string;
     cursorHome: string;
     claudeHome: string;
+    geminiHome: string;
     openclawHome: string;
     credentialStore: StubCredentialStore;
     secureSnapshots: MemorySecureSnapshotStore;
   },
-  agentId: "codex" | "cursor" | "claude" | "openclaw",
+  agentId: "codex" | "cursor" | "claude" | "gemini" | "openclaw",
   connectionId: string,
   modelId: string,
 ): void {
@@ -1187,12 +1199,7 @@ function setAgentConnectionModel(
     credentialStore: setup.credentialStore,
     secureSnapshotStore: setup.secureSnapshots,
     logger: NileLogger.silent().child({ module: "desktop-surface-test" }),
-    agentHomes: {
-      codex: setup.codexHome,
-      cursor: setup.cursorHome,
-      claude: setup.claudeHome,
-      openclaw: setup.openclawHome,
-    },
+    agentHomes: createAgentHomes(setup),
   });
   try {
     session.setAgentConnectionModel(agentId, connectionId, modelId);
@@ -1207,24 +1214,20 @@ async function updateConnectionEnabledAgents(
     codexHome: string;
     cursorHome: string;
     claudeHome: string;
+    geminiHome: string;
     openclawHome: string;
     credentialStore: StubCredentialStore;
     secureSnapshots: MemorySecureSnapshotStore;
   },
   connectionId: string,
-  enabledAgents: Array<"codex" | "cursor" | "claude" | "openclaw">,
+  enabledAgents: Array<"codex" | "cursor" | "claude" | "gemini" | "openclaw">,
 ): Promise<void> {
   const session = NileSession.open({
     databasePath: setup.dbPath,
     credentialStore: setup.credentialStore,
     secureSnapshotStore: setup.secureSnapshots,
     logger: NileLogger.silent().child({ module: "desktop-surface-test" }),
-    agentHomes: {
-      codex: setup.codexHome,
-      cursor: setup.cursorHome,
-      claude: setup.claudeHome,
-      openclaw: setup.openclawHome,
-    },
+    agentHomes: createAgentHomes(setup),
   });
   try {
     await session.updateConnection({
@@ -1234,6 +1237,22 @@ async function updateConnectionEnabledAgents(
   } finally {
     session.close();
   }
+}
+
+function createAgentHomes(setup: {
+  codexHome: string;
+  cursorHome: string;
+  claudeHome: string;
+  geminiHome: string;
+  openclawHome: string;
+}) {
+  return {
+    codex: setup.codexHome,
+    cursor: setup.cursorHome,
+    claude: setup.claudeHome,
+    gemini: setup.geminiHome,
+    openclaw: setup.openclawHome,
+  } as const;
 }
 
 function seedProvider(

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
 
 import type { Definition } from "../../shared/DesktopData";
 import {
@@ -44,12 +45,15 @@ export function useAddConnectionPageState({
   const [preparedDraft, setPreparedDraft] = useState<PreparedConnectionDraft | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const supportsCurrentCodexImport = formState.authMode === "openai_session";
-  const shouldShowAuthJsonPath =
-    formState.authMode === "openai_session" && formState.sessionSource === "current_codex";
-  const requiresSessionPreparation =
-    (formState.authMode === "openai_session" && formState.sessionSource === "login")
-    || formState.authMode === "claude_session";
+  const sessionMethod = SHARED_SESSION_CONNECTION_METHODS.readMethod(
+    formState.authMode,
+    formState.sessionSource,
+  );
+
+  const supportsCurrentCodexImport = formState.authMode === "openai_session"
+    && SHARED_SESSION_CONNECTION_METHODS.listForAuthMode("openai_session").some((method) => method.source === "current_codex");
+  const shouldShowAuthJsonPath = sessionMethod?.requiresAuthJsonPath === true;
+  const requiresSessionPreparation = sessionMethod?.requiresPreparation === true;
   const isPreparedSessionFlow = requiresSessionPreparation && preparedDraft !== null;
   const requiresGatewayPreparation =
     selectedDefinition?.preset === "gateway" && formState.authMode === "api_key";
@@ -100,9 +104,8 @@ export function useAddConnectionPageState({
       apiKeySource: formState.apiKeySource,
       apiKey: formState.apiKeySource === "direct" ? formState.apiKey.trim() || undefined : undefined,
       envKey: formState.apiKeySource === "env_key" ? formState.envKey.trim() || undefined : undefined,
-      openAiSessionSource: supportsCurrentCodexImport ? formState.sessionSource : undefined,
-      openAiAuthJsonPath: shouldShowAuthJsonPath ? formState.authJsonPath.trim() || undefined : undefined,
-      claudeSessionSource: formState.authMode === "claude_session" ? "login" : undefined,
+      sessionSource: sessionMethod?.source,
+      sessionAuthJsonPath: shouldShowAuthJsonPath ? formState.authJsonPath.trim() || undefined : undefined,
     };
   };
 

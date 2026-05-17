@@ -70,6 +70,19 @@
       ]
     },
     {
+      "id": "gemini",
+      "name": "Gemini",
+      "module_path": ".vestin/specs/gemini/",
+      "module_spec_path": ".vestin/specs/gemini/module.md",
+      "features": [
+        {
+          "id": "adapter",
+          "name": "Gemini CLI Adapter",
+          "spec_path": ".vestin/specs/gemini/features/adapter.md"
+        }
+      ]
+    },
+    {
       "id": "surfaces",
       "name": "Surfaces",
       "module_path": ".vestin/specs/surfaces/",

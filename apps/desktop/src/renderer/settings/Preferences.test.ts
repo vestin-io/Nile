@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent/definitions";
+
 import { DesktopPreferencesStore } from "./Preferences";
 
 describe("DesktopPreferencesStore", () => {
@@ -12,6 +14,23 @@ describe("DesktopPreferencesStore", () => {
     const store = new DesktopPreferencesStore(storage, createRootElement());
 
     expect(store.load().theme).toBe("system");
+  });
+
+  it("includes every supported agent in the default order", () => {
+    const store = new DesktopPreferencesStore(createStorage({}), createRootElement());
+
+    expect(store.load().agentOrder).toEqual(SUPPORTED_AGENT_IDS);
+  });
+
+  it("appends newly supported agents to stored preferences", () => {
+    const storage = createStorage({
+      "nile.desktop.preferences": JSON.stringify({
+        agentOrder: ["codex", "claude", "cursor", "openclaw"],
+      }),
+    });
+    const store = new DesktopPreferencesStore(storage, createRootElement());
+
+    expect(store.load().agentOrder).toEqual(["codex", "claude", "cursor", "openclaw", "gemini"]);
   });
 });
 

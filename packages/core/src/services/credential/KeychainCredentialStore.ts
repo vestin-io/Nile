@@ -283,6 +283,14 @@ const DEFAULT_CREDENTIAL_VALIDATORS: Record<string, CredentialValidator> = {
     requireOptionalStringField(credential, "displayName");
     requireOptionalNumberField(credential, "userId");
   },
+  gemini_cli_session: (credential) => {
+    requireStringField(credential, "accessToken");
+    requireStringField(credential, "refreshToken");
+    requireStringField(credential, "idToken");
+    requireOptionalNumberField(credential, "expiryDate");
+    requireOptionalStringField(credential, "tokenType");
+    requireOptionalStringField(credential, "scope");
+  },
   cursor_web_session: (credential) => {
     requireStringField(credential, "sessionToken");
   },

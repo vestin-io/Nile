@@ -1,3 +1,4 @@
+import { registerBuiltinAgentDeclarations } from "@nile/builtins/agents";
 import { createTranslator } from "../shared/I18n";
 import { DesktopPreferencesStore } from "../settings/Preferences";
 import { authModeLabel } from "../shared/DisplayText";
@@ -12,6 +13,8 @@ const settingsButton = document.getElementById("settings-button");
 const refreshButton = document.getElementById("refresh-button");
 const currentTitleElement = document.getElementById("menubar-current-title");
 const switchTitleElement = document.getElementById("menubar-switch-title");
+
+registerBuiltinAgentDeclarations();
 
 function applyFramePreferences() {
   const preferences = preferencesStore.load();

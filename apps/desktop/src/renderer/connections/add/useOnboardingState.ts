@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { Definition } from "../../shared/DesktopData";
 import type { AddConnectionSubmitInput } from "./Types";

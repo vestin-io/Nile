@@ -1,6 +1,6 @@
 import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent";
 
-export const KNOWN_FLAGS = new Set([
+export const BASE_KNOWN_FLAGS = [
   "db-path",
   "home",
   "json",
@@ -17,12 +17,11 @@ export const KNOWN_FLAGS = new Set([
   "from-codex-current",
   "from-claude-current",
   "from-cursor-current",
+  "from-gemini-current",
   "agents",
-  "session-token",
-  "workos-session-token",
-]);
+];
 
-export function buildCliHelpLines(): string[] {
+export function buildCliHelpLines(agentExtensionHelpLines: string[] = []): string[] {
   return [
     "Usage:",
     "  nile",
@@ -30,12 +29,11 @@ export function buildCliHelpLines(): string[] {
     ...SUPPORTED_AGENT_IDS.map((agentId) => `  nile ${agentId} status [--json] [--db-path <path>] [--home ${agentId}=<path>]`),
     "  nile list [--json] [--db-path <path>]",
     "  nile usage <connectionId> [--json] [--db-path <path>]",
-    "  nile cursor usage bind <connectionId> --session-token <token> [--json] [--db-path <path>] [--home cursor=<path>]",
-    "  nile cursor usage auto-bind <connectionId> [--json] [--db-path <path>] [--home cursor=<path>]",
+    ...agentExtensionHelpLines,
     "  nile history [--json] [--db-path <path>]",
     "  nile reset [--json] [--db-path <path>]",
     "  nile reset --yes --confirm-reset [--json] [--db-path <path>]",
-    "  nile add [--preset <preset>] [--auth-mode <mode>] [--id <id>] [--label <label>] [--endpoint-url <url>] [--login] [--api-key <key>] [--model-id <model>] [--from-codex-current] [--from-claude-current] [--from-cursor-current] [--db-path <path>] [--home <agent>=<path>]",
+    "  nile add [--preset <preset>] [--auth-mode <mode>] [--id <id>] [--label <label>] [--endpoint-url <url>] [--login] [--api-key <key>] [--model-id <model>] [--from-codex-current] [--from-claude-current] [--from-cursor-current] [--from-gemini-current] [--db-path <path>] [--home <agent>=<path>]",
     ...SUPPORTED_AGENT_IDS.map((agentId) => `  nile ${agentId} import [--db-path <path>] [--home ${agentId}=<path>]`),
     ...SUPPORTED_AGENT_IDS.map((agentId) => `  nile ${agentId} use <connectionId> [--db-path <path>] [--home ${agentId}=<path>]`),
     "  nile remove <connectionId> [--db-path <path>]",

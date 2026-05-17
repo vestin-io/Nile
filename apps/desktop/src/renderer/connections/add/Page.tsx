@@ -1,4 +1,5 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
+import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
 
 import {
   buildConnectionMethods,
@@ -99,14 +100,14 @@ export function AddConnectionPage({
     formState.sessionSource,
     formState.apiKeySource,
   );
+  const selectedSessionMethod = SHARED_SESSION_CONNECTION_METHODS.readMethod(
+    formState.authMode,
+    formState.sessionSource,
+  );
 
   const submitLabel = (() => {
     if (isPreparedSessionFlow) {
       return t("addConnection.saveConnection");
-    }
-
-    if (formState.authMode === "openai_session" && formState.sessionSource === "current_codex") {
-      return t("addConnection.importAuthJson");
     }
 
     if (requiresGatewayPreparation && !gatewayPrepared) {
@@ -116,16 +117,8 @@ export function AddConnectionPage({
       return t("addConnection.detectCapability");
     }
 
-    if (formState.authMode === "openai_session") {
-      return t("addConnection.signInWithOpenAi");
-    }
-
-    if (formState.authMode === "claude_session") {
-      return preparedDraft ? t("addConnection.saveConnection") : t("addConnection.signInWithClaude");
-    }
-
-    if (formState.authMode === "cursor_session") {
-      return t("addConnection.useCurrentCursorSession");
+    if (selectedSessionMethod) {
+      return t(selectedSessionMethod.submitKey);
     }
 
     return t("common.addConnection");
@@ -159,7 +152,7 @@ export function AddConnectionPage({
               void submit();
             }}
           >
-            {connectionMethods.length > 1 ? (
+            {connectionMethods.length > 0 ? (
               <FormField label={t("addConnection.chooseMethod")}>
                 <ConnectionMethodSelector
                   disabled={isSessionStructureLocked}
@@ -241,9 +234,9 @@ export function AddConnectionPage({
                 >
                   {isPreparingDraft
                     ? t("addConnection.signingIn")
-                    : formState.authMode === "claude_session"
-                      ? t("addConnection.signInWithClaude")
-                      : t("addConnection.signInWithOpenAi")}
+                    : selectedSessionMethod
+                      ? t(selectedSessionMethod.submitKey)
+                      : t("common.addConnection")}
                 </Button>
               ) : requiresGatewayPreparation && !showPostPreparationFields ? (
                 <>

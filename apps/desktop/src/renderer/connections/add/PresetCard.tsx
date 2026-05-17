@@ -1,8 +1,3 @@
-import { Waypoints } from "lucide-react";
-import openAiSvg from "@lobehub/icons-static-svg/icons/openai.svg";
-import azureAiSvg from "@lobehub/icons-static-svg/icons/azureai-color.svg";
-import claudeSvg from "@lobehub/icons-static-svg/icons/claude.svg";
-
 import type { Translator } from "../../shared/I18n";
 import { readDefinitionKeywords, type Definition } from "../../shared/DesktopData";
 import { authModeLabel } from "../../shared/DisplayText";
@@ -11,6 +6,7 @@ import {
   hasProviderSummary,
   ProviderSummary,
 } from "../../providers/ProviderSummary";
+import { readProviderIconNode } from "../ProviderDisplay";
 import { Card } from "../../ui/card";
 import { type ComboboxItem, Combobox } from "../../ui/combobox";
 import { Separator } from "../../ui/separator";
@@ -41,7 +37,7 @@ export function AddConnectionPresetCard({
     value: definition.preset,
     label: definition.label,
     description: definition.supportedAuthModes.map((mode) => authModeLabel(mode, t)).join(" · "),
-    icon: readPresetIcon(definition.preset),
+    icon: readProviderIconNode(definition.iconKey),
     keywords: readDefinitionKeywords(definition),
   })) satisfies ComboboxItem<Definition["preset"]>[];
 
@@ -78,28 +74,5 @@ export function AddConnectionPresetCard({
         ) : null}
       </div>
     </Card>
-  );
-}
-
-function readPresetIcon(preset: Definition["preset"]) {
-  if (preset === "openai") {
-    return <BrandIcon svg={openAiSvg} />;
-  }
-  if (preset === "gateway") {
-    return <Waypoints className="h-4 w-4" />;
-  }
-  if (preset === "azure-openai") {
-    return <BrandIcon svg={azureAiSvg} />;
-  }
-  return <BrandIcon svg={claudeSvg} />;
-}
-
-function BrandIcon({ svg }: { svg: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-4 w-4 shrink-0 items-center justify-center [&_svg]:h-4 [&_svg]:w-4"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
   );
 }

@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { DesktopAdvancedState, DesktopAgentState } from "../../state/Types";
 import type { Translator } from "../shared/I18n";

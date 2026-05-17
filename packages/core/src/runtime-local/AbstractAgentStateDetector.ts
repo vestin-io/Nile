@@ -2,7 +2,10 @@ import type { AgentLiveStateValidity, MatchedAgentConnection } from "../models/a
 import type { LiveSetupMatcher } from "../actions/live-setup/Matcher";
 import type { AgentSelectionRecord } from "../models/selection/Types";
 import type { NileLogger } from "../services/NileLogger";
-import type { AgentWorkspaceSession } from "./AgentWorkspaceSession";
+
+type OwnedContext = {
+  close(): void;
+};
 
 /** Shared live-state shape for template-method reconciliation. */
 export type ReconcilableDetectedState = {
@@ -17,7 +20,7 @@ export abstract class AbstractAgentStateDetector<TState extends ReconcilableDete
   constructor(
     protected readonly matcher: LiveSetupMatcher,
     protected readonly logger: NileLogger,
-    private readonly ownedContext: AgentWorkspaceSession | null = null,
+    private readonly ownedContext: OwnedContext | null = null,
   ) {}
 
   abstract detect(): TState;

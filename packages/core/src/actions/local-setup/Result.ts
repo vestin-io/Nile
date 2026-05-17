@@ -1,4 +1,4 @@
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 
 export type ScanItemState =
   | "new"

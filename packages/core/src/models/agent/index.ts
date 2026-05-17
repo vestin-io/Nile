@@ -1,7 +1,9 @@
-export { AGENT_DEFINITIONS, SUPPORTED_AGENT_IDS, formatAgentLabel, isAgentId } from "./Types";
-export type { AgentId } from "./Types";
-export { AGENT_CAPABILITIES, AgentCapabilities } from "./Capabilities";
-export type { AgentCapability } from "./Capabilities";
+export { listAgentDefinitions, SUPPORTED_AGENT_IDS, formatAgentLabel, isAgentId } from "./Definitions";
+export type { AgentId } from "./Definitions";
+export { listAgentManifests, readAgentManifest } from "./registry";
+export type { AgentConnectionEntryMode, AgentManifest } from "./registry";
+export { AGENT_CAPABILITIES, AgentCapabilities } from "./registry";
+export type { AgentCapability } from "./registry";
 export type {
   AgentAdapter,
   AgentAdapterLookup,

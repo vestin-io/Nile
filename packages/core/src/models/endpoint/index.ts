@@ -2,6 +2,7 @@ export type {
   EndpointAnthropicProtocol,
   EndpointAuthScheme,
   EndpointCursorProtocol,
+  EndpointGeminiProtocol,
   EndpointOpenAiProtocol,
   EndpointProfile,
   EndpointProtocol,

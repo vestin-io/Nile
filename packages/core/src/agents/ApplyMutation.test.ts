@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ApplyMutation } from "./ApplyMutation";
 import type { PreparedAgentApplySelection } from "../actions/apply/Support";
 import type { ApplyAgentSelectionResult } from "../models/agent";
-import type { AgentId } from "../models/agent/Types";
+import type { AgentId } from "../models/agent/Definitions";
 import type {
   MutationAfterFileInput,
   MutationTrackedFileInput,

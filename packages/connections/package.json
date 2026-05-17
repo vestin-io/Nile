@@ -1,0 +1,130 @@
+{
+  "name": "@nile/connections",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@nile/core": "0.0.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/build-workspace-package.mjs"
+  },
+  "exports": {
+    "./labeling": {
+      "types": "./types/labeling/index.d.ts",
+      "default": "./dist/labeling/index.js"
+    },
+    "./support": {
+      "types": "./types/support/index.d.ts",
+      "default": "./dist/support/index.js"
+    },
+    "./mutations": {
+      "types": "./types/mutations/index.d.ts",
+      "default": "./dist/mutations/index.js"
+    },
+    "./setup": {
+      "types": "./types/setup/index.d.ts",
+      "default": "./dist/setup/index.js"
+    },
+    "./catalog": {
+      "types": "./types/catalog/index.d.ts",
+      "default": "./dist/catalog/index.js"
+    },
+    "./anthropic-api-key": {
+      "types": "./types/families/anthropic-api-key/index.d.ts",
+      "default": "./dist/families/anthropic-api-key/index.js"
+    },
+    "./anthropic-api-key/module": {
+      "types": "./types/families/anthropic-api-key/module.d.ts",
+      "default": "./dist/families/anthropic-api-key/Module.js"
+    },
+    "./anthropic-api-key/manifest": {
+      "types": "./types/families/anthropic-api-key/manifest.d.ts",
+      "default": "./dist/families/anthropic-api-key/Manifest.js"
+    },
+    "./claude-session": {
+      "types": "./types/families/claude-session/index.d.ts",
+      "default": "./dist/families/claude-session/index.js"
+    },
+    "./claude-session/module": {
+      "types": "./types/families/claude-session/module.d.ts",
+      "default": "./dist/families/claude-session/Module.js"
+    },
+    "./claude-session/manifest": {
+      "types": "./types/families/claude-session/manifest.d.ts",
+      "default": "./dist/families/claude-session/Manifest.js"
+    },
+    "./cursor-api-key": {
+      "types": "./types/families/cursor-api-key/index.d.ts",
+      "default": "./dist/families/cursor-api-key/index.js"
+    },
+    "./cursor-api-key/module": {
+      "types": "./types/families/cursor-api-key/module.d.ts",
+      "default": "./dist/families/cursor-api-key/Module.js"
+    },
+    "./cursor-api-key/manifest": {
+      "types": "./types/families/cursor-api-key/manifest.d.ts",
+      "default": "./dist/families/cursor-api-key/Manifest.js"
+    },
+    "./cursor-session": {
+      "types": "./types/families/cursor-session/index.d.ts",
+      "default": "./dist/families/cursor-session/index.js"
+    },
+    "./cursor-session/module": {
+      "types": "./types/families/cursor-session/module.d.ts",
+      "default": "./dist/families/cursor-session/Module.js"
+    },
+    "./cursor-session/manifest": {
+      "types": "./types/families/cursor-session/manifest.d.ts",
+      "default": "./dist/families/cursor-session/Manifest.js"
+    },
+    "./gemini-cli-session": {
+      "types": "./types/families/gemini-cli-session/index.d.ts",
+      "default": "./dist/families/gemini-cli-session/index.js"
+    },
+    "./gemini-cli-session/module": {
+      "types": "./types/families/gemini-cli-session/module.d.ts",
+      "default": "./dist/families/gemini-cli-session/Module.js"
+    },
+    "./gemini-cli-session/manifest": {
+      "types": "./types/families/gemini-cli-session/manifest.d.ts",
+      "default": "./dist/families/gemini-cli-session/Manifest.js"
+    },
+    "./openai-api-key": {
+      "types": "./types/families/openai-api-key/index.d.ts",
+      "default": "./dist/families/openai-api-key/index.js"
+    },
+    "./openai-api-key/module": {
+      "types": "./types/families/openai-api-key/module.d.ts",
+      "default": "./dist/families/openai-api-key/Module.js"
+    },
+    "./openai-api-key/manifest": {
+      "types": "./types/families/openai-api-key/manifest.d.ts",
+      "default": "./dist/families/openai-api-key/Manifest.js"
+    },
+    "./openai-session": {
+      "types": "./types/families/openai-session/index.d.ts",
+      "default": "./dist/families/openai-session/index.js"
+    },
+    "./openai-session/module": {
+      "types": "./types/families/openai-session/module.d.ts",
+      "default": "./dist/families/openai-session/Module.js"
+    },
+    "./openai-session/manifest": {
+      "types": "./types/families/openai-session/manifest.d.ts",
+      "default": "./dist/families/openai-session/Manifest.js"
+    },
+    "./openclaw-openai-session": {
+      "types": "./types/families/openclaw-openai-session/index.d.ts",
+      "default": "./dist/families/openclaw-openai-session/index.js"
+    },
+    "./openclaw-openai-session/module": {
+      "types": "./types/families/openclaw-openai-session/module.d.ts",
+      "default": "./dist/families/openclaw-openai-session/Module.js"
+    },
+    "./openclaw-openai-session/manifest": {
+      "types": "./types/families/openclaw-openai-session/manifest.d.ts",
+      "default": "./dist/families/openclaw-openai-session/Manifest.js"
+    }
+  }
+}

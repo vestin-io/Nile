@@ -156,7 +156,7 @@ describe("SavedConnections", () => {
       endpointLabel: "OpenAI",
       endpointFamily: "openai",
       accessId: "openclaw-session",
-      accountLabel: "jay.ji@spotto.ai gpt-5.5",
+      accountLabel: "openai.shared@example.test gpt-5.5",
       authMode: "openclaw_openai_session",
       enabledAgents: ["openclaw"],
       credential: {
@@ -164,7 +164,7 @@ describe("SavedConnections", () => {
         accountId: "acct_openclaw",
         accessToken: "access",
         refreshToken: "refresh",
-        email: "jay.ji@spotto.ai",
+        email: "openai.shared@example.test",
       },
     });
 

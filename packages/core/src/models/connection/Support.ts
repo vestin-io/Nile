@@ -1,18 +1,15 @@
 import type { AuthMode } from "../access";
 import type { EndpointProtocols } from "../endpoint";
-export type { ConnectionPresetFamily } from "./setup/PresetTypes";
-import type { ConnectionPresetFamily } from "./setup/PresetTypes";
+export type { ConnectionPresetFamily } from "./preset";
+import type { ConnectionPresetFamily } from "./preset";
+import {
+  CONNECTION_FAMILY_REGISTRY,
+} from "./family";
+import type { ConnectionFamilyId } from "./family";
 
-export type ConnectionSupportKind =
-  | "openai-api-key"
-  | "anthropic-api-key"
-  | "cursor-api-key"
-  | "openai-session"
-  | "openclaw-openai-session"
-  | "claude-session"
-  | "cursor-session";
+export type ConnectionSupportKind = ConnectionFamilyId;
 
-type ConnectionSupportProtocols = Pick<EndpointProtocols, "openai" | "anthropic" | "cursor">;
+type ConnectionSupportProtocols = Pick<EndpointProtocols, "openai" | "anthropic" | "cursor" | "gemini">;
 
 type ReadSavedKindsInput = {
   protocols: ConnectionSupportProtocols;
@@ -26,72 +23,16 @@ type ReadSelectableKindsInput = {
 
 export class ConnectionSupportKinds {
   readDetectedApiKeyKinds(protocols: ConnectionSupportProtocols): ConnectionSupportKind[] {
-    const kinds: ConnectionSupportKind[] = [];
-    if (protocols.openai) {
-      kinds.push("openai-api-key");
-    }
-    if (protocols.anthropic) {
-      kinds.push("anthropic-api-key");
-    }
-    if (protocols.cursor) {
-      kinds.push("cursor-api-key");
-    }
-    return kinds;
+    return CONNECTION_FAMILY_REGISTRY.readDetectedApiKeyFamilyIds(protocols);
   }
 
   readSavedKinds(input: ReadSavedKindsInput): ConnectionSupportKind[] {
-    switch (input.authMode) {
-      case "api_key":
-        return this.readDetectedApiKeyKinds(input.protocols);
-      case "openai_session":
-        return input.protocols.openai ? ["openai-session"] : [];
-      case "openclaw_openai_session":
-        return input.protocols.openai ? ["openclaw-openai-session"] : [];
-      case "claude_session":
-        return input.protocols.anthropic ? ["claude-session"] : [];
-      case "cursor_session":
-        return input.protocols.cursor ? ["cursor-session"] : [];
-      default:
-        return assertNever(input.authMode);
-    }
+    return CONNECTION_FAMILY_REGISTRY.readSavedFamilyIds(input);
   }
 
   readSelectableKinds(input: ReadSelectableKindsInput): ConnectionSupportKind[] {
-    switch (input.authMode) {
-      case "api_key":
-        return this.readSelectableApiKeyKinds(input.preset);
-      case "openai_session":
-        return input.preset === "openai" ? ["openai-session"] : [];
-      case "openclaw_openai_session":
-        return [];
-      case "claude_session":
-        return input.preset === "anthropic" ? ["claude-session"] : [];
-      case "cursor_session":
-        return input.preset === "gateway" ? ["cursor-session"] : [];
-      default:
-        return assertNever(input.authMode);
-    }
-  }
-
-  private readSelectableApiKeyKinds(
-    preset: ConnectionPresetFamily,
-  ): ConnectionSupportKind[] {
-    switch (preset) {
-      case "openai":
-      case "azure-openai":
-        return ["openai-api-key"];
-      case "anthropic":
-        return ["anthropic-api-key"];
-      case "gateway":
-        return ["openai-api-key", "anthropic-api-key", "cursor-api-key"];
-      default:
-        return assertNever(preset);
-    }
+    return CONNECTION_FAMILY_REGISTRY.readSelectableFamilyIds(input);
   }
 }
 
 export const CONNECTION_SUPPORT_KINDS = new ConnectionSupportKinds();
-
-function assertNever(value: never): never {
-  throw new Error(`Unhandled connection support input: ${String(value)}`);
-}

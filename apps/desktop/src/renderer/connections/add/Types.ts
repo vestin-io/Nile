@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { Definition } from "../../shared/DesktopData";
 
@@ -12,9 +12,8 @@ export type AddConnectionSubmitInput = {
   apiKeySource?: "direct" | "env_key";
   apiKey?: string;
   envKey?: string;
-  openAiSessionSource?: "login" | "current_codex";
-  openAiAuthJsonPath?: string;
-  claudeSessionSource?: "login" | "current_claude";
+  sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
+  sessionAuthJsonPath?: string;
 };
 
 export type AddConnectionPreparedSaveInput = {

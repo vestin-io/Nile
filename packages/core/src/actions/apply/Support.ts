@@ -1,13 +1,10 @@
 import type { AccessRegistry } from "../../models/access";
 import type { AccessRecord } from "../../models/access";
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 import type { EndpointRegistry } from "../../models/endpoint";
 import type { EndpointRecord } from "../../models/endpoint";
 import type { AgentSelection } from "../../models/selection/Selection";
-import {
-  type AgentProjection,
-  AgentProjectionResolver,
-} from "../../projection";
+import type { AgentProjection, ProjectionInput } from "../../projection/Types";
 import type { CredentialStore } from "../../services/credential/Store";
 import type { StoredCredential } from "../../services/credential/Types";
 import type { NileLogger } from "../../services/NileLogger";
@@ -24,6 +21,7 @@ export type PreparedAgentApplySelection = {
 };
 
 type BuildValidationError = (message: string) => Error;
+type ResolveProjection = (input: ProjectionInput) => AgentProjection;
 
 export class AgentApplySupport {
   constructor(
@@ -35,7 +33,7 @@ export class AgentApplySupport {
     private readonly credentialStore: CredentialStore,
     private readonly logger: NileLogger,
     private readonly buildValidationError: BuildValidationError,
-    private readonly projectionResolver: AgentProjectionResolver = new AgentProjectionResolver(),
+    private readonly resolveProjection: ResolveProjection,
   ) {}
 
   prepare(connectionId: string): PreparedAgentApplySelection {
@@ -46,7 +44,7 @@ export class AgentApplySupport {
     const modelId = this.readModelId(connectionId, access);
     let projection: AgentProjection;
     try {
-      projection = this.projectionResolver.resolve(this.agentId, {
+      projection = this.resolveProjection({
         endpoint,
         access,
         credential,

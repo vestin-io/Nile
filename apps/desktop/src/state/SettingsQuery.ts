@@ -1,7 +1,6 @@
-import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/types";
-import { CODEX_AGENT_ID } from "@nile/core/agents";
+import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
-import type { NileSession } from "@nile/core/runtime-local";
+import type { NileSession } from "@nile/builtins/runtime";
 
 import { DesktopConnectionListPresenter } from "./connection/List";
 import { DesktopConnectionStatusPresenter } from "./connection/Status";
@@ -183,3 +182,5 @@ export class DesktopSettingsStateQuery {
     };
   }
 }
+
+const CODEX_AGENT_ID: AgentId = "codex";

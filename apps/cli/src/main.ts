@@ -1,8 +1,11 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { registerBuiltins } from "@nile/builtins";
 import { defaultAgentHomes } from "@nile/core/models/agent";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+
+registerBuiltins();
 
 import { NileCli } from "./NileCli";
 

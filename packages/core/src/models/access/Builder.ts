@@ -35,20 +35,21 @@ export class AccessRecordBuilder {
     credential?: StoredCredential,
   ): AccessRecord {
     const endpointId = input.endpointId ?? current.endpointId;
+    const authMode = input.authMode ?? current.authMode;
     const endpoint = this.requireEndpoint(endpointId);
     return this.normalizeInput(
       {
         id: current.id,
         endpointId,
         label: input.label ?? current.label,
-        authMode: current.authMode,
+        authMode,
         identityKey: input.identityKey === null ? undefined : input.identityKey ?? current.identityKey,
         enabledAgents: input.enabledAgents ?? current.enabledAgents,
       },
       endpoint,
       current.createdAt,
       credential !== undefined
-        ? this.readCredentialMetadata(current.authMode, credential)
+        ? this.readCredentialMetadata(authMode, credential)
         : this.readExistingCredentialMetadata(current),
     );
   }

@@ -1,6 +1,6 @@
 import type { PreparedAgentApplySelection } from "../actions/apply/Support";
 import { AgentApplySupport } from "../actions/apply/Support";
-import type { AgentId } from "../models/agent/Types";
+import type { AgentId } from "../models/agent/Ids";
 import type { ApplyAgentSelectionResult } from "../models/agent";
 import { MutationHistory } from "../services/history/MutationHistory";
 import type {

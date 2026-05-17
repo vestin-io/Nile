@@ -1,6 +1,6 @@
 import { ArrowDownToLine, Check, LoaderCircle } from "lucide-react";
 
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { Translator } from "../shared/I18n";
 import { Button } from "../ui/button";

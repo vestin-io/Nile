@@ -27,58 +27,65 @@ If case `2` applies, read [add-connection-family.md](./add-connection-family.md)
 
 ## Fast Path
 
-Generate the minimal agent skeleton:
+Create the agent package directly under:
+- `packages/agents/<agent-id>/src`
 
-```bash
-npm run scaffold:agent -- --id gemini --label Gemini --dry-run
-```
-
-Then run it without `--dry-run` when the shape looks right.
-
-The scaffold intentionally creates only the minimum files:
+Start with the minimum file set:
 - `types.ts`
 - `index.ts`
 - `<Agent>AgentAdapter.ts`
+- `Manifest.ts`
+- `RuntimeFactory.ts`
+- `Module.ts`
+- `Projection.ts`
 - `live-setup/Detector.ts`
 - `import/ImportCurrentConnection.ts`
 - `apply/ApplySelection.ts`
 - `rollback/RollbackLatestMutation.ts`
 
-It does not auto-register the agent. Registration stays explicit.
+Registration stays explicit and goes through the shared registries.
 
 ## Required Changes
 
-### 1. Register the Agent Identity
+### 1. Declare The Agent Package Surface
 
-Update:
-- [packages/core/src/models/agent/Types.ts](../../packages/core/src/models/agent/Types.ts)
+The agent package should own:
+- `Manifest.ts`
+- `RuntimeFactory.ts`
+- `Projection.ts`
+- `Module.ts`
+- `CurrentSessionSource.ts` if the agent has a current local session source
+- `LoginSource.ts` if the agent supports interactive login
+- `ModelCatalogSource.ts` if the agent contributes a local model catalog source
 
-Add:
-- the new `AgentId`
-- the display label
-
-Then update:
-- [packages/core/src/models/agent/Capabilities.ts](../../packages/core/src/models/agent/Capabilities.ts)
-
-Every supported agent must have an explicit capability entry.
+The shared core layer should only aggregate these declared package-owned surfaces.
 
 ### 2. Add the Core Adapter
 
-Wire the new agent under:
-- `packages/core/src/agents/<agent-id>/...`
+Implement the agent under:
+- `packages/agents/<agent-id>/src/...`
 
 Export it from:
-- [packages/core/src/agents/index.ts](../../packages/core/src/agents/index.ts)
+- the agent package root `src/index.ts` with a narrow public surface
+
+Expose narrow subpaths from the agent package:
+- `./manifest`
+- `./runtime-factory`
+- `./module`
+- `./projection`
+- `./current-session-source` if applicable
+- `./login-source` if applicable
+- `./model-catalog-source` if applicable
 
 Register it in:
-- [packages/core/src/runtime-local/BuiltInAdapters.ts](../../packages/core/src/runtime-local/BuiltInAdapters.ts)
+- [packages/core/src/models/agent/module/Registry.ts](../../packages/core/src/models/agent/module/Registry.ts)
 
 Do not add ad hoc runtime branching elsewhere.
 
 ### 3. Implement Live Setup Detection
 
 Add the live-setup detector and related readers/stores under:
-- `packages/core/src/agents/<agent-id>/live-setup`
+- `packages/agents/<agent-id>/src/live-setup`
 
 The detector should produce one consistent `DetectedAgentState` with:
 - `validity`
@@ -108,7 +115,8 @@ Do not hide switching. Applying a connection must stay explicit.
 ### 5. Register Shared Connection Compatibility
 
 If the agent can consume existing connection families, update:
-- [packages/core/src/models/agent/Capabilities.ts](../../packages/core/src/models/agent/Capabilities.ts)
+- the agent package `Manifest.ts`
+- [packages/core/src/models/connection/family/Registry.ts](../../packages/core/src/models/connection/family/Registry.ts) only if a new family is needed
 - [packages/core/src/models/connection/Support.ts](../../packages/core/src/models/connection/Support.ts) only if a new support kind is needed
 
 Compatibility must continue to flow through:
@@ -154,6 +162,7 @@ Prefer shared helpers:
 - `ConnectionModels`
 - `DesktopData`
 - reconciliation-driven local setup presenters
+- `connectionEntryMode` from the agent manifest instead of UI heuristics
 
 ### 9. Keep Browser-Safe Boundaries Clean
 
@@ -181,6 +190,7 @@ Also add focused tests for:
 - apply
 - rollback
 - any new requirement kind
+- package surface / registry wiring if the agent adds new subpaths
 
 ## Common Mistakes
 

@@ -2,12 +2,10 @@ import type { AccessRecord, AccessRegistry, AuthMode } from "../access";
 import type { AgentId } from "../agent";
 import type { EndpointRecord, EndpointRegistry, EndpointRegistryInput } from "../endpoint";
 import { EndpointShape } from "../endpoint";
-import {
-  isEnvKeyApiKeyCredential,
-  sameApiKeyCredential,
-  type StoredCredential,
-} from "../../services/credential/Types";
+import type { StoredCredential } from "../../services/credential/Types";
+import { ConnectionAccessMatchSupport } from "./AccessMatch";
 import { ConnectionNaming } from "./Naming";
+import { OpenAiSessionCompatibility } from "./OpenAiSessionCompatibility";
 
 export type ConnectionUpsertInput = {
   endpoint: EndpointRegistryInput;
@@ -31,10 +29,14 @@ export type ConnectionUpsertResult = {
 };
 
 export class ConnectionUpsert {
+  private readonly accessMatch: ConnectionAccessMatchSupport;
+
   constructor(
     private readonly endpointRegistry: EndpointRegistry,
     private readonly accessRegistry: AccessRegistry,
-  ) {}
+  ) {
+    this.accessMatch = new ConnectionAccessMatchSupport(accessRegistry, endpointRegistry);
+  }
 
   upsert(input: ConnectionUpsertInput): ConnectionUpsertResult {
     const ensuredEndpoint = this.ensureEndpoint(input.endpoint);
@@ -104,12 +106,20 @@ export class ConnectionUpsert {
       const enabledAgents = input.enabledAgentsMode === "merge"
         ? [...new Set([...existing.enabledAgents, ...input.enabledAgents])]
         : input.enabledAgents;
+      const authMode = OpenAiSessionCompatibility.readCanonicalAuthMode(existing.authMode, input.authMode);
+      const credential = OpenAiSessionCompatibility.shouldPreserveStoredCredential(
+        existing.authMode,
+        input.credential,
+      )
+        ? undefined
+        : input.credential;
       return {
         record: this.accessRegistry.update(existing.id, {
           label: input.label,
+          authMode,
           identityKey: input.identityKey ?? null,
           enabledAgents,
-        }, input.credential),
+        }, credential),
         reused: true,
       };
     }
@@ -131,114 +141,37 @@ export class ConnectionUpsert {
     endpointId: string,
     input: ConnectionUpsertInput["access"],
   ): AccessRecord | null {
-    return this.accessRegistry
+    const candidates = this.accessRegistry
       .list()
-      .filter((access) => access.endpointId === endpointId && access.authMode === input.authMode)
-      .find((access) => this.matchesAccess(access, input)) ?? null;
+      .filter((access) => access.endpointId === endpointId)
+      .filter((access) => OpenAiSessionCompatibility.matches(access.authMode, input.authMode))
+      .filter((access) => this.matchesAccess(access, input));
+    if (candidates.length === 0) {
+      return null;
+    }
+    if (candidates.length === 1) {
+      return candidates[0];
+    }
+    const preferredAuthMode = OpenAiSessionCompatibility.readPreferredSavedAuthMode(
+      candidates.map((access) => access.authMode),
+    );
+    if (preferredAuthMode) {
+      return candidates.find((access) => access.authMode === preferredAuthMode) ?? candidates[0];
+    }
+    return candidates[0];
   }
 
   private matchesAccess(
     access: AccessRecord,
     input: ConnectionUpsertInput["access"],
   ): boolean {
-    if (input.credential.kind === "api_key") {
-      return this.matchesApiKeyAccess(access, input);
-    }
-
-    if (input.credential.kind === "openai_session" && input.authMode === "openai_session") {
-      return this.matchesOpenAiSessionAccess(access, input.credential, input.identityKey ?? null);
-    }
-
-    if (input.credential.kind === "openclaw_openai_session" && input.authMode === "openclaw_openai_session") {
-      return this.matchesOpenClawOpenAiSessionAccess(access, input.credential, input.identityKey ?? null);
-    }
-
-    const identityKey = input.identityKey?.trim();
-    return Boolean(identityKey && access.identityKey === identityKey);
-  }
-
-  private matchesApiKeyAccess(
-    access: AccessRecord,
-    input: ConnectionUpsertInput["access"],
-  ): boolean {
-    try {
-      const stored = this.accessRegistry.readCredential(access.id);
-      if (stored.kind !== "api_key") {
-        return false;
-      }
-      if (sameApiKeyCredential(stored, input.credential as Extract<StoredCredential, { kind: "api_key" }>)) {
-        return true;
-      }
-      return Boolean(
-        input.apiKeyEnvKeyFallback
-          && isEnvKeyApiKeyCredential(stored)
-          && stored.envKey === input.apiKeyEnvKeyFallback,
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  private matchesOpenAiSessionAccess(
-    access: AccessRecord,
-    credential: Extract<StoredCredential, { kind: "openai_session" }>,
-    identityKey: string | null,
-  ): boolean {
-    if (identityKey && access.identityKey === identityKey) {
-      return true;
-    }
-
-    try {
-      const stored = this.accessRegistry.readCredential(access.id);
-      if (stored.kind !== "openai_session") {
-        return false;
-      }
-
-      if (credential.accountId?.trim() && stored.accountId?.trim()) {
-        return credential.accountId.trim() === stored.accountId.trim();
-      }
-
-      if (credential.refreshToken && stored.refreshToken) {
-        return credential.refreshToken === stored.refreshToken;
-      }
-
-      return credential.idToken === stored.idToken;
-    } catch {
-      return false;
-    }
-  }
-
-  private matchesOpenClawOpenAiSessionAccess(
-    access: AccessRecord,
-    credential: Extract<StoredCredential, { kind: "openclaw_openai_session" }>,
-    identityKey: string | null,
-  ): boolean {
-    if (identityKey && access.identityKey === identityKey) {
-      return true;
-    }
-
-    try {
-      const stored = this.accessRegistry.readCredential(access.id);
-      if (stored.kind !== "openclaw_openai_session") {
-        return false;
-      }
-
-      if (credential.accountId?.trim() && stored.accountId?.trim()) {
-        return credential.accountId.trim() === stored.accountId.trim();
-      }
-
-      if (credential.refreshToken && stored.refreshToken) {
-        return credential.refreshToken === stored.refreshToken;
-      }
-
-      return Boolean(
-        credential.email?.trim()
-          && stored.email?.trim()
-          && credential.email.trim().toLowerCase() === stored.email.trim().toLowerCase(),
-      );
-    } catch {
-      return false;
-    }
+    return this.accessMatch.matches(
+      access,
+      input.authMode,
+      input.credential,
+      input.identityKey ?? null,
+      input.apiKeyEnvKeyFallback,
+    );
   }
 
   private resolveAccessId(requestedId: string | undefined, label: string): string {

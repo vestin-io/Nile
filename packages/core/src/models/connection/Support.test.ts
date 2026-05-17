@@ -45,5 +45,10 @@ describe("ConnectionSupportKinds", () => {
       preset: "openai",
       authMode: "openai_session",
     })).toEqual(["openai-session"]);
+
+    expect(CONNECTION_SUPPORT_KINDS.readSelectableKinds({
+      preset: "cursor",
+      authMode: "cursor_session",
+    })).toEqual(["cursor-session"]);
   });
 });

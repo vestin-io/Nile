@@ -1,10 +1,8 @@
 import { Usage } from "../../actions/usage/Usage";
-import { CursorUsageBinder, CursorUsageBindingRegistry, CursorUsageSnapshotStore } from "../../actions/usage/cursor";
-import { CursorUsageAutoBinder } from "./CursorUsageAutoBinder";
-import type { CursorUsageSessionProbe } from "./CursorUsageSessionProbe";
 import { AccessRegistry } from "../../models/access";
 import { AgentConnectionSettings } from "../../models/agent-settings";
-import { ConnectionCreator } from "../../models/connection/Creator";
+import { AGENT_MODULE_REGISTRY } from "../../models/agent/module/Registry";
+import { CONNECTION_RUNTIME_REGISTRY, type ConnectionCreatorContract } from "../../models/connection/Runtime";
 import { SavedConnections } from "../../models/connection/SavedConnections";
 import { EndpointRegistry } from "../../models/endpoint";
 import { AgentSelection } from "../../models/selection/Selection";
@@ -14,10 +12,10 @@ import {
   type CredentialSourceFactory,
 } from "../../services/credential/Factory";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
+import type { LocalConnectionSupport } from "../../runtime-local/LocalConnectionSupport";
 
 export class LocalWorkspaceState {
-  private cursorUsageBindingRegistry: CursorUsageBindingRegistry | null = null;
-  private cursorUsageSnapshotStore: CursorUsageSnapshotStore | null = null;
+  private localConnectionSupports: readonly LocalConnectionSupport[] | null = null;
 
   static open(
     databasePath: string,
@@ -66,36 +64,18 @@ export class LocalWorkspaceState {
     );
   }
 
-  createConnectionCreator(): ConnectionCreator {
-    return new ConnectionCreator(
-      this.endpointRegistry,
-      this.accessRegistry,
-    );
+  createConnectionCreator(): ConnectionCreatorContract {
+    return CONNECTION_RUNTIME_REGISTRY.read().createCreator({
+      endpointRegistry: this.endpointRegistry,
+      accessRegistry: this.accessRegistry,
+    });
   }
 
   createUsage(): Usage {
     return new Usage(
       this.endpointRegistry,
       this.accessRegistry,
-      this.getCursorUsageBindingRegistry(),
-      this.getCursorUsageSnapshotStore(),
-    );
-  }
-
-  createCursorUsageBinder(): CursorUsageBinder {
-    return new CursorUsageBinder(
-      this.endpointRegistry,
-      this.accessRegistry,
-      this.getCursorUsageBindingRegistry(),
-    );
-  }
-
-  createCursorUsageAutoBinder(sessionProbe?: CursorUsageSessionProbe): CursorUsageAutoBinder {
-    return new CursorUsageAutoBinder(
-      this.endpointRegistry,
-      this.accessRegistry,
-      this.getCursorUsageBindingRegistry(),
-      sessionProbe,
+      this.getLocalConnectionSupports().flatMap((support) => [...support.createUsageReaders()]),
     );
   }
 
@@ -107,20 +87,26 @@ export class LocalWorkspaceState {
     return this.accessRegistry;
   }
 
-  clearCursorUsageArtifacts(connectionId: string): void {
-    this.getCursorUsageBindingRegistry().clear(connectionId);
-    this.getCursorUsageSnapshotStore().remove(connectionId);
+  clearConnectionArtifacts(connectionId: string): void {
+    for (const support of this.getLocalConnectionSupports()) {
+      support.clearArtifacts(connectionId);
+    }
   }
 
-  private getCursorUsageBindingRegistry(): CursorUsageBindingRegistry {
-    return (this.cursorUsageBindingRegistry ??= CursorUsageBindingRegistry.fromDatabase(
-      this.database,
-      this.credentialStore,
-    ));
-  }
+  private getLocalConnectionSupports(): readonly LocalConnectionSupport[] {
+    if (this.localConnectionSupports !== null) {
+      return this.localConnectionSupports;
+    }
 
-  private getCursorUsageSnapshotStore(): CursorUsageSnapshotStore {
-    return (this.cursorUsageSnapshotStore ??= CursorUsageSnapshotStore.fromDatabase(this.database));
+    this.localConnectionSupports = AGENT_MODULE_REGISTRY.list()
+      .flatMap((module) => module.localConnectionSupportFactory ? [module.localConnectionSupportFactory] : [])
+      .map((factory) => factory.create(
+        this.database,
+        this.credentialStore,
+        this.endpointRegistry,
+        this.accessRegistry,
+      ));
+    return this.localConnectionSupports;
   }
 
   close(): void {

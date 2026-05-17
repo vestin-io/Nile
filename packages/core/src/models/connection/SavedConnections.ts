@@ -4,7 +4,7 @@ import {
   type StoredCredential,
 } from "../../services/credential/Types";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
-import type { AgentId } from "../agent/Types";
+import type { AgentId } from "../agent/Definitions";
 import { AgentConnectionSettings, type AgentConnectionSettings as AgentConnectionSettingsStore } from "../agent-settings";
 import type { AccessRegistry, AuthMode } from "../access";
 import type { AccessRecord } from "../access";
@@ -14,8 +14,8 @@ import type { EndpointRecord } from "../endpoint";
 import { EndpointRegistry as OpenEndpointRegistry } from "../endpoint";
 import { EndpointShape } from "../endpoint";
 import { AgentSelection } from "../selection/Selection";
+import { CONNECTION_RUNTIME_REGISTRY, type UpdateConnectionInput } from "./Runtime";
 import { SHARED_CONNECTION_AGENT_POLICY } from "./AgentPolicy";
-import { ConnectionUpdater, type UpdateConnectionInput } from "./Updater";
 
 export type SavedConnectionSummary = {
   id: string;
@@ -91,12 +91,12 @@ export class SavedConnections {
   }
 
   async update(input: UpdateConnectionInput): Promise<SavedConnectionSummary> {
-    const updater = new ConnectionUpdater(
-      this.database,
-      this.endpointRegistry,
-      this.accessRegistry,
-      this.agentSelection,
-    );
+    const updater = CONNECTION_RUNTIME_REGISTRY.read().createUpdater({
+      database: this.database,
+      endpointRegistry: this.endpointRegistry,
+      accessRegistry: this.accessRegistry,
+      agentSelection: this.agentSelection,
+    });
     const updated = await updater.update(input);
     const endpoint = this.endpointRegistry.get(updated.endpointId);
     const selectedByAgents = this.agentSelection

@@ -55,6 +55,16 @@ export type CursorSessionCredential = {
   userId?: number;
 };
 
+export type GeminiCliSessionCredential = {
+  kind: "gemini_cli_session";
+  accessToken: string;
+  refreshToken: string;
+  idToken: string;
+  expiryDate?: number;
+  tokenType?: string;
+  scope?: string;
+};
+
 export type CursorWebSessionCredential = {
   kind: "cursor_web_session";
   sessionToken: string;
@@ -66,6 +76,7 @@ export type StoredCredential =
   | OpenAiSessionCredential
   | OpenClawOpenAiSessionCredential
   | CursorSessionCredential
+  | GeminiCliSessionCredential
   | CursorWebSessionCredential;
 
 export function isDirectApiKeyCredential(

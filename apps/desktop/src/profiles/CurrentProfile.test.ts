@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { WorkspaceProfile } from "../electron/profiles/Store";
 import type { DesktopAdvancedState, DesktopAgentState } from "../state/Types";

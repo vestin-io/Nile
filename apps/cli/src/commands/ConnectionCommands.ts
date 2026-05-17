@@ -1,6 +1,6 @@
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { AgentId } from "@nile/core/models/agent";
-import type { RemoveConnectionResult } from "@nile/core/application/local";
+import type { RemoveConnectionResult } from "@nile/builtins/local";
 import type {
   ImportDetectedSetupsInput,
   ImportDetectedSetupsResult,
@@ -8,7 +8,11 @@ import type {
 } from "@nile/core/actions/local-setup";
 import type { CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
-import { CodexSessionLogin } from "@nile/core/agents";
+import type { InteractiveSessionLoginRegistry } from "@nile/builtins/session";
+import {
+  runWithCursorUsageWorkspace,
+  type ConnectionChangeResult,
+} from "@nile/builtins/cursor-usage";
 import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 
 import { ConnectionCredentialResolver } from "./CredentialResolver";
@@ -20,19 +24,21 @@ import type {
   AddConnectionResult,
   ResolvedCliOptions,
 } from "../types";
-import { formatAgentLabel } from "@nile/core/models/agent/types";
+import { formatAgentLabel } from "@nile/core/models/agent/definitions";
+import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
 
 export class ConnectionCommands {
   private readonly addFlow: ConnectionAddFlow;
   private readonly sessions: SessionRunner;
+  private readonly cursorUsageSessionProbe = CursorUsageSessionSourceProbe.createDefault();
 
   constructor(
-    credentialStore: CredentialStore,
+    private readonly credentialStore: CredentialStore,
     prompt: InteractivePrompt,
-    loginRunner: CodexSessionLogin,
+    interactiveSessionLoginRegistry: Pick<InteractiveSessionLoginRegistry, "signInAndRead">,
     private readonly logger: NileLogger,
   ) {
-    const credentialResolver = new ConnectionCredentialResolver(prompt, loginRunner);
+    const credentialResolver = new ConnectionCredentialResolver(prompt, interactiveSessionLoginRegistry);
     const onboardingPrompts = new ConnectionOnboardingPrompts(prompt, credentialResolver);
     this.addFlow = new ConnectionAddFlow({
       credentialResolver,
@@ -43,7 +49,7 @@ export class ConnectionCommands {
       onboardingPrompts,
       prompt,
     });
-    this.sessions = new SessionRunner(credentialStore, logger, CursorUsageSessionSourceProbe.createDefault());
+    this.sessions = new SessionRunner(this.credentialStore, logger);
   }
 
   listConnections(options: ResolvedCliOptions): SavedConnectionSummary[] {
@@ -75,10 +81,11 @@ export class ConnectionCommands {
     const input = await this.addFlow.resolveInput(options, flags);
     return await this.sessions.runAsync(options, "create-connection", async (session) => {
       const { selectedModelId, ...createInput } = input;
-      const created = await session.createConnectionWithLocalEffects(createInput);
-      if (selectedModelId) {
-        session.setAgentConnectionModel("openclaw", created.id, selectedModelId);
-      }
+      const created = this.applyCursorUsageFollowUp(
+        options,
+        await session.createConnection(createInput),
+      );
+      this.applySelectedModelId(session, created.id, createInput.enabledAgents, selectedModelId);
       return this.buildAddConnectionResult(created);
     });
   }
@@ -87,17 +94,21 @@ export class ConnectionCommands {
     const input = await this.addFlow.resolveInput(options, new Map());
     return await this.sessions.runAsync(options, "create-connection", async (session) => {
       const { selectedModelId, ...createInput } = input;
-      const created = await session.createConnectionWithLocalEffects(createInput);
-      if (selectedModelId) {
-        session.setAgentConnectionModel("openclaw", created.id, selectedModelId);
-      }
+      const created = this.applyCursorUsageFollowUp(
+        options,
+        await session.createConnection(createInput),
+      );
+      this.applySelectedModelId(session, created.id, createInput.enabledAgents, selectedModelId);
       return this.buildAddConnectionResult(created);
     });
   }
 
   async importCurrentConnection(options: ResolvedCliOptions, agentId: AgentId): Promise<AddConnectionResult> {
     return await this.sessions.runAsync(options, `${agentId}-import-current-connection`, async (session) => {
-      const imported = await session.importCurrentConnectionWithLocalEffects(agentId);
+      const imported = this.applyCursorUsageFollowUp(
+        options,
+        await session.importCurrentConnection(agentId),
+      );
       return this.buildAddConnectionResult(imported);
     });
   }
@@ -141,5 +152,35 @@ export class ConnectionCommands {
       authMode: input.authMode,
       ...(input.reused ? { reused: true } : {}),
     };
+  }
+
+  private applyCursorUsageFollowUp<T extends ConnectionChangeResult>(
+    options: ResolvedCliOptions,
+    result: T,
+  ): T {
+    return runWithCursorUsageWorkspace({
+      databasePath: options.databasePath,
+      credentialStore: this.credentialStore,
+      sessionProbe: this.cursorUsageSessionProbe,
+      logger: this.logger,
+    }, (workspace) => workspace.applyFollowUp(result));
+  }
+
+  private applySelectedModelId(
+    session: { setAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string): void },
+    connectionId: string,
+    enabledAgents: AgentId[] | undefined,
+    selectedModelId: string | undefined,
+  ): void {
+    if (!selectedModelId?.trim() || !enabledAgents?.length) {
+      return;
+    }
+
+    for (const agentId of enabledAgents) {
+      if (!AGENT_CAPABILITIES.read(agentId).requiredApplyRequirements.includes("selected-model")) {
+        continue;
+      }
+      session.setAgentConnectionModel(agentId, connectionId, selectedModelId);
+    }
   }
 }

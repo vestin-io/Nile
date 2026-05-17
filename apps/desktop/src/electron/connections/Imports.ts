@@ -1,6 +1,6 @@
 import type { AgentId, ImportCurrentConnectionResult } from "@nile/core/models/agent";
 import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
-import { NileSession } from "@nile/core/runtime-local";
+import { NileSession } from "@nile/builtins/runtime";
 import type { MatchedImportStateSnapshot } from "@nile/core/runtime-local/import-state";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
@@ -15,7 +15,7 @@ export class DesktopManagedConnectionImports {
     agentId: AgentId,
   ): Promise<ImportCurrentConnectionResult | SavedConnectionSummary> {
     const snapshot = this.captureMatchedImportState(session, agentId);
-    const imported = await session.importCurrentConnectionWithLocalEffects(agentId);
+    const imported = await session.importCurrentConnection(agentId);
     try {
       return await this.ensureManagedConnection(session, imported);
     } catch (error) {

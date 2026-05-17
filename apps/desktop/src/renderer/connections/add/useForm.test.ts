@@ -43,9 +43,11 @@ describe("buildConnectionMethods", () => {
     const methods = buildConnectionMethods({
       preset: "openai",
       label: "Official OpenAI",
+      iconKey: "openai",
       supportedAuthModes: ["openai_session"],
       requiresEndpointUrl: false,
       configurableAgents: ["codex", "openclaw"],
+      selectableAgents: ["codex", "openclaw"],
       defaultEnabledAgents: ["codex"],
       supportsEnvKey: false,
       suggestEnabledAgents: false,
@@ -55,5 +57,22 @@ describe("buildConnectionMethods", () => {
       "openai_session:current_codex",
       "openai_session:login",
     ]);
+  });
+
+  it("offers Gemini as a sign-in-only add flow", () => {
+    const methods = buildConnectionMethods({
+      preset: "gemini",
+      label: "Gemini CLI",
+      iconKey: "gemini",
+      supportedAuthModes: ["gemini_cli_session"],
+      requiresEndpointUrl: false,
+      configurableAgents: ["gemini"],
+      selectableAgents: ["gemini"],
+      defaultEnabledAgents: ["gemini"],
+      supportsEnvKey: false,
+      suggestEnabledAgents: false,
+    }, (key) => key);
+
+    expect(methods.map((method) => method.key)).toEqual(["gemini_cli_session:login"]);
   });
 });

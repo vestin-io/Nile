@@ -36,12 +36,24 @@ describe("LocalCredentialRequestBuilder", () => {
 
     expect(builder.build({
       authMode: "openai_session",
-      openAiSessionSource: "current_codex",
-      openAiAuthJsonPath: "/tmp/auth.json",
+      sessionSource: "current_codex",
+      sessionAuthJsonPath: "/tmp/auth.json",
     })).toEqual({
       authMode: "openai_session",
       source: "current_codex",
       authJsonPath: "/tmp/auth.json",
+    });
+  });
+
+  it("builds Gemini CLI session requests", () => {
+    const builder = new LocalCredentialRequestBuilder();
+
+    expect(builder.build({
+      authMode: "gemini_cli_session",
+      sessionSource: "current_gemini",
+    })).toEqual({
+      authMode: "gemini_cli_session",
+      source: "current_gemini",
     });
   });
 
@@ -53,10 +65,17 @@ describe("LocalCredentialRequestBuilder", () => {
     })).toBeUndefined();
 
     expect(builder.buildUpdate("claude_session", {
-      claudeSessionSource: "current_claude",
+      sessionSource: "current_claude",
     })).toEqual({
       authMode: "claude_session",
       source: "current_claude",
+    });
+
+    expect(builder.buildUpdate("gemini_cli_session", {
+      sessionSource: "current_gemini",
+    })).toEqual({
+      authMode: "gemini_cli_session",
+      source: "current_gemini",
     });
   });
 });

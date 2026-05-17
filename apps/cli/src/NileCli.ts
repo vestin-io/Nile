@@ -3,7 +3,7 @@ import {
   KeychainCredentialStore,
 } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
-import { CodexSessionLogin } from "@nile/core/agents";
+import { INTERACTIVE_SESSION_LOGIN_REGISTRY } from "@nile/builtins/session";
 
 import { NILE_WELCOME_BODY, NILE_WORDMARK } from "./Branding";
 import { AgentCommands } from "./commands/AgentCommands";
@@ -19,6 +19,8 @@ import { ResetPresenter } from "./presenters/ResetPresenter";
 import { StatusPresenter } from "./presenters/StatusPresenter";
 import { InteractivePrompt } from "./InteractivePrompt";
 import type { CliOptions, CommandResult, ResolvedCliOptions } from "./types";
+import { AgentCommandExtensionRegistry } from "./commands/agent/Registry";
+import { CursorUsageCommandExtension } from "./commands/agent/CursorUsage";
 
 export class NileCli {
   private readonly logger: NileLogger;
@@ -34,7 +36,8 @@ export class NileCli {
   ) {
     this.logger = options.logger ?? NileLogger.createDefault({ module: "cli" });
     const prompt = options.prompt ?? new InteractivePrompt();
-    const loginRunner = options.loginRunner ?? new CodexSessionLogin();
+    const interactiveSessionLoginRegistry =
+      options.interactiveSessionLoginRegistry ?? INTERACTIVE_SESSION_LOGIN_REGISTRY;
 
     this.prompt = prompt;
     this.parser = new ArgumentParser(options);
@@ -42,7 +45,7 @@ export class NileCli {
     const connectionCommands = new ConnectionCommands(
       credentialStore,
       prompt,
-      loginRunner,
+      interactiveSessionLoginRegistry,
       this.logger,
     );
     const resetCommands = new ResetCommands(prompt, this.logger);
@@ -50,6 +53,14 @@ export class NileCli {
     const connectionPresenter = new ConnectionPresenter();
     const resetPresenter = new ResetPresenter();
     const statusPresenter = new StatusPresenter();
+    const agentCommandExtensions = new AgentCommandExtensionRegistry([
+      new CursorUsageCommandExtension(usageCommands, connectionPresenter, this.resultFactory),
+    ]);
+    this.parser = new ArgumentParser(
+      options,
+      agentCommandExtensions.listHelpLines(),
+      agentCommandExtensions.listKnownFlags(),
+    );
     this.interactiveMenu = new InteractiveMenu(
       this.prompt,
       agentCommands,
@@ -69,6 +80,7 @@ export class NileCli {
       resultFactory: this.resultFactory,
       statusPresenter,
       usageCommands,
+      agentCommandExtensions,
     });
   }
 

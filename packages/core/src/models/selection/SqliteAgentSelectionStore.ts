@@ -1,6 +1,6 @@
 import { SchemaMigrations, SqliteDatabase } from "../../services/database";
 import { type AgentSelectionRecord } from "./Types";
-import type { AgentId } from "../agent/Types";
+import type { AgentId } from "../agent/Definitions";
 
 type AgentSelectionRow = {
   agent_id: string;

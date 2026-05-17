@@ -12,7 +12,6 @@
     "@nile/core": "file:../core"
   },
   "scripts": {
-    "prebuild": "npm --prefix ../.. run build:core",
     "build": "node ./build.mjs && tsc -p ./tsconfig.build.json"
   },
   "exports": {

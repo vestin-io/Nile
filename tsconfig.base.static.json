@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@nile/builtins": ["packages/builtins/src/index.ts"],
+      "@nile/core": ["packages/core/src/index.ts"],
+      "@nile/core/actions/apply": ["packages/core/src/actions/apply/index.ts"],
+      "@nile/core/actions/local-setup/reconciliation": ["packages/core/src/actions/local-setup/Reconciliation.ts"],
+      "@nile/core/application/local/model-catalog-source": ["packages/core/src/application/local/ModelCatalogSource.ts"],
+      "@nile/core/models/agent/capabilities": ["packages/core/src/models/agent/registry/Capabilities.ts"],
+      "@nile/core/models/agent/homes": ["packages/core/src/models/agent/Homes.ts"],
+      "@nile/core/models/agent/ids": ["packages/core/src/models/agent/Ids.ts"],
+      "@nile/core/models/agent/module": ["packages/core/src/models/agent/module/index.ts"],
+      "@nile/core/models/agent/registry": ["packages/core/src/models/agent/registry/index.ts"],
+      "@nile/core/models/agent/definitions": ["packages/core/src/models/agent/Definitions.ts"],
+      "@nile/core/models/connection/enabled-agents-policy": ["packages/core/src/models/connection/EnabledAgentsPolicy.ts"],
+      "@nile/core/models/connection/requirements": ["packages/core/src/models/connection/Requirements.ts"],
+      "@nile/core/runtime-local/import-state": ["packages/core/src/runtime-local/ImportState.ts"],
+      "@nile/core/*": ["packages/core/src/*"]
+    }
+  }
+}

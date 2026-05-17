@@ -1,7 +1,7 @@
 {
   "name": "@nile/desktop",
   "productName": "Nile",
-  "version": "0.16.2",
+  "version": "0.16.3",
   "private": true,
   "description": "Nile desktop app",
   "author": "Nile contributors",
@@ -17,10 +17,10 @@
     "update-electron-app": "^3.2.0"
   },
   "scripts": {
-    "prebuild": "npm --prefix ../.. run build:host-local",
-    "prebuild:release": "npm --prefix ../.. run build:host-local",
-    "predev": "npm --prefix ../.. run build:host-local",
-    "prestart": "npm --prefix ../.. run build:host-local",
+    "prebuild": "npm --prefix ../.. run build -w @nile/builtins && npm --prefix ../.. run build:host-local",
+    "prebuild:release": "npm --prefix ../.. run build -w @nile/builtins && npm --prefix ../.. run build:host-local",
+    "predev": "npm --prefix ../.. run build -w @nile/builtins && npm --prefix ../.. run build:host-local",
+    "prestart": "npm --prefix ../.. run build -w @nile/builtins && npm --prefix ../.. run build:host-local",
     "build": "node --import tsx ./build.ts",
     "build:release": "NILE_BUILD_RELEASE=1 node --import tsx ./build.ts",
     "clean:release": "node --import tsx ./clean-release.ts",
@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@lobehub/icons-static-svg": "^1.88.0",
+    "@nile/builtins": "file:../../packages/builtins",
     "@nile/core": "file:../../packages/core",
     "@nile/host-local": "file:../../packages/host-local",
     "@radix-ui/react-checkbox": "^1.3.3",

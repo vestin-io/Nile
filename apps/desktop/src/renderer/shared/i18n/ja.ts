@@ -147,7 +147,7 @@ export const JA_MESSAGES: Messages = {
     "addConnection.signInWithClaudeDescription": "Claude のサインインフローを開始し、新しいセッションを Nile に保存します。",
     "addConnection.completeSessionStep": "先にサインインを完了",
     "addConnection.completeSessionStepDescription": "まずサインインを完了してください。その後、ラベルと機能を確認して接続を保存できます。",
-    "addConnection.sessionReadyTitle": "OpenAI の認証が完了しました",
+    "addConnection.sessionReadyTitle": "認証が完了しました",
     "addConnection.sessionReadyDescription": "認証は完了しています。接続ラベルと機能を確認したら、「接続を保存」をクリックしてこの接続を Nile に追加してください。",
     "addConnection.sessionReadyAction": "次へ: {action}",
     "addConnection.useApiKey": "API キーを使用",

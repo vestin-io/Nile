@@ -1,14 +1,18 @@
-import type { DesktopAgentState } from "../../../state/Types";
+import type { DesktopAgentState, DesktopOnboardingItem } from "../../../state/Types";
 import type { Translator } from "../../shared/I18n";
 import { ConnectionsToolbar } from "../../connections/ConnectionsToolbar";
 import { Alert, AlertDescription } from "../../ui/alert";
+import { Button } from "../../ui/button";
 import { AgentConnectionModelDialog } from "./ModelEditor";
 import { AgentConnectionsList } from "./ConnectionsList";
 import { useAgentConnectionSwitchFlow } from "../useConnectionSwitchFlow";
 
 type AgentConnectionsSectionProps = {
   agent: DesktopAgentState;
+  canConfigure: boolean;
+  detectedSetup: DesktopOnboardingItem | null;
   t: Translator;
+  onImport(agentId: DesktopAgentState["agentId"]): Promise<void>;
   onOpenAddPage(agentId: DesktopAgentState["agentId"]): void;
   onOpenConnection(connectionId: string): void;
   onRefresh(): Promise<void>;
@@ -18,7 +22,10 @@ type AgentConnectionsSectionProps = {
 
 export function AgentConnectionsSection({
   agent,
+  canConfigure,
+  detectedSetup,
   t,
+  onImport,
   onOpenAddPage,
   onOpenConnection,
   onRefresh,
@@ -38,10 +45,18 @@ export function AgentConnectionsSection({
     <div className="space-y-4">
       <ConnectionsToolbar
         t={t}
+        showAddButton={canConfigure}
         showSearchAndFilter={false}
         onOpenAddPage={() => onOpenAddPage(agent.agentId)}
         onRefresh={onRefresh}
       />
+      {detectedSetup?.importable ? (
+        <div className="flex justify-start">
+          <Button size="sm" onClick={() => void onImport(agent.agentId)}>
+            {t("agents.importCurrentSetup")}
+          </Button>
+        </div>
+      ) : null}
       <AgentConnectionModelDialog
         agentId={agent.agentId}
         agentLabel={agent.agentLabel}
@@ -62,9 +77,11 @@ export function AgentConnectionsSection({
         onSubmit={flow.saveModel}
       />
       {agent.connections.length === 0 ? (
-        <Alert>
-          <AlertDescription>{t("agents.emptyConnections", { agent: agent.agentLabel })}</AlertDescription>
-        </Alert>
+        <div className="space-y-3">
+          <Alert>
+            <AlertDescription>{t("agents.emptyConnections", { agent: agent.agentLabel })}</AlertDescription>
+          </Alert>
+        </div>
       ) : (
         <AgentConnectionsList
           agent={agent}

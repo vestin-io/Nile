@@ -14,6 +14,7 @@ export type AccessRegistryInput = {
 export type AccessRegistryUpdate = {
   endpointId?: string;
   label?: string;
+  authMode?: AuthMode;
   identityKey?: string | null;
   enabledAgents?: AgentId[];
 };

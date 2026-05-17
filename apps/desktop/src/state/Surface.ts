@@ -3,7 +3,7 @@ import {
   resolveAgentHome,
   type AgentId,
 } from "@nile/core/models/agent";
-import { NileSession } from "@nile/core/runtime-local";
+import { NileSession } from "@nile/builtins/runtime";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import { type CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";

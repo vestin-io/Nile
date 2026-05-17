@@ -9,6 +9,7 @@ import tailwindcss from "tailwindcss";
 const root = dirname(fileURLToPath(import.meta.url));
 const src = join(root, "src");
 const dist = join(root, "dist");
+const repoRoot = join(root, "..", "..");
 const isReleaseBuild = process.env.NILE_BUILD_RELEASE === "1";
 
 async function build(): Promise<void> {
@@ -30,6 +31,7 @@ async function buildEntry(entrypoint: string, outfile: string, target: "node" | 
   await esbuild({
     entryPoints: [entrypoint],
     outfile,
+    tsconfig: join(repoRoot, "tsconfig.base.json"),
     platform: target === "node" ? "node" : "browser",
     bundle: true,
     format: target === "node" ? "cjs" : "esm",

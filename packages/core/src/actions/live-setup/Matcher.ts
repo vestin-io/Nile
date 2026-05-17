@@ -5,9 +5,10 @@ import type { AgentConnectionSettings } from "../../models/agent-settings";
 import { AgentSelection } from "../../models/selection/Selection";
 import type { AgentSelectionRecord } from "../../models/selection/Types";
 import type { AuthMode } from "../../models/access";
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 import { EndpointRegistry, EndpointShape } from "../../models/endpoint";
 import type { EndpointRecord, EndpointRegistryInput } from "../../models/endpoint";
+import { AGENT_CAPABILITIES } from "../../models/agent/registry/Capabilities";
 import {
   isEnvKeyApiKeyCredential,
   sameApiKeyCredential,
@@ -116,7 +117,8 @@ export class LiveSetupMatcher {
   ): AccessRecord | null {
     const candidates = this.accessRegistry
       .list()
-      .filter((access) => access.endpointId === endpointId && access.authMode === resolved.access.authMode)
+      .filter((access) => access.endpointId === endpointId)
+      .filter((access) => this.matchesResolvedAuthMode(access.authMode, resolved))
       .filter((access) => this.accessMatchesResolvedState(access, resolved));
 
     if (candidates.length === 0) {
@@ -124,6 +126,11 @@ export class LiveSetupMatcher {
     }
     if (candidates.length === 1) {
       return candidates[0];
+    }
+
+    const preferredCompatibleCandidate = this.readPreferredCompatibleCandidate(candidates, resolved);
+    if (preferredCompatibleCandidate) {
+      return preferredCompatibleCandidate;
     }
 
     const current = this.agentSelection.get(this.agentId);
@@ -142,6 +149,33 @@ export class LiveSetupMatcher {
     return null;
   }
 
+  private matchesResolvedAuthMode(
+    accessAuthMode: AuthMode,
+    resolved: ResolvedLiveSetup,
+  ): boolean {
+    if (accessAuthMode === resolved.access.authMode) {
+      return true;
+    }
+
+    return resolved.access.authMode === "openclaw_openai_session"
+      && resolved.credential.kind === "openclaw_openai_session"
+      && accessAuthMode === "openai_session";
+  }
+
+  private readPreferredCompatibleCandidate(
+    candidates: readonly AccessRecord[],
+    resolved: ResolvedLiveSetup,
+  ): AccessRecord | null {
+    if (
+      resolved.access.authMode !== "openclaw_openai_session"
+      || resolved.credential.kind !== "openclaw_openai_session"
+    ) {
+      return null;
+    }
+
+    return candidates.find((access) => access.authMode === "openai_session") ?? null;
+  }
+
   private accessMatchesResolvedState(
     access: AccessRecord,
     resolved: ResolvedLiveSetup,
@@ -151,7 +185,7 @@ export class LiveSetupMatcher {
         return false;
       }
 
-      if (this.agentId === "openclaw") {
+      if (this.requiresSelectedModelMatch()) {
         const resolvedModelId = resolved.modelId?.trim() || undefined;
         const storedModelId = this.readStoredModelId(access);
         if (resolvedModelId !== storedModelId) {
@@ -195,5 +229,9 @@ export class LiveSetupMatcher {
   private readStoredModelId(access: AccessRecord): string | undefined {
     const selectedModelId = this.agentConnectionSettings?.get(this.agentId, access.id)?.modelId?.trim();
     return selectedModelId || undefined;
+  }
+
+  private requiresSelectedModelMatch(): boolean {
+    return AGENT_CAPABILITIES.read(this.agentId).requiredApplyRequirements.includes("selected-model");
   }
 }

@@ -1,4 +1,4 @@
-import type { AgentId } from "../models/agent/Types";
+import type { AgentId } from "../models/agent/Definitions";
 import type { AgentSelection } from "../models/selection/Selection";
 import { MutationHistory } from "../services/history/MutationHistory";
 import type { NileLogger } from "../services/NileLogger";

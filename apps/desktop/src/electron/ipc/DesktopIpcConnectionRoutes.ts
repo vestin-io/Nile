@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 
-import { SHARED_CONNECTION_CATALOG } from "@nile/core/models/connection";
+import { SHARED_CONNECTION_CATALOG } from "@nile/builtins/connections";
 
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
 import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";

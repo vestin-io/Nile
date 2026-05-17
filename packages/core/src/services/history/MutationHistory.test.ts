@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 
 import { MutationHistory } from "./MutationHistory";
 import { SecureSnapshotStore } from "./SecureSnapshotStore";
-import type { AgentId } from "../../models/agent/Types";
+import type { AgentId } from "../../models/agent/Definitions";
 
 const tempDirs: string[] = [];
 const CODEX_AGENT: AgentId = "codex";

@@ -3,6 +3,7 @@ export type {
   ClaudeSessionCredential,
   DirectApiKeyCredential,
   EnvKeyApiKeyCredential,
+  GeminiCliSessionCredential,
   OpenAiSessionCredential,
   CursorSessionCredential,
   StoredCredential,

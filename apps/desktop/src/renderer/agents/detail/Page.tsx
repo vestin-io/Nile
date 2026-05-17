@@ -1,6 +1,6 @@
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
 
-import type { DesktopAgentState, DesktopHistoryEntry } from "../../../state/Types";
+import type { DesktopAgentState, DesktopHistoryEntry, DesktopOnboardingItem } from "../../../state/Types";
 import { AgentHomeSection } from "./HomeSection";
 import { AgentConnectionsSection } from "./ConnectionsSection";
 import { AgentHistorySection } from "./HistorySection";
@@ -21,6 +21,8 @@ type AgentDetailPageProps = {
   agent: DesktopAgentState;
   activeTab: AgentDetailTab;
   agentHomePath: string;
+  canConfigure: boolean;
+  detectedSetup: DesktopOnboardingItem | null;
   defaultAgentHomePath: string;
   entries: DesktopHistoryEntry[];
   t: Translator;
@@ -31,6 +33,7 @@ type AgentDetailPageProps = {
   onOpenConnection(connectionId: string): void;
   onRefresh(): Promise<void>;
   onRollback(agentId: DesktopAgentState["agentId"]): Promise<void>;
+  onImport(agentId: DesktopAgentState["agentId"]): Promise<void>;
   onUpdateAgentConnectionModel(agentId: DesktopAgentState["agentId"], connectionId: string, modelId: string | null): Promise<void>;
   onSwitch(agentId: DesktopAgentState["agentId"], connectionId: string): Promise<void>;
 };
@@ -39,6 +42,8 @@ export function AgentDetailPage({
   agent,
   activeTab,
   agentHomePath,
+  canConfigure,
+  detectedSetup,
   defaultAgentHomePath,
   entries,
   t,
@@ -49,6 +54,7 @@ export function AgentDetailPage({
   onOpenConnection,
   onRefresh,
   onRollback,
+  onImport,
   onUpdateAgentConnectionModel,
   onSwitch,
 }: AgentDetailPageProps) {
@@ -91,7 +97,10 @@ export function AgentDetailPage({
         <TabsContent value="connections" className="space-y-4">
           <AgentConnectionsSection
             agent={agent}
+            canConfigure={canConfigure}
+            detectedSetup={detectedSetup}
             t={t}
+            onImport={onImport}
             onOpenAddPage={onOpenAddPage}
             onOpenConnection={onOpenConnection}
             onRefresh={onRefresh}

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/types";
+import type { AgentId } from "@nile/core/models/agent/definitions";
+import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
 import { EnabledAgentsPolicy } from "@nile/core/models/connection/enabled-agents-policy";
 
 import { orderSupportedAuthModes, type Definition } from "../../shared/DesktopData";
@@ -7,6 +8,13 @@ import { sameAgentSelection } from "../../shared/AgentSelection";
 import { syncDefaultAuthJsonPath } from "../AuthJsonPath";
 
 export { sameAgentSelection } from "../../shared/AgentSelection";
+
+type SessionSourceSelection =
+  | "login"
+  | "current_codex"
+  | "current_claude"
+  | "current_gemini"
+  | "current_cursor";
 
 type AddConnectionFormState = {
   apiKey: string;
@@ -17,7 +25,7 @@ type AddConnectionFormState = {
   endpointUrl: string;
   enabledAgents: AgentId[];
   preset: Definition["preset"] | "";
-  sessionSource: "login" | "current_codex";
+  sessionSource: SessionSourceSelection;
 };
 
 export type SetEnabledAgentsOptions = {
@@ -34,7 +42,7 @@ function createInitialFormState(defaultOpenAiAuthJsonPath: string): AddConnectio
     endpointUrl: "",
     enabledAgents: [],
     preset: "",
-    sessionSource: "current_codex",
+    sessionSource: "login",
   };
 }
 
@@ -114,6 +122,23 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
   }, [selectedDefinition, formState.authMode]);
 
   useEffect(() => {
+    setFormState((current) => {
+      const methods = SHARED_SESSION_CONNECTION_METHODS.listVisibleForAddConnectionForAuthMode(current.authMode);
+      const defaultMethod = SHARED_SESSION_CONNECTION_METHODS.readDefaultForAuthMode(current.authMode);
+      if (methods.length > 0 && defaultMethod) {
+        const nextSessionSource = methods.some((method) => method.source === current.sessionSource)
+          ? current.sessionSource
+          : defaultMethod.source;
+        if (nextSessionSource !== current.sessionSource) {
+          return { ...current, sessionSource: nextSessionSource };
+        }
+      }
+
+      return current;
+    });
+  }, [formState.authMode]);
+
+  useEffect(() => {
     if (!selectedDefinition) {
       return;
     }
@@ -177,7 +202,7 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
     [],
   );
   const setSessionSource = useCallback(
-    (sessionSource: "login" | "current_codex") => setFormState((current) => ({ ...current, sessionSource })),
+    (sessionSource: SessionSourceSelection) => setFormState((current) => ({ ...current, sessionSource })),
     [],
   );
 
