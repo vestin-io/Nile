@@ -218,6 +218,27 @@
   - `openai_session`
   - `openclaw_openai_session`
   - `claude_session`
+
+## Release follow-up: desktop Cursor auto-bind CI fix
+
+### Tasks completed
+
+- Added a desktop-scoped `CursorUsageSessionProbeFactory` so `DesktopConnectionManager` builds the Cursor usage probe from the active desktop `agentHomes` instead of process-global defaults.
+- Updated desktop Cursor import follow-up to use the factory-created probe during auto-bind after importing the current Cursor session connection.
+- Hardened the desktop Cursor auto-bind test so it stubs `Chrome Safe Storage` explicitly instead of depending on ambient host keychain state.
+- Prepared release `v0.16.5` with dedicated release notes.
+
+### Key findings
+
+- The CLI and desktop release regressions had the same shape: usage auto-bind was correct in normal local environments but still leaked host-machine assumptions into tests and into probe construction.
+- The release failure was not a product regression in Cursor import itself. It was a composition bug in how the desktop-side usage probe was sourced during follow-up binding.
+- Verification in this worktree must remain sequential because parallel `build:core` runs still race on the macOS `lipo` output for `KeychainGenericPasswordHelper`.
+
+### Verification
+
+- `npm run test:cli`
+- `npm run test:desktop`
+- `npm run typecheck`
   - `cursor_session`
 - Kept the existing reader implementations stable while moving selection ownership out of the central `Usage` class.
 

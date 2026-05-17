@@ -25,7 +25,6 @@ import {
   runWithCursorUsageWorkspace,
   type ConnectionChangeResult,
 } from "@nile/builtins/cursor-usage";
-import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 
 import {
   type DesktopAddConnectionInput,
@@ -37,6 +36,7 @@ import {
   type DesktopSavePreparedConnectionInput,
   type DesktopUpdateConnectionInput,
 } from "./contracts";
+import { CursorUsageSessionProbeFactory } from "./CursorUsageSessionProbeFactory";
 import { DesktopConnectionModelCatalog } from "./ModelCatalog";
 import { DesktopPreparedDraftStore } from "./DesktopPreparedDraftStore";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
@@ -57,7 +57,7 @@ export class DesktopConnectionManager {
   private static readonly defaultMaxPreparedDrafts = 20;
 
   private readonly localCredentialResolver: LocalCredentialResolver;
-  private readonly cursorUsageSessionProbe = CursorUsageSessionSourceProbe.createDefault();
+  private readonly cursorUsageSessionProbeFactory = new CursorUsageSessionProbeFactory();
   private readonly sessions: SessionRunner;
   private readonly labeler = new ConnectionLabeler();
   private readonly requestBuilder = new LocalCredentialRequestBuilder();
@@ -339,7 +339,7 @@ export class DesktopConnectionManager {
     return runWithCursorUsageWorkspace({
       databasePath: this.options.databasePath,
       credentialStore: this.options.credentialStore,
-      sessionProbe: this.cursorUsageSessionProbe,
+      sessionProbe: this.cursorUsageSessionProbeFactory.create(this.options.agentHomes),
     }, (workspace) => workspace.applyFollowUp(result));
   }
 }
