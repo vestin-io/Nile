@@ -6,7 +6,7 @@
 
 Nile is a macOS app for people who work across multiple AI accounts, providers, and local agent tools.
 
-It gives you one place to save connections, switch the active setup for local tools like Codex, Claude, and Cursor, and keep those changes understandable instead of hidden across scattered config files.
+It gives you one place to save connections, switch the active setup for local tools like Codex, Claude, Cursor, Gemini CLI, and OpenClaw, and keep those changes understandable instead of hidden across scattered config files.
 
 ## Why Nile
 
@@ -26,14 +26,16 @@ Current surface area:
 
 - macOS desktop app
 - command-line interface
-- local connection switching for `codex`, `claude`, and `cursor`
+- local connection switching for `codex`, `claude`, `cursor`, `gemini`, and `openclaw`
 
 Current connection types:
 
 - OpenAI API keys
 - OpenAI session auth imported from Codex
+- OpenClaw-compatible OpenAI session auth
 - Claude session auth
 - Cursor session auth
+- Gemini CLI Google session auth
 - provider-compatible gateway endpoints
 - Azure OpenAI endpoints
 
@@ -43,6 +45,13 @@ Current provider presets:
 - Gateway
 - Azure OpenAI
 - Anthropic
+- Cursor
+- Gemini CLI
+
+Current caveats:
+
+- Gemini connection add/sign-in is supported, but Gemini quota and usage reporting are not yet available in Nile.
+- Nile is built to carry forward existing local state across upgrades. If an older local state shape becomes incompatible, Nile should fail with a recoverable reset path instead of silently dropping state.
 
 ## How It Feels
 

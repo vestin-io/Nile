@@ -1850,3 +1850,54 @@
 - `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run apps/cli/src/NileCli.test.ts -t "auto-binds cursor usage after importing the current cursor session connection"`
 - `npm run test:cli`
 - `npm run typecheck`
+
+## 2026-05-18 - Upgrade compatibility guard for Gemini saved connections
+
+### What changed
+
+- Added an explicit repository rule that agent/connection/auth-mode changes must account for upgrades from older released versions instead of assuming a clean install:
+  - `AGENTS.md`
+- Normalized unsupported saved-connection upgrade failures into a user-recoverable reset hint instead of surfacing the raw internal error:
+  - `apps/desktop/src/state/ErrorNormalizer.ts`
+  - `apps/desktop/src/state/ErrorNormalizer.test.ts`
+- Added a desktop settings regression that seeds a saved `gemini_cli_session` connection and verifies settings state still loads cleanly:
+  - `apps/desktop/src/state/Surface.test.ts`
+
+### Key findings
+
+- The exact `Unhandled connection support input: gemini_cli_session` message no longer exists in current source; it came from an older manual auth-mode switch. The practical fix in the current tree is to lock the upgraded-state path with a settings-level regression and convert any similar stale-state failure into a recoverable reset message.
+- There was also a current-state gap below the original throw site: `AccessRecordBuilder` still inferred default enabled agents only for `openai`, `anthropic`, and `cursor`. A saved Gemini access without explicit `enabledAgents` therefore failed validation during desktop-state reads. Extending the inference to `endpoint.protocols.gemini` closes the real upgrade hole.
+- Covering this only at the family-registry unit-test layer would be too weak. The upgrade bug surfaced through `desktop:refresh-settings`, so the regression belongs on the desktop state read path.
+- Test helpers in `Surface.test.ts` had drifted behind the real endpoint/auth-mode matrix. Extending the fixture layer to understand `gemini`/`gemini_cli_session` is part of the fix because otherwise future upgrade regressions would stay invisible to desktop-state tests.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run apps/desktop/src/state/ErrorNormalizer.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+## 2026-05-18 - Codex desktop sign-in isolation and OpenAI add-flow recovery
+
+### What changed
+
+- Reworked Codex interactive sign-in so desktop add-connection flows open an external `Terminal.app` session, wait for a new local OpenAI session to appear, and then import only the resulting credential into Nile:
+  - `packages/agents/codex/src/CodexSessionLogin.ts`
+  - `packages/agents/codex/src/LoginSource.ts`
+  - `packages/agents/codex/src/CodexSessionLogin.test.ts`
+- Updated desktop release metadata for the follow-up patch release:
+  - `apps/desktop/package.json`
+  - `release-notes/v0.16.6.md`
+
+### Key findings
+
+- The previous Codex login path still assumed an attached interactive terminal and a writable real `~/.codex` home. That is acceptable for direct CLI usage, but not for desktop onboarding where login must be isolated and must not implicitly switch the user's active local Codex account.
+- The right model is the same one Gemini now uses: launch the CLI in a visible Terminal window, isolate it in a temporary agent home, and poll for a newly written session artifact before returning control to the surface.
+- Polling through `CodexCurrentCredentialReader.read()` was too eager because it throws before `auth.json` exists. The wait loop has to read the underlying auth store defensively and only promote a credential once the session file actually appears.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run packages/agents/codex/src/CodexSessionLogin.test.ts`
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts`
+- `npm run test:core`
+- `npm run test:cli`
+- `npm run test:desktop`
+- `npm run typecheck`

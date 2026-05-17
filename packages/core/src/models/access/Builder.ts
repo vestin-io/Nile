@@ -180,6 +180,9 @@ export class AccessRecordBuilder {
     if (endpoint.protocols.cursor) {
       agents.push("cursor");
     }
+    if (endpoint.protocols.gemini) {
+      agents.push("gemini");
+    }
     return agents;
   }
 }

@@ -32,6 +32,7 @@ This file defines the working rules for code changes in this repository.
 - UI surfaces may trigger apply flows, but they must not own provider/account mutation rules.
 - Secrets must not be written into SQLite, docs, logs, or test fixtures. Store only references and non-sensitive metadata outside the credential store.
 - Do not introduce implicit switching behavior. Applying a new agent selection must stay an explicit user action.
+- When adding or changing an agent, connection family, auth mode, session source, or saved-state shape, always account for upgrade paths from older released versions. Existing SQLite rows, keychain entries, config files, and renderer/main IPC payloads must either continue to load safely, migrate explicitly, or fail with a user-recoverable path. Do not assume a clean install or freshly reset local state.
 - Workspace packages must form an acyclic dependency graph at the `package.json` level. Type-only imports through narrow subpaths do not justify a runtime dependency edge. Treat any cycle as a defect.
 - Plugin packages (`packages/agents/*`, `packages/connections`, future runtime packages) depend on `@nile/core` for contracts. They must not depend on each other. If two plugin packages need to share behavior, the shared piece belongs in `@nile/core` or in a separate utility package.
 

@@ -1,7 +1,19 @@
-import { describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { afterEach, describe, expect, it } from "vitest";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import { CodexSessionLogin } from "./CodexSessionLogin";
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  while (tempDirs.length > 0) {
+    rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  }
+});
 
 describe("CodexSessionLogin", () => {
   it("prefers the current process PATH and appends login-shell PATH entries", async () => {
@@ -48,5 +60,64 @@ describe("CodexSessionLogin", () => {
     await expect(login.signIn("/tmp/.codex")).rejects.toThrow(
       "Codex CLI was not found in PATH. Install Codex CLI or add it to your shell PATH, then restart Nile.",
     );
+  });
+
+  it("opens Terminal and waits for a new OpenAI session in Electron", async () => {
+    const loginRoot = mkdtempSync(join(tmpdir(), "nile-codex-login-test-"));
+    tempDirs.push(loginRoot);
+    const codexHome = join(loginRoot, ".codex");
+    const codexBin = join(loginRoot, "bin");
+    mkdirSync(codexHome, { recursive: true });
+    mkdirSync(codexBin, { recursive: true });
+    writeFileSync(join(codexBin, "codex"), "#!/bin/sh\nexit 0\n");
+    const originalPath = process.env.PATH;
+    process.env.PATH = codexBin;
+
+    let command: string | null = null;
+    let receivedStdio: "inherit" | "ignore" | null = null;
+    const login = new CodexSessionLogin(
+      EnvironmentSource.empty(),
+      (spawnedCommand, _args, options) => {
+        command = spawnedCommand;
+        receivedStdio = options.stdio;
+        if (spawnedCommand === "osascript") {
+          writeFileSync(
+            join(codexHome, "auth.json"),
+            JSON.stringify({
+              OPENAI_API_KEY: null,
+              tokens: {
+                id_token: "id-token",
+                access_token: "access-token",
+                refresh_token: "refresh-token",
+                account_id: "acct-electron",
+              },
+            }),
+          );
+        }
+        return {
+          once(event: "error" | "exit", listener: ((error: Error) => void) | ((code: number | null) => void)) {
+            if (event === "exit") {
+              (listener as (code: number | null) => void)(0);
+            }
+            return this;
+          },
+        } as never;
+      },
+      () => true,
+    );
+
+    try {
+      await expect(login.signInAndRead(codexHome)).resolves.toEqual(
+        expect.objectContaining({
+          kind: "openai_session",
+          accountId: "acct-electron",
+        }),
+      );
+    } finally {
+      process.env.PATH = originalPath;
+    }
+
+    expect(command).toBe("osascript");
+    expect(receivedStdio).toBe("ignore");
   });
 });

@@ -963,6 +963,53 @@ describe("DesktopSurface", () => {
     expect(state.connections[0]?.usage).toBeNull();
   });
 
+  it("reads settings with a saved Gemini CLI connection from upgraded local state", async () => {
+    const setup = createSetup();
+    seedProvider(setup.dbPath, {
+      id: "gemini",
+      label: "Gemini CLI",
+      endpointFamily: "gemini",
+      supportedAuthModes: ["gemini_cli_session"],
+    });
+    seedBinding(
+      setup.dbPath,
+      setup.credentialStore,
+      {
+        id: "gemini-primary-example-test",
+        endpointId: "gemini",
+        label: "gemini.primary@example.test",
+        authMode: "gemini_cli_session",
+      },
+      geminiSessionCredential(),
+    );
+
+    const state = await createSurface(setup).getSettingsState();
+
+    expect(state.connections).toEqual([
+      expect.objectContaining({
+        id: "gemini-primary-example-test",
+        label: "gemini.primary@example.test",
+        endpointLabel: "Gemini CLI",
+        endpointFamily: "gemini",
+        authMode: "gemini_cli_session",
+        isCurrent: false,
+        usage: null,
+        enabledAgents: ["gemini"],
+        configurableAgents: ["gemini"],
+        selectedByAgents: [],
+        endpointUrl: "https://gemini.google.com",
+      }),
+    ]);
+    expect(state.currentAgentConnections).toEqual([]);
+    expect(state.agents.find((agent) => agent.agentId === "gemini")?.connections).toEqual([
+      expect.objectContaining({
+        id: "gemini-primary-example-test",
+        endpointFamily: "gemini",
+        authMode: "gemini_cli_session",
+      }),
+    ]);
+  });
+
   it("prefers the matched live saved connection over the stale selected connection", async () => {
     const setup = createSetup({
       configToml: [
@@ -1260,9 +1307,9 @@ function seedProvider(
   input: {
     id: string;
     label: string;
-    endpointFamily: "openai" | "gateway" | "azure-openai" | "anthropic" | "cursor";
-    supportedAuthModes?: Array<"api_key" | "openai_session" | "claude_session" | "cursor_session">;
-    agentCompatibility?: Array<"codex" | "cursor" | "claude">;
+    endpointFamily: "openai" | "gateway" | "azure-openai" | "anthropic" | "cursor" | "gemini";
+    supportedAuthModes?: Array<"api_key" | "openai_session" | "claude_session" | "cursor_session" | "gemini_cli_session">;
+    agentCompatibility?: Array<"codex" | "cursor" | "claude" | "gemini">;
     connectionMetadata?: {
       baseUrl?: string;
       backendUrl?: string;
@@ -1283,7 +1330,7 @@ function seedBinding(
     id: string;
     endpointId: string;
     label: string;
-    authMode: "api_key" | "openai_session" | "claude_session" | "cursor_session";
+    authMode: "api_key" | "openai_session" | "claude_session" | "cursor_session" | "gemini_cli_session";
     identityKey?: string;
   },
   credential: StoredCredential,
@@ -1304,7 +1351,7 @@ function seedBinding(
 function buildEndpointInput(input: {
   id: string;
   label: string;
-  endpointFamily: "openai" | "gateway" | "azure-openai" | "anthropic" | "cursor";
+  endpointFamily: "openai" | "gateway" | "azure-openai" | "anthropic" | "cursor" | "gemini";
   connectionMetadata?: {
     baseUrl?: string;
     backendUrl?: string;
@@ -1347,6 +1394,20 @@ function buildEndpointInput(input: {
               ? "ANTHROPIC_AUTH_TOKEN"
               : "ANTHROPIC_API_KEY",
           versionHeader: "2023-06-01",
+        },
+      },
+    };
+  }
+
+  if (input.endpointFamily === "gemini") {
+    return {
+      id: input.id,
+      label: input.label,
+      rootUrl: "https://gemini.google.com",
+      profile: "gemini-cli",
+      protocols: {
+        gemini: {
+          authTypes: ["oauth-personal"],
         },
       },
     };
@@ -1406,6 +1467,18 @@ function cursorSessionCredential(): StoredCredential {
     authCacheKey: "cache-key",
     email: "cursor@example.com",
     displayName: "Cursor User",
+  };
+}
+
+function geminiSessionCredential(): StoredCredential {
+  return {
+    kind: "gemini_cli_session",
+    accessToken: "gemini-access-token",
+    refreshToken: "gemini-refresh-token",
+    idToken: "gemini-id-token",
+    expiryDate: 1_778_000_000_000,
+    tokenType: "Bearer",
+    scope: "openid email profile",
   };
 }
 

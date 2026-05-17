@@ -235,6 +235,42 @@ describe("AccessRegistry", () => {
     registry.close();
   });
 
+  it("infers Gemini as the enabled agent for Gemini CLI session connections", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedEndpoint(dbPath, {
+      id: "gemini",
+      label: "Gemini CLI",
+      rootUrl: "https://gemini.google.com",
+      profile: "gemini-cli",
+      protocols: {
+        gemini: {
+          authTypes: ["oauth-personal"],
+        },
+      },
+    });
+
+    const registry = AccessRegistry.open(dbPath, credentialStore);
+    const record = registry.add(
+      {
+        id: "gemini-primary",
+        endpointId: "gemini",
+        label: "gemini.primary@example.test",
+        authMode: "gemini_cli_session",
+      },
+      {
+        kind: "gemini_cli_session",
+        accessToken: "gemini-access-token",
+        refreshToken: "gemini-refresh-token",
+        idToken: "gemini-id-token",
+      },
+    );
+
+    expect(record.enabledAgents).toEqual(["gemini"]);
+
+    registry.close();
+  });
+
   it("restores the previous credential when access update persistence fails", () => {
     const dbPath = createTempDatabasePath();
     const credentialStore = new StubCredentialStore();
