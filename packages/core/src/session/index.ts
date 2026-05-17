@@ -6,6 +6,7 @@ export type {
 } from "./Types";
 export type {
   InteractiveSessionLoginContext,
+  InteractiveSessionLoginInteractionMode,
   InteractiveSessionLoginManifest,
   InteractiveSessionLoginRequest,
   InteractiveSessionLoginStoredCredential,

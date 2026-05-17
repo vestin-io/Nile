@@ -1,6 +1,26 @@
 // src/session/index.ts
 import { INTERACTIVE_SESSION_LOGIN_REGISTRY } from "@nile/core/session";
 
+// src/session/LoginDeclarations.ts
+import { CLAUDE_LOGIN_DECLARATION } from "@nile/agent-claude/login-declaration";
+import { CODEX_LOGIN_DECLARATION } from "@nile/agent-codex/login-declaration";
+import { GEMINI_LOGIN_DECLARATION } from "@nile/agent-gemini/login-declaration";
+var BUILTIN_INTERACTIVE_SESSION_LOGIN_DECLARATIONS = [
+  CODEX_LOGIN_DECLARATION,
+  CLAUDE_LOGIN_DECLARATION,
+  GEMINI_LOGIN_DECLARATION
+];
+function isBuiltinInteractiveSessionLoginAuthMode(authMode) {
+  return BUILTIN_INTERACTIVE_SESSION_LOGIN_DECLARATIONS.some((declaration) => declaration.authMode === authMode);
+}
+function readBuiltinInteractiveSessionLoginDeclaration(authMode) {
+  const match = BUILTIN_INTERACTIVE_SESSION_LOGIN_DECLARATIONS.find((declaration) => declaration.authMode === authMode);
+  if (!match) {
+    throw new Error(`Unsupported interactive session login auth mode: ${authMode}`);
+  }
+  return match;
+}
+
 // src/session/MethodCatalog.ts
 var SESSION_AUTH_MODES = /* @__PURE__ */ new Set([
   "openai_session",
@@ -167,8 +187,16 @@ var SessionConnectionMethodCatalog = class {
     return match;
   }
   withKey(method) {
+    let interactionMode = method.interactionMode;
+    if (method.source === "login") {
+      if (!isBuiltinInteractiveSessionLoginAuthMode(method.authMode)) {
+        throw new Error(`Unsupported interactive session login auth mode: ${method.authMode}`);
+      }
+      interactionMode = readBuiltinInteractiveSessionLoginDeclaration(method.authMode).interactionMode;
+    }
     return {
       ...method,
+      ...interactionMode ? { interactionMode } : {},
       key: `${method.authMode}:${method.source}`
     };
   }
@@ -178,7 +206,10 @@ var SessionConnectionMethodCatalog = class {
 };
 var SHARED_SESSION_CONNECTION_METHODS = new SessionConnectionMethodCatalog();
 export {
+  BUILTIN_INTERACTIVE_SESSION_LOGIN_DECLARATIONS,
   INTERACTIVE_SESSION_LOGIN_REGISTRY,
   SHARED_SESSION_CONNECTION_METHODS,
-  SessionConnectionMethodCatalog
+  SessionConnectionMethodCatalog,
+  isBuiltinInteractiveSessionLoginAuthMode,
+  readBuiltinInteractiveSessionLoginDeclaration
 };

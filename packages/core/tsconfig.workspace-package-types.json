@@ -29,6 +29,9 @@
       "@nile/agent-claude/login-source": [
         "packages/agents/claude/types/login-source.d.ts"
       ],
+      "@nile/agent-claude/login-declaration": [
+        "packages/agents/claude/types/login-declaration.d.ts"
+      ],
       "@nile/agent-claude/model-catalog-source": [
         "packages/agents/claude/types/model-catalog-source.d.ts"
       ],
@@ -55,6 +58,9 @@
       ],
       "@nile/agent-codex/login-source": [
         "packages/agents/codex/types/login-source.d.ts"
+      ],
+      "@nile/agent-codex/login-declaration": [
+        "packages/agents/codex/types/login-declaration.d.ts"
       ],
       "@nile/agent-codex/projection": [
         "packages/agents/codex/types/projection.d.ts"
@@ -103,6 +109,9 @@
       ],
       "@nile/agent-gemini/login-source": [
         "packages/agents/gemini/types/login-source.d.ts"
+      ],
+      "@nile/agent-gemini/login-declaration": [
+        "packages/agents/gemini/types/login-declaration.d.ts"
       ],
       "@nile/agent-gemini/projection": [
         "packages/agents/gemini/types/projection.d.ts"

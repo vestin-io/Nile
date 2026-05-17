@@ -1,5 +1,10 @@
 import type { AuthMode } from "@nile/core/models/access";
 import type { CurrentSessionSourceId } from "@nile/core/models/connection/SourceTypes";
+import type { InteractiveSessionLoginInteractionMode } from "@nile/core/session";
+import {
+  isBuiltinInteractiveSessionLoginAuthMode,
+  readBuiltinInteractiveSessionLoginDeclaration,
+} from "./LoginDeclarations";
 
 type SessionSourceSelection = "login" | CurrentSessionSourceId;
 export type SessionConnectionAuthMode = Exclude<AuthMode, "api_key" | "openclaw_openai_session">;
@@ -7,6 +12,7 @@ export type SessionConnectionAuthMode = Exclude<AuthMode, "api_key" | "openclaw_
 type SessionMethodDescriptor = {
   authMode: SessionConnectionAuthMode;
   source: SessionSourceSelection;
+  interactionMode?: InteractiveSessionLoginInteractionMode;
   promptValue?: string;
   titleKey: string;
   descriptionKey?: string;
@@ -248,8 +254,16 @@ export class SessionConnectionMethodCatalog {
   }
 
   private withKey(method: SessionMethodDescriptor): SessionConnectionMethod {
+    let interactionMode = method.interactionMode;
+    if (method.source === "login") {
+      if (!isBuiltinInteractiveSessionLoginAuthMode(method.authMode)) {
+        throw new Error(`Unsupported interactive session login auth mode: ${method.authMode}`);
+      }
+      interactionMode = readBuiltinInteractiveSessionLoginDeclaration(method.authMode).interactionMode;
+    }
     return {
       ...method,
+      ...(interactionMode ? { interactionMode } : {}),
       key: `${method.authMode}:${method.source}`,
     };
   }

@@ -24,6 +24,10 @@ export type InteractiveSessionLoginStoredCredential = Extract<
   | { kind: "gemini_cli_session" }
 >;
 
+export type InteractiveSessionLoginInteractionMode =
+  | "browser_oauth"
+  | "terminal_interactive";
+
 export type InteractiveSessionLoginContext = {
   agentHomes: AgentHomes | undefined;
   environment: EnvironmentSource;
@@ -32,6 +36,7 @@ export type InteractiveSessionLoginContext = {
 export type InteractiveSessionLoginManifest = {
   authMode: InteractiveSessionLoginRequest["authMode"];
   label: string;
+  interactionMode: InteractiveSessionLoginInteractionMode;
   signInAndRead(
     context: InteractiveSessionLoginContext,
     request: InteractiveSessionLoginRequest,

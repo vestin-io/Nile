@@ -6,3 +6,8 @@ export {
   SessionConnectionMethodCatalog,
 } from "./MethodCatalog";
 export type { SessionConnectionAuthMode, SessionConnectionMethod } from "./MethodCatalog";
+export {
+  BUILTIN_INTERACTIVE_SESSION_LOGIN_DECLARATIONS,
+  isBuiltinInteractiveSessionLoginAuthMode,
+  readBuiltinInteractiveSessionLoginDeclaration,
+} from "./LoginDeclarations";

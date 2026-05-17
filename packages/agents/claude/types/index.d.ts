@@ -13,6 +13,11 @@ export declare const CLAUDE_DECLARATION: import("@nile/core/models/agent/registr
 export declare const CLAUDE_MANIFEST: AgentManifestDefinition;
 export declare const CLAUDE_RUNTIME_FACTORY: AgentFactoryRegistration;
 export declare const CLAUDE_CURRENT_SESSION_SOURCE: CurrentSessionSourceManifest;
+export declare const CLAUDE_LOGIN_DECLARATION: {
+  readonly authMode: "claude_session";
+  readonly label: "Sign in with Claude";
+  readonly interactionMode: "terminal_interactive";
+};
 export declare const CLAUDE_LOGIN_SOURCE: InteractiveSessionLoginManifest;
 export declare const CLAUDE_MODEL_CATALOG_SOURCE: LocalModelCatalogSourceManifest;
 export declare const CLAUDE_PROJECTION: AgentProjectionRegistration;

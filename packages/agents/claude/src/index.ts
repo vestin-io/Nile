@@ -5,6 +5,7 @@ export { CLAUDE_DECLARATION } from "./Declaration";
 export { CLAUDE_MANIFEST } from "./Manifest";
 export { CLAUDE_RUNTIME_FACTORY } from "./RuntimeFactory";
 export { CLAUDE_CURRENT_SESSION_SOURCE } from "./CurrentSessionSource";
+export { CLAUDE_LOGIN_DECLARATION } from "./LoginDeclaration";
 export { CLAUDE_LOGIN_SOURCE } from "./LoginSource";
 export { CLAUDE_MODEL_CATALOG_SOURCE } from "./ModelCatalogSource";
 export { CLAUDE_PROJECTION } from "./Projection";

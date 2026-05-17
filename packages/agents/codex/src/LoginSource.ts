@@ -3,10 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CodexSessionLogin } from "./CodexSessionLogin";
+import { CODEX_LOGIN_DECLARATION } from "./LoginDeclaration";
 
 export const CODEX_LOGIN_SOURCE = {
-  authMode: "openai_session",
-  label: "Sign in with Codex",
+  ...CODEX_LOGIN_DECLARATION,
   async signInAndRead(context) {
     const { loginRoot, codexHome } = createTemporaryCodexHome();
     const login = new CodexSessionLogin(context.environment);

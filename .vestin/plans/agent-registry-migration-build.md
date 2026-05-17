@@ -1925,3 +1925,63 @@
 - `npm run test:desktop`
 - `npm run test:cli`
 - `npm run typecheck`
+
+## 2026-05-18 - Declare interactive login UX on agent manifests
+
+### What changed
+
+- Added explicit interactive login `interactionMode` capability to the shared session-login manifest contract and registry:
+  - `packages/core/src/session/LoginTypes.ts`
+  - `packages/core/src/session/Login.ts`
+  - `packages/core/src/session/index.ts`
+- Declared the concrete login UX per agent instead of leaving surfaces and future changes to infer it:
+  - `packages/agents/codex/src/LoginSource.ts`
+  - `packages/agents/claude/src/LoginSource.ts`
+  - `packages/agents/gemini/src/LoginSource.ts`
+- Wired the shared session method catalog to read the login interaction mode from the registry so session add-flow behavior has a single source of truth:
+  - `packages/builtins/src/session/MethodCatalog.ts`
+  - `packages/builtins/src/session/MethodCatalog.test.ts`
+- Recorded the repository rule that interactive login UX must be declared on the manifest instead of copied between agents:
+  - `AGENTS.md`
+
+### Key findings
+
+- The real failure mode was not “desktop login is fragile”; it was “interactive login UX was implicit”. Once Gemini introduced a terminal-driven flow, there was nothing in the shared model preventing that behavior from being wrongly generalized onto Codex.
+- This capability belongs on the login manifest, not in the renderer and not in a comment. The owning agent package is the only layer that actually knows whether a sign-in is browser-driven or terminal-driven.
+- The session method catalog was the right integration point for the shared capability. It already defines the cross-surface add-flow shape, so augmenting the method records there keeps the new rule visible to both desktop and CLI code without adding another parallel table.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run packages/core/src/session/Login.test.ts packages/builtins/src/session/MethodCatalog.test.ts packages/agents/codex/src/CodexSessionLogin.test.ts`
+- `npm run typecheck`
+
+## 2026-05-18 - Move interactive login declarations onto renderer-safe builtins metadata
+
+### What changed
+
+- Added renderer-safe interactive login declaration files for builtin agents and exported them through package subpaths:
+  - `packages/agents/codex/src/LoginDeclaration.ts`
+  - `packages/agents/claude/src/LoginDeclaration.ts`
+  - `packages/agents/gemini/src/LoginDeclaration.ts`
+  - `packages/agents/*/package.json`
+  - `packages/agents/*/types/login-declaration.d.ts`
+- Reworked the shared session method catalog to read login interaction mode from builtin declaration metadata instead of the runtime interactive login registry:
+  - `packages/builtins/src/session/LoginDeclarations.ts`
+  - `packages/builtins/src/session/MethodCatalog.ts`
+  - `packages/builtins/src/session/index.ts`
+  - `packages/builtins/types/session/index.d.ts`
+- Updated desktop release metadata for the renderer crash follow-up release:
+  - `apps/desktop/package.json`
+  - `release-notes/v0.16.8.md`
+
+### Key findings
+
+- The previous manifest-level `interactionMode` change was correct in principle, but desktop renderer code cannot depend on runtime login registry registration. That registry only exists in privileged/runtime composition layers, not in renderer-safe bundles.
+- The right ownership split is: plugin package owns the declaration, builtins owns the aggregation array, and renderer surfaces read the aggregation directly. That keeps per-agent login UX explicit without reintroducing core-side hardcoded tables.
+- `cursor_session` remains a session auth mode without an interactive login source. The shared method catalog needs an explicit auth-mode narrowing guard instead of assuming every session auth mode with a method record can be resolved through the interactive login declarations.
+
+### Verification
+
+- `npm run typecheck`
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run packages/builtins/src/session/MethodCatalog.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts packages/core/src/session/Login.test.ts packages/agents/codex/src/CodexSessionLogin.test.ts`
+- `npm run test:desktop`

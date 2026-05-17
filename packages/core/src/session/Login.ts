@@ -2,12 +2,14 @@ import { AGENT_MODULE_REGISTRY } from "../models/agent/module/Registry";
 import { IndexedRegistry } from "../services/IndexedRegistry";
 import type {
   InteractiveSessionLoginContext,
+  InteractiveSessionLoginInteractionMode,
   InteractiveSessionLoginManifest,
   InteractiveSessionLoginRequest,
   InteractiveSessionLoginStoredCredential,
 } from "./LoginTypes";
 export type {
   InteractiveSessionLoginContext,
+  InteractiveSessionLoginInteractionMode,
   InteractiveSessionLoginManifest,
   InteractiveSessionLoginRequest,
   InteractiveSessionLoginStoredCredential,
@@ -25,6 +27,12 @@ export class InteractiveSessionLoginRegistry {
 
   read(authMode: InteractiveSessionLoginRequest["authMode"]): InteractiveSessionLoginManifest {
     return this.buildIndex().read(authMode);
+  }
+
+  readInteractionMode(
+    authMode: InteractiveSessionLoginRequest["authMode"],
+  ): InteractiveSessionLoginInteractionMode {
+    return this.read(authMode).interactionMode;
   }
 
   async signInAndRead(

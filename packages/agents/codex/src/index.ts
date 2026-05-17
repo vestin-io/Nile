@@ -5,6 +5,7 @@ export { CODEX_DECLARATION } from "./Declaration";
 export { CODEX_MANIFEST } from "./Manifest";
 export { CODEX_RUNTIME_FACTORY } from "./RuntimeFactory";
 export { CODEX_CURRENT_SESSION_SOURCE } from "./CurrentSessionSource";
+export { CODEX_LOGIN_DECLARATION } from "./LoginDeclaration";
 export { CODEX_LOGIN_SOURCE } from "./LoginSource";
 export { CODEX_PROJECTION } from "./Projection";
 export { CODEX_AGENT_MODULE } from "./Module";

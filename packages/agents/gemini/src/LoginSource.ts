@@ -4,13 +4,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GeminiSessionLogin } from "./GeminiSessionLogin";
 import { GeminiSessionStores } from "./Stores";
+import { GEMINI_LOGIN_DECLARATION } from "./LoginDeclaration";
 
 const loginPollIntervalMs = 1000;
 const loginTimeoutMs = 5 * 60 * 1000;
 
 export const GEMINI_LOGIN_SOURCE = {
-  authMode: "gemini_cli_session",
-  label: "Sign in with Gemini",
+  ...GEMINI_LOGIN_DECLARATION,
   async signInAndRead(context) {
     const geminiHome = createTemporaryGeminiHome();
     const stores = GeminiSessionStores.open(geminiHome);

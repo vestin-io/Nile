@@ -40,6 +40,10 @@
       "types": "./types/login-source.d.ts",
       "default": "./dist/LoginSource.js"
     },
+    "./login-declaration": {
+      "types": "./types/login-declaration.d.ts",
+      "default": "./dist/LoginDeclaration.js"
+    },
     "./projection": {
       "types": "./types/projection.d.ts",
       "default": "./dist/Projection.js"

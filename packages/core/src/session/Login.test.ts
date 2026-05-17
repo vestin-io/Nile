@@ -15,6 +15,7 @@ describe("InteractiveSessionLoginRegistry", () => {
     expect(INTERACTIVE_SESSION_LOGIN_REGISTRY.read("openai_session")).toMatchObject({
       authMode: "openai_session",
       label: "Sign in with Codex",
+      interactionMode: "browser_oauth",
     });
   });
 
@@ -22,6 +23,7 @@ describe("InteractiveSessionLoginRegistry", () => {
     expect(INTERACTIVE_SESSION_LOGIN_REGISTRY.read("claude_session")).toMatchObject({
       authMode: "claude_session",
       label: "Sign in with Claude",
+      interactionMode: "terminal_interactive",
     });
   });
 
@@ -29,6 +31,7 @@ describe("InteractiveSessionLoginRegistry", () => {
     expect(INTERACTIVE_SESSION_LOGIN_REGISTRY.read("gemini_cli_session")).toMatchObject({
       authMode: "gemini_cli_session",
       label: "Sign in with Gemini",
+      interactionMode: "terminal_interactive",
     });
   });
 });

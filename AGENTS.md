@@ -59,6 +59,7 @@ This file defines the working rules for code changes in this repository.
 - Always pair `.open()` with `.close()` in a `try/finally` block. Never let an exception path skip resource cleanup.
 - Consumer modules (apps, core actions, registries, UI) must not branch on a specific agent id, connection family id, or session source id string. If behavior depends on plugin specifics, declare it as a capability or field on the manifest and read the capability. The owning plugin package may use its own id literal internally — that is local, not a leak.
 - When a registry exists for a behavior (e.g. `INTERACTIVE_SESSION_LOGIN_REGISTRY`, `CURRENT_SESSION_SOURCE_REGISTRY`, `AGENT_PROJECTION_REGISTRY`), consumer surfaces must depend on the registry interface, not on concrete plugin classes. Hardwiring specific implementation classes in composition roots defeats the registry and blocks new plugins from being picked up automatically.
+- Interactive login sources must declare their user interaction mode (`browser_oauth`, `terminal_interactive`, etc.) on the manifest. Do not infer login UX from one agent and reuse it for another just because both are “sign in” flows.
 
 ## Naming Rules
 

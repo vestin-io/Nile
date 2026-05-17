@@ -40,6 +40,10 @@
       "types": "./types/login-source.d.ts",
       "default": "./dist/LoginSource.js"
     },
+    "./login-declaration": {
+      "types": "./types/login-declaration.d.ts",
+      "default": "./dist/LoginDeclaration.js"
+    },
     "./model-catalog-source": {
       "types": "./types/model-catalog-source.d.ts",
       "default": "./dist/ModelCatalogSource.js"
