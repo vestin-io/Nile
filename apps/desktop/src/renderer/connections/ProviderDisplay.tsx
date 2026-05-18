@@ -26,6 +26,9 @@ export function readProviderLabel(
   if (provider === "cursor") {
     return "Cursor";
   }
+  if (provider === "gemini") {
+    return "Gemini";
+  }
   return t("common.unknown");
 }
 

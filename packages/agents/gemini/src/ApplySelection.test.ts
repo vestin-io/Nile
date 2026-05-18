@@ -56,6 +56,11 @@ describe("Gemini ApplySelection", () => {
     );
 
     const context = AgentWorkspaceSession.open(setup.dbPath, setup.credentialStore);
+    context.sharedContext.agentConnectionSettings.setModelId(
+      GEMINI_AGENT_ID,
+      "gemini-primary-example-test",
+      "gemini-3-flash-preview",
+    );
     const apply = new ApplySelection(
       new ApplyMutation(
         MutationHistory.fromDatabase(setup.dbPath, context.workspaceState.database, {
@@ -98,6 +103,9 @@ describe("Gemini ApplySelection", () => {
       old: [],
     });
     expect(JSON.parse(readFileSync(join(setup.geminiHome, "settings.json"), "utf8"))).toEqual({
+      model: {
+        name: "gemini-3-flash-preview",
+      },
       security: {
         auth: {
           selectedType: "oauth-personal",

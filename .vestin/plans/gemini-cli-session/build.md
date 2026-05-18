@@ -185,3 +185,78 @@
 
 - `./node_modules/.bin/vitest run packages/core/src/application/local/LocalCredentialResolver.test.ts packages/core/src/application/local/LocalCredentialRequestBuilder.test.ts packages/core/src/models/agent/Capabilities.test.ts apps/desktop/src/renderer/CoreImportBoundaries.test.ts apps/desktop/src/state/Surface.test.ts apps/desktop/src/electron/profiles/Manager.test.ts apps/cli/src/NileCli.test.ts packages/core/src/agents/gemini/Backend.test.ts packages/core/src/agents/gemini/ImportCurrentConnection.test.ts packages/core/src/agents/gemini/ApplySelection.test.ts packages/core/src/agents/gemini/RollbackLatestMutation.test.ts`
 - `npm run typecheck`
+
+### Gemini usage reader slice
+
+- added `GeminiSessionUsageReader` in the shared usage pipeline
+- Gemini usage now follows the same remote-API flow shape as OpenAI / Claude:
+  - discover `cloudaicompanionProject` via `loadCodeAssist`
+  - fetch quota buckets via `retrieveUserQuota`
+  - normalize them into shared `ConnectionUsageWindow` entries
+- deduped tier-alias buckets so Gemini no longer shows repeated preview/stable aliases for the same quota
+- wired `gemini_cli_session` into builtin connection usage reader registration
+- added usage tests covering:
+  - successful Gemini quota normalization
+  - missing project metadata fallback
+  - desktop/state usage surface regression
+
+### Key findings
+
+- Gemini quota is available from a usable source, but it is still based on Google internal `cloudcode-pa` endpoints rather than a documented public usage API.
+- Accurate Gemini quota requires the discovered `cloudaicompanionProject`; treating a missing project as unavailable is safer than surfacing misleading all-`100%` buckets.
+- This slice does not auto-refresh expired Gemini OAuth tokens inside core. If the saved access token is stale, the user currently gets a clear refresh/re-auth message instead of a silent fallback through the local CLI.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/actions/usage/Usage.test.ts`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+### Gemini selected-model apply slice
+
+- threaded Gemini `modelId` through the agent projection so saved per-connection model settings can participate in apply
+- extended `GeminiSettingsStore` to read and write `settings.json.model.name`
+- updated Gemini apply so:
+  - `security.auth.selectedType` is still enforced as `oauth-personal`
+  - `model.name` is written only when the selected connection actually has a saved model
+- added coverage for:
+  - preserving unrelated Gemini settings while writing `model.name`
+  - applying a Gemini connection with a saved selected model and verifying it lands in `~/.gemini/settings.json`
+
+### Key findings
+
+- Gemini CLI persists the preferred startup model in the global user settings file under `settings.json -> model.name`; it does not maintain a per-connection model slot of its own.
+- Applying a Gemini model from Nile can safely set the default model for new Gemini CLI sessions, but it does not retarget already-running Gemini CLI processes.
+- Leaving `model.name` untouched when a connection has no saved model is the safer behavior because it avoids clobbering an existing user-wide Gemini default unexpectedly.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/gemini/src/SettingsStore.test.ts packages/agents/gemini/src/ApplySelection.test.ts packages/agents/gemini/src/RollbackLatestMutation.test.ts packages/core/src/actions/usage/Usage.test.ts`
+- `npm run typecheck`
+
+### Gemini model catalog slice
+
+- added a Gemini session model catalog reader under the Gemini CLI session family instead of forcing Gemini through the OpenAI `/models` path
+- Gemini model detection now follows Gemini CLI's own shape closely:
+  - `loadCodeAssist` discovers `cloudaicompanionProject`
+  - `listExperiments` reads Gemini feature flags
+  - `retrieveUserQuota` confirms preview-model access
+- wired connection model catalog lookup so session-backed families can provide their own model list
+- Gemini connections now surface a supported model list that includes:
+  - preview models only when quota/flags indicate access
+  - stable `gemini-2.5-*` defaults
+  - Gemma options exposed by Gemini CLI
+- kept the model catalog transport injectable from `ConnectionModelCatalog` so the shared test harness can mock Gemini remote calls without special global fetch state
+
+### Key findings
+
+- Gemini CLI model selection is not driven by a public `/models` endpoint. The reliable source for Nile is Gemini CLI's own internal combination of project discovery, experiments, and quota buckets.
+- Returning a Gemini-specific session model catalog is cleaner than pretending Gemini is OpenAI-compatible, and it avoids baking Gemini-specific branches into generic UI code.
+- This slice still depends on Google internal `cloudcode-pa` endpoints. If those responses drift, the safe fallback remains:
+  - keep saved manual model ids working
+  - treat remote Gemini model detection as unavailable instead of guessing more aggressively
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/connections/src/catalog/Catalog.test.ts packages/agents/gemini/src/SettingsStore.test.ts packages/agents/gemini/src/ApplySelection.test.ts packages/core/src/actions/usage/Usage.test.ts`
+- `npm run typecheck`

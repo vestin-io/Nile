@@ -143,6 +143,9 @@ export class ApplySelection {
         this.backend.apply(credential);
         this.accountsStore.applyActive(email.trim());
         this.settingsStore.applySelectedAuthType(projection.selectedAuthType);
+        if (projection.modelId?.trim()) {
+          this.settingsStore.applyModelName(projection.modelId);
+        }
       },
       readAppliedFiles: () => [
         {

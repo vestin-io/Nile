@@ -24,6 +24,7 @@ class GeminiProjectionStrategy {
       accessLabel: input.access.label,
       authMode: "gemini_cli_session",
       selectedAuthType: "oauth-personal",
+      ...(input.modelId?.trim() ? { modelId: input.modelId.trim() } : {}),
     };
   }
 

@@ -246,6 +246,174 @@ describe("ConnectionModelCatalog", () => {
 
     setup.database.close();
   });
+
+  it("reads Gemini models for a Gemini CLI session connection", async () => {
+    const setup = createSetup();
+    setup.endpointRegistry.add({
+      id: "gemini",
+      label: "Gemini",
+      rootUrl: "https://generativelanguage.googleapis.com",
+      profile: "gemini-cli",
+      protocols: {
+        gemini: {
+          authTypes: ["oauth-personal"],
+        },
+      },
+    });
+    setup.accessRegistry.add({
+      id: "gemini-session",
+      endpointId: "gemini",
+      label: "Gemini session",
+      authMode: "gemini_cli_session",
+      enabledAgents: ["gemini"],
+    }, {
+      kind: "gemini_cli_session",
+      accessToken: "gemini-access-token",
+      refreshToken: "gemini-refresh-token",
+      idToken: "gemini-id-token",
+    });
+
+    const requests: string[] = [];
+    const catalog = new ConnectionModelCatalog(
+      setup.endpointRegistry,
+      setup.accessRegistry,
+      EnvironmentSource.empty(),
+      [],
+      async (input) => {
+        const url = input instanceof Request ? input.url : String(input);
+        requests.push(url);
+        if (url === "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist") {
+          return new Response(JSON.stringify({
+            cloudaicompanionProject: "alien-superstate-rq4hk",
+          }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url === "https://cloudcode-pa.googleapis.com/v1internal:listExperiments") {
+          return new Response(JSON.stringify({
+            flags: [
+              { flagId: 45768879, boolValue: true },
+              { flagId: 45760185, boolValue: true },
+              { flagId: 45771641, boolValue: true },
+            ],
+            experimentIds: [],
+          }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url === "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota") {
+          return new Response(JSON.stringify({
+            buckets: [
+              { modelId: "gemini-3-flash-preview" },
+              { modelId: "gemini-3.1-flash-lite-preview" },
+              { modelId: "gemini-2.5-pro" },
+            ],
+          }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      },
+    );
+
+    await expect(catalog.read("gemini-session")).resolves.toEqual({
+      connectionId: "gemini-session",
+      status: "available",
+      models: [
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+      ],
+    });
+    expect(requests).toEqual([
+      "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+      "https://cloudcode-pa.googleapis.com/v1internal:listExperiments",
+      "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota",
+    ]);
+
+    setup.database.close();
+  });
+
+  it("does not advertise Gemini Pro models when preview access exists but experiments are unavailable", async () => {
+    const setup = createSetup();
+    setup.endpointRegistry.add({
+      id: "gemini",
+      label: "Gemini",
+      rootUrl: "https://generativelanguage.googleapis.com",
+      profile: "gemini-cli",
+      protocols: {
+        gemini: {
+          authTypes: ["oauth-personal"],
+        },
+      },
+    });
+    setup.accessRegistry.add({
+      id: "gemini-session",
+      endpointId: "gemini",
+      label: "Gemini session",
+      authMode: "gemini_cli_session",
+      enabledAgents: ["gemini"],
+    }, {
+      kind: "gemini_cli_session",
+      accessToken: "gemini-access-token",
+      refreshToken: "gemini-refresh-token",
+      idToken: "gemini-id-token",
+    });
+
+    const catalog = new ConnectionModelCatalog(
+      setup.endpointRegistry,
+      setup.accessRegistry,
+      EnvironmentSource.empty(),
+      [],
+      async (input) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url === "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist") {
+          return new Response(JSON.stringify({
+            cloudaicompanionProject: { id: "alien-superstate-rq4hk" },
+          }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        if (url === "https://cloudcode-pa.googleapis.com/v1internal:listExperiments") {
+          return new Response(null, { status: 500 });
+        }
+        if (url === "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota") {
+          return new Response(JSON.stringify({
+            buckets: [
+              { modelId: "gemini-3-flash-preview" },
+              { modelId: "gemini-3.1-flash-lite-preview" },
+            ],
+          }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      },
+    );
+
+    await expect(catalog.read("gemini-session")).resolves.toEqual({
+      connectionId: "gemini-session",
+      status: "available",
+      models: [
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+      ],
+    });
+
+    setup.database.close();
+  });
 });
 
 function createSetup() {

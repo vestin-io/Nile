@@ -25,10 +25,10 @@ export class ConnectionModelCatalog {
     private readonly accessRegistry: AccessLookup,
     private readonly environment: EnvironmentSource,
     private readonly localModelCatalogSources: readonly LocalModelCatalogSource[] = [],
-    fetchFn: typeof fetch = globalThis.fetch.bind(globalThis),
+    private readonly fetchFn: typeof fetch = globalThis.fetch.bind(globalThis),
   ) {
-    this.openAiCatalogReader = new OpenAiReader(fetchFn);
-    this.codexCatalogReader = new CodexReader(fetchFn);
+    this.openAiCatalogReader = new OpenAiReader(this.fetchFn);
+    this.codexCatalogReader = new CodexReader(this.fetchFn);
   }
 
   async read(connectionId: string): Promise<ConnectionModelCatalogResult> {
@@ -36,6 +36,7 @@ export class ConnectionModelCatalog {
     if (!access) {
       throw new Error(`Connection not found: ${connectionId}`);
     }
+    const credential = this.accessRegistry.readCredential(connectionId);
 
     const endpoint = this.endpointRegistry.get(access.endpointId);
     if (!endpoint) {
@@ -48,7 +49,12 @@ export class ConnectionModelCatalog {
     }
 
     const cachedGatewayModels = this.readLocalModelCatalogModels(endpoint);
-    const authorization = this.readOpenAiAuthorization(access, this.accessRegistry.readCredential(connectionId));
+    const sessionCatalog = await this.readSessionModelCatalog(access, endpoint, credential);
+    if (sessionCatalog) {
+      return this.mergeSessionCatalogResult(connectionId, cachedGatewayModels, sessionCatalog);
+    }
+
+    const authorization = this.readOpenAiAuthorization(access, credential);
     const shouldProbeGenericGatewayOpenAi =
       endpoint.profile === "generic-gateway" && access.authMode === "api_key" && Boolean(authorization);
 
@@ -84,7 +90,7 @@ export class ConnectionModelCatalog {
     }
 
     try {
-      if (this.shouldUseCodexModelCatalog(access, endpoint, this.accessRegistry.readCredential(connectionId))) {
+      if (this.shouldUseCodexModelCatalog(access, endpoint, credential)) {
         return await this.codexCatalogReader.read(connectionId, authorization);
       }
       const openAiCatalog = await this.openAiCatalogReader.read(connectionId, endpoint, authorization);
@@ -136,6 +142,34 @@ export class ConnectionModelCatalog {
       };
     }
     return openAiCatalog;
+  }
+
+  private mergeSessionCatalogResult(
+    connectionId: string,
+    cachedGatewayModels: string[],
+    sessionCatalog: { status: "available" | "unavailable" | "error"; models: string[]; message?: string },
+  ): ConnectionModelCatalogResult {
+    const models = this.mergeModelIds(sessionCatalog.models, cachedGatewayModels);
+    if (models.length > 0) {
+      return {
+        connectionId,
+        status: "available",
+        models,
+      };
+    }
+    if (cachedGatewayModels.length > 0) {
+      return {
+        connectionId,
+        status: "available",
+        models: cachedGatewayModels,
+      };
+    }
+    return {
+      connectionId,
+      status: sessionCatalog.status,
+      models: [],
+      ...(sessionCatalog.message ? { message: sessionCatalog.message } : {}),
+    };
   }
 
   private readOpenAiAuthorization(
@@ -223,6 +257,28 @@ export class ConnectionModelCatalog {
       const module = CONNECTION_FAMILY_REGISTRY.readModule(family);
       if (module.behaviors.openAiSessionModelCatalogReader) {
         return module.behaviors.openAiSessionModelCatalogReader;
+      }
+    }
+    return null;
+  }
+
+  private async readSessionModelCatalog(
+    access: AccessRecord,
+    endpoint: EndpointRecord,
+    credential: StoredCredential,
+  ): Promise<{ status: "available" | "unavailable" | "error"; models: string[]; message?: string } | null> {
+    for (const family of CONNECTION_FAMILY_REGISTRY.readSavedFamilyIds({
+      protocols: {
+        openai: endpoint.protocols.openai,
+        anthropic: endpoint.protocols.anthropic,
+        cursor: endpoint.protocols.cursor,
+        gemini: endpoint.protocols.gemini,
+      },
+      authMode: access.authMode,
+    })) {
+      const module = CONNECTION_FAMILY_REGISTRY.readModule(family);
+      if (module.behaviors.sessionModelCatalogReader) {
+        return await module.behaviors.sessionModelCatalogReader.read(endpoint, credential, this.fetchFn);
       }
     }
     return null;

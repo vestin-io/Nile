@@ -7,6 +7,7 @@ export type ConnectionFamilyBehaviorSet = {
   accessLabelReader?: ConnectionAccessLabelReader;
   sessionFallbackLabel?: string;
   openAiSessionModelCatalogReader?: OpenAiSessionModelCatalogReader;
+  sessionModelCatalogReader?: SessionModelCatalogReader;
   accessMatcher?: ConnectionAccessMatcher;
 };
 
@@ -21,6 +22,20 @@ export type ConnectionAccessLabelReader = {
 export type OpenAiSessionModelCatalogReader = {
   readAuthorization(credential: StoredCredential): { token: string; accountId?: string } | null;
   shouldUseCodexModelCatalog(endpoint: EndpointRecord, credential: StoredCredential): boolean;
+};
+
+export type SessionModelCatalogResult = {
+  status: "available" | "unavailable" | "error";
+  models: string[];
+  message?: string;
+};
+
+export type SessionModelCatalogReader = {
+  read(
+    endpoint: EndpointRecord,
+    credential: StoredCredential,
+    fetchFn?: typeof fetch,
+  ): Promise<SessionModelCatalogResult | null>;
 };
 
 export type ConnectionAccessMatcher = {

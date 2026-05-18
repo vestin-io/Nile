@@ -30,6 +30,14 @@ export class GeminiSettingsStore {
       : null;
   }
 
+  readModelName(): string | null {
+    const document = this.readDocument();
+    const model = this.readObject(document.model);
+    return typeof model?.name === "string" && model.name.trim()
+      ? model.name.trim()
+      : null;
+  }
+
   applySelectedAuthType(selectedType: string): void {
     const document = this.readDocument();
     const security = this.readObject(document.security) ?? {};
@@ -38,6 +46,21 @@ export class GeminiSettingsStore {
     auth.selectedType = selectedType;
     security.auth = auth;
     document.security = security;
+
+    this.writeDocument(document);
+  }
+
+  applyModelName(modelName: string): void {
+    const normalizedModelName = modelName.trim();
+    if (!normalizedModelName) {
+      throw new Error("Gemini model.name must not be empty");
+    }
+
+    const document = this.readDocument();
+    const model = this.readObject(document.model) ?? {};
+
+    model.name = normalizedModelName;
+    document.model = model;
 
     this.writeDocument(document);
   }

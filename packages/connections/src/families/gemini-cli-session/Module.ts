@@ -4,12 +4,14 @@ import type {
   ConnectionFamilyBehaviorSet,
   ConnectionFamilyModule,
   ConnectionIdentityKeyReader,
+  SessionModelCatalogReader,
 } from "@nile/core/models/connection/family";
 import { JWT_PAYLOAD_DECODER } from "@nile/core/services/JwtPayloadDecoder";
 import type { StoredCredential } from "@nile/core/services/credential/Types";
 import type { AccessRecord } from "@nile/core/models/access";
 
 import { GEMINI_CLI_SESSION_MANIFEST } from "./Manifest";
+import { GeminiSessionModelCatalogReader } from "./ModelCatalog";
 
 class GeminiCliSessionIdentityKeyReader {
   resolve(credential: StoredCredential): string | null {
@@ -80,11 +82,14 @@ const GEMINI_CLI_SESSION_ACCESS_LABEL_READER: ConnectionAccessLabelReader =
   new GeminiCliSessionAccessLabelReader();
 const GEMINI_CLI_SESSION_ACCESS_MATCHER: ConnectionAccessMatcher =
   new GeminiCliSessionAccessMatcher();
+const GEMINI_CLI_SESSION_MODEL_CATALOG_READER: SessionModelCatalogReader =
+  new GeminiSessionModelCatalogReader();
 
 const GEMINI_CLI_SESSION_BEHAVIORS = {
   identityKeyReader: GEMINI_CLI_SESSION_IDENTITY_KEY_READER,
   accessLabelReader: GEMINI_CLI_SESSION_ACCESS_LABEL_READER,
   sessionFallbackLabel: "Gemini Session",
+  sessionModelCatalogReader: GEMINI_CLI_SESSION_MODEL_CATALOG_READER,
   accessMatcher: GEMINI_CLI_SESSION_ACCESS_MATCHER,
 } as const satisfies ConnectionFamilyBehaviorSet;
 

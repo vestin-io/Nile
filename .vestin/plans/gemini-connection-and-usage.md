@@ -185,7 +185,9 @@ Before implementation, run a source spike to answer:
 1. Gemini add connection
    - implemented
 2. Gemini usage/quota source spike
-   - still open
+   - resolved enough to implement
+3. Gemini usage/quota reader
+   - implemented with a remote API path and explicit missing-project fallback
 
 ## Build updates
 
@@ -337,7 +339,34 @@ Verification:
 
 Residual gap:
 
-- Gemini quota / usage is still unresolved and remains in Workstream B.
+- Gemini quota / usage now has a working reader through the shared usage pipeline.
+- Remaining caveat:
+  - expired Gemini OAuth tokens are not auto-refreshed inside core yet
+  - the reader surfaces a clear refresh/re-auth error instead of shelling out to the local `gemini` CLI
+
+### 2026-05-18 - Gemini quota source resolved and usage reader implemented
+
+Resolved Workstream B enough to land a real Gemini usage reader.
+
+- confirmed the viable source is:
+  - `loadCodeAssist` to discover `cloudaicompanionProject`
+  - `retrieveUserQuota` to fetch per-model quota buckets
+- implemented `GeminiSessionUsageReader` in the shared usage flow
+- registered `gemini_cli_session` in builtin usage reader wiring
+- normalized Gemini model buckets into shared usage windows and deduped tier aliases
+- guarded against misleading fake quota by treating a missing Gemini project as unavailable instead of continuing with projectless quota requests
+
+### 2026-05-18 - Gemini model detection and selected-model apply integrated
+
+- Gemini connections now expose a real model catalog through the shared connection catalog surface
+- the model catalog is Gemini-specific and does not pretend Gemini supports OpenAI `/models`
+- model detection follows Gemini CLI's own shape:
+  - discover `cloudaicompanionProject`
+  - read experiment flags
+  - read quota buckets to confirm preview access
+- Gemini apply now writes the saved connection model into:
+  - `~/.gemini/settings.json -> model.name`
+- this makes the selected model effective for new Gemini CLI sessions launched after Nile apply
 
 ## Suggested next execution units
 
@@ -352,10 +381,10 @@ Residual gap:
 
 - Gemini usage source spike
 - deliver:
-  - decision: supported / unsupported / partial
-  - exact source and normalization contract
+  - decision: supported via internal Code Assist endpoints
+  - source + normalization contract recorded in build log
 
 ### Feature 3
 
 - Gemini usage reader
-- only if Feature 2 confirms a stable source
+- implemented with the current source caveat

@@ -30,6 +30,8 @@
     { "module": "core", "feature": "cursor-usage-binding", "state": "built" },
     { "module": "core", "feature": "cursor-usage-snapshot", "state": "built" },
     { "module": "core", "feature": "cursor-usage-reader", "state": "built" },
+    { "module": "core", "feature": "gemini-usage-reader", "state": "built" },
+    { "module": "core", "feature": "gemini-model-catalog", "state": "built" },
     { "module": "core", "feature": "cursor-usage-auto-bind", "state": "built" },
     { "module": "core", "feature": "core-runtime-hardening", "state": "built" },
     { "module": "core", "feature": "review-hardening-pass", "state": "built" },

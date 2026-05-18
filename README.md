@@ -20,6 +20,44 @@ With Nile you can:
 - see what is currently active, what is saved, and where things have drifted
 - use either a desktop UI or a CLI, depending on how you work
 
+## Product Surfaces
+
+### Desktop app
+
+<img src="./assets/preview/demo.gif" alt="Nile desktop app demo" width="960" />
+
+The desktop app is the primary Nile surface. This is where you add connections, review supported agents, save authenticated sessions, and switch active local setups without digging through scattered config files.
+
+### Menubar
+
+<p>
+  <img src="./assets/preview/menubar2.png" alt="Nile menubar picker preview" height="220" />
+  <img src="./assets/preview/menubar.png" alt="Nile menubar preview" height="220" />
+</p>
+
+The menubar gives you a lighter-weight status and switching surface. It is useful when you want to quickly check what is active, inspect saved connections, or change context without opening the full desktop window.
+
+### CLI
+
+![Nile CLI preview](./assets/preview/cli.png)
+
+The CLI is for local workflows, scripting, and terminal-first usage. It exposes the same connection model in a form that fits automation and fast inspection.
+
+Common CLI entry points:
+
+```bash
+nile status
+nile list
+nile add
+nile codex import
+nile codex use <connectionId>
+nile cursor usage auto-bind <connectionId>
+```
+
+`nile status`, `nile list`, and `nile history` are human-readable by default. Add `--json` when you want structured output.
+
+Canonical project terms live in [GLOSSARY.md](./GLOSSARY.md).
+
 ## What It Supports Today
 
 Current surface area:
@@ -50,7 +88,7 @@ Current provider presets:
 
 Current caveats:
 
-- Gemini connection add/sign-in is supported, but Gemini quota and usage reporting are not yet available in Nile.
+- Gemini quota, usage, and model detection rely on internal Code Assist endpoints. If the saved Gemini CLI OAuth token expires, Nile will ask you to refresh that local session.
 - Nile is built to carry forward existing local state across upgrades. If an older local state shape becomes incompatible, Nile should fail with a recoverable reset path instead of silently dropping state.
 
 ## How It Feels
@@ -79,41 +117,6 @@ Current limits:
 - macOS only
 - local tooling workflows only
 - Windows and Linux support are not in scope yet
-
-## Product Surfaces
-
-### Desktop app
-
-![Nile desktop app preview](./assets/preview/desktop.png)
-
-The desktop app is the primary Nile surface. This is where you add connections, review supported agents, save authenticated sessions, and switch active local setups without digging through scattered config files.
-
-### Menubar
-
-<img src="./assets/preview/menubar.png" alt="Nile menubar preview" width="210" />
-
-The menubar gives you a lighter-weight status and switching surface. It is useful when you want to quickly check what is active, inspect saved connections, or change context without opening the full desktop window.
-
-### CLI
-
-![Nile CLI preview](./assets/preview/cli.png)
-
-The CLI is for local workflows, scripting, and terminal-first usage. It exposes the same connection model in a form that fits automation and fast inspection.
-
-Common CLI entry points:
-
-```bash
-nile status
-nile list
-nile add
-nile codex import
-nile codex use <connectionId>
-nile cursor usage auto-bind <connectionId>
-```
-
-`nile status`, `nile list`, and `nile history` are human-readable by default. Add `--json` when you want structured output.
-
-Canonical project terms live in [GLOSSARY.md](./GLOSSARY.md).
 
 ## Development
 

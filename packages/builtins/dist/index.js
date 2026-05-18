@@ -24,12 +24,14 @@ import { CONNECTION_RUNTIME_REGISTRY } from "@nile/core/models/connection";
 import {
   ClaudeSessionConnectionUsageReader,
   CONNECTION_USAGE_READER_REGISTRY,
+  GeminiSessionConnectionUsageReader,
   OpenAiSessionConnectionUsageReader
 } from "@nile/core/actions/usage";
 var BUILTIN_CONNECTION_USAGE_READERS = [
   new OpenAiSessionConnectionUsageReader("openai_session"),
   new OpenAiSessionConnectionUsageReader("openclaw_openai_session"),
-  new ClaudeSessionConnectionUsageReader()
+  new ClaudeSessionConnectionUsageReader(),
+  new GeminiSessionConnectionUsageReader()
 ];
 function registerBuiltinConnectionUsageReaders() {
   CONNECTION_USAGE_READER_REGISTRY.register(BUILTIN_CONNECTION_USAGE_READERS);

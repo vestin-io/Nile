@@ -236,6 +236,194 @@ describe("Usage", () => {
     endpointRegistry.close();
   });
 
+  it("returns deduped Gemini quota windows for gemini session connections", async () => {
+    const setup = createSetup();
+    const { accessRegistry, endpointRegistry } = seedGeminiConnection(setup.dbPath, setup.credentialStore);
+    globalThis.fetch = (async (
+      input: FetchInput,
+      init?: FetchInit,
+    ) => {
+      const url = String(input);
+      if (url === "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist") {
+        expect(new Headers(init?.headers).get("authorization")).toBe("Bearer gemini-access-token");
+        return new Response(JSON.stringify({
+          cloudaicompanionProject: "alien-superstate-rq4hk",
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      if (url === "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota") {
+        expect(init?.body).toBe(JSON.stringify({ project: "alien-superstate-rq4hk" }));
+        return new Response(JSON.stringify({
+          buckets: [
+            {
+              modelId: "gemini-2.5-pro",
+              remainingFraction: 0.42,
+              resetTime: "2026-05-18T12:00:00.000Z",
+            },
+            {
+              modelId: "gemini-3.1-pro-preview",
+              remainingFraction: 0.42,
+              resetTime: "2026-05-18T12:00:00.000Z",
+            },
+            {
+              modelId: "gemini-2.5-flash",
+              remainingFraction: 0.88,
+              resetTime: "2026-05-18T13:00:00.000Z",
+            },
+            {
+              modelId: "gemini-3-flash-preview",
+              remainingFraction: 0.88,
+              resetTime: "2026-05-18T13:00:00.000Z",
+            },
+            {
+              modelId: "gemini-2.5-flash-lite",
+              remainingFraction: 1,
+              resetTime: "2026-05-18T14:00:00.000Z",
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ error: "unexpected url", url, method: init?.method ?? "GET" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    }) as unknown as typeof fetch;
+
+    const result = await createUsage(setup.dbPath, setup.credentialStore, endpointRegistry, accessRegistry).get("gemini-session");
+
+    expect(result).toEqual({
+      connectionId: "gemini-session",
+      connectionLabel: "gemini@example.com",
+      endpointFamily: "gemini",
+      endpointLabel: "Gemini",
+      status: "available",
+      source: "remote_api",
+      planLabel: "Gemini",
+      windows: [
+        expect.objectContaining({
+          kind: "primary",
+          label: "Pro",
+          usedPercent: 58,
+          remainingPercent: 42,
+          resetsAt: "2026-05-18T12:00:00.000Z",
+        }),
+        expect.objectContaining({
+          kind: "additional",
+          label: "Flash",
+          usedPercent: 12,
+          remainingPercent: 88,
+          resetsAt: "2026-05-18T13:00:00.000Z",
+        }),
+        expect.objectContaining({
+          kind: "additional",
+          label: "Flash Lite",
+          usedPercent: 0,
+          remainingPercent: 100,
+          resetsAt: "2026-05-18T14:00:00.000Z",
+        }),
+      ],
+    });
+
+    accessRegistry.close();
+    endpointRegistry.close();
+  });
+
+  it("returns unavailable when Gemini project discovery does not resolve a project", async () => {
+    const setup = createSetup();
+    const { accessRegistry, endpointRegistry } = seedGeminiConnection(setup.dbPath, setup.credentialStore);
+    globalThis.fetch = (async (input: FetchInput) => {
+      const url = String(input);
+      if (url === "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist") {
+        return new Response(JSON.stringify({ currentTier: { id: "standard-tier" } }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      return new Response(null, { status: 500 });
+    }) as unknown as typeof fetch;
+
+    const result = await createUsage(setup.dbPath, setup.credentialStore, endpointRegistry, accessRegistry).get("gemini-session");
+
+    expect(result).toEqual({
+      connectionId: "gemini-session",
+      connectionLabel: "gemini@example.com",
+      endpointFamily: "gemini",
+      endpointLabel: "Gemini",
+      status: "unavailable",
+      source: "remote_api",
+      planLabel: "Gemini",
+      message: "Gemini usage project metadata is unavailable for this session.",
+      windows: [],
+    });
+
+    accessRegistry.close();
+    endpointRegistry.close();
+  });
+
+  it("accepts object-shaped Gemini project metadata", async () => {
+    const setup = createSetup();
+    const { accessRegistry, endpointRegistry } = seedGeminiConnection(setup.dbPath, setup.credentialStore);
+    globalThis.fetch = (async (input: FetchInput, init?: FetchInit) => {
+      const url = String(input);
+      if (url === "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist") {
+        return new Response(JSON.stringify({
+          cloudaicompanionProject: { id: "alien-superstate-rq4hk" },
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      if (url === "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota") {
+        expect(init?.body).toBe(JSON.stringify({ project: "alien-superstate-rq4hk" }));
+        return new Response(JSON.stringify({
+          buckets: [
+            {
+              modelId: "gemini-2.5-flash",
+              remainingFraction: 0.75,
+              resetTime: "2026-05-18T13:00:00.000Z",
+            },
+          ],
+        }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
+      return new Response(null, { status: 500 });
+    }) as unknown as typeof fetch;
+
+    const result = await createUsage(setup.dbPath, setup.credentialStore, endpointRegistry, accessRegistry).get("gemini-session");
+
+    expect(result).toEqual({
+      connectionId: "gemini-session",
+      connectionLabel: "gemini@example.com",
+      endpointFamily: "gemini",
+      endpointLabel: "Gemini",
+      status: "available",
+      source: "remote_api",
+      planLabel: "Gemini",
+      windows: [
+        expect.objectContaining({
+          label: "Flash",
+          usedPercent: 25,
+          remainingPercent: 75,
+          resetsAt: "2026-05-18T13:00:00.000Z",
+        }),
+      ],
+    });
+
+    accessRegistry.close();
+    endpointRegistry.close();
+  });
+
   it("returns live cursor usage when a bound web session succeeds", async () => {
     const setup = createSetup();
     const { accessRegistry, endpointRegistry } = seedCursorConnection(setup.dbPath, setup.credentialStore);
@@ -442,6 +630,35 @@ function seedCursorConnection(dbPath: string, credentialStore: StubCredentialSto
     refreshToken: "cursor-refresh-token",
     authId: "auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
     email: "cursor.user@example.com",
+  });
+  return { accessRegistry, endpointRegistry };
+}
+
+function seedGeminiConnection(dbPath: string, credentialStore: StubCredentialStore) {
+  const endpointRegistry = EndpointRegistry.open(dbPath);
+  endpointRegistry.add({
+    id: "gemini",
+    label: "Gemini",
+    rootUrl: "https://cloudcode-pa.googleapis.com",
+    profile: "gemini-cli",
+    protocols: {
+      gemini: {
+        authTypes: ["oauth-personal"],
+      },
+    },
+  });
+  const accessRegistry = AccessRegistry.open(dbPath, credentialStore);
+  accessRegistry.add({
+    id: "gemini-session",
+    endpointId: "gemini",
+    label: "gemini@example.com",
+    authMode: "gemini_cli_session",
+  }, {
+    kind: "gemini_cli_session",
+    accessToken: "gemini-access-token",
+    refreshToken: "gemini-refresh-token",
+    idToken: "gemini-id-token",
+    tokenType: "Bearer",
   });
   return { accessRegistry, endpointRegistry };
 }

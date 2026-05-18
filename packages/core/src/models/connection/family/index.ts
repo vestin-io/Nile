@@ -6,6 +6,8 @@ export type {
   ConnectionFamilyBehaviorSet,
   ConnectionIdentityKeyReader,
   OpenAiSessionModelCatalogReader,
+  SessionModelCatalogReader,
+  SessionModelCatalogResult,
 } from "./BehaviorTypes";
 export type { ConnectionFamilyModule } from "./ModuleTypes";
 export type { ConnectionFamilyId, ConnectionFamilyProtocolKey } from "./Types";

@@ -5,4 +5,5 @@ export type GeminiProjection = AgentProjection & {
   protocol: "gemini";
   authMode: "gemini_cli_session";
   selectedAuthType: "oauth-personal";
+  modelId?: string;
 };

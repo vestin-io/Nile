@@ -61,6 +61,38 @@ describe("GeminiSettingsStore", () => {
       },
     });
   });
+
+  it("writes model.name without discarding unrelated settings", () => {
+    const store = new GeminiSettingsStore(createGeminiHome());
+
+    store.restore(JSON.stringify({
+      security: {
+        auth: {
+          selectedType: "oauth-personal",
+        },
+      },
+      ui: {
+        theme: "Default Light",
+      },
+    }));
+
+    store.applyModelName("gemini-3-flash-preview");
+
+    expect(store.readModelName()).toBe("gemini-3-flash-preview");
+    expect(JSON.parse(readFileSync(store.settingsPath, "utf8"))).toEqual({
+      security: {
+        auth: {
+          selectedType: "oauth-personal",
+        },
+      },
+      model: {
+        name: "gemini-3-flash-preview",
+      },
+      ui: {
+        theme: "Default Light",
+      },
+    });
+  });
 });
 
 function createGeminiHome(): string {

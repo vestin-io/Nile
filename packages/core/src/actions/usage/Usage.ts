@@ -14,6 +14,7 @@ import type {
 import { EndpointShape } from "../../models/endpoint";
 import type { ConnectionUsageResult } from "./Result";
 import { ClaudeSessionUsageReader } from "./ClaudeSessionUsageReader";
+import { GeminiSessionUsageReader } from "./GeminiSessionUsageReader";
 import { OpenAiSessionUsageReader } from "./OpenAiSessionUsageReader";
 import type { LocalConnectionUsageReader } from "../../runtime-local/LocalConnectionSupport";
 import {
@@ -144,6 +145,50 @@ export class ClaudeSessionConnectionUsageReader implements ConnectionUsageReader
     const credential = accessRegistry.readCredential(access.id);
     if (credential.kind !== "claude_session") {
       return this.buildCredentialError(access, endpoint, "Expected claude_session credential");
+    }
+
+    return await this.reader.read({
+      connectionId: access.id,
+      connectionLabel: access.label,
+      endpointLabel: endpoint.label,
+      credential,
+    });
+  }
+
+  private buildCredentialError(
+    access: AccessRecord,
+    endpoint: EndpointRecord,
+    prefix: string,
+  ): ConnectionUsageResult {
+    return {
+      connectionId: access.id,
+      connectionLabel: access.label,
+      endpointFamily: EndpointShape.readFamily(endpoint),
+      endpointLabel: endpoint.label,
+      status: "error",
+      source: "remote_api",
+      message: `${prefix} for ${access.id}`,
+      windows: [],
+    };
+  }
+}
+
+export class GeminiSessionConnectionUsageReader implements ConnectionUsageReader {
+  readonly authMode = "gemini_cli_session" satisfies AuthMode;
+  private readonly reader = new GeminiSessionUsageReader();
+
+  async read(
+    access: AccessRecord,
+    endpoint: EndpointRecord,
+    accessRegistry: AccessRegistry,
+  ): Promise<ConnectionUsageResult | null> {
+    if (!endpoint.protocols.gemini) {
+      return null;
+    }
+
+    const credential = accessRegistry.readCredential(access.id);
+    if (credential.kind !== "gemini_cli_session") {
+      return this.buildCredentialError(access, endpoint, "Expected gemini_cli_session credential");
     }
 
     return await this.reader.read({
