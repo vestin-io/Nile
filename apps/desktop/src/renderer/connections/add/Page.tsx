@@ -6,6 +6,7 @@ import {
   ConnectionMethodSelector,
   FormField,
   readSelectedMethodKey,
+  readSessionPreparationLabel,
 } from "../ConnectionFormParts";
 import type { Translator } from "../../shared/I18n";
 import { type Definition } from "../../shared/DesktopData";
@@ -233,7 +234,7 @@ export function AddConnectionPage({
                   onClick={() => void prepareDraft()}
                 >
                   {isPreparingDraft
-                    ? t("addConnection.signingIn")
+                    ? readSessionPreparationLabel(selectedSessionMethod?.interactionMode, t)
                     : selectedSessionMethod
                       ? t(selectedSessionMethod.submitKey)
                       : t("common.addConnection")}

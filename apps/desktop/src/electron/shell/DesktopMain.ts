@@ -283,6 +283,7 @@ export class DesktopMain {
     }).register();
     new DesktopIpcUpdateRoutes({
       autoUpdateManager: this.autoUpdateManager,
+      installDesktopUpdate: () => this.installDesktopUpdate(),
     }).register();
     new DesktopIpcAppRoutes({
       inputs: this.inputs,
@@ -305,6 +306,12 @@ export class DesktopMain {
       invalidate: true,
       notifyRenderer: true,
     });
+  }
+
+  private installDesktopUpdate() {
+    this.isQuitting = true;
+    this.shell.prepareForUpdateInstall();
+    return this.autoUpdateManager.installUpdate();
   }
 
   private updateAgentHome(agentId: AgentId, path: string | null): void {

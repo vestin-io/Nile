@@ -32,7 +32,7 @@ describe("AutoUpdateManager", () => {
     }));
   });
 
-  it("reports development builds as unavailable for auto updates", () => {
+  it("reports development builds as unavailable for auto updates", async () => {
     const manager = new AutoUpdateManager({
       logger: new StubLogger(),
       isPackaged: false,
@@ -47,7 +47,7 @@ describe("AutoUpdateManager", () => {
       availableVersion: null,
       errorMessage: null,
     });
-    expect(manager.checkForUpdates()).toEqual({ status: "unavailable" });
+    await expect(manager.checkForUpdates()).resolves.toEqual({ status: "unavailable" });
   });
 
   it("reports unsupported platforms separately", () => {
@@ -68,7 +68,7 @@ describe("AutoUpdateManager", () => {
     });
   });
 
-  it("moves to checking state and triggers renderer refresh on manual checks", () => {
+  it("reconciles manual checks against the update feed before reporting up to date", async () => {
     const updater = new StubUpdater();
     const runAutoUpdate = vi.fn();
     const onReleaseInfoChanged = vi.fn();
@@ -76,37 +76,76 @@ describe("AutoUpdateManager", () => {
       logger: new StubLogger(),
       isPackaged: true,
       platform: "darwin",
-      runAutoUpdate,
+      arch: "arm64",
+      runAutoUpdate: vi.fn(),
       updater,
-      version: "0.1.0",
+      version: "0.16.6",
       onReleaseInfoChanged,
+      fetchUpdateFeedRelease: async () => ({
+        version: "0.16.7",
+        name: "Nile Desktop v0.16.7",
+        url: "https://github.com/vestin-io/Nile/releases/download/v0.16.7/Nile-0.16.7-arm64-mac.zip",
+      }),
     });
 
-    const result = manager.checkForUpdates();
+    const result = await manager.checkForUpdates();
 
     expect(result).toEqual({ status: "started" });
     expect(updater.checkForUpdatesCalls).toBe(1);
     expect(manager.getReleaseInfo()).toEqual({
-      version: "0.1.0",
+      version: "0.16.6",
       updateAvailability: "available",
-      status: "checking",
-      availableVersion: null,
+      status: "downloading",
+      availableVersion: "0.16.7",
       errorMessage: null,
     });
     expect(onReleaseInfoChanged).toHaveBeenCalled();
   });
 
-  it("captures downloaded versions for install UI", () => {
+  it("does not report a newer feed release as up to date when Electron emits update-not-available", async () => {
     const updater = new StubUpdater();
     const manager = new AutoUpdateManager({
       logger: new StubLogger(),
       isPackaged: true,
       platform: "darwin",
+      arch: "arm64",
+      runAutoUpdate: vi.fn(),
       updater,
-      version: "0.15.0",
+      version: "0.16.6",
+      fetchUpdateFeedRelease: async () => ({
+        version: "0.16.7",
+        name: "Nile Desktop v0.16.7",
+        url: "https://github.com/vestin-io/Nile/releases/download/v0.16.7/Nile-0.16.7-arm64-mac.zip",
+      }),
     });
 
-    manager.checkForUpdates();
+    await manager.checkForUpdates();
+    updater.emit("update-not-available");
+    await Promise.resolve();
+
+    expect(manager.getReleaseInfo()).toEqual({
+      version: "0.16.6",
+      updateAvailability: "available",
+      status: "downloading",
+      availableVersion: "0.16.7",
+      errorMessage: null,
+    });
+    expect(updater.checkForUpdatesCalls).toBeGreaterThanOrEqual(1);
+  });
+
+  it("captures downloaded versions for install UI", async () => {
+    const updater = new StubUpdater();
+    const manager = new AutoUpdateManager({
+      logger: new StubLogger(),
+      isPackaged: true,
+      platform: "darwin",
+      runAutoUpdate: vi.fn(),
+      updater,
+      version: "0.15.0",
+      fetchUpdateFeedRelease: async () => null,
+    });
+
+    await manager.checkForUpdates();
     updater.emit("update-downloaded", {}, "", "Nile Desktop v0.15.1", new Date(), "https://example.com/Nile-0.15.1.zip");
 
     expect(manager.getReleaseInfo()).toEqual({
@@ -118,18 +157,19 @@ describe("AutoUpdateManager", () => {
     });
   });
 
-  it("marks up-to-date checks without showing an update target", () => {
+  it("marks up-to-date checks without showing an update target", async () => {
     const updater = new StubUpdater();
     const manager = new AutoUpdateManager({
       logger: new StubLogger(),
       isPackaged: true,
       platform: "darwin",
+      runAutoUpdate: vi.fn(),
       updater,
       version: "0.15.0",
+      fetchUpdateFeedRelease: async () => null,
     });
 
-    manager.checkForUpdates();
-    updater.emit("update-not-available");
+    await manager.checkForUpdates();
 
     expect(manager.getReleaseInfo()).toEqual({
       version: "0.15.0",
@@ -140,63 +180,75 @@ describe("AutoUpdateManager", () => {
     });
   });
 
-  it("shows downloading while an update is being fetched", () => {
+  it("shows downloading while an update is being fetched", async () => {
     const updater = new StubUpdater();
     const manager = new AutoUpdateManager({
       logger: new StubLogger(),
       isPackaged: true,
       platform: "darwin",
+      runAutoUpdate: vi.fn(),
       updater,
       version: "0.15.0",
+      fetchUpdateFeedRelease: async () => ({
+        version: "0.15.1",
+        name: "Nile Desktop v0.15.1",
+        url: "https://example.com/Nile-0.15.1.zip",
+      }),
     });
 
-    manager.checkForUpdates();
+    await manager.checkForUpdates();
     updater.emit("update-available");
+    await Promise.resolve();
 
     expect(manager.getReleaseInfo()).toEqual({
       version: "0.15.0",
       updateAvailability: "available",
       status: "downloading",
-      availableVersion: null,
+      availableVersion: "0.15.1",
       errorMessage: null,
     });
   });
 
-  it("quits and installs only when an update is ready", () => {
+  it("quits and installs only when an update is ready", async () => {
     const updater = new StubUpdater();
     const manager = new AutoUpdateManager({
       logger: new StubLogger(),
       isPackaged: true,
       platform: "darwin",
+      runAutoUpdate: vi.fn(),
       updater,
       version: "0.15.0",
+      fetchUpdateFeedRelease: async () => null,
     });
 
     expect(manager.installUpdate()).toEqual({ status: "unavailable" });
 
-    manager.checkForUpdates();
+    await manager.checkForUpdates();
     updater.emit("update-downloaded", {}, "", "v0.15.1", new Date(), "https://example.com/Nile-0.15.1.zip");
 
     expect(manager.installUpdate()).toEqual({ status: "started" });
     expect(updater.quitAndInstallCalls).toBe(1);
   });
 
-  it("surfaces fetch failures in release info", () => {
+  it("surfaces fetch failures in release info", async () => {
     const updater = new StubUpdater();
     const logger = new StubLogger();
     const manager = new AutoUpdateManager({
       logger,
       isPackaged: true,
       platform: "darwin",
+      runAutoUpdate: vi.fn(),
       updater,
       version: "0.15.0",
+      fetchUpdateFeedRelease: async () => {
+        throw new Error("repository not accessible");
+      },
     });
 
-    manager.checkForUpdates();
-    updater.emit("error", new Error("repository not accessible"));
+    await manager.checkForUpdates();
 
     expect(logger.warnEvents).toContainEqual({
-      event: "desktop.auto_update.fetch_failed",
+      event: "desktop.auto_update.feed_reconcile_failed",
       fields: {
         error: "repository not accessible",
         platform: "darwin",

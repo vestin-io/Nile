@@ -40,6 +40,17 @@ export class DesktopShell {
     this.settingsWindow?.focus();
   }
 
+  prepareForUpdateInstall(): void {
+    if (this.tray) {
+      this.tray.destroy();
+      this.tray = null;
+    }
+
+    if (this.settingsWindow && !this.settingsWindow.isDestroyed()) {
+      this.settingsWindow.close();
+    }
+  }
+
   showSettingsTarget(target: DesktopNotificationTarget): void {
     this.showSettings();
     this.sendNotificationTarget(target);

@@ -1985,3 +1985,32 @@
 - `npm run typecheck`
 - `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run packages/builtins/src/session/MethodCatalog.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts packages/core/src/session/Login.test.ts packages/agents/codex/src/CodexSessionLogin.test.ts`
 - `npm run test:desktop`
+
+## 2026-05-18 - Fix desktop Claude login and wire interactionMode into renderer UX
+
+### What changed
+
+- Reworked Claude interactive sign-in for Electron and isolated add-connection flows:
+  - `packages/agents/claude/src/ClaudeSessionLogin.ts`
+  - `packages/agents/claude/src/ClaudeSessionLogin.test.ts`
+  - `packages/agents/claude/src/LoginSource.ts`
+- Surfaced `interactionMode` in desktop add-connection method cards and preparation button copy:
+  - `apps/desktop/src/renderer/connections/ConnectionFormParts.tsx`
+  - `apps/desktop/src/renderer/connections/add/Page.tsx`
+  - `apps/desktop/src/renderer/shared/i18n/*.ts`
+- Added a builtins test that keeps renderer-safe login declarations aligned with the runtime registry:
+  - `packages/builtins/src/session/LoginDeclarations.test.ts`
+
+### Key findings
+
+- Claude desktop sign-in failed because `stdio: "inherit"` in Electron main has no interactive terminal. The fix mirrors Gemini: launch `claude login` in `Terminal.app` on macOS, then poll the isolated temporary `.claude` home for a new session artifact.
+- Claude add-connection now uses a temporary agent home like Codex so onboarding does not mutate the user's active local Claude account.
+- `interactionMode` metadata is only useful once renderer surfaces consume it. Method descriptions and the preparing-state button label now distinguish browser OAuth from terminal-driven sign-in.
+- Gemini desktop Terminal launch remains macOS-only (`osascript`). Linux/Windows desktop Gemini sign-in is still unsupported.
+
+### Verification
+
+- `npm run typecheck`
+- `npx vitest run packages/agents/claude/src/ClaudeSessionLogin.test.ts packages/builtins/src/session/LoginDeclarations.test.ts`
+- `npm run test:core`
+- `npm run test:desktop`

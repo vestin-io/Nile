@@ -1,15 +1,30 @@
 import type { InteractiveSessionLoginManifest } from "@nile/core/session/LoginTypes";
-import { resolveAgentHome } from "@nile/core/models/agent/homes";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { ClaudeSessionLogin } from "./ClaudeSessionLogin";
-import { CurrentCredentialReader } from "./live-setup/CredentialReader";
 import { CLAUDE_LOGIN_DECLARATION } from "./LoginDeclaration";
 
 export const CLAUDE_LOGIN_SOURCE = {
   ...CLAUDE_LOGIN_DECLARATION,
   async signInAndRead(context) {
-    const claudeHome = resolveAgentHome("claude", context.agentHomes);
+    const { loginRoot, claudeHome } = createTemporaryClaudeHome();
     const login = new ClaudeSessionLogin(context.environment);
-    await login.signIn(claudeHome);
-    return CurrentCredentialReader.open({ claudeHome }).readSession();
+    try {
+      const credential = await login.signInAndRead(claudeHome);
+      if (credential.kind !== "claude_session") {
+        throw new Error("No Claude session found after Claude sign-in");
+      }
+      return credential;
+    } finally {
+      rmSync(loginRoot, { recursive: true, force: true });
+    }
   },
 } as const satisfies InteractiveSessionLoginManifest;
+
+function createTemporaryClaudeHome(): { loginRoot: string; claudeHome: string } {
+  const loginRoot = mkdtempSync(join(tmpdir(), "nile-claude-login-"));
+  const claudeHome = join(loginRoot, ".claude");
+  mkdirSync(claudeHome, { recursive: true });
+  return { loginRoot, claudeHome };
+}

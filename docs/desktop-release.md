@@ -118,6 +118,10 @@ Requirements for the in-app updater to work:
 
 The updater checks for new releases when the packaged app starts and continues polling in the background on Electron's default interval.
 
+Manual update checks also query `https://update.electronjs.org/<owner>/<repo>/<platform>-<arch>/<current-version>` directly and compare the returned release version with the running app version. This prevents false "already up to date" results when Electron's `update-not-available` event races or misfires even though a newer GitHub Release is available.
+
+When the user chooses to install a downloaded update, Nile must quit for real before Squirrel can swap the app bundle. On macOS the settings window normally closes to the menu bar tray instead of exiting, so the install path sets an explicit quitting state, destroys the tray icon, and closes the window before calling `autoUpdater.quitAndInstall()`.
+
 ## Local Signed Build
 
 Local signed builds now use the checked-in desktop version from `apps/desktop/package.json`.

@@ -10,9 +10,13 @@ import type {
   DesktopUpdateCheckResult,
 } from "../../state/Types";
 import {
+  buildElectronUpdateFeedUrl,
   createAutoUpdaterLogger,
   extractAutoUpdateVersion,
+  fetchElectronUpdateFeedRelease,
+  isReleaseVersionNewer,
   readDesktopUpdateAvailability,
+  type ElectronUpdateFeedRelease,
 } from "./AutoUpdateSupport";
 
 type AutoUpdateLogger = Pick<NileLogger, "debug" | "info" | "warn" | "error">;
@@ -29,16 +33,19 @@ type AutoUpdaterLike = {
   checkForUpdates(): void;
   quitAndInstall(): void;
 };
+type FetchUpdateFeedRelease = typeof fetchElectronUpdateFeedRelease;
 
 type AutoUpdateManagerOptions = {
   logger: AutoUpdateLogger;
   isPackaged?: boolean;
   platform?: NodeJS.Platform;
+  arch?: string;
   runAutoUpdate?: RunAutoUpdate;
   scheduleTask?: (task: () => void) => void;
   updater?: AutoUpdaterLike;
   version?: string;
   onReleaseInfoChanged?: () => void;
+  fetchUpdateFeedRelease?: FetchUpdateFeedRelease;
 };
 
 export class AutoUpdateManager {
@@ -46,14 +53,17 @@ export class AutoUpdateManager {
   private readonly logger: AutoUpdateLogger;
   private readonly isPackaged: boolean;
   private readonly platform: NodeJS.Platform;
+  private readonly arch: string;
   private readonly runAutoUpdate: RunAutoUpdate;
   private readonly scheduleTask: (task: () => void) => void;
   private readonly updater: AutoUpdaterLike;
   private readonly version: string;
   private readonly onReleaseInfoChanged: () => void;
+  private readonly fetchUpdateFeedRelease: FetchUpdateFeedRelease;
   private hasStarted = false;
   private hasScheduledStart = false;
   private listenersBound = false;
+  private checkSequence = 0;
   private status: DesktopReleaseStatus = "idle";
   private availableVersion: string | null = null;
   private errorMessage: string | null = null;
@@ -62,6 +72,7 @@ export class AutoUpdateManager {
     this.logger = options.logger;
     this.isPackaged = options.isPackaged ?? false;
     this.platform = options.platform ?? process.platform;
+    this.arch = options.arch ?? process.arch;
     this.runAutoUpdate = options.runAutoUpdate ?? updateElectronApp;
     this.scheduleTask = options.scheduleTask ?? ((task) => {
       setTimeout(task, 0);
@@ -69,6 +80,7 @@ export class AutoUpdateManager {
     this.updater = options.updater ?? autoUpdater;
     this.version = options.version?.trim() || "0.0.0";
     this.onReleaseInfoChanged = options.onReleaseInfoChanged ?? (() => {});
+    this.fetchUpdateFeedRelease = options.fetchUpdateFeedRelease ?? fetchElectronUpdateFeedRelease;
   }
 
   start(): void {
@@ -107,7 +119,7 @@ export class AutoUpdateManager {
     };
   }
 
-  checkForUpdates(): DesktopUpdateCheckResult {
+  async checkForUpdates(): Promise<DesktopUpdateCheckResult> {
     if (this.readUpdateAvailability() !== "available") {
       return { status: "unavailable" };
     }
@@ -120,15 +132,7 @@ export class AutoUpdateManager {
       return { status: "unavailable" };
     }
 
-    if (this.status === "checking") {
-      return { status: "started" };
-    }
-
-    this.updateReleaseState({
-      status: "checking",
-      availableVersion: this.availableVersion,
-      errorMessage: null,
-    });
+    const sequence = this.beginChecking();
 
     try {
       this.updater.checkForUpdates();
@@ -136,7 +140,6 @@ export class AutoUpdateManager {
         platform: this.platform,
         repo: AutoUpdateManager.repository,
       });
-      return { status: "started" };
     } catch (error) {
       this.logger.warn("desktop.auto_update.manual_check_unavailable", {
         platform: this.platform,
@@ -150,6 +153,9 @@ export class AutoUpdateManager {
       });
       return { status: "unavailable" };
     }
+
+    await this.reconcileReleaseStateWithFeed(sequence, "downloading");
+    return { status: "started" };
   }
 
   installUpdate(): DesktopInstallUpdateResult {
@@ -217,25 +223,15 @@ export class AutoUpdateManager {
 
     this.listenersBound = true;
     this.updater.on("checking-for-update", () => {
-      this.updateReleaseState({
-        status: "checking",
-        availableVersion: this.availableVersion,
-        errorMessage: null,
-      });
+      if (this.status === "idle" || this.status === "up_to_date" || this.status === "error") {
+        this.beginChecking();
+      }
     });
     this.updater.on("update-available", () => {
-      this.updateReleaseState({
-        status: "downloading",
-        availableVersion: this.availableVersion,
-        errorMessage: null,
-      });
+      void this.handleUpdateAvailable();
     });
     this.updater.on("update-not-available", () => {
-      this.updateReleaseState({
-        status: "up_to_date",
-        availableVersion: null,
-        errorMessage: null,
-      });
+      void this.handleUpdateNotAvailable();
     });
     this.updater.on("update-downloaded", (_event, _releaseNotes, releaseName, _releaseDate, updateURL) => {
       this.updateReleaseState({
@@ -256,6 +252,101 @@ export class AutoUpdateManager {
         errorMessage: error.message,
       });
     });
+  }
+
+  private beginChecking(): number {
+    const sequence = ++this.checkSequence;
+    this.updateReleaseState({
+      status: "checking",
+      availableVersion: this.availableVersion,
+      errorMessage: null,
+    });
+    return sequence;
+  }
+
+  private async handleUpdateAvailable(): Promise<void> {
+    const sequence = this.checkSequence;
+    await this.reconcileReleaseStateWithFeed(sequence, "downloading");
+  }
+
+  private async handleUpdateNotAvailable(): Promise<void> {
+    const sequence = this.checkSequence;
+    await this.reconcileReleaseStateWithFeed(sequence, "up_to_date");
+  }
+
+  private async reconcileReleaseStateWithFeed(
+    sequence: number,
+    fallbackStatus: Extract<DesktopReleaseStatus, "downloading" | "up_to_date"> = "up_to_date",
+  ): Promise<void> {
+    if (sequence !== this.checkSequence) {
+      return;
+    }
+
+    try {
+      const release = await this.readFeedRelease();
+      if (sequence !== this.checkSequence) {
+        return;
+      }
+
+      if (release && isReleaseVersionNewer(release.version, this.version)) {
+        this.applyFeedRelease(release, this.status === "ready" ? "ready" : "downloading");
+        if (fallbackStatus === "up_to_date") {
+          this.updater.checkForUpdates();
+        }
+        return;
+      }
+
+      if (this.status === "ready") {
+        return;
+      }
+
+      this.updateReleaseState({
+        status: "up_to_date",
+        availableVersion: null,
+        errorMessage: null,
+      });
+    } catch (error) {
+      if (sequence !== this.checkSequence) {
+        return;
+      }
+
+      this.logger.warn("desktop.auto_update.feed_reconcile_failed", {
+        error: error instanceof Error ? error.message : String(error),
+        platform: this.platform,
+        repo: AutoUpdateManager.repository,
+      });
+      if (this.status === "checking") {
+        this.updateReleaseState({
+          status: "error",
+          availableVersion: this.availableVersion,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  private applyFeedRelease(
+    release: ElectronUpdateFeedRelease,
+    status: Extract<DesktopReleaseStatus, "downloading" | "ready">,
+  ): void {
+    this.updateReleaseState({
+      status,
+      availableVersion: release.version,
+      errorMessage: null,
+    });
+  }
+
+  private readFeedUrl(): string {
+    return buildElectronUpdateFeedUrl(
+      AutoUpdateManager.repository,
+      this.version,
+      this.platform,
+      this.arch,
+    );
+  }
+
+  private async readFeedRelease(): Promise<ElectronUpdateFeedRelease | null> {
+    return await this.fetchUpdateFeedRelease(this.readFeedUrl());
   }
 
   private updateReleaseState(next: {

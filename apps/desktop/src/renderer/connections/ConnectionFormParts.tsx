@@ -1,6 +1,10 @@
 import { type ReactNode } from "react";
 import type { AgentId } from "@nile/core/models/agent/definitions";
-import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
+import type { InteractiveSessionLoginInteractionMode } from "@nile/core/session";
+import {
+  SHARED_SESSION_CONNECTION_METHODS,
+  type SessionConnectionMethod,
+} from "@nile/builtins/session";
 
 import type { Translator } from "../shared/I18n";
 import { orderSupportedAuthModes, type Definition } from "../shared/DesktopData";
@@ -15,6 +19,7 @@ export type ConnectionMethod = {
   authMode: Definition["supportedAuthModes"][number];
   apiKeySource?: "direct" | "env_key";
   description: string;
+  interactionMode?: InteractiveSessionLoginInteractionMode;
   sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
   title: string;
 };
@@ -56,7 +61,8 @@ export function buildConnectionMethods(definition: Definition, t: Translator): C
       methods.push({
         key: method.key,
         authMode,
-        description: method.descriptionKey ? t(method.descriptionKey) : t(method.titleKey),
+        description: readConnectionMethodDescription(method, t),
+        ...(method.interactionMode ? { interactionMode: method.interactionMode } : {}),
         sessionSource: method.source,
         title: t(method.titleKey),
       });
@@ -74,6 +80,31 @@ export function buildConnectionMethods(definition: Definition, t: Translator): C
   }
 
   return methods;
+}
+
+function readConnectionMethodDescription(method: SessionConnectionMethod, t: Translator): string {
+  const base = method.descriptionKey ? t(method.descriptionKey) : t(method.titleKey);
+  if (!method.interactionMode) {
+    return base;
+  }
+
+  const hintKey = method.interactionMode === "browser_oauth"
+    ? "addConnection.loginInteraction.browserOauth"
+    : "addConnection.loginInteraction.terminalInteractive";
+  return `${base} ${t(hintKey)}`;
+}
+
+export function readSessionPreparationLabel(
+  interactionMode: InteractiveSessionLoginInteractionMode | undefined,
+  t: Translator,
+): string {
+  if (interactionMode === "browser_oauth") {
+    return t("addConnection.signingInBrowser");
+  }
+  if (interactionMode === "terminal_interactive") {
+    return t("addConnection.signingInTerminal");
+  }
+  return t("addConnection.signingIn");
 }
 
 export function readSelectedMethodKey(
