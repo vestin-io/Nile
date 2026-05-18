@@ -36,12 +36,15 @@ type SettingsPageContentProps = {
   definitions: Definition[];
   historyState: HistoryState;
   isLoadedNotificationMute: boolean;
+  isLoadedMenubarDisplay: boolean;
   isLoadingNotificationHistory: boolean;
   isMarkingNotificationHistoryRead: boolean;
+  isSavingMenubarDisplay: boolean;
   isSavingNotificationMute: boolean;
   isResetting: boolean;
   isSavingProfileFeature: boolean;
   language: LanguagePreference;
+  menubarDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"];
   notificationsMuted: boolean;
   notificationHistoryFilter: NotificationHistoryFilter;
   notificationHistoryConnections: DesktopNotificationHistoryConnection[];
@@ -79,6 +82,9 @@ type SettingsPageContentProps = {
   onDeleteProfile(profileId: string): Promise<void>;
   onInstallUpdate(): Promise<void>;
   onLanguageChange(language: LanguagePreference): void;
+  onMenubarDisplayModeChange(
+    mode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"],
+  ): Promise<void>;
   onNotificationsMutedChange(muted: boolean): Promise<void>;
   onNotificationHistoryFilterChange(filter: NotificationHistoryFilter): void;
   onMarkNotificationHistoryRead(entryIds: string[]): Promise<void>;
@@ -129,12 +135,15 @@ export function SettingsPageContent({
   definitions,
   historyState,
   isLoadedNotificationMute,
+  isLoadedMenubarDisplay,
   isLoadingNotificationHistory,
   isMarkingNotificationHistoryRead,
+  isSavingMenubarDisplay,
   isSavingNotificationMute,
   isResetting,
   isSavingProfileFeature,
   language,
+  menubarDisplayMode,
   notificationsMuted,
   notificationHistoryFilter,
   notificationHistoryConnections,
@@ -171,6 +180,7 @@ export function SettingsPageContent({
   onDeleteProfile,
   onInstallUpdate,
   onLanguageChange,
+  onMenubarDisplayModeChange,
   onNotificationsMutedChange,
   onNotificationHistoryFilterChange,
   onMarkNotificationHistoryRead,
@@ -344,6 +354,9 @@ export function SettingsPageContent({
     return (
       <SettingsPage
         isLoadedNotificationMute={isLoadedNotificationMute}
+        isLoadedMenubarDisplay={isLoadedMenubarDisplay}
+        isSavingMenubarDisplay={isSavingMenubarDisplay}
+        menubarDisplayMode={menubarDisplayMode}
         isSavingNotificationMute={isSavingNotificationMute}
         isResetting={isResetting}
         isSavingProfileFeature={isSavingProfileFeature}
@@ -355,6 +368,7 @@ export function SettingsPageContent({
         onCheckForUpdates={onCheckForUpdates}
         onInstallUpdate={onInstallUpdate}
         onLanguageChange={onLanguageChange}
+        onMenubarDisplayModeChange={onMenubarDisplayModeChange}
         onNotificationsMutedChange={onNotificationsMutedChange}
         onProfileFeatureEnabledChange={onProfileFeatureEnabledChange}
         onReset={onReset}

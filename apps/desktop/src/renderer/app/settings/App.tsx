@@ -6,6 +6,7 @@ import { useNotificationHistory } from "./useNotificationHistory";
 import { useNotificationUnread } from "./useNotificationUnread";
 import { useNotificationMute } from "./useNotificationMute";
 import { useDesktopPreferences } from "./usePreferences";
+import { useMenubarDisplay } from "./useMenubarDisplay";
 import { useProfileFeature } from "./useProfileFeature";
 import { useSettingsNavigation } from "./useNavigation";
 import { useDesktopData } from "./useData";
@@ -35,6 +36,12 @@ export function SettingsApp() {
     settingsState,
   } = useDesktopData();
   const { preferences, setPreferences, t } = useDesktopPreferences();
+  const {
+    isLoaded: isMenubarDisplayLoaded,
+    isSaving: isSavingMenubarDisplay,
+    mode: menubarDisplayMode,
+    setMode: setMenubarDisplayMode,
+  } = useMenubarDisplay();
   const {
     isLoaded: isNotificationMuteLoaded,
     isSaving: isSavingNotificationMute,
@@ -272,11 +279,14 @@ export function SettingsApp() {
         definitions={definitions}
         historyState={historyState}
         isLoadedNotificationMute={isNotificationMuteLoaded}
+        isLoadedMenubarDisplay={isMenubarDisplayLoaded}
         isLoadingNotificationHistory={isLoadingNotificationHistory}
         isMarkingNotificationHistoryRead={isMarkingNotificationHistoryRead}
+        isSavingMenubarDisplay={isSavingMenubarDisplay}
         isSavingNotificationMute={isSavingNotificationMute}
         isResetting={isResetting}
         language={preferences.language}
+        menubarDisplayMode={menubarDisplayMode}
         notificationsMuted={notificationsMuted}
         notificationHistoryFilter={notificationHistoryFilter}
         notificationHistoryConnections={notificationHistoryConnections}
@@ -333,6 +343,7 @@ export function SettingsApp() {
           await window.nileDesktop.updates.installUpdate().catch(() => ({ status: "unavailable" as const }));
         }}
         onLanguageChange={(language) => setPreferences((current) => ({ ...current, language }))}
+        onMenubarDisplayModeChange={setMenubarDisplayMode}
         onNotificationsMutedChange={setNotificationsMuted}
         onNotificationHistoryFilterChange={(filter) => {
           setNotificationHistoryFilter(filter);

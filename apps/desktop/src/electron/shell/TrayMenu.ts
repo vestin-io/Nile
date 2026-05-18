@@ -7,12 +7,15 @@ import { readCurrentProfile } from "../../profiles/CurrentProfile";
 import type { MenubarAgentState, MenubarState, SettingsState } from "../../state/Types";
 import type { DesktopNotificationIntent } from "../notifications/Types";
 import type { WorkspaceProfile } from "../profiles/Store";
+import type { DesktopMenubarDisplayState } from "../state/MenubarDisplayStore";
+import { DesktopTrayTickerTitle } from "./TickerTitle";
 
 type DesktopTrayMenuOptions = {
   isProfileFeatureEnabled(): boolean;
   logger: NileLogger;
   peekState(): MenubarState | null;
   peekSettingsState(): SettingsState | null;
+  readMenubarDisplay(): DesktopMenubarDisplayState;
   refreshState(): Promise<MenubarState>;
   refreshSettingsState(): Promise<SettingsState>;
   listProfiles(): WorkspaceProfile[];
@@ -21,6 +24,7 @@ type DesktopTrayMenuOptions = {
   applyProfile(profileId: string): Promise<void>;
   notify(intent: DesktopNotificationIntent): void;
   switchConnection(agentId: AgentId, connectionId: string): Promise<void>;
+  toggleTickerAgent(agentId: AgentId): void;
 };
 
 export class DesktopTrayMenu {
@@ -49,6 +53,8 @@ export class DesktopTrayMenu {
     settingsState: SettingsState | null,
     profiles: WorkspaceProfile[],
   ): MenuItemConstructorOptions[] {
+    const menubarDisplay = this.options.readMenubarDisplay();
+    const selectedTickerAgentIds = new Set(DesktopTrayTickerTitle.readSelectedAgentIds(state, menubarDisplay));
     const profileMenu = this.readProfileFeatureEnabled()
       ? this.buildProfileSubmenu(
           profiles,
@@ -68,13 +74,13 @@ export class DesktopTrayMenu {
     }
 
     return [
-      { label: "Open Main Window", click: () => this.options.showSettings() },
-      { type: "separator" },
-      ...(profileMenu ? [profileMenu, { type: "separator" as const }] : []),
-      ...state.agents.map((agent) => this.buildAgentSubmenu(agent)),
-      { type: "separator" },
-      { label: "Quit", click: () => this.options.quitApp() },
-    ];
+        { label: "Open Main Window", click: () => this.options.showSettings() },
+        { type: "separator" },
+        ...(profileMenu ? [profileMenu, { type: "separator" as const }] : []),
+        ...state.agents.map((agent) => this.buildAgentSubmenu(agent, selectedTickerAgentIds)),
+        { type: "separator" },
+        { label: "Quit", click: () => this.options.quitApp() },
+      ];
   }
 
   private buildProfileSubmenu(
@@ -104,7 +110,10 @@ export class DesktopTrayMenu {
     };
   }
 
-  private buildAgentSubmenu(agent: MenubarAgentState): MenuItemConstructorOptions {
+  private buildAgentSubmenu(
+    agent: MenubarAgentState,
+    selectedTickerAgentIds: Set<AgentId>,
+  ): MenuItemConstructorOptions {
     if (agent.connections.length === 0) {
       return {
         label: agent.agentLabel,
@@ -114,7 +123,17 @@ export class DesktopTrayMenu {
 
     const submenu: MenuItemConstructorOptions[] = [];
     if (agent.currentUsage?.status === "available") {
-      submenu.push({ label: `Quota · ${agent.currentUsage.text}`, enabled: false });
+      submenu.push({
+        label: `Quota · ${agent.currentUsage.text}`,
+        submenu: [{
+          label: "Show in ticker",
+          type: "checkbox",
+          checked: selectedTickerAgentIds.has(agent.agentId),
+          click: () => {
+            this.options.toggleTickerAgent(agent.agentId);
+          },
+        }],
+      });
       submenu.push({ type: "separator" });
     }
 

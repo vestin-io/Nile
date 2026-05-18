@@ -41,11 +41,13 @@ import { WorkspaceProfileStore } from "../profiles/Store";
 import { DesktopShell } from "./DesktopShell";
 import { DesktopTrayMenu } from "./TrayMenu";
 import { DesktopStateReset } from "../state/Reset";
+import { DesktopMenubarDisplayStore } from "../state/MenubarDisplayStore";
 import { DesktopNotificationMuteStore } from "../state/NotificationMuteStore";
 import { DesktopProfileFeatureStore } from "../state/ProfileFeatureStore";
 import { DesktopStateRefresher } from "../state/DesktopStateRefresher";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 import { DesktopWorkspaceWatcher } from "./DesktopWorkspaceWatcher";
+import { DesktopTrayTickerTitle } from "./TickerTitle";
 
 const currentDir =
   typeof __dirname === "string"
@@ -65,6 +67,7 @@ export class DesktopMain {
   private readonly environmentStore: DesktopEnvironmentStore;
   private readonly shellEnvironment: DesktopShellEnvironment;
   private readonly agentHomesStore: AgentHomesStore;
+  private readonly menubarDisplayStore: DesktopMenubarDisplayStore;
   private readonly notificationMuteStore: DesktopNotificationMuteStore;
   private readonly profileFeatureStore: DesktopProfileFeatureStore;
   private readonly profileStore: WorkspaceProfileStore;
@@ -96,6 +99,7 @@ export class DesktopMain {
       this.environmentStore,
     );
     this.agentHomesStore = new AgentHomesStore(options.databasePath);
+    this.menubarDisplayStore = new DesktopMenubarDisplayStore(options.databasePath);
     this.notificationMuteStore = new DesktopNotificationMuteStore(options.databasePath);
     this.profileFeatureStore = new DesktopProfileFeatureStore(options.databasePath);
     this.profileStore = new WorkspaceProfileStore(options.databasePath);
@@ -164,6 +168,7 @@ export class DesktopMain {
       peekState: () => this.stateStore.peekMenubarState(),
       peekSettingsState: () => this.stateStore.peekSettingsState(),
       isProfileFeatureEnabled: () => this.profileFeatureStore.read(),
+      readMenubarDisplay: () => this.menubarDisplayStore.read(),
       refreshState: async () => await this.stateStore.refreshMenubarState(),
       refreshSettingsState: async () => await this.stateStore.getSettingsState({ refreshUsage: false }),
       listProfiles: () => this.profileManager.list(),
@@ -180,6 +185,10 @@ export class DesktopMain {
         await this.stateStore.switchConnection(agentId, connectionId);
         this.reloadAll();
       },
+      toggleTickerAgent: (agentId) => {
+        this.toggleMenubarTickerAgent(agentId);
+        this.syncTrayTitle();
+      },
     });
     this.stateRefresher = new DesktopStateRefresher({
       alertEvaluator: new ConnectionUsageAlertEvaluator({
@@ -188,7 +197,10 @@ export class DesktopMain {
         },
       }),
       logger: this.logger,
-      notifyRenderer: () => this.shell.notifyStateChanged(),
+      notifyRenderer: () => {
+        this.shell.notifyStateChanged();
+        this.syncTrayTitle();
+      },
       stateStore: this.stateStore,
     });
     this.workspaceWatcher = new DesktopWorkspaceWatcher({
@@ -232,6 +244,7 @@ export class DesktopMain {
     this.applicationMenu.install();
     this.registerIpcRoutes();
     this.shell.attach();
+    this.syncTrayTitle();
     await this.syncManagedApiKeyEnvironment();
     this.workspaceWatcher.start();
     void this.stateStore.refreshMenubarState().catch((error) => {
@@ -254,15 +267,26 @@ export class DesktopMain {
 
   private registerIpcRoutes(): void {
     new DesktopIpcStateRoutes({
+      getMenubarDisplay: () => this.menubarDisplayStore.read(),
       getNotificationsMuted: () => this.notificationMuteStore.read(),
       getProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       inputs: this.inputs,
       notifyNotificationHistoryChanged: () => this.shell.notifyNotificationHistoryChanged(),
       refreshAll: () => this.reloadAll(),
       refreshDesktopState: (options) => this.refreshDesktopState(options),
+      setMenubarDisplayMode: (mode) => {
+        const next = this.menubarDisplayStore.writeMode(mode);
+        this.syncTrayTitle();
+        return next;
+      },
       setNotificationsMuted: (muted) => this.notificationMuteStore.write(muted),
       setProfileFeatureEnabled: (enabled) => this.profileFeatureStore.write(enabled),
       stateStore: this.stateStore,
+      toggleMenubarTickerAgent: (agentId) => {
+        const next = this.toggleMenubarTickerAgent(agentId);
+        this.syncTrayTitle();
+        return next;
+      },
       updateAgentHome: (agentId, path) => this.updateAgentHome(agentId, path),
     }).register();
     new DesktopIpcConnectionRoutes({
@@ -397,5 +421,24 @@ export class DesktopMain {
 
   private refreshMenubarUsage(): Promise<void> {
     return this.stateRefresher.refreshMenubarUsage();
+  }
+
+  private toggleMenubarTickerAgent(agentId: AgentId) {
+    const preferences = this.menubarDisplayStore.read();
+    const nextSelectedAgentIds = DesktopTrayTickerTitle.toggleSelectedAgentIds(
+      this.stateStore.peekMenubarState(),
+      preferences,
+      agentId,
+    );
+    return this.menubarDisplayStore.writeTickerAgentIds(nextSelectedAgentIds);
+  }
+
+  private syncTrayTitle(): void {
+    this.shell.setTrayTitle(
+      DesktopTrayTickerTitle.format(
+        this.stateStore.peekMenubarState(),
+        this.menubarDisplayStore.read(),
+      ),
+    );
   }
 }

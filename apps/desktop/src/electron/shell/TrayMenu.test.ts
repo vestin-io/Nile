@@ -170,6 +170,7 @@ describe("DesktopTrayMenu", () => {
       logger: { warn } as never,
       peekState: () => createMenubarState(),
       peekSettingsState: () => createSettingsState(),
+      readMenubarDisplay: () => ({ hasConfiguredTickerAgents: false, mode: "app_entry", tickerAgentIds: [] }),
       refreshState: async () => createMenubarState(),
       refreshSettingsState: async () => createSettingsState(),
       listProfiles: () => [{
@@ -182,6 +183,7 @@ describe("DesktopTrayMenu", () => {
       quitApp: () => {},
       applyProfile: async () => {},
       switchConnection: async () => {},
+      toggleTickerAgent: () => {},
     });
 
     const template = await menu.readTemplate();
@@ -204,7 +206,8 @@ describe("DesktopTrayMenu", () => {
     const template = await menu.readTemplate();
     const codexMenu = template.find((item) => item.label === "Codex");
     const submenu = readSubmenu(codexMenu ?? {});
-    submenu[1]?.click?.({} as never, {} as never, {} as never);
+    const personalConnection = submenu.find((item) => item.label === "Codex Personal");
+    personalConnection?.click?.({} as never, {} as never, {} as never);
     await Promise.resolve();
 
     expect(switchConnection).toHaveBeenCalledWith("codex", "codex-personal");
@@ -220,6 +223,31 @@ describe("DesktopTrayMenu", () => {
       cooldownMs: 60_000,
     });
   });
+
+  it("shows a ticker toggle under the quota row when usage is available", async () => {
+    const toggleTickerAgent = vi.fn();
+    const menu = createMenu({
+      profiles: [],
+      readMenubarDisplay: () => ({ hasConfiguredTickerAgents: true, mode: "ticker", tickerAgentIds: ["codex"] }),
+      toggleTickerAgent,
+    });
+
+    const template = await menu.readTemplate();
+    const codexMenu = template.find((item) => item.label === "Codex");
+    const submenu = readSubmenu(codexMenu ?? {});
+    const quotaItem = submenu[0];
+
+    expect(quotaItem).toMatchObject({ label: "Quota · 5h 72% left" });
+    const quotaSubmenu = readSubmenu(quotaItem ?? {});
+    expect(quotaSubmenu[0]).toMatchObject({
+      label: "Show in ticker",
+      type: "checkbox",
+      checked: true,
+    });
+
+    quotaSubmenu[0]?.click?.({} as never, {} as never, {} as never);
+    expect(toggleTickerAgent).toHaveBeenCalledWith("codex");
+  });
 });
 
 function createMenu(options: {
@@ -227,7 +255,9 @@ function createMenu(options: {
   notify?: (intent: object) => void;
   profileFeatureEnabled?: boolean;
   profiles: WorkspaceProfile[];
+  readMenubarDisplay?: () => { hasConfiguredTickerAgents: boolean; mode: "app_entry" | "ticker"; tickerAgentIds: AgentId[] };
   switchConnection?: (agentId: AgentId, connectionId: string) => Promise<void>;
+  toggleTickerAgent?: (agentId: AgentId) => void;
 }) {
   const settingsState = createSettingsState();
   const menubarState = createMenubarState();
@@ -239,6 +269,11 @@ function createMenu(options: {
     } as never,
     peekState: () => menubarState,
     peekSettingsState: () => settingsState,
+    readMenubarDisplay: options.readMenubarDisplay ?? (() => ({
+      hasConfiguredTickerAgents: false,
+      mode: "app_entry",
+      tickerAgentIds: [],
+    })),
     refreshState: async () => menubarState,
     refreshSettingsState: async () => settingsState,
     listProfiles: () => options.profiles,
@@ -247,6 +282,7 @@ function createMenu(options: {
     quitApp: () => {},
     applyProfile: options.applyProfile ?? (async () => {}),
     switchConnection: options.switchConnection ?? (async () => {}),
+    toggleTickerAgent: options.toggleTickerAgent ?? (() => {}),
   });
 }
 
@@ -267,14 +303,26 @@ function createMenubarState(): MenubarState {
         agentId: "codex",
         agentLabel: "Codex",
         currentConnection: codexWork,
-        currentUsage: null,
+        currentUsage: {
+          status: "available",
+          windows: [],
+          windowLabel: "5h",
+          remainingPercent: 72,
+          text: "5h 72% left",
+        },
         connections: [codexWork, createConnection("codex-personal", "Codex Personal", ["codex"])],
       },
       {
         agentId: "cursor",
         agentLabel: "Cursor",
         currentConnection: null,
-        currentUsage: null,
+        currentUsage: {
+          status: "available",
+          windows: [],
+          windowLabel: "monthly",
+          remainingPercent: 6,
+          text: "monthly 6% left",
+        },
         connections: [],
       },
       {

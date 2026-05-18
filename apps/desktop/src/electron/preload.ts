@@ -45,6 +45,7 @@ const bridge: DesktopBridge = {
   },
   state: {
     getMenubarState: () => ipcRenderer.invoke("desktop:get-menubar-state"),
+    getMenubarDisplay: () => ipcRenderer.invoke("desktop:get-menubar-display"),
     getSettingsState: () => ipcRenderer.invoke("desktop:get-settings-state"),
     getSettingsStateSnapshot: () => ipcRenderer.invoke("desktop:get-settings-state-snapshot"),
     getHistoryState: () => ipcRenderer.invoke("desktop:get-history-state"),
@@ -55,7 +56,9 @@ const bridge: DesktopBridge = {
     markNotificationHistoryReadByFilter: (filter) => ipcRenderer.invoke("desktop:mark-notification-history-read-by-filter", filter),
     getNotificationsMuted: () => ipcRenderer.invoke("desktop:get-notifications-muted"),
     getProfileFeatureEnabled: () => ipcRenderer.invoke("desktop:get-profile-feature-enabled"),
+    setMenubarDisplayMode: (mode) => ipcRenderer.invoke("desktop:set-menubar-display-mode", mode),
     setNotificationsMuted: (muted) => ipcRenderer.invoke("desktop:set-notifications-muted", muted),
+    toggleMenubarTickerAgent: (agentId) => ipcRenderer.invoke("desktop:toggle-menubar-ticker-agent", agentId),
     setProfileFeatureEnabled: (enabled) => ipcRenderer.invoke("desktop:set-profile-feature-enabled", enabled),
     refreshSettings: () => ipcRenderer.invoke("desktop:refresh-settings"),
     refreshMenubar: () => ipcRenderer.invoke("desktop:refresh-menubar"),

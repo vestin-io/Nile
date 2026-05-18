@@ -21,6 +21,48 @@
 
 - `npm run typecheck`
 
+### Menubar usage ticker
+
+- Added a persisted menubar display preference in Electron main so the tray can survive restarts with either:
+  - compact `App entry` mode
+  - usage `Ticker` mode
+- Added tray title formatting from current agent usage snapshots:
+  - `codex 72% · cursor 6%` style output
+  - hidden automatically when ticker mode is off or selected agents do not have available usage
+- Added per-agent ticker customization from the tray menu itself:
+  - each agent's `Quota` row now expands to a `Show in ticker` checkbox
+  - users can keep only specific agents, such as Codex, in the top-bar ticker
+- Refined ticker fallback behavior:
+  - when ticker agent selection has never been configured, Nile defaults to the first agent that currently has available quota
+  - when ticker mode is enabled but the selected agents do not currently expose quota, the tray falls back to the normal app-entry icon instead of showing an empty ticker
+  - when ticker text is present, the macOS tray hides the Nile icon and shows text-only output
+- Added a desktop Settings control for the global menubar mode without moving existing theme/language/profile settings.
+
+### Key findings
+
+- Tray title state cannot rely on renderer `localStorage`; it has to live in Electron main because the tray exists before or without the settings window.
+- The existing menubar state already exposes `currentUsage` per agent, so this feature did not need a new usage pipeline. The right seam was main-process formatting plus a small persisted preference store.
+- Keeping agent selection in the tray `Quota` submenu is materially better than adding another dense settings matrix because it lets users tune visibility where they immediately see the result.
+
+### Verification
+
+- `npm run typecheck`
+- `npx vitest run apps/desktop/src/electron/state/MenubarDisplayStore.test.ts apps/desktop/src/electron/shell/TickerTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts`
+
+### Menubar usage ticker follow-up fixes
+
+- Fixed the first-click tray-toggle bug when ticker agents had never been explicitly configured:
+  - the tray checkbox state was showing the inferred default selection
+  - but the toggle mutation was still operating on the raw persisted selection
+  - main-process toggles now derive from the current effective selection before writing the configured set
+- Removed the unused `settings.menubar.tickerHint` locale key after the settings hint text was dropped from the UI.
+- Replaced the temporary English placeholder copy for the new menubar setting in the shipped non-English desktop locale catalogs.
+
+### Key findings
+
+- The "default selected agent" behavior and the "persisted configured selection" behavior cannot share the same raw toggle path. The mutation has to operate on the effective selection the user actually sees.
+- Locale-complete product settings need to be treated as part of the feature, not a later polish pass, because placeholder English strings create an immediate regression in already localized builds.
+
 ### Update prompt polish and shutdown safety
 
 - Slimmed the global update prompt into a smaller notification-style card:

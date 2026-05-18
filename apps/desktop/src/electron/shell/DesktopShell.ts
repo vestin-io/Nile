@@ -35,6 +35,15 @@ export class DesktopShell {
     this.sendToSettingsWindow("desktop:notification-history-changed");
   }
 
+  setTrayTitle(title: string): void {
+    if (!this.tray || process.platform !== "darwin") {
+      return;
+    }
+    const normalizedTitle = title.trim();
+    this.tray.setTitle(normalizedTitle);
+    this.tray.setImage(normalizedTitle ? nativeImage.createEmpty() : this.createTrayImage());
+  }
+
   showSettings(): void {
     this.settingsWindow?.show();
     this.settingsWindow?.focus();

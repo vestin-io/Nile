@@ -20,15 +20,21 @@ import { UpdateSection } from "./UpdateSection";
 
 type SettingsPageProps = {
   isLoadedNotificationMute: boolean;
+  isLoadedMenubarDisplay: boolean;
+  isSavingMenubarDisplay: boolean;
   isSavingNotificationMute: boolean;
   isResetting: boolean;
   isSavingProfileFeature: boolean;
+  menubarDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"];
   notificationsMuted: boolean;
   preferences: DesktopPreferences;
   profileFeatureEnabled: boolean;
   releaseInfo: DesktopReleaseInfo | null;
   onCheckForUpdates(): Promise<void>;
   onInstallUpdate(): Promise<void>;
+  onMenubarDisplayModeChange(
+    mode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"],
+  ): Promise<void>;
   onNotificationsMutedChange(muted: boolean): Promise<void>;
   onProfileFeatureEnabledChange(enabled: boolean): Promise<void>;
   onReset(): void;
@@ -39,15 +45,19 @@ type SettingsPageProps = {
 
 export function SettingsPage({
   isLoadedNotificationMute,
+  isLoadedMenubarDisplay,
+  isSavingMenubarDisplay,
   isSavingNotificationMute,
   isResetting,
   isSavingProfileFeature,
+  menubarDisplayMode,
   notificationsMuted,
   preferences,
   profileFeatureEnabled,
   releaseInfo,
   onCheckForUpdates,
   onInstallUpdate,
+  onMenubarDisplayModeChange,
   onNotificationsMutedChange,
   onProfileFeatureEnabledChange,
   onReset,
@@ -112,6 +122,31 @@ export function SettingsPage({
           <SelectContent>
             <SelectItem value="on">{t("common.on")}</SelectItem>
             <SelectItem value="off">{t("common.off")}</SelectItem>
+          </SelectContent>
+        </Select>
+      </SettingsSection>
+
+      <Separator />
+
+      <SettingsSection
+        title={t("settings.menubar.title")}
+        description={t("settings.menubar.description")}
+      >
+        <Select
+          value={menubarDisplayMode}
+          onValueChange={(value) => {
+            void onMenubarDisplayModeChange(
+              value as Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"],
+            );
+          }}
+          disabled={!isLoadedMenubarDisplay || isSavingMenubarDisplay}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={t("settings.menubar.label")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="app_entry">{t("settings.menubar.appEntry")}</SelectItem>
+            <SelectItem value="ticker">{t("settings.menubar.ticker")}</SelectItem>
           </SelectContent>
         </Select>
       </SettingsSection>

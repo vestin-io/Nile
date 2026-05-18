@@ -4,17 +4,21 @@ import type { AgentId } from "@nile/core/models/agent";
 
 import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
 import { DesktopStateStore } from "../state/DesktopStateStore";
+import { MENUBAR_DISPLAY_MODES, type DesktopMenubarDisplayMode, type DesktopMenubarDisplayState } from "../state/MenubarDisplayStore";
 
 type DesktopIpcStateRoutesOptions = {
+  getMenubarDisplay(): DesktopMenubarDisplayState;
   getNotificationsMuted(): boolean;
   getProfileFeatureEnabled(): boolean;
   inputs: DesktopIpcInputValidator;
   notifyNotificationHistoryChanged(): void;
   refreshAll(): void;
   refreshDesktopState(options: { invalidate: boolean; notifyRenderer: boolean }): Promise<void>;
+  setMenubarDisplayMode(mode: DesktopMenubarDisplayMode): DesktopMenubarDisplayState;
   setNotificationsMuted(muted: boolean): boolean;
   setProfileFeatureEnabled(enabled: boolean): boolean;
   stateStore: DesktopStateStore;
+  toggleMenubarTickerAgent(agentId: AgentId): DesktopMenubarDisplayState;
   updateAgentHome(agentId: AgentId, path: string | null): void;
 };
 
@@ -25,6 +29,7 @@ export class DesktopIpcStateRoutes {
     const { inputs, stateStore } = this.options;
 
     ipcMain.handle("desktop:get-menubar-state", () => stateStore.getMenubarState());
+    ipcMain.handle("desktop:get-menubar-display", () => this.options.getMenubarDisplay());
     ipcMain.handle("desktop:get-settings-state", () => stateStore.getSettingsState());
     ipcMain.handle("desktop:get-settings-state-snapshot", () => stateStore.getSettingsState({ refreshUsage: false }));
     ipcMain.handle("desktop:get-history-state", () => stateStore.getHistoryState());
@@ -43,8 +48,14 @@ export class DesktopIpcStateRoutes {
     });
     ipcMain.handle("desktop:get-notifications-muted", () => this.options.getNotificationsMuted());
     ipcMain.handle("desktop:get-profile-feature-enabled", () => this.options.getProfileFeatureEnabled());
+    ipcMain.handle("desktop:set-menubar-display-mode", (_event, mode: unknown) => {
+      return this.options.setMenubarDisplayMode(this.readMenubarDisplayMode(mode));
+    });
     ipcMain.handle("desktop:set-notifications-muted", (_event, muted: unknown) => {
       return this.options.setNotificationsMuted(inputs.readBoolean(muted, "muted"));
+    });
+    ipcMain.handle("desktop:toggle-menubar-ticker-agent", (_event, agentId: unknown) => {
+      return this.options.toggleMenubarTickerAgent(inputs.readAgentId(agentId));
     });
     ipcMain.handle("desktop:set-profile-feature-enabled", (_event, enabled: unknown) => {
       return this.options.setProfileFeatureEnabled(inputs.readBoolean(enabled, "enabled"));
@@ -86,5 +97,13 @@ export class DesktopIpcStateRoutes {
       );
       this.options.refreshAll();
     });
+  }
+
+  private readMenubarDisplayMode(value: unknown): DesktopMenubarDisplayMode {
+    const mode = this.options.inputs.readRequiredString(value, "mode");
+    if (MENUBAR_DISPLAY_MODES.includes(mode as DesktopMenubarDisplayMode)) {
+      return mode as DesktopMenubarDisplayMode;
+    }
+    throw new Error(`Unsupported menubar display mode: ${mode}`);
   }
 }
