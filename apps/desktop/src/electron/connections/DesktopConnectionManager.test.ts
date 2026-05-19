@@ -9,6 +9,7 @@ import { AccessRegistry } from "@nile/core/models/access";
 import { EndpointRegistry } from "@nile/core/models/endpoint";
 import { CursorUsageBindingRegistry } from "@nile/builtins/cursor-usage";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import type { InteractiveSessionLoginContext } from "@nile/core/session";
 import { KeychainCredentialStore, SecurityCli, type StoredCredential, type SecurityCliResult } from "@nile/core/services/credential";
 import type { InteractiveSessionLoginRegistry } from "@nile/builtins/session";
 
@@ -156,6 +157,36 @@ describe("DesktopConnectionManager", () => {
         endpointFamily: "openai",
         authMode: "openai_session",
       }),
+    );
+  });
+
+  it("passes the desktop browser opener into Codex session sign-in", async () => {
+    const setup = createSetup();
+    const loginRunner = new StubCodexInteractiveSessionLoginRegistry(
+      setup.codexHome,
+      "https://auth.openai.com/oauth/authorize?state=desktop-test",
+    );
+    const openExternalUrl = vi.fn(async () => {});
+    const manager = new DesktopConnectionManager(
+      {
+        databasePath: setup.dbPath,
+        agentHomes: { codex: setup.codexHome },
+        environment: EnvironmentSource.empty(),
+        openExternalUrl,
+        credentialStore: setup.credentialStore,
+      },
+      loginRunner,
+    );
+
+    const draft = await manager.prepareConnectionDraft({
+      preset: "openai",
+      authMode: "openai_session",
+      sessionSource: "login",
+    });
+
+    expect(draft.authMode).toBe("openai_session");
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      "https://auth.openai.com/oauth/authorize?state=desktop-test",
     );
   });
 
@@ -1134,10 +1165,14 @@ class StubCredentialStore extends KeychainCredentialStore {
 
 class StubCodexInteractiveSessionLoginRegistry implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
   readonly signInCalls: string[] = [];
+  readonly openExternalCalls: string[] = [];
 
-  constructor(private readonly codexHome: string) {}
+  constructor(
+    private readonly codexHome: string,
+    private readonly loginUrl?: string,
+  ) {}
 
-  async signInAndRead(): Promise<{
+  async signInAndRead(context: InteractiveSessionLoginContext): Promise<{
     kind: "openai_session";
     idToken: string;
     accessToken: string;
@@ -1146,6 +1181,10 @@ class StubCodexInteractiveSessionLoginRegistry implements Pick<InteractiveSessio
     lastRefresh: string;
   }> {
     this.signInCalls.push(this.codexHome);
+    if (this.loginUrl && context.openExternalUrl) {
+      await context.openExternalUrl(this.loginUrl);
+      this.openExternalCalls.push(this.loginUrl);
+    }
     writeOpenAiSession(this.codexHome, "acct-signed-in");
     return {
       kind: "openai_session",

@@ -11,7 +11,9 @@ export const CODEX_LOGIN_SOURCE = {
     const { loginRoot, codexHome } = createTemporaryCodexHome();
     const login = new CodexSessionLogin(context.environment);
     try {
-      const credential = await login.signInAndRead(codexHome);
+      const credential = await login.signInAndRead(codexHome, {
+        openExternalUrl: context.openExternalUrl,
+      });
       if (credential.kind !== "openai_session") {
         throw new Error("No OpenAI session found after Codex sign-in");
       }

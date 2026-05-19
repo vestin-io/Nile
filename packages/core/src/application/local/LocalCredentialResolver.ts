@@ -20,11 +20,13 @@ export class LocalCredentialResolver {
       InteractiveSessionLoginRegistry,
       "signInAndRead"
     > = INTERACTIVE_SESSION_LOGIN_REGISTRY,
+    openExternalUrl?: (url: string) => Promise<void>,
   ) {
     this.sessionCredentialResolver = new SessionCredentialResolver(
       agentHomes,
       environment,
       interactiveSessionLoginRegistry,
+      openExternalUrl,
     );
   }
 

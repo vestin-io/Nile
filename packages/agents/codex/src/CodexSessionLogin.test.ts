@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -81,7 +82,7 @@ describe("CodexSessionLogin", () => {
     writeFileSync(join(toolBin, "codex"), "");
 
     let command: string | null = null;
-    let receivedStdio: "inherit" | "ignore" | null = null;
+    let receivedStdio: "inherit" | "ignore" | "pipe" | null = null;
     const originalPath = process.env.PATH;
     process.env.PATH = toolBin;
     const login = new CodexSessionLogin(
@@ -127,6 +128,70 @@ describe("CodexSessionLogin", () => {
     }
 
     expect(command).toBe(join(toolBin, "codex"));
-    expect(receivedStdio).toBe("ignore");
+    expect(receivedStdio).toBe("pipe");
+  });
+
+  it("opens the emitted Codex sign-in URL when a browser opener is available", async () => {
+    let openedUrl: string | null = null;
+    let receivedStdio: "inherit" | "ignore" | "pipe" | null = null;
+    const login = new CodexSessionLogin(
+      EnvironmentSource.empty(),
+      (_spawnedCommand, _args, options) => {
+        receivedStdio = options.stdio;
+        const child = new StubSpawnedProcess();
+        queueMicrotask(() => {
+          child.stdout.emit("data", "Starting local login server on http://localhost:1455.\n");
+          child.stdout.emit(
+            "data",
+            "https://auth.openai.com/oauth/authorize?response_type=code&state=test-state\n",
+          );
+          child.emit("exit", 0);
+        });
+        return child as never;
+      },
+      () => true,
+    );
+
+    await expect(
+      login.signIn("/tmp/.codex", {
+        openExternalUrl: async (url) => {
+          openedUrl = url;
+        },
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(receivedStdio).toBe("pipe");
+    expect(openedUrl).toBe("https://auth.openai.com/oauth/authorize?response_type=code&state=test-state");
+  });
+
+  it("includes captured Codex stderr when Electron login exits non-zero", async () => {
+    const login = new CodexSessionLogin(
+      EnvironmentSource.empty(),
+      () => {
+        const child = new StubSpawnedProcess();
+        queueMicrotask(() => {
+          child.stderr.emit("data", "Error logging in: browser launch failed\n");
+          child.emit("exit", 1);
+        });
+        return child as never;
+      },
+      () => true,
+    );
+
+    await expect(login.signIn("/tmp/.codex")).rejects.toThrow(
+      "codex login failed with exit code 1: Error logging in: browser launch failed",
+    );
   });
 });
+
+class StubSpawnedProcess extends EventEmitter {
+  readonly stdout = new EventEmitter();
+  readonly stderr = new EventEmitter();
+
+  kill(): boolean {
+    queueMicrotask(() => {
+      this.emit("exit", 1);
+    });
+    return true;
+  }
+}

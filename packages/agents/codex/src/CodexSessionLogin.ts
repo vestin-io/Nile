@@ -8,21 +8,34 @@ import type { StoredCredential } from "@nile/core/services/credential";
 import { CodexAuthStore } from "./stores/CodexAuthStore";
 
 type SpawnedProcess = {
+  stdout?: NodeJS.ReadableStream | null;
+  stderr?: NodeJS.ReadableStream | null;
   once(event: "error", listener: (error: Error) => void): unknown;
   once(event: "exit", listener: (code: number | null) => void): unknown;
+  kill?(signal?: NodeJS.Signals | number): boolean;
 };
 
 type SpawnFn = (
   command: string,
   args: string[],
   options: {
-    stdio: "inherit" | "ignore";
+    stdio: "inherit" | "ignore" | "pipe";
     env: NodeJS.ProcessEnv;
   },
 ) => SpawnedProcess;
 
+type BrowserOpener = (url: string) => Promise<void>;
+
+type LoginExecutionState = {
+  browserOpenError: Error | null;
+  browserOpenPromise: Promise<void> | null;
+  loginUrl: string | null;
+  output: string[];
+};
+
 const loginPollIntervalMs = 1000;
 const loginTimeoutMs = 5 * 60 * 1000;
+const loginUrlPattern = /https:\/\/auth\.openai\.com\/\S+/;
 
 export class CodexSessionLogin {
   constructor(
@@ -31,23 +44,30 @@ export class CodexSessionLogin {
     private readonly isElectronProcess: () => boolean = () => Boolean(process.versions.electron),
   ) {}
 
-  async signIn(codexHome: string): Promise<void> {
+  async signIn(codexHome: string, options: { openExternalUrl?: BrowserOpener } = {}): Promise<void> {
     const env = this.buildLoginEnv(codexHome);
     const codexCommand = this.resolveCodexCommand(env.PATH ?? "");
+    const shouldCaptureOutput = this.isElectronProcess() || options.openExternalUrl !== undefined;
+    const child = this.spawn(codexCommand, ["login"], {
+      stdio: shouldCaptureOutput ? "pipe" : "inherit",
+      env,
+    });
+    const state = this.captureLoginOutput(child, options.openExternalUrl);
 
     await this.waitForExit(
-      this.spawn(codexCommand, ["login"], {
-        stdio: this.isElectronProcess() ? "ignore" : "inherit",
-        env,
-      }),
+      child,
       "codex login",
+      state,
     );
   }
 
-  async signInAndRead(codexHome: string): Promise<StoredCredential> {
+  async signInAndRead(
+    codexHome: string,
+    options: { openExternalUrl?: BrowserOpener } = {},
+  ): Promise<StoredCredential> {
     const authStore = new CodexAuthStore({ codexHome });
     const baseline = authStore.snapshot();
-    await this.signIn(codexHome);
+    await this.signIn(codexHome, options);
     return await this.waitForSignedInSession(authStore, baseline);
   }
 
@@ -62,6 +82,71 @@ export class CodexSessionLogin {
     return new Error(
       "Codex CLI was not found in PATH. Install Codex CLI or add it to your shell PATH, then restart Nile.",
       cause ? { cause } : undefined,
+    );
+  }
+
+  private captureLoginOutput(
+    child: SpawnedProcess,
+    openExternalUrl: BrowserOpener | undefined,
+  ): LoginExecutionState {
+    const state: LoginExecutionState = {
+      browserOpenError: null,
+      browserOpenPromise: null,
+      loginUrl: null,
+      output: [],
+    };
+
+    this.attachOutputListener(child.stdout, child, state, openExternalUrl);
+    this.attachOutputListener(child.stderr, child, state, openExternalUrl);
+    return state;
+  }
+
+  private attachOutputListener(
+    stream: NodeJS.ReadableStream | null | undefined,
+    child: SpawnedProcess,
+    state: LoginExecutionState,
+    openExternalUrl: BrowserOpener | undefined,
+  ): void {
+    if (!stream) {
+      return;
+    }
+
+    stream.on("data", (chunk: string | Buffer) => {
+      const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+      if (!text) {
+        return;
+      }
+
+      state.output.push(text);
+      const loginUrl = this.extractLoginUrl(state.output.join(""));
+      if (!loginUrl || state.loginUrl === loginUrl) {
+        return;
+      }
+
+      state.loginUrl = loginUrl;
+      if (!openExternalUrl || state.browserOpenPromise) {
+        return;
+      }
+
+      state.browserOpenPromise = openExternalUrl(loginUrl).catch((error) => {
+        state.browserOpenError = this.buildBrowserOpenError(loginUrl, error);
+        child.kill?.();
+      });
+    });
+  }
+
+  private extractLoginUrl(output: string): string | null {
+    const match = output.match(loginUrlPattern);
+    return match ? match[0] : null;
+  }
+
+  private buildBrowserOpenError(loginUrl: string, cause: unknown): Error {
+    const detail = cause instanceof Error && cause.message
+      ? `: ${cause.message}`
+      : "";
+    return new Error(
+      `Failed to open the Codex sign-in URL automatically${detail} (${loginUrl})`,
+      cause instanceof Error ? { cause } : undefined,
     );
   }
 
@@ -82,6 +167,32 @@ export class CodexSessionLogin {
       }
     }
     return "codex";
+  }
+
+  private buildLoginFailure(
+    operation: string,
+    exitCode: number | null,
+    state: LoginExecutionState,
+  ): Error {
+    const detail = this.extractFailureDetail(state.output.join(""));
+    if (detail) {
+      return new Error(`${operation} failed with exit code ${exitCode ?? "unknown"}: ${detail}`);
+    }
+    return new Error(`${operation} failed with exit code ${exitCode ?? "unknown"}`);
+  }
+
+  private extractFailureDetail(output: string): string | null {
+    const lines = output
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line) =>
+        !line.startsWith("Starting local login server on ")
+        && !line.startsWith("If your browser did not open")
+        && !line.startsWith("On a remote or headless machine?")
+        && !line.startsWith("navigate to this URL to authenticate:")
+        && !/^https:\/\/auth\.openai\.com\//.test(line));
+    return lines.length > 0 ? lines[lines.length - 1] : null;
   }
 
   private async waitForSignedInSession(
@@ -105,13 +216,23 @@ export class CodexSessionLogin {
     );
   }
 
-  private async waitForExit(child: SpawnedProcess, operation: string): Promise<void> {
+  private async waitForExit(
+    child: SpawnedProcess,
+    operation: string,
+    state: LoginExecutionState,
+  ): Promise<void> {
     const exitCode = await new Promise<number | null>((resolve, reject) => {
       child.once("error", (error) => reject(this.buildSpawnError(error)));
       child.once("exit", (code) => resolve(code));
     });
+    if (state.browserOpenPromise) {
+      await state.browserOpenPromise.catch(() => {});
+    }
+    if (state.browserOpenError) {
+      throw state.browserOpenError;
+    }
     if (exitCode !== 0) {
-      throw new Error(`${operation} failed with exit code ${exitCode ?? "unknown"}`);
+      throw this.buildLoginFailure(operation, exitCode, state);
     }
   }
 }

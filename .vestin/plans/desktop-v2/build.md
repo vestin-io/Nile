@@ -21,6 +21,30 @@
 
 - `npm run typecheck`
 
+### Desktop Codex browser-oauth release fix
+
+- Fixed desktop OpenAI sign-in so packaged builds no longer depend on `codex login` opening the browser by itself:
+  - extended the shared interactive-login context with an optional `openExternalUrl()` callback
+  - desktop now injects that callback from the Electron shell when preparing or creating a login-backed connection
+  - Codex login now captures `codex login` output in Electron, extracts the emitted OpenAI OAuth URL, and opens it through the desktop shell
+- Improved Codex login failure reporting in desktop/Electron paths:
+  - stopped discarding all child-process output with `stdio: ignore`
+  - preserved captured login errors so the UI no longer collapses every failure into a bare `exit code 1`
+- Added regression coverage for:
+  - browser opener injection from `DesktopConnectionManager`
+  - Codex login URL capture and browser launch
+  - surfaced stderr details on failed Codex login exits
+
+#### Key findings
+
+- The production failure was not in `desktop:prepare-connection-draft` itself; the broken behavior was that Nile never actively opened the OAuth URL in packaged desktop flows and also hid the underlying Codex CLI output.
+- The fix still relies on `codex login` printing an OpenAI auth URL. If Codex CLI changes that output format in a future release, the URL extraction pattern may need to be updated.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run packages/agents/codex/src/CodexSessionLogin.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts packages/core/src/application/local/LocalCredentialResolver.test.ts`
+- `npm run typecheck`
+
 ### Review follow-up fixes
 
 - Seeded the main-process language store during startup from the hidden settings renderer's existing desktop preference payload before creating the tray.

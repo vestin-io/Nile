@@ -23,6 +23,7 @@ export class SessionCredentialResolver {
       InteractiveSessionLoginRegistry,
       "signInAndRead"
     > = INTERACTIVE_SESSION_LOGIN_REGISTRY,
+    private readonly openExternalUrl?: (url: string) => Promise<void>,
   ) {
     this.currentSessionResolver = new CurrentSessionResolver(agentHomes, environment);
   }
@@ -43,6 +44,7 @@ export class SessionCredentialResolver {
       {
         agentHomes: this.agentHomes,
         environment: this.environment,
+        openExternalUrl: this.openExternalUrl,
       },
       request,
     );

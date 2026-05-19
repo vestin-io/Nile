@@ -31,6 +31,7 @@ export type InteractiveSessionLoginInteractionMode =
 export type InteractiveSessionLoginContext = {
   agentHomes: AgentHomes | undefined;
   environment: EnvironmentSource;
+  openExternalUrl?: (url: string) => Promise<void>;
 };
 
 export type InteractiveSessionLoginManifest = {

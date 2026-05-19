@@ -46,6 +46,7 @@ type DesktopConnectionManagerOptions = {
   databasePath: string;
   agentHomes?: AgentHomes;
   environment: EnvironmentSource;
+  openExternalUrl?: (url: string) => Promise<void>;
   managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
   credentialStore: CredentialStore;
   maxPreparedDrafts?: number;
@@ -74,6 +75,7 @@ export class DesktopConnectionManager {
       this.options.agentHomes,
       this.options.environment,
       interactiveSessionLoginRegistry,
+      this.options.openExternalUrl,
     );
     this.managedApiKeyEnvironment = this.options.managedApiKeyEnvironment ?? new NoopManagedApiKeyEnvironment();
     this.sessions = new SessionRunner(this);
