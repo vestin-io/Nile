@@ -180,7 +180,7 @@ export function SettingsApp() {
   );
   const shouldShowUpdatePrompt =
     releaseInfo !== null &&
-    (releaseInfo.status === "downloading" || releaseInfo.status === "ready" || releaseInfo.status === "error") &&
+    (releaseInfo.status === "ready" || releaseInfo.status === "error") &&
     updatePromptKey !== dismissedUpdatePromptKey;
 
   useEffect(() => {
@@ -188,6 +188,10 @@ export function SettingsApp() {
       current === null || current === updatePromptKey ? current : null
     ));
   }, [updatePromptKey]);
+
+  useEffect(() => {
+    void window.nileDesktop.state.refreshMenubar().catch(() => undefined);
+  }, [preferences.language, preferences.theme]);
 
   if (isLoading && (!settingsState || !historyState)) {
     return <LoadingShell label={t("loading.desktop")} />;

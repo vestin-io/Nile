@@ -4,6 +4,10 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  parseLanguagePreferenceFromDesktopPreferences,
+  type LanguagePreference,
+} from "../../state/UiPreferences";
 import type { DesktopNotificationTarget } from "../notifications/contracts";
 
 type DesktopShellOptions = {
@@ -15,16 +19,20 @@ type DesktopShellOptions = {
 
 export class DesktopShell {
   private static readonly trayIconName = "nileTemplate@2x.png";
+  private static readonly preferencesStorageKey = "nile.desktop.preferences";
+  private static readonly settingsLoadTimeoutMs = 2_000;
   private tray: Tray | null = null;
   private settingsWindow: BrowserWindow | null = null;
   private pendingNotificationTarget: DesktopNotificationTarget | null = null;
 
   constructor(private readonly options: DesktopShellOptions) {}
 
-  attach(): void {
+  async attach(): Promise<LanguagePreference | null> {
     this.createSettingsWindow();
+    const initialLanguagePreference = await this.readInitialLanguagePreference();
     this.createTray();
     this.setAppIcon();
+    return initialLanguagePreference;
   }
 
   notifyStateChanged(): void {
@@ -167,6 +175,45 @@ export class DesktopShell {
       this.settingsWindow = null;
     });
     void this.settingsWindow.loadFile(fileURLToPath(settingsUrl));
+  }
+
+  private async readInitialLanguagePreference(): Promise<LanguagePreference | null> {
+    const settingsWindow = this.readSettingsWindowForSend();
+    if (!settingsWindow) {
+      return null;
+    }
+    try {
+      await this.waitForSettingsWindowLoad(settingsWindow);
+      const raw = await settingsWindow.webContents.executeJavaScript(
+        `window.localStorage.getItem(${JSON.stringify(DesktopShell.preferencesStorageKey)})`,
+        true,
+      );
+      return parseLanguagePreferenceFromDesktopPreferences(typeof raw === "string" ? raw : null);
+    } catch {
+      return null;
+    }
+  }
+
+  private async waitForSettingsWindowLoad(settingsWindow: BrowserWindow): Promise<void> {
+    if (!settingsWindow.webContents.isLoadingMainFrame()) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const settle = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timeoutId);
+        settingsWindow.webContents.removeListener("did-finish-load", settle);
+        settingsWindow.webContents.removeListener("did-fail-load", settle);
+        resolve();
+      };
+      const timeoutId = setTimeout(settle, DesktopShell.settingsLoadTimeoutMs);
+      settingsWindow.webContents.once("did-finish-load", settle);
+      settingsWindow.webContents.once("did-fail-load", settle);
+    });
   }
 
   private async popTrayMenu(): Promise<void> {

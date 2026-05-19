@@ -117,6 +117,7 @@ refreshButton?.addEventListener("click", async () => {
 });
 
 window.nileDesktopEvents.onStateChanged(() => {
+  applyFramePreferences();
   void render();
 });
 

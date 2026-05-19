@@ -54,6 +54,7 @@ const bridge: DesktopBridge = {
     hasUnreadNotifications: () => ipcRenderer.invoke("desktop:has-unread-notifications"),
     markNotificationHistoryRead: (entryIds) => ipcRenderer.invoke("desktop:mark-notification-history-read", entryIds),
     markNotificationHistoryReadByFilter: (filter) => ipcRenderer.invoke("desktop:mark-notification-history-read-by-filter", filter),
+    setLanguagePreference: (language) => ipcRenderer.invoke("desktop:set-language-preference", language),
     getNotificationsMuted: () => ipcRenderer.invoke("desktop:get-notifications-muted"),
     getProfileFeatureEnabled: () => ipcRenderer.invoke("desktop:get-profile-feature-enabled"),
     setMenubarDisplayMode: (mode) => ipcRenderer.invoke("desktop:set-menubar-display-mode", mode),

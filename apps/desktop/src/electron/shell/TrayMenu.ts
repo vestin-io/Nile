@@ -3,6 +3,8 @@ import type { MenuItemConstructorOptions } from "electron";
 import type { AgentId } from "@nile/core/models/agent";
 import { NileLogger } from "@nile/core/services/NileLogger";
 
+import { createTranslator, type Translator } from "../../renderer/shared/I18n";
+import type { LanguagePreference } from "../../state/UiPreferences";
 import { readCurrentProfile } from "../../profiles/CurrentProfile";
 import type { MenubarAgentState, MenubarState, SettingsState } from "../../state/Types";
 import type { DesktopNotificationIntent } from "../notifications/Types";
@@ -15,6 +17,7 @@ type DesktopTrayMenuOptions = {
   logger: NileLogger;
   peekState(): MenubarState | null;
   peekSettingsState(): SettingsState | null;
+  readLanguagePreference(): LanguagePreference;
   readMenubarDisplay(): DesktopMenubarDisplayState;
   refreshState(): Promise<MenubarState>;
   refreshSettingsState(): Promise<SettingsState>;
@@ -45,13 +48,14 @@ export class DesktopTrayMenu {
       });
       return this.options.peekSettingsState();
     });
-    return this.buildTemplate(state, settingsState, this.options.listProfiles());
+    return this.buildTemplate(state, settingsState, this.options.listProfiles(), this.readTranslator());
   }
 
   private buildTemplate(
     state: MenubarState | null,
     settingsState: SettingsState | null,
     profiles: WorkspaceProfile[],
+    t: Translator,
   ): MenuItemConstructorOptions[] {
     const menubarDisplay = this.options.readMenubarDisplay();
     const selectedTickerAgentIds = new Set(DesktopTrayTickerTitle.readSelectedAgentIds(state, menubarDisplay));
@@ -59,43 +63,45 @@ export class DesktopTrayMenu {
       ? this.buildProfileSubmenu(
           profiles,
           settingsState ? readCurrentProfile(profiles, settingsState.agents, settingsState.advanced.agentHomes) : null,
+          t,
         )
       : null;
 
     if (!state) {
       return [
-        { label: "Open Main Window", click: () => this.options.showSettings() },
+        { label: t("tray.openMainWindow"), click: () => this.options.showSettings() },
         { type: "separator" },
         ...(profileMenu ? [profileMenu, { type: "separator" as const }] : []),
-        { label: "Loading connections…", enabled: false },
+        { label: t("tray.loadingConnections"), enabled: false },
         { type: "separator" },
-        { label: "Quit", click: () => this.options.quitApp() },
+        { label: t("tray.quit"), click: () => this.options.quitApp() },
       ];
     }
 
     return [
-        { label: "Open Main Window", click: () => this.options.showSettings() },
+        { label: t("tray.openMainWindow"), click: () => this.options.showSettings() },
         { type: "separator" },
         ...(profileMenu ? [profileMenu, { type: "separator" as const }] : []),
-        ...state.agents.map((agent) => this.buildAgentSubmenu(agent, selectedTickerAgentIds)),
+        ...state.agents.map((agent) => this.buildAgentSubmenu(agent, selectedTickerAgentIds, t)),
         { type: "separator" },
-        { label: "Quit", click: () => this.options.quitApp() },
+        { label: t("tray.quit"), click: () => this.options.quitApp() },
       ];
   }
 
   private buildProfileSubmenu(
     profiles: WorkspaceProfile[],
     currentProfile: WorkspaceProfile | null,
+    t: Translator,
   ): MenuItemConstructorOptions {
     if (profiles.length === 0) {
       return {
-        label: "Profile",
-        submenu: [{ label: "No saved profiles", enabled: false }],
+        label: t("tray.profile"),
+        submenu: [{ label: t("tray.noSavedProfiles"), enabled: false }],
       };
     }
 
     return {
-      label: currentProfile ? this.formatProfileLabel(currentProfile) : "Profile",
+      label: currentProfile ? this.formatProfileLabel(currentProfile) : t("tray.profile"),
       submenu: profiles.map<MenuItemConstructorOptions>((profile) => ({
         label: this.formatProfileLabel(profile),
         type: "checkbox",
@@ -113,20 +119,21 @@ export class DesktopTrayMenu {
   private buildAgentSubmenu(
     agent: MenubarAgentState,
     selectedTickerAgentIds: Set<AgentId>,
+    t: Translator,
   ): MenuItemConstructorOptions {
     if (agent.connections.length === 0) {
       return {
         label: agent.agentLabel,
-        submenu: [{ label: "No saved connections", enabled: false }],
+        submenu: [{ label: t("tray.noSavedConnections"), enabled: false }],
       };
     }
 
     const submenu: MenuItemConstructorOptions[] = [];
     if (agent.currentUsage?.status === "available") {
       submenu.push({
-        label: `Quota · ${agent.currentUsage.text}`,
+        label: t("tray.quota", { text: agent.currentUsage.text }),
         submenu: [{
-          label: "Show in ticker",
+          label: t("tray.showInTicker"),
           type: "checkbox",
           checked: selectedTickerAgentIds.has(agent.agentId),
           click: () => {
@@ -164,10 +171,11 @@ export class DesktopTrayMenu {
         connectionId,
         error: error instanceof Error ? error.message : String(error),
       });
+      const t = this.readTranslator();
       this.options.notify({
         id: `connection-switch-failed:${agentId}:${connectionId}`,
-        title: "Couldn't switch connection",
-        body: "Open Connections to review this saved connection.",
+        title: t("tray.connectionSwitchFailedTitle"),
+        body: t("tray.connectionSwitchFailedBody"),
         kind: "action-required",
         scope: "connection",
         subject: {
@@ -189,10 +197,11 @@ export class DesktopTrayMenu {
         profileId,
         error: error instanceof Error ? error.message : String(error),
       });
+      const t = this.readTranslator();
       this.options.notify({
         id: `profile-apply-failed:${profileId}`,
-        title: "Couldn't apply profile",
-        body: "Open Profiles to review this work mode.",
+        title: t("tray.profileApplyFailedTitle"),
+        body: t("tray.profileApplyFailedBody"),
         kind: "action-required",
         scope: "profile",
         subject: {
@@ -220,5 +229,9 @@ export class DesktopTrayMenu {
   private formatProfileLabel(profile: WorkspaceProfile): string {
     const emoji = profile.emoji?.trim() || DesktopTrayMenu.PROFILE_EMOJI_PLACEHOLDER;
     return `${emoji} ${profile.name}`;
+  }
+
+  private readTranslator(): Translator {
+    return createTranslator(this.options.readLanguagePreference());
   }
 }

@@ -1,4 +1,5 @@
 import {
+  LANGUAGE_SELF_LABELS,
   SUPPORTED_LANGUAGES,
   type DesktopPreferences,
   type LanguagePreference,
@@ -78,7 +79,7 @@ export function SettingsPage({
           <SelectContent>
             {SUPPORTED_LANGUAGES.map((language) => (
               <SelectItem key={language} value={language}>
-                {t(`settings.language.${language}`)}
+                {LANGUAGE_SELF_LABELS[language]}
               </SelectItem>
             ))}
           </SelectContent>

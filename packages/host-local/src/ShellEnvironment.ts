@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 type ExecFile = typeof execFileSync;
 const LOGIN_SHELL_TIMEOUT_MS = 1_500;
 const LOGIN_SHELL_MAX_BUFFER = 1_024 * 1_024;
+const NILE_MANAGED_ENV_SKIP_FLAG = "NILE_SWITCHER_MANAGED_ENV_LOADED";
 
 export class ShellEnvironment {
   constructor(private readonly execFile: ExecFile = execFileSync) {}
@@ -13,6 +14,10 @@ export class ShellEnvironment {
     try {
       const output = this.execFile("/bin/zsh", ["-lc", "env"], {
         encoding: "utf8",
+        env: {
+          ...process.env,
+          [NILE_MANAGED_ENV_SKIP_FLAG]: "1",
+        },
         stdio: ["ignore", "pipe", "ignore"],
         timeout: LOGIN_SHELL_TIMEOUT_MS,
         maxBuffer: LOGIN_SHELL_MAX_BUFFER,

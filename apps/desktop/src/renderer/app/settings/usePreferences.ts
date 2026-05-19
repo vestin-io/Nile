@@ -26,6 +26,10 @@ export function useDesktopPreferences(): DesktopPreferencesState {
   }, [preferences, preferencesStore]);
 
   useEffect(() => {
+    void window.nileDesktop.state.setLanguagePreference(preferences.language).catch(() => undefined);
+  }, [preferences.language]);
+
+  useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const syncSystemTheme = () => {
       if (preferences.theme === "system") {

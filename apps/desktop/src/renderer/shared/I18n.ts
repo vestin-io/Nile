@@ -1,4 +1,4 @@
-import type { LanguagePreference, ThemePreference } from "../settings/Preferences";
+import type { LanguagePreference, ThemePreference } from "../../state/UiPreferences";
 
 import { MESSAGE_CATALOG } from "./i18n/catalog";
 

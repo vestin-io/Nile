@@ -6,7 +6,7 @@ import type { StoredCredential } from "@nile/core/services/credential";
 import { ManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 
 describe("ManagedApiKeyEnvironment", () => {
-  it("attaches an env key through the direct-api-key metadata path", async () => {
+  it("attaches an env key through the direct-api-key metadata path without wiring shell exports for non-shell agents", async () => {
     const write = vi.fn();
     const ensureShell = vi.fn();
     const setConnectionDirectApiKeyEnvKey = vi.fn().mockReturnValue({
@@ -59,7 +59,7 @@ describe("ManagedApiKeyEnvironment", () => {
     } as never, "gateway-shared-api-key");
 
     expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
-    expect(ensureShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+    expect(ensureShell).not.toHaveBeenCalled();
     expect(setConnectionDirectApiKeyEnvKey).toHaveBeenCalledWith(
       "gateway-shared-api-key",
       "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
@@ -72,7 +72,104 @@ describe("ManagedApiKeyEnvironment", () => {
     );
   });
 
-  it("re-syncs shell exports for an existing managed env key", async () => {
+  it("wires shell exports when an enabled agent requires managed env keys", async () => {
+    const write = vi.fn();
+    const ensureShell = vi.fn();
+    const environment = new ManagedApiKeyEnvironment(
+      {
+        read: vi.fn().mockReturnValue(null),
+        write,
+      } as never,
+      {
+        ensure: ensureShell,
+        remove: vi.fn(),
+      } as never,
+    );
+
+    await environment.ensureForConnection({
+      listSavedConnections: () => [{
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        endpointUrl: "https://llmfk.dpdns.org/v1",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway",
+        authMode: "api_key",
+        apiKeySource: "direct",
+        enabledAgents: ["claude", "openclaw"],
+        configurableAgents: ["codex", "claude", "openclaw"],
+        selectedByAgents: ["claude"],
+      }],
+      readConnectionCredential: (): StoredCredential => ({
+        kind: "api_key",
+        apiKey: "gateway-secret",
+      }),
+      setConnectionDirectApiKeyEnvKey: vi.fn().mockReturnValue({
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        endpointUrl: "https://llmfk.dpdns.org/v1",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway",
+        authMode: "api_key",
+        apiKeySource: "direct",
+        envKey: "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+        enabledAgents: ["claude", "openclaw"],
+        configurableAgents: ["codex", "claude", "openclaw"],
+        selectedByAgents: ["claude"],
+      } satisfies SavedConnectionSummary),
+    } as never, "gateway-shared-api-key");
+
+    expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
+    expect(ensureShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+  });
+
+  it("removes shell exports immediately when an existing managed env key is no longer needed by shell-backed agents", async () => {
+    const read = vi.fn().mockReturnValue("gateway-secret");
+    const write = vi.fn();
+    const ensureShell = vi.fn();
+    const removeShell = vi.fn();
+    const environment = new ManagedApiKeyEnvironment(
+      {
+        read,
+        write,
+      } as never,
+      {
+        ensure: ensureShell,
+        remove: removeShell,
+      } as never,
+    );
+
+    const result = await environment.ensureForConnection({
+      listSavedConnections: () => [{
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        endpointUrl: "https://llmfk.dpdns.org/v1",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway",
+        authMode: "api_key",
+        apiKeySource: "direct",
+        envKey: "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+        enabledAgents: ["claude"],
+        configurableAgents: ["codex", "claude", "openclaw"],
+        selectedByAgents: ["claude"],
+      }],
+      readConnectionCredential: (): StoredCredential => ({
+        kind: "api_key",
+        apiKey: "gateway-secret",
+      }),
+      setConnectionDirectApiKeyEnvKey: vi.fn(),
+    } as never, "gateway-shared-api-key");
+
+    expect(read).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+    expect(write).not.toHaveBeenCalled();
+    expect(ensureShell).not.toHaveBeenCalled();
+    expect(removeShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+    expect(result?.envKey).toBe("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+  });
+
+  it("re-syncs shell exports for an existing managed env key when an enabled agent requires them", async () => {
     const write = vi.fn();
     const ensureShell = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
@@ -97,7 +194,7 @@ describe("ManagedApiKeyEnvironment", () => {
         authMode: "api_key",
         apiKeySource: "direct",
         envKey: "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
-        enabledAgents: ["codex", "claude"],
+        enabledAgents: ["claude", "openclaw"],
         configurableAgents: ["codex", "claude", "openclaw"],
         selectedByAgents: ["claude"],
       }],
@@ -114,7 +211,7 @@ describe("ManagedApiKeyEnvironment", () => {
     expect(result?.envKey).toBe("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
   });
 
-  it("skips re-writing an unchanged managed env value", async () => {
+  it("skips re-writing an unchanged managed env value while keeping shell exports for shell-backed agents", async () => {
     const read = vi.fn().mockReturnValue("gateway-secret");
     const write = vi.fn();
     const ensureShell = vi.fn();
@@ -140,7 +237,7 @@ describe("ManagedApiKeyEnvironment", () => {
         authMode: "api_key",
         apiKeySource: "direct",
         envKey: "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
-        enabledAgents: ["codex", "claude"],
+        enabledAgents: ["claude", "openclaw"],
         configurableAgents: ["codex", "claude", "openclaw"],
         selectedByAgents: ["claude"],
       }],
@@ -256,7 +353,7 @@ describe("ManagedApiKeyEnvironment", () => {
         authMode: "api_key",
         apiKeySource: "direct",
         envKey: "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
-        enabledAgents: ["codex", "claude"],
+        enabledAgents: ["claude", "openclaw"],
         configurableAgents: ["codex", "claude", "openclaw"],
         selectedByAgents: ["claude"],
       } satisfies SavedConnectionSummary)
@@ -269,7 +366,7 @@ describe("ManagedApiKeyEnvironment", () => {
         endpointFamily: "gateway",
         authMode: "api_key",
         apiKeySource: "direct",
-        enabledAgents: ["codex", "claude"],
+        enabledAgents: ["claude", "openclaw"],
         configurableAgents: ["codex", "claude", "openclaw"],
         selectedByAgents: ["claude"],
       } satisfies SavedConnectionSummary);
@@ -296,7 +393,7 @@ describe("ManagedApiKeyEnvironment", () => {
         endpointFamily: "gateway",
         authMode: "api_key",
         apiKeySource: "direct",
-        enabledAgents: ["codex", "claude"],
+        enabledAgents: ["claude", "openclaw"],
         configurableAgents: ["codex", "claude", "openclaw"],
         selectedByAgents: ["claude"],
       }],
@@ -352,7 +449,47 @@ describe("ManagedApiKeyEnvironment", () => {
     expect(removeShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
   });
 
-  it("syncs managed shell exports once for the full session", () => {
+  it("does not sync shell exports for api-key connections that no enabled agent needs", () => {
+    const write = vi.fn();
+    const syncShell = vi.fn();
+    const environment = new ManagedApiKeyEnvironment(
+      {
+        read: vi.fn().mockReturnValue(null),
+        write,
+      } as never,
+      {
+        ensure: vi.fn(),
+        sync: syncShell,
+        remove: vi.fn(),
+      } as never,
+    );
+
+    const failures = environment.syncForSession({
+      listSavedConnections: () => [{
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        endpointUrl: "https://llmfk.dpdns.org/v1",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway",
+        authMode: "api_key",
+        enabledAgents: ["claude"],
+        configurableAgents: ["claude", "openclaw"],
+        selectedByAgents: ["claude"],
+      }],
+      readConnectionCredential: (): StoredCredential => ({
+        kind: "api_key",
+        apiKey: "gateway-secret",
+      }),
+      setConnectionDirectApiKeyEnvKey: vi.fn(),
+    } as never);
+
+    expect(failures).toEqual([]);
+    expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
+    expect(syncShell).toHaveBeenCalledWith([]);
+  });
+
+  it("syncs managed shell exports once for the full session when an enabled agent needs them", () => {
     const write = vi.fn();
     const syncShell = vi.fn();
     const setConnectionDirectApiKeyEnvKey = vi.fn();
@@ -378,7 +515,7 @@ describe("ManagedApiKeyEnvironment", () => {
           endpointLabel: "Gateway (llmfk.dpdns.org)",
           endpointFamily: "gateway",
           authMode: "api_key",
-          enabledAgents: ["claude"],
+          enabledAgents: ["claude", "openclaw"],
           configurableAgents: ["claude", "openclaw"],
           selectedByAgents: ["claude"],
         },
@@ -498,7 +635,7 @@ describe("ManagedApiKeyEnvironment", () => {
         endpointLabel: "Gateway (llmfk.dpdns.org)",
         endpointFamily: "gateway",
         authMode: "api_key",
-        enabledAgents: ["claude"],
+        enabledAgents: ["claude", "openclaw"],
         configurableAgents: ["claude", "openclaw"],
         selectedByAgents: ["claude"],
       }],

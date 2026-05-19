@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { AgentId } from "@nile/core/models/agent";
+import type { LanguagePreference } from "../../state/UiPreferences";
 import type { WorkspaceProfile } from "../profiles/Store";
 import { DesktopTrayMenu } from "./TrayMenu";
 import type { DesktopConnection, MenubarState, SettingsState } from "../../state/Types";
@@ -170,6 +171,7 @@ describe("DesktopTrayMenu", () => {
       logger: { warn } as never,
       peekState: () => createMenubarState(),
       peekSettingsState: () => createSettingsState(),
+      readLanguagePreference: () => "en",
       readMenubarDisplay: () => ({ hasConfiguredTickerAgents: false, mode: "app_entry", tickerAgentIds: [] }),
       refreshState: async () => createMenubarState(),
       refreshSettingsState: async () => createSettingsState(),
@@ -248,10 +250,28 @@ describe("DesktopTrayMenu", () => {
     quotaSubmenu[0]?.click?.({} as never, {} as never, {} as never);
     expect(toggleTickerAgent).toHaveBeenCalledWith("codex");
   });
+
+  it("localizes tray labels from the stored language preference", async () => {
+    const menu = createMenu({
+      language: "zh",
+      profiles: [],
+      readMenubarDisplay: () => ({ hasConfiguredTickerAgents: true, mode: "ticker", tickerAgentIds: ["codex"] }),
+    });
+
+    const template = await menu.readTemplate();
+
+    expect(template[0]?.label).toBe("打开主窗口");
+    expect(template.at(-1)?.label).toBe("退出");
+    const codexMenu = template.find((item) => item.label === "Codex");
+    const submenu = readSubmenu(codexMenu ?? {});
+    expect(submenu[0]).toMatchObject({ label: "用量 · 5h 72% left" });
+    expect(readSubmenu(submenu[0] ?? {})[0]).toMatchObject({ label: "在用量指标中显示" });
+  });
 });
 
 function createMenu(options: {
   applyProfile?: (profileId: string) => Promise<void>;
+  language?: LanguagePreference;
   notify?: (intent: object) => void;
   profileFeatureEnabled?: boolean;
   profiles: WorkspaceProfile[];
@@ -269,6 +289,7 @@ function createMenu(options: {
     } as never,
     peekState: () => menubarState,
     peekSettingsState: () => settingsState,
+    readLanguagePreference: () => options.language ?? "en",
     readMenubarDisplay: options.readMenubarDisplay ?? (() => ({
       hasConfiguredTickerAgents: false,
       mode: "app_entry",

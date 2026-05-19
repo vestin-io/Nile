@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 
 import type { AgentId } from "@nile/core/models/agent";
 
+import { SUPPORTED_LANGUAGES, type LanguagePreference } from "../../state/UiPreferences";
 import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 import { MENUBAR_DISPLAY_MODES, type DesktopMenubarDisplayMode, type DesktopMenubarDisplayState } from "../state/MenubarDisplayStore";
@@ -14,6 +15,7 @@ type DesktopIpcStateRoutesOptions = {
   notifyNotificationHistoryChanged(): void;
   refreshAll(): void;
   refreshDesktopState(options: { invalidate: boolean; notifyRenderer: boolean }): Promise<void>;
+  setLanguagePreference(language: LanguagePreference): LanguagePreference;
   setMenubarDisplayMode(mode: DesktopMenubarDisplayMode): DesktopMenubarDisplayState;
   setNotificationsMuted(muted: boolean): boolean;
   setProfileFeatureEnabled(enabled: boolean): boolean;
@@ -45,6 +47,9 @@ export class DesktopIpcStateRoutes {
     ipcMain.handle("desktop:mark-notification-history-read-by-filter", (_event, filter: unknown) => {
       stateStore.markNotificationHistoryReadByFilter(inputs.readNotificationHistoryFilter(filter));
       this.options.notifyNotificationHistoryChanged();
+    });
+    ipcMain.handle("desktop:set-language-preference", (_event, language: unknown) => {
+      return this.options.setLanguagePreference(this.readLanguagePreference(language));
     });
     ipcMain.handle("desktop:get-notifications-muted", () => this.options.getNotificationsMuted());
     ipcMain.handle("desktop:get-profile-feature-enabled", () => this.options.getProfileFeatureEnabled());
@@ -105,5 +110,13 @@ export class DesktopIpcStateRoutes {
       return mode as DesktopMenubarDisplayMode;
     }
     throw new Error(`Unsupported menubar display mode: ${mode}`);
+  }
+
+  private readLanguagePreference(value: unknown): LanguagePreference {
+    const language = this.options.inputs.readRequiredString(value, "language");
+    if (SUPPORTED_LANGUAGES.includes(language as LanguagePreference)) {
+      return language as LanguagePreference;
+    }
+    throw new Error(`Unsupported language preference: ${language}`);
   }
 }

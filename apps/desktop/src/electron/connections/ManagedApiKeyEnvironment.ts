@@ -1,5 +1,6 @@
 import { isDirectApiKeyCredential, type StoredCredential } from "@nile/core/services/credential";
 import type { NileSession } from "@nile/builtins/runtime";
+import { AGENT_CAPABILITIES } from "@nile/core/models/agent";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 
 import { DesktopEnvironmentStore } from "../environment/Store";
@@ -30,13 +31,13 @@ export class ManagedApiKeyEnvironment {
     const previousEnvKey = connection.envKey?.trim() || credential.envKey?.trim() || null;
     const envKey = this.readEnvKey(connection, credential);
     if (previousEnvKey === envKey) {
-      this.writeManagedEnvironment(envKey, apiKey);
+      this.writeManagedEnvironment(connection, envKey, apiKey);
       return connection;
     }
 
     const updated = session.setConnectionDirectApiKeyEnvKey(connectionId, envKey);
     try {
-      this.writeManagedEnvironment(envKey, apiKey);
+      this.writeManagedEnvironment(updated, envKey, apiKey);
     } catch (error) {
       this.cleanupManagedEnvironment(envKey);
       session.setConnectionDirectApiKeyEnvKey(connectionId, previousEnvKey);
@@ -54,7 +55,7 @@ export class ManagedApiKeyEnvironment {
       }
       try {
         const envKey = this.syncConnectionWithoutShell(session, connection.id);
-        if (envKey) {
+        if (envKey && this.supportsManagedShellEnvironment(connection)) {
           shellKeys.push(envKey);
         }
       } catch (error) {
@@ -127,9 +128,13 @@ export class ManagedApiKeyEnvironment {
     return `NILE_${normalizedConnectionId}_API_KEY`;
   }
 
-  private writeManagedEnvironment(envKey: string, apiKey: string): void {
+  private writeManagedEnvironment(connection: SavedConnectionSummary, envKey: string, apiKey: string): void {
     this.writeManagedStoreIfChanged(envKey, apiKey);
-    this.shellEnvironment.ensure(envKey);
+    if (this.supportsManagedShellEnvironment(connection)) {
+      this.shellEnvironment.ensure(envKey);
+      return;
+    }
+    this.shellEnvironment.remove(envKey);
   }
 
   private syncConnectionWithoutShell(session: NileSession, connectionId: string): string | null {
@@ -175,6 +180,14 @@ export class ManagedApiKeyEnvironment {
   private removeManagedEnvironment(envKey: string): void {
     this.store.remove(envKey);
     this.shellEnvironment.remove(envKey);
+  }
+
+  private supportsManagedShellEnvironment(connection: SavedConnectionSummary): boolean {
+    return connection.enabledAgents.some((agentId) => {
+      const capability = AGENT_CAPABILITIES.read(agentId);
+      return capability.supportsManagedEnvBackedApiKey
+        && capability.requiredApplyRequirements.includes("selected-model");
+    });
   }
 
   private cleanupManagedEnvironment(envKey: string): void {

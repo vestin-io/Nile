@@ -42,6 +42,7 @@ import { DesktopShell } from "./DesktopShell";
 import { DesktopTrayMenu } from "./TrayMenu";
 import { DesktopStateReset } from "../state/Reset";
 import { DesktopMenubarDisplayStore } from "../state/MenubarDisplayStore";
+import { DesktopLanguageStore } from "../state/LanguageStore";
 import { DesktopNotificationMuteStore } from "../state/NotificationMuteStore";
 import { DesktopProfileFeatureStore } from "../state/ProfileFeatureStore";
 import { DesktopStateRefresher } from "../state/DesktopStateRefresher";
@@ -68,6 +69,7 @@ export class DesktopMain {
   private readonly shellEnvironment: DesktopShellEnvironment;
   private readonly agentHomesStore: AgentHomesStore;
   private readonly menubarDisplayStore: DesktopMenubarDisplayStore;
+  private readonly languageStore: DesktopLanguageStore;
   private readonly notificationMuteStore: DesktopNotificationMuteStore;
   private readonly profileFeatureStore: DesktopProfileFeatureStore;
   private readonly profileStore: WorkspaceProfileStore;
@@ -100,6 +102,7 @@ export class DesktopMain {
     );
     this.agentHomesStore = new AgentHomesStore(options.databasePath);
     this.menubarDisplayStore = new DesktopMenubarDisplayStore(options.databasePath);
+    this.languageStore = new DesktopLanguageStore(options.databasePath);
     this.notificationMuteStore = new DesktopNotificationMuteStore(options.databasePath);
     this.profileFeatureStore = new DesktopProfileFeatureStore(options.databasePath);
     this.profileStore = new WorkspaceProfileStore(options.databasePath);
@@ -168,6 +171,7 @@ export class DesktopMain {
       peekState: () => this.stateStore.peekMenubarState(),
       peekSettingsState: () => this.stateStore.peekSettingsState(),
       isProfileFeatureEnabled: () => this.profileFeatureStore.read(),
+      readLanguagePreference: () => this.languageStore.read(),
       readMenubarDisplay: () => this.menubarDisplayStore.read(),
       refreshState: async () => await this.stateStore.refreshMenubarState(),
       refreshSettingsState: async () => await this.stateStore.getSettingsState({ refreshUsage: false }),
@@ -243,7 +247,10 @@ export class DesktopMain {
     this.applicationMenu.configureAboutPanel();
     this.applicationMenu.install();
     this.registerIpcRoutes();
-    this.shell.attach();
+    const initialLanguagePreference = await this.shell.attach();
+    if (initialLanguagePreference) {
+      this.languageStore.write(initialLanguagePreference);
+    }
     this.syncTrayTitle();
     await this.syncManagedApiKeyEnvironment();
     this.workspaceWatcher.start();
@@ -274,6 +281,7 @@ export class DesktopMain {
       notifyNotificationHistoryChanged: () => this.shell.notifyNotificationHistoryChanged(),
       refreshAll: () => this.reloadAll(),
       refreshDesktopState: (options) => this.refreshDesktopState(options),
+      setLanguagePreference: (language) => this.languageStore.write(language),
       setMenubarDisplayMode: (mode) => {
         const next = this.menubarDisplayStore.writeMode(mode);
         this.syncTrayTitle();

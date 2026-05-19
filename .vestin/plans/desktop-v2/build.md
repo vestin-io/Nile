@@ -21,6 +21,131 @@
 
 - `npm run typecheck`
 
+### Review follow-up fixes
+
+- Seeded the main-process language store during startup from the hidden settings renderer's existing desktop preference payload before creating the tray.
+- Added a shared parser for the stored desktop language preference so upgrade-time bootstrap can reuse the same supported-language normalization rules.
+- Made managed API-key updates remove shell wiring immediately when a connection no longer has any enabled agent that still needs the shell-backed export path.
+
+#### Key findings
+
+- The first tray-menu localization pass fixed steady-state syncing, but upgraded users could still briefly get an English tray until the settings renderer had time to write the new main-process store.
+- Connection-update paths needed explicit shell-export removal; only pruning shell keys during later session sync left a stale prompt-triggering bridge behind after certain edits.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/state/UiPreferences.test.ts apps/desktop/src/electron/state/LanguageStore.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts`
+- `npm run typecheck`
+
+### Tray menu locale sync
+
+- Added a dedicated main-process desktop language store so tray-menu localization no longer depends on renderer `localStorage`.
+- Settings now sync the selected language into that store whenever the preference changes.
+- Localized the Electron tray menu and tray-originated failure notifications through the shared translation catalog.
+- Added Chinese tray/menu copy so the right-click menu now matches the settings surface and menubar popover language.
+
+#### Key findings
+
+- The screenshoted menu is not the menubar renderer window; it is the Electron tray context menu built in main, so the earlier renderer-side language fix could not affect it.
+- Persisting one small language preference in main was a lower-risk fix than trying to bridge renderer `localStorage` state into tray-menu construction.
+- Tray menu labels can be localized with the existing catalog once the main process has a stable language source; there was no need for a second i18n system.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/LanguageStore.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run typecheck`
+
+### Language selector self-labels
+
+- Changed the desktop language selector to show each language in its own native label instead of translating language names through the current UI locale.
+- Moved the self-label list into shared UI preference definitions so renderer surfaces can reuse one source of truth for language names.
+
+#### Key findings
+
+- Translating language names through the active locale makes the selector harder to scan when users are explicitly trying to switch into a language they may not currently read well.
+- The right behavior here is different from ordinary UI copy: language choices should stay self-identified, while section titles and descriptions remain localized.
+
+### Verification
+
+- `npm run typecheck`
+
+### Menubar locale refresh fix
+
+- Made the separate menubar renderer reliably re-apply language and theme preferences when desktop state refreshes.
+- Settings now explicitly trigger a menubar refresh after language or theme changes so the detached menubar window no longer depends on cross-window `localStorage` propagation timing.
+- Corrected the Chinese menubar settings copy:
+  - description now says `agent 用量指标`
+  - the ticker option label is now `用量指标`
+
+#### Key findings
+
+- The menubar surface is a separate renderer window, so relying on local `CustomEvent` dispatch and browser-managed storage sync was not a stable way to propagate preference changes.
+- The simplest safe fix was to reuse the existing main-process `refreshMenubar` path and make the menubar renderer re-apply preferences whenever that state notification arrives.
+
+### Verification
+
+- `npm run typecheck`
+
+### Update prompt visual simplification
+
+- Removed the remaining status icon treatment from the floating desktop update prompt.
+- Kept the prompt to plain:
+  - title
+  - body text
+  - action buttons
+  - dismiss button
+- Narrowed the prompt width slightly so the card reads more like a compact notification than a mini status panel.
+
+#### Key findings
+
+- Once the fake downloading progress UI was removed, the status icons no longer added meaningful information beyond the title text.
+- The update prompt is easier to scan when it behaves like a lightweight toast with explicit actions instead of a decorated status card.
+
+### Verification
+
+- `npm run typecheck`
+
+### Update prompt simplification
+
+- Removed the synthetic downloading progress treatment from the global update prompt:
+  - the floating update card no longer renders a pulsing pseudo-progress bar
+  - downloading remains visible in the settings update section, which already had truthful status copy
+- Simplified prompt visibility so the global card now opens only for actionable or recovery states:
+  - `ready`
+  - `error`
+- Trimmed the prompt presenter shape to match the new flow by removing the optional body slot that only existed to host the fake progress bar.
+
+#### Key findings
+
+- The desktop updater does not currently expose a real download-progress signal to this prompt, so the old bar was decoration rather than state.
+- Showing the global card during `downloading` made the update flow feel more complicated than it was; the real user actions only happen after completion or failure.
+- This change intentionally simplifies renderer UX only. It does not alter the packaged auto-update pipeline or Electron `quitAndInstall()` behavior.
+
+### Verification
+
+- `npm run typecheck`
+
+### Managed env popup reduction
+
+- Reduced Nile-managed shell env bridging so desktop-managed API keys no longer wire login-shell profile blocks for every env-capable agent:
+  - desktop still writes and reads managed `NILE_*` API-key values through the keychain-backed environment store
+  - shell/profile export wiring now only stays active for enabled agents whose apply requirements indicate an external env-backed runtime path
+  - this keeps OpenClaw-style external env bridging while stopping Claude/Codex-only API-key connections from needlessly triggering shell-time keychain reads
+- Hardened desktop startup environment probing so Nile's own login-shell snapshot skips the managed shell bridge block:
+  - `ShellEnvironment.readLoginShellEnvironment()` now sets `NILE_SWITCHER_MANAGED_ENV_LOADED=1` for the spawned login shell
+  - this prevents desktop startup from re-triggering its own `managed.sh` keychain reads before startup reconciliation can prune stale shell wiring
+
+#### Key findings
+
+- The recurring keychain prompt was not caused by `auth.json` or OpenAI session storage; it came from shell startup sourcing Nile-generated profile blocks that called `/usr/bin/security find-generic-password`.
+- Desktop already had a direct keychain-backed read path through `DesktopEnvironmentSource`, so the shell bridge was only necessary for external env-driven agent runtimes, not for ordinary desktop-managed API-key connections.
+- The remaining shell bridge policy still uses current agent apply requirements as the narrowest available registry signal for “external env-backed runtime”; there is not yet a dedicated capability for this distinction.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/host-local/src/ShellEnvironment.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts apps/desktop/src/electron/environment/Shell.test.ts apps/desktop/src/electron/environment/Source.test.ts`
+- `npm run typecheck`
+
 ### Menubar usage ticker
 
 - Added a persisted menubar display preference in Electron main so the tray can survive restarts with either:

@@ -1,20 +1,12 @@
 import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
+import {
+  LANGUAGE_SELF_LABELS,
+  SUPPORTED_LANGUAGES,
+  normalizeLanguagePreference as normalizeStoredLanguagePreference,
+  type LanguagePreference,
+  type ThemePreference,
+} from "../../state/UiPreferences";
 
-export const SUPPORTED_LANGUAGES = [
-  "en",
-  "zh",
-  "ko",
-  "ja",
-  "th",
-  "fr",
-  "es",
-  "it",
-  "de",
-  "vi",
-] as const;
-
-export type LanguagePreference = (typeof SUPPORTED_LANGUAGES)[number];
-export type ThemePreference = "system" | "light" | "dark";
 export type AgentOrderPreference = AgentId[];
 
 export type DesktopPreferences = {
@@ -25,6 +17,10 @@ export type DesktopPreferences = {
 };
 
 const STORAGE_KEY = "nile.desktop.preferences";
+export { SUPPORTED_LANGUAGES };
+export { LANGUAGE_SELF_LABELS };
+export type { LanguagePreference, ThemePreference };
+
 function readDefaultAgentOrder(): AgentOrderPreference {
   return [...SUPPORTED_AGENT_IDS];
 }
@@ -91,9 +87,7 @@ export class DesktopPreferencesStore {
 }
 
 function normalizeLanguagePreference(value: unknown): LanguagePreference {
-  return typeof value === "string" && SUPPORTED_LANGUAGES.includes(value as LanguagePreference)
-    ? (value as LanguagePreference)
-    : "en";
+  return normalizeStoredLanguagePreference(value);
 }
 
 function normalizeThemePreference(value: unknown): ThemePreference {
