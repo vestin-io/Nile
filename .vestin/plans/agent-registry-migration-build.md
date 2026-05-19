@@ -1926,6 +1926,23 @@
 - `npm run test:cli`
 - `npm run typecheck`
 
+## 2026-05-20 - Harden Codex desktop login command resolution
+
+### What changed
+
+- Updated Codex desktop OpenAI sign-in to resolve the absolute `codex` executable from the merged runtime/login-shell `PATH` before spawning `codex login`:
+  - `packages/agents/codex/src/CodexSessionLogin.ts`
+  - `packages/agents/codex/src/CodexSessionLogin.test.ts`
+
+### Key findings
+
+- The desktop add-connection flow still routes OpenAI session login through the Codex CLI provider, so packaged app reliability depends on resolving the local `codex` binary correctly.
+- Relying on a bare `spawn("codex", ...)` is weaker than the Claude/Gemini login pattern when the CLI lives under version-manager paths such as `~/.nvm/.../bin`.
+
+### Verification
+
+- `npx vitest run packages/agents/codex/src/CodexSessionLogin.test.ts`
+
 ## 2026-05-18 - Declare interactive login UX on agent manifests
 
 ### What changed

@@ -1,5 +1,6 @@
 import { spawn as spawnChild } from "node:child_process";
-import { dirname } from "node:path";
+import { existsSync } from "node:fs";
+import { delimiter, dirname, join } from "node:path";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import { ShellPath } from "@nile/core/services/ShellPath";
@@ -31,15 +32,11 @@ export class CodexSessionLogin {
   ) {}
 
   async signIn(codexHome: string): Promise<void> {
-    const env = {
-      ...process.env,
-      PATH: ShellPath.merge(process.env.PATH, this.environment.read("PATH")),
-      CODEX_HOME: codexHome,
-      HOME: dirname(codexHome),
-    };
+    const env = this.buildLoginEnv(codexHome);
+    const codexCommand = this.resolveCodexCommand(env.PATH ?? "");
 
     await this.waitForExit(
-      this.spawn("codex", ["login"], {
+      this.spawn(codexCommand, ["login"], {
         stdio: this.isElectronProcess() ? "ignore" : "inherit",
         env,
       }),
@@ -66,6 +63,25 @@ export class CodexSessionLogin {
       "Codex CLI was not found in PATH. Install Codex CLI or add it to your shell PATH, then restart Nile.",
       cause ? { cause } : undefined,
     );
+  }
+
+  private buildLoginEnv(codexHome: string): NodeJS.ProcessEnv {
+    return {
+      ...process.env,
+      PATH: ShellPath.merge(process.env.PATH, this.environment.read("PATH")),
+      CODEX_HOME: codexHome,
+      HOME: dirname(codexHome),
+    };
+  }
+
+  private resolveCodexCommand(pathValue: string): string {
+    for (const entry of pathValue.split(delimiter).filter((value) => value.trim().length > 0)) {
+      const candidate = join(entry, "codex");
+      if (existsSync(candidate)) {
+        return candidate;
+      }
+    }
+    return "codex";
   }
 
   private async waitForSignedInSession(

@@ -17,12 +17,20 @@ afterEach(() => {
 
 describe("CodexSessionLogin", () => {
   it("prefers the current process PATH and appends login-shell PATH entries", async () => {
+    const toolRoot = mkdtempSync(join(tmpdir(), "nile-codex-path-"));
+    tempDirs.push(toolRoot);
+    const toolBin = join(toolRoot, "bin");
+    mkdirSync(toolBin, { recursive: true });
+    writeFileSync(join(toolBin, "codex"), "");
+
+    let receivedCommand: string | undefined;
     let receivedPath: string | undefined;
     const originalPath = process.env.PATH;
-    process.env.PATH = "/Users/test/.nvm/bin:/usr/bin";
+    process.env.PATH = `${toolBin}:/Users/test/.nvm/bin:/usr/bin`;
     const login = new CodexSessionLogin(
       EnvironmentSource.from({ PATH: "/opt/homebrew/bin:/usr/bin:/usr/local/bin" }),
-      (_command, _args, options) => {
+      (command, _args, options) => {
+        receivedCommand = command;
         receivedPath = options?.env?.PATH;
         return {
           once(event: "error" | "exit", listener: ((error: Error) => void) | ((code: number | null) => void)) {
@@ -41,7 +49,8 @@ describe("CodexSessionLogin", () => {
       process.env.PATH = originalPath;
     }
 
-    expect(receivedPath).toBe("/Users/test/.nvm/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin");
+    expect(receivedCommand).toBe(join(toolBin, "codex"));
+    expect(receivedPath).toBe(`${toolBin}:/Users/test/.nvm/bin:/usr/bin:/opt/homebrew/bin:/usr/local/bin`);
   });
 
   it("returns a user-facing error when the codex CLI is missing from PATH", async () => {
@@ -67,15 +76,20 @@ describe("CodexSessionLogin", () => {
     tempDirs.push(loginRoot);
     const codexHome = join(loginRoot, ".codex");
     mkdirSync(codexHome, { recursive: true });
+    const toolBin = join(loginRoot, "bin");
+    mkdirSync(toolBin, { recursive: true });
+    writeFileSync(join(toolBin, "codex"), "");
 
     let command: string | null = null;
     let receivedStdio: "inherit" | "ignore" | null = null;
+    const originalPath = process.env.PATH;
+    process.env.PATH = toolBin;
     const login = new CodexSessionLogin(
       EnvironmentSource.empty(),
       (spawnedCommand, _args, options) => {
         command = spawnedCommand;
         receivedStdio = options.stdio;
-        if (spawnedCommand === "codex") {
+        if (spawnedCommand === join(toolBin, "codex")) {
           writeFileSync(
             join(codexHome, "auth.json"),
             JSON.stringify({
@@ -101,14 +115,18 @@ describe("CodexSessionLogin", () => {
       () => true,
     );
 
-    await expect(login.signInAndRead(codexHome)).resolves.toEqual(
-      expect.objectContaining({
-        kind: "openai_session",
-        accountId: "acct-electron",
-      }),
-    );
+    try {
+      await expect(login.signInAndRead(codexHome)).resolves.toEqual(
+        expect.objectContaining({
+          kind: "openai_session",
+          accountId: "acct-electron",
+        }),
+      );
+    } finally {
+      process.env.PATH = originalPath;
+    }
 
-    expect(command).toBe("codex");
+    expect(command).toBe(join(toolBin, "codex"));
     expect(receivedStdio).toBe("ignore");
   });
 });
