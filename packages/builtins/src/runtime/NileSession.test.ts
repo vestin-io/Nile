@@ -1,12 +1,13 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { CursorUsageBindingRegistry, CursorUsageSnapshotStore } from "@nile/agent-cursor/usage";
 import { AccessRegistry } from "@nile/core/models/access";
 import { EndpointRegistry } from "@nile/core/models/endpoint";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import { NileLogger } from "@nile/core/services/NileLogger";
 import { NileSession } from "./NileSession";
 
 const tempDirs: string[] = [];
@@ -25,6 +26,7 @@ describe("NileSession", () => {
     const binDir = join(dir, "bin");
     const codexHome = join(dir, ".codex");
     writeFakeCodex(binDir);
+    const createDefaultLogger = vi.spyOn(NileLogger, "createDefault").mockReturnValue(NileLogger.silent());
 
     process.env.PATH = "";
     const session = NileSession.open({
@@ -32,6 +34,7 @@ describe("NileSession", () => {
       credentialStore: new StubCredentialStore() as never,
       databasePath: join(dir, "db.sqlite"),
       environment: EnvironmentSource.from({ PATH: binDir }),
+      logger: NileLogger.silent(),
     });
 
     try {
@@ -51,6 +54,7 @@ describe("NileSession", () => {
         }),
       );
     } finally {
+      createDefaultLogger.mockRestore();
       process.env.PATH = originalPath;
       session.close();
     }
@@ -125,6 +129,7 @@ describe("NileSession", () => {
     const session = NileSession.open({
       databasePath: setup.dbPath,
       credentialStore: setup.credentialStore,
+      logger: NileLogger.silent(),
     });
 
     try {
@@ -218,7 +223,59 @@ EOF
     "utf8",
   );
   chmodSync(scriptPath, 0o755);
+
+  const targetTriple = readTargetTriple();
+  if (!targetTriple) {
+    throw new Error(`Unsupported test platform: ${process.platform}/${process.arch}`);
+  }
+  const vendorRoot = join(dirname(binDir), "node_modules", "@openai", readOptionalPackageDirectoryName(), "vendor", targetTriple, "codex");
+  mkdirSync(vendorRoot, { recursive: true });
+  writeFileSync(join(vendorRoot, "codex"), "", "utf8");
 }
 
 const CURSOR_WEB_SESSION_TOKEN =
   "user_01K03K41CNGRCADY5VT0JPH69Y::eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhdXRoMHx1c2VyXzAxSzAzSzQxQ05HUkNBRFk1VlQwSlBINjlZIiwidHlwZSI6IndlYiIsImV4cCI6NDEwMjQ0NDgwMH0.sig";
+
+function readTargetTriple(): string | null {
+  if (process.platform === "darwin" && process.arch === "arm64") {
+    return "aarch64-apple-darwin";
+  }
+  if (process.platform === "darwin" && process.arch === "x64") {
+    return "x86_64-apple-darwin";
+  }
+  if (process.platform === "linux" && process.arch === "arm64") {
+    return "aarch64-unknown-linux-gnu";
+  }
+  if (process.platform === "linux" && process.arch === "x64") {
+    return "x86_64-unknown-linux-gnu";
+  }
+  if (process.platform === "win32" && process.arch === "arm64") {
+    return "aarch64-pc-windows-msvc";
+  }
+  if (process.platform === "win32" && process.arch === "x64") {
+    return "x86_64-pc-windows-msvc";
+  }
+  return null;
+}
+
+function readOptionalPackageDirectoryName(): string {
+  if (process.platform === "darwin" && process.arch === "arm64") {
+    return "codex-darwin-arm64";
+  }
+  if (process.platform === "darwin" && process.arch === "x64") {
+    return "codex-darwin-x64";
+  }
+  if (process.platform === "linux" && process.arch === "arm64") {
+    return "codex-linux-arm64";
+  }
+  if (process.platform === "linux" && process.arch === "x64") {
+    return "codex-linux-x64";
+  }
+  if (process.platform === "win32" && process.arch === "arm64") {
+    return "codex-win32-arm64";
+  }
+  if (process.platform === "win32" && process.arch === "x64") {
+    return "codex-win32-x64";
+  }
+  throw new Error(`Unsupported test platform: ${process.platform}/${process.arch}`);
+}
