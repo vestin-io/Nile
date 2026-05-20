@@ -392,6 +392,9 @@ export function SettingsApp() {
         onUpdateAgentHome={async (agentId, path) => {
           await window.nileDesktop.app.updateAgentHome(agentId, path);
         }}
+        onUpdateAgentRuntimeCommand={async (agentId, path) => {
+          await window.nileDesktop.app.updateAgentRuntimeCommand(agentId, path);
+        }}
         onUpdateAgentConnectionModel={async (agentId, connectionId, modelId) => {
           await window.nileDesktop.connections.updateAgentConnectionModel({
             agentId,

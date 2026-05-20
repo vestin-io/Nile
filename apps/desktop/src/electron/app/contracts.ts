@@ -6,4 +6,5 @@ export type DesktopAppBridge = {
   openSettings(): Promise<void>;
   openSupportEmail(): Promise<void>;
   updateAgentHome(agentId: AgentId, path: string | null): Promise<void>;
+  updateAgentRuntimeCommand(agentId: AgentId, path: string | null): Promise<void>;
 };

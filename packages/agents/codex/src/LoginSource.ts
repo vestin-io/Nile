@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { CodexSessionLogin } from "./CodexSessionLogin";
 import { CODEX_LOGIN_DECLARATION } from "./LoginDeclaration";
+import { CODEX_AGENT_ID } from "./types";
 
 export const CODEX_LOGIN_SOURCE = {
   ...CODEX_LOGIN_DECLARATION,
@@ -12,6 +13,7 @@ export const CODEX_LOGIN_SOURCE = {
     const login = new CodexSessionLogin(context.environment);
     try {
       const credential = await login.signInAndRead(codexHome, {
+        commandPathOverride: context.agentRuntimeCommandOverrides?.[CODEX_AGENT_ID],
         openExternalUrl: context.openExternalUrl,
       });
       if (credential.kind !== "openai_session") {

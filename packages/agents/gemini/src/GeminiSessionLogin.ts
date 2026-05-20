@@ -1,9 +1,10 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { spawn as spawnChild } from "node:child_process";
 import { delimiter, dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import { RuntimeCommandResolver } from "@nile/core/services/RuntimeCommandResolver";
 import { ShellPath } from "@nile/core/services/ShellPath";
 
 type SpawnedProcess = {
@@ -21,6 +22,8 @@ type SpawnFn = (
 ) => SpawnedProcess;
 
 export class GeminiSessionLogin {
+  private readonly runtimeCommandResolver = new RuntimeCommandResolver("gemini");
+
   constructor(
     private readonly environment: EnvironmentSource = EnvironmentSource.from(process.env),
     private readonly spawn: SpawnFn = spawnChild,
@@ -31,12 +34,14 @@ export class GeminiSessionLogin {
     },
   ) {}
 
-  async signIn(geminiHome: string): Promise<void> {
+  async signIn(geminiHome: string, options: { commandPathOverride?: string | null } = {}): Promise<void> {
     const openWrapperDir = this.readOpenWrapperDirectory();
+    const basePath = ShellPath.merge(process.env.PATH, this.environment.read("PATH")) ?? "";
+    const geminiCommand = this.resolveGeminiCommand(basePath, options.commandPathOverride);
     const env = {
       ...process.env,
       PATH: ShellPath.merge(
-        [openWrapperDir, process.env.PATH, this.environment.read("PATH")]
+        [openWrapperDir, dirname(geminiCommand), process.env.PATH, this.environment.read("PATH")]
           .filter((value): value is string => Boolean(value))
           .join(delimiter),
         null,
@@ -48,7 +53,7 @@ export class GeminiSessionLogin {
     if (this.canUseAttachedTerminal()) {
       try {
         await this.waitForExit(
-          this.spawn("gemini", [], {
+          this.spawn(geminiCommand, [], {
             stdio: "inherit",
             env,
           }),
@@ -62,7 +67,7 @@ export class GeminiSessionLogin {
 
     try {
       await this.waitForExit(
-        this.spawn("osascript", ["-e", this.buildTerminalScript(env, openWrapperDir)], {
+        this.spawn("osascript", ["-e", this.buildTerminalScript(env, openWrapperDir, geminiCommand)], {
           stdio: "ignore",
           env,
         }),
@@ -121,13 +126,16 @@ export class GeminiSessionLogin {
     return wrapperDir;
   }
 
-  private buildTerminalScript(env: NodeJS.ProcessEnv, openWrapperDir: string): string {
-    const geminiCommand = this.resolveGeminiCommand(env.PATH ?? "");
+  private buildTerminalScript(
+    env: NodeJS.ProcessEnv,
+    openWrapperDir: string,
+    geminiCommand: string,
+  ): string {
     const command = [
       `trap "rm -rf ${this.quoteForShell(openWrapperDir)}" EXIT`,
       `export GEMINI_CLI_HOME=${this.quoteForShell(env.GEMINI_CLI_HOME ?? "")}`,
       `export HOME=${this.quoteForShell(env.HOME ?? "")}`,
-      `export PATH=${this.quoteForShell(openWrapperDir)}:"$PATH"`,
+      `export PATH=${this.quoteForShell(env.PATH ?? "")}`,
       `printf '%s\\n\\n' ${this.quoteForShell(
         "Complete Gemini sign-in in this Terminal window using the account you want to add to Nile. When Gemini finishes logging in, close this window and return to Nile.",
       )}`,
@@ -146,14 +154,27 @@ export class GeminiSessionLogin {
     return `'${value.replaceAll("'", `'\"'\"'`)}'`;
   }
 
-  private resolveGeminiCommand(pathValue: string): string {
-    for (const entry of pathValue.split(delimiter).filter((value) => value.trim().length > 0)) {
-      const candidate = join(entry, "gemini");
-      if (existsSync(candidate)) {
-        return candidate;
-      }
+  private resolveGeminiCommand(pathValue: string, commandPathOverride?: string | null): string {
+    const explicitResolution = this.runtimeCommandResolver.resolveExplicit(commandPathOverride);
+    if (explicitResolution.command) {
+      return explicitResolution.command;
     }
-    return "gemini";
+    if (commandPathOverride?.trim()) {
+      throw new Error(
+        `Gemini CLI command override was not found (${commandPathOverride.trim()}). Update the override or use auto-detected CLI command, then try again.`,
+      );
+    }
+
+    const resolution = this.runtimeCommandResolver.resolve(pathValue, {
+      homeDirectory: this.environment.read("HOME") ?? process.env.HOME,
+    });
+    if (resolution.command) {
+      return resolution.command;
+    }
+
+    throw new Error(
+      "Gemini CLI was not found in PATH. Install Gemini CLI or add it to your shell PATH, then restart Nile.",
+    );
   }
 
   private escapeForAppleScript(value: string): string {

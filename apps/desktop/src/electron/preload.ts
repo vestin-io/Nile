@@ -10,6 +10,7 @@ const bridge: DesktopBridge = {
     openSettings: () => ipcRenderer.invoke("desktop:open-settings"),
     openSupportEmail: () => ipcRenderer.invoke("desktop:open-support-email"),
     updateAgentHome: (agentId, path) => ipcRenderer.invoke("desktop:update-agent-home", agentId, path),
+    updateAgentRuntimeCommand: (agentId, path) => ipcRenderer.invoke("desktop:update-agent-runtime-command", agentId, path),
   },
   connections: {
     listConnectionDefinitions: () => ipcRenderer.invoke("desktop:list-connection-definitions"),

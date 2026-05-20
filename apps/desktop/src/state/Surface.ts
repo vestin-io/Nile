@@ -1,5 +1,6 @@
 import {
   type AgentHomes,
+  type AgentRuntimeCommandOverrides,
   resolveAgentHome,
   type AgentId,
 } from "@nile/core/models/agent";
@@ -24,6 +25,7 @@ import { DesktopUsageCache } from "./UsageCache";
 type DesktopSurfaceOptions = {
   databasePath: string;
   agentHomes?: AgentHomes;
+  agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides;
   environment?: EnvironmentSource;
   credentialStore: CredentialStore;
   secureSnapshotStore?: SecureSnapshotStore;
@@ -52,6 +54,8 @@ export class DesktopSurface {
     this.usage = new DesktopUsageCache(this.logger);
     this.menubar = new DesktopMenubarStateQuery(this.lists, this.status, this.usage);
     this.settings = new DesktopSettingsStateQuery({
+      agentRuntimeCommandOverrides: options.agentRuntimeCommandOverrides,
+      environment: options.environment ?? EnvironmentSource.empty(),
       resolveDesktopAgentHome: (agentId) => this.resolveDesktopAgentHome(agentId),
       resolveDefaultDesktopAgentHome: (agentId) => resolveAgentHome(agentId),
     }, this.lists, this.status, this.usage);

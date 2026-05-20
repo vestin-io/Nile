@@ -1,5 +1,5 @@
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { spawn, type ChildProcess } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
@@ -12,7 +12,10 @@ export class DesktopLauncher {
   private static readonly appName = "Nile";
   private static readonly macHostName = "Nile.app";
 
-  constructor(private readonly root: string) {}
+  constructor(
+    private readonly root: string,
+    private readonly runCommand: typeof execFileSync = execFileSync,
+  ) {}
 
   async launch(options: SpawnOptions): Promise<ChildProcess> {
     const executablePath = this.resolveExecutablePath();
@@ -39,6 +42,7 @@ export class DesktopLauncher {
 
   private prepareMacHost(): string {
     const sourceAppPath = join(this.resolveElectronPackageRoot(), "dist", "Electron.app");
+    this.ensureElectronMacHostInstalled(sourceAppPath);
     const targetRoot = join(this.root, ".runtime", "host");
     const targetAppPath = join(targetRoot, DesktopLauncher.macHostName);
     const plistPath = join(targetAppPath, "Contents", "Info.plist");
@@ -69,6 +73,29 @@ export class DesktopLauncher {
 
   private resolveElectronPackageRoot(): string {
     return dirname(this.requireFromRoot().resolve("electron/package.json"));
+  }
+
+  private ensureElectronMacHostInstalled(sourceAppPath: string): void {
+    if (existsSync(sourceAppPath)) {
+      return;
+    }
+
+    this.runCommand(process.execPath, [this.resolveElectronInstallScriptPath()], {
+      cwd: this.root,
+      stdio: "ignore",
+    });
+
+    if (existsSync(sourceAppPath)) {
+      return;
+    }
+
+    throw new Error(
+      `Electron runtime is missing at ${sourceAppPath}. Reinstall dependencies or run node node_modules/electron/install.js.`,
+    );
+  }
+
+  private resolveElectronInstallScriptPath(): string {
+    return this.requireFromRoot().resolve("electron/install.js");
   }
 
   private requireFromRoot(): NodeJS.Require {

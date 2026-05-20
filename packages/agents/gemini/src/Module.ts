@@ -1,5 +1,6 @@
 import type { AgentModule } from "@nile/core/models/agent/module/Types";
 import { GEMINI_CURRENT_SESSION_SOURCE } from "./CurrentSessionSource";
+import { GEMINI_LOCAL_RUNTIME_INFO } from "./LocalRuntimeInfo";
 import { GEMINI_LOGIN_SOURCE } from "./LoginSource";
 import { GEMINI_MANIFEST } from "./Manifest";
 import { GEMINI_PROJECTION } from "./Projection";
@@ -11,4 +12,5 @@ export const GEMINI_AGENT_MODULE: AgentModule = {
   get projection() { return GEMINI_PROJECTION; },
   get currentSessionSource() { return GEMINI_CURRENT_SESSION_SOURCE; },
   get interactiveSessionLogin() { return GEMINI_LOGIN_SOURCE; },
+  get localRuntimeInfo() { return GEMINI_LOCAL_RUNTIME_INFO; },
 };

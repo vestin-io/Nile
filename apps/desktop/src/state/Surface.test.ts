@@ -15,12 +15,16 @@ import { DesktopSurface } from "./Surface";
 
 const tempDirs: string[] = [];
 const originalFetch = globalThis.fetch;
+const originalPath = process.env.PATH;
+const originalHome = process.env.HOME;
 
 afterEach(() => {
   while (tempDirs.length > 0) {
     rmSync(tempDirs.pop()!, { recursive: true, force: true });
   }
   delete process.env.OPENAI_API_KEY3;
+  process.env.PATH = originalPath;
+  process.env.HOME = originalHome;
   globalThis.fetch = originalFetch;
 });
 
@@ -1120,6 +1124,98 @@ describe("DesktopSurface", () => {
       }),
     );
   });
+
+  it("shows the resolved Codex runtime command in agent home details", async () => {
+    const brokenInstall = createCodexCliInstall("broken", { includeVendor: false, layout: "legacy" });
+    const workingInstall = createCodexCliInstall("working");
+    const setup = createSetup();
+    process.env.PATH = `${brokenInstall.bin}:${workingInstall.bin}`;
+    process.env.HOME = dirname(setup.codexHome);
+
+    const state = await createSurface(setup).getSettingsState();
+    const codexHome = state.advanced.agentHomes.find((entry) => entry.agentId === "codex");
+    const claudeHome = state.advanced.agentHomes.find((entry) => entry.agentId === "claude");
+
+    expect(codexHome?.runtimeCommandPath).toBe(join(workingInstall.bin, "codex"));
+    expect(codexHome?.runtimeCommandOverridePath).toBeNull();
+    expect(claudeHome?.runtimeCommandPath).toBeNull();
+  });
+
+  it("shows the resolved .nvm Codex runtime command when PATH has no working install", async () => {
+    const setup = createSetup();
+    const brokenInstall = createCodexCliInstall("broken-path", { includeVendor: false, layout: "legacy" });
+    const homeRoot = dirname(setup.codexHome);
+    const fallbackInstall = createNvmCodexCliInstall(homeRoot, "v22.22.0");
+    process.env.PATH = brokenInstall.bin;
+    process.env.HOME = homeRoot;
+
+    const state = await createSurface(setup).getSettingsState();
+    const codexHome = state.advanced.agentHomes.find((entry) => entry.agentId === "codex");
+
+    expect(codexHome?.runtimeCommandPath).toBe(fallbackInstall.command);
+  });
+
+  it("shows a desktop-local Codex runtime command override in agent home details", async () => {
+    const setup = createSetup();
+    const overrideInstall = createCodexCliInstall("override");
+
+    const state = await new DesktopSurface({
+      databasePath: setup.dbPath,
+      agentHomes: createAgentHomes(setup),
+      agentRuntimeCommandOverrides: { codex: join(overrideInstall.bin, "codex") },
+      credentialStore: setup.credentialStore,
+      secureSnapshotStore: setup.secureSnapshots,
+      logger: NileLogger.silent(),
+    }).getSettingsState();
+    const codexHome = state.advanced.agentHomes.find((entry) => entry.agentId === "codex");
+
+    expect(codexHome?.runtimeCommandOverridePath).toBe(join(overrideInstall.bin, "codex"));
+    expect(codexHome?.runtimeCommandPath).toBe(join(overrideInstall.bin, "codex"));
+  });
+
+  it("shows the resolved Claude runtime command in agent home details", async () => {
+    const install = createClaudeCliInstall("working");
+    process.env.PATH = install.bin;
+
+    const state = await createSurface(createSetup()).getSettingsState();
+    const claudeHome = state.advanced.agentHomes.find((entry) => entry.agentId === "claude");
+
+    expect(claudeHome?.runtimeCommandPath).toBe(install.command);
+    expect(claudeHome?.runtimeCommandOverridePath).toBeNull();
+  });
+
+  it("shows the resolved Cursor runtime command in agent home details", async () => {
+    const install = createCursorCliInstall("working");
+    process.env.PATH = install.bin;
+
+    const state = await createSurface(createSetup()).getSettingsState();
+    const cursorHome = state.advanced.agentHomes.find((entry) => entry.agentId === "cursor");
+
+    expect(cursorHome?.runtimeCommandPath).toBe(install.command);
+    expect(cursorHome?.runtimeCommandOverridePath).toBeNull();
+  });
+
+  it("shows the resolved Gemini runtime command in agent home details", async () => {
+    const install = createGeminiCliInstall("working");
+    process.env.PATH = install.bin;
+
+    const state = await createSurface(createSetup()).getSettingsState();
+    const geminiHome = state.advanced.agentHomes.find((entry) => entry.agentId === "gemini");
+
+    expect(geminiHome?.runtimeCommandPath).toBe(install.command);
+    expect(geminiHome?.runtimeCommandOverridePath).toBeNull();
+  });
+
+  it("shows the resolved OpenClaw runtime command in agent home details", async () => {
+    const install = createOpenClawCliInstall("working");
+    process.env.PATH = install.bin;
+
+    const state = await createSurface(createSetup()).getSettingsState();
+    const openclawHome = state.advanced.agentHomes.find((entry) => entry.agentId === "openclaw");
+
+    expect(openclawHome?.runtimeCommandPath).toBe(install.command);
+    expect(openclawHome?.runtimeCommandOverridePath).toBeNull();
+  });
 });
 
 function createSetup(options?: {
@@ -1300,6 +1396,152 @@ function createAgentHomes(setup: {
     gemini: setup.geminiHome,
     openclaw: setup.openclawHome,
   } as const;
+}
+
+function createCodexCliInstall(
+  name: string,
+  options: { includeVendor?: boolean; layout?: "optional-package" | "legacy" } = {},
+): { bin: string; root: string } {
+  const root = mkdtempSync(join(tmpdir(), `nile-desktop-codex-cli-${name}-`));
+  tempDirs.push(root);
+
+  const bin = join(root, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(join(bin, "codex"), "#!/usr/bin/env node\n", "utf8");
+
+  if (options.includeVendor !== false) {
+    const targetTriple = readTargetTriple();
+    if (!targetTriple) {
+      throw new Error(`Unsupported test platform: ${process.platform}/${process.arch}`);
+    }
+
+    const vendorRoot = options.layout === "legacy"
+      ? join(root, "vendor", targetTriple, "codex")
+      : join(root, "node_modules", "@openai", readOptionalPackageDirectoryName(), "vendor", targetTriple, "codex");
+    mkdirSync(vendorRoot, { recursive: true });
+    writeFileSync(join(vendorRoot, "codex"), "", "utf8");
+  }
+
+  return { bin, root };
+}
+
+function createNvmCodexCliInstall(
+  homeRoot: string,
+  versionName: string,
+  options: { includeVendor?: boolean; layout?: "optional-package" | "legacy" } = {},
+): { command: string } {
+  const installRoot = join(homeRoot, ".nvm", "versions", "node", versionName);
+  const bin = join(installRoot, "bin");
+  mkdirSync(bin, { recursive: true });
+  const command = join(bin, "codex");
+  writeFileSync(command, "#!/usr/bin/env node\n", "utf8");
+
+  if (options.includeVendor !== false) {
+    const targetTriple = readTargetTriple();
+    if (!targetTriple) {
+      throw new Error(`Unsupported test platform: ${process.platform}/${process.arch}`);
+    }
+
+    const vendorRoot = options.layout === "legacy"
+      ? join(installRoot, "vendor", targetTriple, "codex")
+      : join(installRoot, "node_modules", "@openai", readOptionalPackageDirectoryName(), "vendor", targetTriple, "codex");
+    mkdirSync(vendorRoot, { recursive: true });
+    writeFileSync(join(vendorRoot, "codex"), "", "utf8");
+  }
+
+  return { command };
+}
+
+function createGeminiCliInstall(name: string): { bin: string; command: string } {
+  const root = mkdtempSync(join(tmpdir(), `nile-desktop-gemini-cli-${name}-`));
+  tempDirs.push(root);
+
+  const bin = join(root, "bin");
+  mkdirSync(bin, { recursive: true });
+  const command = join(bin, "gemini");
+  writeFileSync(command, "#!/usr/bin/env node\n", { encoding: "utf8", mode: 0o755 });
+
+  return { bin, command };
+}
+
+function createClaudeCliInstall(name: string): { bin: string; command: string } {
+  const root = mkdtempSync(join(tmpdir(), `nile-desktop-claude-cli-${name}-`));
+  tempDirs.push(root);
+
+  const bin = join(root, "bin");
+  mkdirSync(bin, { recursive: true });
+  const command = join(bin, "claude");
+  writeFileSync(command, "#!/usr/bin/env node\n", { encoding: "utf8", mode: 0o755 });
+
+  return { bin, command };
+}
+
+function createCursorCliInstall(name: string): { bin: string; command: string } {
+  const root = mkdtempSync(join(tmpdir(), `nile-desktop-cursor-cli-${name}-`));
+  tempDirs.push(root);
+
+  const bin = join(root, "bin");
+  mkdirSync(bin, { recursive: true });
+  const command = join(bin, "agent");
+  writeFileSync(command, "#!/usr/bin/env node\n", { encoding: "utf8", mode: 0o755 });
+
+  return { bin, command };
+}
+
+function createOpenClawCliInstall(name: string): { bin: string; command: string } {
+  const root = mkdtempSync(join(tmpdir(), `nile-desktop-openclaw-cli-${name}-`));
+  tempDirs.push(root);
+
+  const bin = join(root, "bin");
+  mkdirSync(bin, { recursive: true });
+  const command = join(bin, "openclaw");
+  writeFileSync(command, "#!/usr/bin/env node\n", { encoding: "utf8", mode: 0o755 });
+
+  return { bin, command };
+}
+
+function readTargetTriple(): string | null {
+  if (process.platform === "darwin" && process.arch === "arm64") {
+    return "aarch64-apple-darwin";
+  }
+  if (process.platform === "darwin" && process.arch === "x64") {
+    return "x86_64-apple-darwin";
+  }
+  if (process.platform === "linux" && process.arch === "arm64") {
+    return "aarch64-unknown-linux-gnu";
+  }
+  if (process.platform === "linux" && process.arch === "x64") {
+    return "x86_64-unknown-linux-gnu";
+  }
+  if (process.platform === "win32" && process.arch === "arm64") {
+    return "aarch64-pc-windows-msvc";
+  }
+  if (process.platform === "win32" && process.arch === "x64") {
+    return "x86_64-pc-windows-msvc";
+  }
+  return null;
+}
+
+function readOptionalPackageDirectoryName(): string {
+  if (process.platform === "darwin" && process.arch === "arm64") {
+    return "codex-darwin-arm64";
+  }
+  if (process.platform === "darwin" && process.arch === "x64") {
+    return "codex-darwin-x64";
+  }
+  if (process.platform === "linux" && process.arch === "arm64") {
+    return "codex-linux-arm64";
+  }
+  if (process.platform === "linux" && process.arch === "x64") {
+    return "codex-linux-x64";
+  }
+  if (process.platform === "win32" && process.arch === "arm64") {
+    return "codex-win32-arm64";
+  }
+  if (process.platform === "win32" && process.arch === "x64") {
+    return "codex-win32-x64";
+  }
+  throw new Error(`Unsupported test platform: ${process.platform}/${process.arch}`);
 }
 
 function seedProvider(

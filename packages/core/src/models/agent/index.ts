@@ -25,3 +25,4 @@ export {
   resolveAgentHome,
 } from "./Homes";
 export type { AgentHomes } from "./Homes";
+export type { AgentRuntimeCommandOverrides } from "./RuntimeCommands";

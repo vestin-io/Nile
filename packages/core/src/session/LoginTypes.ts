@@ -1,4 +1,5 @@
 import type { AgentHomes } from "../models/agent/Homes";
+import type { AgentRuntimeCommandOverrides } from "../models/agent/RuntimeCommands";
 import type { EnvironmentSource } from "../services/EnvironmentSource";
 import type { StoredCredential } from "../services/credential/Types";
 
@@ -30,6 +31,7 @@ export type InteractiveSessionLoginInteractionMode =
 
 export type InteractiveSessionLoginContext = {
   agentHomes: AgentHomes | undefined;
+  agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides;
   environment: EnvironmentSource;
   openExternalUrl?: (url: string) => Promise<void>;
 };

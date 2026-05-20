@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { StateReset } from "@nile/builtins/local";
-import type { AgentHomes } from "@nile/core/models/agent";
+import type { AgentHomes, AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
 import { mergeAgentHomes, type AgentId } from "@nile/core/models/agent";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import {
@@ -16,6 +16,7 @@ import { ShellEnvironment } from "@nile/host-local";
 import { DesktopSurface } from "../../state/Surface";
 import { DesktopApplicationMenu } from "./DesktopApplicationMenu";
 import { AgentHomesStore } from "../state/AgentHomesStore";
+import { AgentRuntimeCommandsStore } from "../state/AgentRuntimeCommandsStore";
 import { AutoUpdateManager } from "../updates/AutoUpdateManager";
 import { ConnectionUsageAlertEvaluator } from "../alerts/Evaluator";
 import { ConnectionAlertOverlay } from "../alerts/Overlay";
@@ -68,6 +69,7 @@ export class DesktopMain {
   private readonly environmentStore: DesktopEnvironmentStore;
   private readonly shellEnvironment: DesktopShellEnvironment;
   private readonly agentHomesStore: AgentHomesStore;
+  private readonly agentRuntimeCommandsStore: AgentRuntimeCommandsStore;
   private readonly menubarDisplayStore: DesktopMenubarDisplayStore;
   private readonly languageStore: DesktopLanguageStore;
   private readonly notificationMuteStore: DesktopNotificationMuteStore;
@@ -77,6 +79,7 @@ export class DesktopMain {
   private readonly notificationHistory: DesktopNotificationHistory;
   private readonly profileManager: WorkspaceProfileManager;
   private readonly agentHomes: AgentHomes;
+  private readonly agentRuntimeCommandOverrides: AgentRuntimeCommandOverrides;
   private readonly surface: DesktopSurface;
   private readonly connectionGateway: DesktopConnectionGateway;
   private readonly connectionManager: DesktopConnectionManager;
@@ -101,6 +104,7 @@ export class DesktopMain {
       this.environmentStore,
     );
     this.agentHomesStore = new AgentHomesStore(options.databasePath);
+    this.agentRuntimeCommandsStore = new AgentRuntimeCommandsStore(options.databasePath);
     this.menubarDisplayStore = new DesktopMenubarDisplayStore(options.databasePath);
     this.languageStore = new DesktopLanguageStore(options.databasePath);
     this.notificationMuteStore = new DesktopNotificationMuteStore(options.databasePath);
@@ -109,9 +113,11 @@ export class DesktopMain {
     this.connectionAlertStore = new ConnectionAlertStore(options.databasePath);
     this.notificationHistory = new DesktopNotificationHistory(options.databasePath);
     this.agentHomes = mergeAgentHomes(options.agentHomes, this.agentHomesStore.read());
+    this.agentRuntimeCommandOverrides = this.agentRuntimeCommandsStore.read();
     this.surface = new DesktopSurface({
       databasePath: options.databasePath,
       agentHomes: this.agentHomes,
+      agentRuntimeCommandOverrides: this.agentRuntimeCommandOverrides,
       environment: this.environment,
       credentialStore: this.credentialStore,
       logger: this.logger.child({ scope: "desktop-surface" }),
@@ -119,6 +125,7 @@ export class DesktopMain {
     this.connectionManager = new DesktopConnectionManager({
       databasePath: options.databasePath,
       agentHomes: this.agentHomes,
+      agentRuntimeCommandOverrides: this.agentRuntimeCommandOverrides,
       environment: this.environment,
       openExternalUrl: async (url) => await this.shell.openExternalUrl(url),
       managedApiKeyEnvironment: new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment),
@@ -297,6 +304,7 @@ export class DesktopMain {
         return next;
       },
       updateAgentHome: (agentId, path) => this.updateAgentHome(agentId, path),
+      updateAgentRuntimeCommand: (agentId, path) => this.updateAgentRuntimeCommand(agentId, path),
     }).register();
     new DesktopIpcConnectionRoutes({
       chooseOpenAiAuthJsonPath: (defaultPath) => this.shell.chooseOpenAiAuthJsonPath(defaultPath),
@@ -355,14 +363,26 @@ export class DesktopMain {
     Object.assign(this.agentHomes, next);
   }
 
+  private updateAgentRuntimeCommand(agentId: AgentId, path: string | null): void {
+    const next = this.agentRuntimeCommandsStore.update(agentId, path);
+    for (const key of Object.keys(this.agentRuntimeCommandOverrides) as AgentId[]) {
+      delete this.agentRuntimeCommandOverrides[key];
+    }
+    Object.assign(this.agentRuntimeCommandOverrides, next);
+  }
+
   private resetDesktopLocalState(): void {
     this.connectionManager.clearPreparedConnectionDrafts();
     this.connectionAlertStore.clearCache();
+    this.agentRuntimeCommandsStore.clear();
     const next = mergeAgentHomes(this.options.agentHomes, {});
     for (const key of Object.keys(this.agentHomes) as AgentId[]) {
       delete this.agentHomes[key];
     }
     Object.assign(this.agentHomes, next);
+    for (const key of Object.keys(this.agentRuntimeCommandOverrides) as AgentId[]) {
+      delete this.agentRuntimeCommandOverrides[key];
+    }
   }
 
   private clearManagedApiKeyEnvironment(): void {

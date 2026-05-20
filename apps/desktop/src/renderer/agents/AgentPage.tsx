@@ -27,6 +27,7 @@ type AgentPageProps = {
   t: Translator;
   onAgentOrderChange(agentOrder: AgentId[]): void;
   onAgentHomeSave(agentId: AgentId, path: string | null): Promise<void>;
+  onAgentRuntimeCommandSave(agentId: AgentId, path: string | null): Promise<void>;
   onConfigureAgent(agentId: DesktopAgentState["agentId"]): void;
   onImport(agentId: DesktopAgentState["agentId"]): Promise<void>;
   onOpenQuickSetup(): void;
@@ -53,6 +54,7 @@ export function AgentPage({
   t,
   onAgentOrderChange,
   onAgentHomeSave,
+  onAgentRuntimeCommandSave,
   onConfigureAgent,
   onImport,
   onOpenQuickSetup,
@@ -138,16 +140,16 @@ export function AgentPage({
   return (
     <AgentDetailPage
       agent={agent}
-      agentHomePath={agentHome.path}
+      agentHome={agentHome}
       canConfigure={canConfigureAgent(agent.agentId)}
       detectedSetup={detectedSetupsByAgent.get(agent.agentId) ?? null}
-      defaultAgentHomePath={agentHome.defaultPath}
       entries={history.entries.filter((entry) => entry.agentId === agent.agentId)}
       activeTab={selectedDetailTab}
       t={t}
       onBack={() => onSelectedDetailAgentIdChange(null)}
       onTabChange={onSelectedDetailTabChange}
       onAgentHomeSave={onAgentHomeSave}
+      onAgentRuntimeCommandSave={onAgentRuntimeCommandSave}
       onOpenAddPage={onOpenAddPage}
       onOpenConnection={(connectionId) => onOpenConnection(connectionId, agent.agentId)}
       onRefresh={onRefresh}

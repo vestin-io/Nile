@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ClaudeSessionLogin } from "./ClaudeSessionLogin";
 import { CLAUDE_LOGIN_DECLARATION } from "./LoginDeclaration";
+import { CLAUDE_AGENT_ID } from "./types";
 
 export const CLAUDE_LOGIN_SOURCE = {
   ...CLAUDE_LOGIN_DECLARATION,
@@ -11,7 +12,9 @@ export const CLAUDE_LOGIN_SOURCE = {
     const { loginRoot, claudeHome } = createTemporaryClaudeHome();
     const login = new ClaudeSessionLogin(context.environment);
     try {
-      const credential = await login.signInAndRead(claudeHome);
+      const credential = await login.signInAndRead(claudeHome, {
+        commandPathOverride: context.agentRuntimeCommandOverrides?.[CLAUDE_AGENT_ID],
+      });
       if (credential.kind !== "claude_session") {
         throw new Error("No Claude session found after Claude sign-in");
       }

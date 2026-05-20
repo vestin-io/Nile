@@ -1,10 +1,11 @@
 import { spawn as spawnChild } from "node:child_process";
-import { existsSync } from "node:fs";
-import { delimiter, dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import { NileLogger } from "@nile/core/services/NileLogger";
 import { ShellPath } from "@nile/core/services/ShellPath";
 import type { StoredCredential } from "@nile/core/services/credential";
+import { CliCommandResolver } from "./CliCommandResolver";
 import { CodexAuthStore } from "./stores/CodexAuthStore";
 
 type SpawnedProcess = {
@@ -29,8 +30,10 @@ type BrowserOpener = (url: string) => Promise<void>;
 type LoginExecutionState = {
   browserOpenError: Error | null;
   browserOpenPromise: Promise<void> | null;
+  codexCommand: string;
   loginUrl: string | null;
   output: string[];
+  path: string | undefined;
 };
 
 const loginPollIntervalMs = 1000;
@@ -38,21 +41,34 @@ const loginTimeoutMs = 5 * 60 * 1000;
 const loginUrlPattern = /https:\/\/auth\.openai\.com\/\S+/;
 
 export class CodexSessionLogin {
+  private readonly logger: NileLogger;
+  private readonly cliCommandResolver = new CliCommandResolver();
+
   constructor(
     private readonly environment: EnvironmentSource = EnvironmentSource.from(process.env),
     private readonly spawn: SpawnFn = spawnChild,
     private readonly isElectronProcess: () => boolean = () => Boolean(process.versions.electron),
-  ) {}
+    logger: NileLogger = NileLogger.createDefault({ module: "codex-session-login" }),
+  ) {
+    this.logger = logger;
+  }
 
-  async signIn(codexHome: string, options: { openExternalUrl?: BrowserOpener } = {}): Promise<void> {
+  async signIn(
+    codexHome: string,
+    options: { commandPathOverride?: string | null; openExternalUrl?: BrowserOpener } = {},
+  ): Promise<void> {
     const env = this.buildLoginEnv(codexHome);
-    const codexCommand = this.resolveCodexCommand(env.PATH ?? "");
+    const codexCommand = this.resolveCodexCommand(env.PATH ?? "", options.commandPathOverride);
+    const codexCommandDirectory = dirname(codexCommand);
+    if (codexCommandDirectory !== ".") {
+      env.PATH = ShellPath.merge(codexCommandDirectory, env.PATH ?? null);
+    }
     const shouldCaptureOutput = this.isElectronProcess() || options.openExternalUrl !== undefined;
     const child = this.spawn(codexCommand, ["login"], {
       stdio: shouldCaptureOutput ? "pipe" : "inherit",
       env,
     });
-    const state = this.captureLoginOutput(child, options.openExternalUrl);
+    const state = this.captureLoginOutput(child, options.openExternalUrl, codexCommand, env.PATH);
 
     await this.waitForExit(
       child,
@@ -63,7 +79,7 @@ export class CodexSessionLogin {
 
   async signInAndRead(
     codexHome: string,
-    options: { openExternalUrl?: BrowserOpener } = {},
+    options: { commandPathOverride?: string | null; openExternalUrl?: BrowserOpener } = {},
   ): Promise<StoredCredential> {
     const authStore = new CodexAuthStore({ codexHome });
     const baseline = authStore.snapshot();
@@ -85,15 +101,31 @@ export class CodexSessionLogin {
     );
   }
 
+  private buildBrokenCliInstallError(commands: readonly string[]): Error {
+    return new Error(
+      `Codex CLI was found in PATH, but its packaged binary is missing (${commands.join(", ")}). Reinstall Codex CLI or fix PATH so Nile can use a working codex command, then restart Nile.`,
+    );
+  }
+
+  private buildInvalidCliOverrideError(command: string): Error {
+    return new Error(
+      `Configured Codex CLI path is invalid or its packaged binary is missing (${command}). Update the desktop-local CLI override or remove it to use auto-detection.`,
+    );
+  }
+
   private captureLoginOutput(
     child: SpawnedProcess,
     openExternalUrl: BrowserOpener | undefined,
+    codexCommand: string,
+    path: string | undefined,
   ): LoginExecutionState {
     const state: LoginExecutionState = {
       browserOpenError: null,
       browserOpenPromise: null,
+      codexCommand,
       loginUrl: null,
       output: [],
+      path,
     };
 
     this.attachOutputListener(child.stdout, child, state, openExternalUrl);
@@ -150,6 +182,31 @@ export class CodexSessionLogin {
     );
   }
 
+  private logLoginFailure(
+    operation: string,
+    exitCode: number | null,
+    state: LoginExecutionState,
+  ): void {
+    console.error("[desktop][codex-login] login failed", {
+      operation,
+      exitCode: exitCode ?? "unknown",
+      codexCommand: state.codexCommand,
+      path: state.path,
+      loginUrl: state.loginUrl,
+      browserOpenError: state.browserOpenError?.message ?? null,
+      output: state.output.join(""),
+    });
+    this.logger.error("desktop.codex_login_failed", undefined, {
+      operation,
+      exitCode: exitCode ?? "unknown",
+      codexCommand: state.codexCommand,
+      path: state.path,
+      loginUrl: state.loginUrl,
+      browserOpenError: state.browserOpenError?.message ?? null,
+      output: state.output.join(""),
+    });
+  }
+
   private buildLoginEnv(codexHome: string): NodeJS.ProcessEnv {
     return {
       ...process.env,
@@ -159,13 +216,26 @@ export class CodexSessionLogin {
     };
   }
 
-  private resolveCodexCommand(pathValue: string): string {
-    for (const entry of pathValue.split(delimiter).filter((value) => value.trim().length > 0)) {
-      const candidate = join(entry, "codex");
-      if (existsSync(candidate)) {
-        return candidate;
-      }
+  private resolveCodexCommand(pathValue: string, commandPathOverride?: string | null): string {
+    const explicitResolution = this.cliCommandResolver.resolveExplicit(commandPathOverride);
+    if (explicitResolution.command) {
+      return explicitResolution.command;
     }
+    if (explicitResolution.invalidCommandPaths.length > 0) {
+      throw this.buildInvalidCliOverrideError(explicitResolution.invalidCommandPaths[0]!);
+    }
+
+    const resolution = this.cliCommandResolver.resolve(pathValue, {
+      homeDirectory: this.environment.read("HOME") ?? process.env.HOME,
+    });
+    if (resolution.command) {
+      return resolution.command;
+    }
+
+    if (resolution.invalidCommandPaths.length > 0) {
+      throw this.buildBrokenCliInstallError(resolution.invalidCommandPaths);
+    }
+
     return "codex";
   }
 
@@ -229,9 +299,11 @@ export class CodexSessionLogin {
       await state.browserOpenPromise.catch(() => {});
     }
     if (state.browserOpenError) {
+      this.logLoginFailure(operation, exitCode, state);
       throw state.browserOpenError;
     }
     if (exitCode !== 0) {
+      this.logLoginFailure(operation, exitCode, state);
       throw this.buildLoginFailure(operation, exitCode, state);
     }
   }

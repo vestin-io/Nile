@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -97,6 +98,66 @@ describe("DesktopLauncher", () => {
       expect(readFileSync(join(targetRoot, "Info.plist"), "utf8")).toContain(
         "<key>CFBundleName</key><string>Nile</string>",
       );
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("reinstalls the Electron runtime when the macOS host bundle is missing", () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), "nile-desktop-launcher-"));
+    const appRoot = join(repoRoot, "apps", "desktop");
+    try {
+      const electronRoot = join(repoRoot, "node_modules", "electron");
+      const electronAppRoot = join(
+        electronRoot,
+        "dist",
+        "Electron.app",
+        "Contents",
+      );
+      mkdirSync(join(appRoot, "build", "icons"), { recursive: true });
+      mkdirSync(electronRoot, { recursive: true });
+      writeFileSync(join(appRoot, "package.json"), "{}");
+      writeFileSync(join(appRoot, "build", "icons", "icon.icns"), "nile-icon");
+      writeFileSync(join(electronRoot, "package.json"), "{}");
+      writeFileSync(join(electronRoot, "install.js"), "");
+
+      let installCalled = false;
+      const runCommand = ((...input: Parameters<typeof execFileSync>) => {
+        const [, args] = input;
+        installCalled = true;
+        expect(args).toBeDefined();
+        if (!args) {
+          throw new Error("Expected install script args");
+        }
+        expect(args).toHaveLength(1);
+        expect(args[0]?.endsWith("/node_modules/electron/install.js")).toBe(true);
+        mkdirSync(join(electronAppRoot, "MacOS"), { recursive: true });
+        mkdirSync(join(electronAppRoot, "Resources"), { recursive: true });
+        writeFileSync(join(electronAppRoot, "MacOS", "Electron"), "");
+        writeFileSync(join(electronAppRoot, "Resources", "electron.icns"), "electron-icon");
+        writeFileSync(
+          join(electronAppRoot, "Info.plist"),
+          [
+            "<plist>",
+            "<dict>",
+            "<key>CFBundleDisplayName</key><string>Electron</string>",
+            "<key>CFBundleIdentifier</key><string>com.github.electron</string>",
+            "<key>CFBundleName</key><string>Electron</string>",
+            "</dict>",
+            "</plist>",
+          ].join("\n"),
+        );
+        return Buffer.alloc(0);
+      }) as typeof execFileSync;
+      const launcher = new DesktopLauncher(appRoot, runCommand);
+
+      const prepareMacHost = (
+        Reflect.get(launcher, "prepareMacHost") as () => string
+      ).bind(launcher);
+      const executablePath = prepareMacHost();
+
+      expect(installCalled).toBe(true);
+      expect(executablePath).toBe(join(appRoot, ".runtime", "host", "Nile.app", "Contents", "MacOS", "Electron"));
     } finally {
       rmSync(repoRoot, { recursive: true, force: true });
     }

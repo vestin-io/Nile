@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { GeminiSessionLogin } from "./GeminiSessionLogin";
 import { GeminiSessionStores } from "./Stores";
 import { GEMINI_LOGIN_DECLARATION } from "./LoginDeclaration";
+import { GEMINI_AGENT_ID } from "./types";
 
 const loginPollIntervalMs = 1000;
 const loginTimeoutMs = 5 * 60 * 1000;
@@ -21,7 +22,9 @@ export const GEMINI_LOGIN_SOURCE = {
       stores.backend,
     );
 
-    await new GeminiSessionLogin(context.environment).signIn(geminiHome);
+    await new GeminiSessionLogin(context.environment).signIn(geminiHome, {
+      commandPathOverride: context.agentRuntimeCommandOverrides?.[GEMINI_AGENT_ID],
+    });
     const session = await waitForSignedInSession(stores, baseline);
     if (session.kind !== "resolved") {
       throw new Error(

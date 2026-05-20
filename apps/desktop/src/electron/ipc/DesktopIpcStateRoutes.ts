@@ -22,6 +22,7 @@ type DesktopIpcStateRoutesOptions = {
   stateStore: DesktopStateStore;
   toggleMenubarTickerAgent(agentId: AgentId): DesktopMenubarDisplayState;
   updateAgentHome(agentId: AgentId, path: string | null): void;
+  updateAgentRuntimeCommand(agentId: AgentId, path: string | null): void;
 };
 
 export class DesktopIpcStateRoutes {
@@ -97,6 +98,13 @@ export class DesktopIpcStateRoutes {
     });
     ipcMain.handle("desktop:update-agent-home", async (_event, agentId: unknown, path: unknown) => {
       this.options.updateAgentHome(
+        inputs.readAgentId(agentId),
+        inputs.readNullableString(path, "path"),
+      );
+      this.options.refreshAll();
+    });
+    ipcMain.handle("desktop:update-agent-runtime-command", async (_event, agentId: unknown, path: unknown) => {
+      this.options.updateAgentRuntimeCommand(
         inputs.readAgentId(agentId),
         inputs.readNullableString(path, "path"),
       );

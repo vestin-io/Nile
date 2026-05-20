@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
@@ -8,14 +11,23 @@ describe("ClaudeSessionLogin", () => {
   afterEach(() => {
     restoreTty("stdin");
     restoreTty("stdout");
+    process.env.PATH = originalPath;
+    while (tempDirs.length > 0) {
+      const path = tempDirs.pop();
+      if (path) {
+        rmSync(path, { recursive: true, force: true });
+      }
+    }
   });
 
   it("runs claude login directly when attached to a terminal", async () => {
     setTty("stdin", true);
     setTty("stdout", true);
+    const install = createClaudeCliInstall("terminal");
+    process.env.PATH = install.bin;
     const calls: Array<{ command: string; args: string[]; stdio: "inherit" | "ignore" }> = [];
     const login = new ClaudeSessionLogin(
-      EnvironmentSource.from({ PATH: "/custom/bin" }),
+      EnvironmentSource.empty(),
       (command, args, options) => {
         calls.push({ command, args, stdio: options.stdio });
         return exitedProcess(0);
@@ -27,7 +39,7 @@ describe("ClaudeSessionLogin", () => {
 
     expect(calls).toEqual([
       {
-        command: "claude",
+        command: install.command,
         args: ["login"],
         stdio: "inherit",
       },
@@ -37,6 +49,8 @@ describe("ClaudeSessionLogin", () => {
   it("opens Terminal for Claude sign-in when no attached terminal is available", async () => {
     setTty("stdin", false);
     setTty("stdout", false);
+    const install = createClaudeCliInstall("osascript");
+    process.env.PATH = install.bin;
     const calls: Array<{ command: string; args: string[]; stdio: "inherit" | "ignore" }> = [];
     const login = new ClaudeSessionLogin(
       EnvironmentSource.empty(),
@@ -56,13 +70,15 @@ describe("ClaudeSessionLogin", () => {
     });
     expect(calls[0]?.args[1]).toContain('tell application "Terminal"');
     expect(calls[0]?.args[1]).toContain("HOME='/tmp/test-home'");
-    expect(calls[0]?.args[1]).toContain("claude");
+    expect(calls[0]?.args[1]).toContain(install.command);
     expect(calls[0]?.args[1]).toContain("login");
   });
 
   it("opens Terminal for Claude sign-in inside Electron even when a TTY exists", async () => {
     setTty("stdin", true);
     setTty("stdout", true);
+    const install = createClaudeCliInstall("electron");
+    process.env.PATH = install.bin;
     const calls: Array<{ command: string; stdio: "inherit" | "ignore" }> = [];
     const login = new ClaudeSessionLogin(
       EnvironmentSource.empty(),
@@ -101,6 +117,35 @@ describe("ClaudeSessionLogin", () => {
       "Claude CLI was not found in PATH. Install Claude CLI or add it to your shell PATH, then restart Nile.",
     );
   });
+
+  it("prefers an explicit Claude CLI override over PATH auto-detection", async () => {
+    setTty("stdin", true);
+    setTty("stdout", true);
+    const pathInstall = createClaudeCliInstall("path");
+    const overrideInstall = createClaudeCliInstall("override");
+    process.env.PATH = pathInstall.bin;
+    const calls: Array<{ command: string; args: string[]; stdio: "inherit" | "ignore" }> = [];
+    const login = new ClaudeSessionLogin(
+      EnvironmentSource.empty(),
+      (command, args, options) => {
+        calls.push({ command, args, stdio: options.stdio });
+        return exitedProcess(0);
+      },
+      () => false,
+    );
+
+    await login.signIn("/tmp/test-home/.claude", {
+      commandPathOverride: overrideInstall.command,
+    });
+
+    expect(calls).toEqual([
+      {
+        command: overrideInstall.command,
+        args: ["login"],
+        stdio: "inherit",
+      },
+    ]);
+  });
 });
 
 function exitedProcess(code: number | null) {
@@ -118,6 +163,8 @@ const originalDescriptors = {
   stdin: Object.getOwnPropertyDescriptor(process.stdin, "isTTY"),
   stdout: Object.getOwnPropertyDescriptor(process.stdout, "isTTY"),
 };
+const originalPath = process.env.PATH;
+const tempDirs: string[] = [];
 
 function setTty(target: "stdin" | "stdout", value: boolean): void {
   Object.defineProperty(process[target], "isTTY", {
@@ -134,4 +181,14 @@ function restoreTty(target: "stdin" | "stdout"): void {
   }
 
   delete (process[target] as { isTTY?: boolean }).isTTY;
+}
+
+function createClaudeCliInstall(name: string): { bin: string; command: string } {
+  const root = mkdtempSync(join(tmpdir(), `nile-claude-cli-${name}-`));
+  tempDirs.push(root);
+  const bin = join(root, "bin");
+  const command = join(bin, "claude");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(command, "#!/usr/bin/env node\n", { encoding: "utf8", mode: 0o755 });
+  return { bin, command };
 }

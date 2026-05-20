@@ -1,6 +1,11 @@
 import type { AgentId } from "@nile/core/models/agent/definitions";
 
-import type { DesktopAgentState, DesktopHistoryEntry, DesktopOnboardingItem } from "../../../state/Types";
+import type {
+  DesktopAgentHomeState,
+  DesktopAgentState,
+  DesktopHistoryEntry,
+  DesktopOnboardingItem,
+} from "../../../state/Types";
 import { AgentHomeSection } from "./HomeSection";
 import { AgentConnectionsSection } from "./ConnectionsSection";
 import { AgentHistorySection } from "./HistorySection";
@@ -20,15 +25,15 @@ export type AgentDetailTab = "connections" | "history" | "home";
 type AgentDetailPageProps = {
   agent: DesktopAgentState;
   activeTab: AgentDetailTab;
-  agentHomePath: string;
+  agentHome: DesktopAgentHomeState;
   canConfigure: boolean;
   detectedSetup: DesktopOnboardingItem | null;
-  defaultAgentHomePath: string;
   entries: DesktopHistoryEntry[];
   t: Translator;
   onBack(): void;
   onTabChange(tab: AgentDetailTab): void;
   onAgentHomeSave(agentId: AgentId, path: string | null): Promise<void>;
+  onAgentRuntimeCommandSave(agentId: AgentId, path: string | null): Promise<void>;
   onOpenAddPage(agentId: DesktopAgentState["agentId"]): void;
   onOpenConnection(connectionId: string): void;
   onRefresh(): Promise<void>;
@@ -41,15 +46,15 @@ type AgentDetailPageProps = {
 export function AgentDetailPage({
   agent,
   activeTab,
-  agentHomePath,
+  agentHome,
   canConfigure,
   detectedSetup,
-  defaultAgentHomePath,
   entries,
   t,
   onBack,
   onTabChange,
   onAgentHomeSave,
+  onAgentRuntimeCommandSave,
   onOpenAddPage,
   onOpenConnection,
   onRefresh,
@@ -121,11 +126,13 @@ export function AgentDetailPage({
         <TabsContent value="home" className="space-y-4">
           <AgentHomeSection
             agentId={agent.agentId}
-            currentPath={agentHomePath}
-            defaultPath={defaultAgentHomePath}
+            currentPath={agentHome.path}
+            defaultPath={agentHome.defaultPath}
+            runtimeCommandPath={agentHome.runtimeCommandPath}
             liveIssues={agent.liveIssues}
             t={t}
-            onSave={onAgentHomeSave}
+            onSaveHome={onAgentHomeSave}
+            onSaveRuntimeCommand={onAgentRuntimeCommandSave}
           />
         </TabsContent>
       </Tabs>

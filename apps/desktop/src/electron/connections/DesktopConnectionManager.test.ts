@@ -190,6 +190,29 @@ describe("DesktopConnectionManager", () => {
     );
   });
 
+  it("passes the desktop-local Codex CLI override into session sign-in", async () => {
+    const setup = createSetup();
+    const loginRunner = new StubCodexInteractiveSessionLoginRegistry(setup.codexHome);
+    const manager = new DesktopConnectionManager(
+      {
+        databasePath: setup.dbPath,
+        agentHomes: { codex: setup.codexHome },
+        agentRuntimeCommandOverrides: { codex: "/tmp/codex-override/codex" },
+        environment: EnvironmentSource.empty(),
+        credentialStore: setup.credentialStore,
+      },
+      loginRunner,
+    );
+
+    await manager.prepareConnectionDraft({
+      preset: "openai",
+      authMode: "openai_session",
+      sessionSource: "login",
+    });
+
+    expect(loginRunner.commandOverrides).toEqual(["/tmp/codex-override/codex"]);
+  });
+
   it("adds a claude_session connection from the current Claude auth", async () => {
     const setup = createSetup();
     writeClaudeSession(setup.claudeHome);
@@ -1165,6 +1188,7 @@ class StubCredentialStore extends KeychainCredentialStore {
 
 class StubCodexInteractiveSessionLoginRegistry implements Pick<InteractiveSessionLoginRegistry, "signInAndRead"> {
   readonly signInCalls: string[] = [];
+  readonly commandOverrides: Array<string | null> = [];
   readonly openExternalCalls: string[] = [];
 
   constructor(
@@ -1181,6 +1205,7 @@ class StubCodexInteractiveSessionLoginRegistry implements Pick<InteractiveSessio
     lastRefresh: string;
   }> {
     this.signInCalls.push(this.codexHome);
+    this.commandOverrides.push(context.agentRuntimeCommandOverrides?.codex ?? null);
     if (this.loginUrl && context.openExternalUrl) {
       await context.openExternalUrl(this.loginUrl);
       this.openExternalCalls.push(this.loginUrl);

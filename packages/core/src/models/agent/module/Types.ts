@@ -5,6 +5,7 @@ import type { AgentFactoryRegistration } from "../../../runtime-local/Types";
 import type { CurrentSessionSourceManifest } from "../../../session/Types";
 import type { InteractiveSessionLoginManifest } from "../../../session/LoginTypes";
 import type { LocalConnectionSupportFactory } from "../../../runtime-local/LocalConnectionSupport";
+import type { AgentLocalRuntimeInfoProvider } from "./LocalRuntimeInfo";
 
 export type AgentModule = {
   manifest: AgentManifestDefinition;
@@ -14,4 +15,5 @@ export type AgentModule = {
   interactiveSessionLogin?: InteractiveSessionLoginManifest;
   localModelCatalogSources?: readonly LocalModelCatalogSourceManifest[];
   localConnectionSupportFactory?: LocalConnectionSupportFactory;
+  localRuntimeInfo?: AgentLocalRuntimeInfoProvider;
 };

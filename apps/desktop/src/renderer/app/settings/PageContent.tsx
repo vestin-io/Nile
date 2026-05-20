@@ -109,6 +109,7 @@ type SettingsPageContentProps = {
   onSelectProfile(profileId: string | null): void;
   onThemeChange(theme: ThemePreference): void;
   onUpdateAgentHome(agentId: AgentId, path: string | null): Promise<void>;
+  onUpdateAgentRuntimeCommand(agentId: AgentId, path: string | null): Promise<void>;
   onSaveProfile(profileId: string, name: string, emoji: string, assignments: WorkspaceProfileAssignment[]): Promise<void>;
   onDeleteConnectionAlert(connectionId: string, alertId: string): Promise<void>;
   onUpdateConnectionAlert(input: UpdateConnectionAlertInput): Promise<void>;
@@ -205,6 +206,7 @@ export function SettingsPageContent({
   onSelectProfile,
   onThemeChange,
   onUpdateAgentHome,
+  onUpdateAgentRuntimeCommand,
   onUpdateAgentConnectionModel,
   onSaveProfile,
   onDeleteConnectionAlert,
@@ -243,6 +245,7 @@ export function SettingsPageContent({
         t={t}
         onAgentOrderChange={onAgentOrderChange}
         onAgentHomeSave={onUpdateAgentHome}
+        onAgentRuntimeCommandSave={onUpdateAgentRuntimeCommand}
         onConfigureAgent={onConfigureAgent}
         onImport={onConfirmImportAgent}
         onOpenQuickSetup={onOpenQuickSetup}

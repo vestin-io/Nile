@@ -15,25 +15,34 @@ type AgentHomeSectionProps = {
   agentId: AgentId;
   currentPath: string;
   defaultPath: string;
+  runtimeCommandPath?: string | null;
   liveIssues?: string[];
   t: Translator;
-  onSave(agentId: AgentId, path: string | null): Promise<void>;
+  onSaveHome(agentId: AgentId, path: string | null): Promise<void>;
+  onSaveRuntimeCommand(agentId: AgentId, path: string | null): Promise<void>;
 };
 
 export function AgentHomeSection({
   agentId,
   currentPath,
   defaultPath,
+  runtimeCommandPath,
   liveIssues,
   t,
-  onSave,
+  onSaveHome,
+  onSaveRuntimeCommand,
 }: AgentHomeSectionProps) {
   const [path, setPath] = useState(currentPath);
+  const [runtimeCommandInputPath, setRuntimeCommandInputPath] = useState(runtimeCommandPath ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setPath(currentPath);
   }, [currentPath]);
+
+  useEffect(() => {
+    setRuntimeCommandInputPath(runtimeCommandPath ?? "");
+  }, [runtimeCommandPath]);
 
   const handleSave = async () => {
     if (isSaving) {
@@ -42,7 +51,7 @@ export function AgentHomeSection({
 
     setIsSaving(true);
     try {
-      await onSave(agentId, path.trim() ? path : null);
+      await onSaveHome(agentId, path.trim() ? path : null);
     } finally {
       setIsSaving(false);
     }
@@ -56,7 +65,34 @@ export function AgentHomeSection({
     setPath(defaultPath);
     setIsSaving(true);
     try {
-      await onSave(agentId, null);
+      await onSaveHome(agentId, null);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRuntimeCommandSave = async () => {
+    if (isSaving) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await onSaveRuntimeCommand(agentId, runtimeCommandInputPath.trim() ? runtimeCommandInputPath : null);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRuntimeCommandReset = async () => {
+    if (isSaving) {
+      return;
+    }
+
+    setRuntimeCommandInputPath("");
+    setIsSaving(true);
+    try {
+      await onSaveRuntimeCommand(agentId, null);
     } finally {
       setIsSaving(false);
     }
@@ -103,6 +139,45 @@ export function AgentHomeSection({
           </div>
         </CardContent>
       </Card>
+
+      {runtimeCommandPath !== undefined ? (
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            {!runtimeCommandPath ? (
+              <Alert variant="destructive">
+                <AlertTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />
+                  {t("agents.home.cliCommand")}
+                </AlertTitle>
+                <AlertDescription>{t("agents.home.cliCommandMissing")}</AlertDescription>
+              </Alert>
+            ) : null}
+
+            <Field label={t("agents.home.cliCommand")}>
+              <Input
+                value={runtimeCommandInputPath}
+                placeholder={t("agents.home.cliCommandOverridePlaceholder")}
+                onChange={(event) => setRuntimeCommandInputPath(event.target.value)}
+              />
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => void handleRuntimeCommandSave()}
+                disabled={isSaving}
+              >
+                {isSaving ? t("agents.home.saving") : t("common.save")}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void handleRuntimeCommandReset()}
+                disabled={isSaving}
+              >
+                {t("agents.home.resetCliCommandOverride")}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

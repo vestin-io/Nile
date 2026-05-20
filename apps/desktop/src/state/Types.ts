@@ -77,6 +77,16 @@ export type DesktopConnection = {
 };
 
 export type DesktopCurrentConnectionState = "none" | "saved" | "orphaned";
+
+export type DesktopAgentHomeState = {
+  agentId: AgentId;
+  agentLabel: string;
+  path: string;
+  defaultPath: string;
+  runtimeCommandPath?: string | null;
+  runtimeCommandOverridePath?: string | null;
+};
+
 export type MenubarAgentState = {
   agentId: AgentId;
   agentLabel: string;
@@ -124,12 +134,7 @@ export type DesktopAgentState = {
 };
 
 export type DesktopAdvancedState = {
-  agentHomes: Array<{
-    agentId: AgentId;
-    agentLabel: string;
-    path: string;
-    defaultPath: string;
-  }>;
+  agentHomes: DesktopAgentHomeState[];
   supportedAgents: Array<{
     agentId: AgentId;
     agentLabel: string;

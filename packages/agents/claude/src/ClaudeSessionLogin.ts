@@ -1,8 +1,8 @@
 import { spawn as spawnChild } from "node:child_process";
-import { existsSync } from "node:fs";
-import { delimiter, dirname, join } from "node:path";
+import { dirname } from "node:path";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import { RuntimeCommandResolver } from "@nile/core/services/RuntimeCommandResolver";
 import { ShellPath } from "@nile/core/services/ShellPath";
 import type { ClaudeSessionCredential } from "@nile/core/services/credential";
 import { CurrentCredentialReader } from "./live-setup/CredentialReader";
@@ -26,18 +26,21 @@ const loginPollIntervalMs = 1000;
 const loginTimeoutMs = 5 * 60 * 1000;
 
 export class ClaudeSessionLogin {
+  private readonly runtimeCommandResolver = new RuntimeCommandResolver("claude");
+
   constructor(
     private readonly environment: EnvironmentSource = EnvironmentSource.from(process.env),
     private readonly spawn: SpawnFn = spawnChild,
     private readonly isElectronProcess: () => boolean = () => Boolean(process.versions.electron),
   ) {}
 
-  async signIn(claudeHome: string): Promise<void> {
-    const env = this.buildLoginEnv(claudeHome);
+  async signIn(claudeHome: string, options: { commandPathOverride?: string | null } = {}): Promise<void> {
+    const env = this.buildLoginEnv(claudeHome, options.commandPathOverride);
+    const claudeCommand = this.resolveClaudeCommand(env.PATH ?? "", options.commandPathOverride);
 
     if (this.canUseAttachedTerminal()) {
       await this.waitForExit(
-        this.spawn("claude", ["login"], {
+        this.spawn(claudeCommand, ["login"], {
           stdio: "inherit",
           env,
         }),
@@ -47,7 +50,7 @@ export class ClaudeSessionLogin {
     }
 
     await this.waitForExit(
-      this.spawn("osascript", ["-e", this.buildTerminalScript(env)], {
+      this.spawn("osascript", ["-e", this.buildTerminalScript(env, claudeCommand)], {
         stdio: "ignore",
         env,
       }),
@@ -55,10 +58,13 @@ export class ClaudeSessionLogin {
     );
   }
 
-  async signInAndRead(claudeHome: string): Promise<ClaudeSessionCredential> {
+  async signInAndRead(
+    claudeHome: string,
+    options: { commandPathOverride?: string | null } = {},
+  ): Promise<ClaudeSessionCredential> {
     const credentialStore = new ClaudeCredentialStore(claudeHome);
     const baseline = credentialStore.snapshot();
-    await this.signIn(claudeHome);
+    await this.signIn(claudeHome, options);
 
     if (this.canUseAttachedTerminal()) {
       return CurrentCredentialReader.open({ claudeHome }).readSession();
@@ -67,16 +73,17 @@ export class ClaudeSessionLogin {
     return await this.waitForSignedInSession(claudeHome, baseline);
   }
 
-  private buildLoginEnv(claudeHome: string): NodeJS.ProcessEnv {
+  private buildLoginEnv(claudeHome: string, commandPathOverride?: string | null): NodeJS.ProcessEnv {
+    const pathValue = ShellPath.merge(process.env.PATH, this.environment.read("PATH")) ?? "";
+    const claudeCommand = this.resolveClaudeCommand(pathValue, commandPathOverride);
     return {
       ...process.env,
-      PATH: ShellPath.merge(process.env.PATH, this.environment.read("PATH")),
+      PATH: ShellPath.merge(dirname(claudeCommand), pathValue),
       HOME: dirname(claudeHome),
     };
   }
 
-  private buildTerminalScript(env: NodeJS.ProcessEnv): string {
-    const claudeCommand = this.resolveClaudeCommand(env.PATH ?? "");
+  private buildTerminalScript(env: NodeJS.ProcessEnv, claudeCommand: string): string {
     const command = [
       `export HOME=${this.quoteForShell(env.HOME ?? "")}`,
       `export PATH=${this.quoteForShell(env.PATH ?? "")}`,
@@ -103,14 +110,27 @@ export class ClaudeSessionLogin {
     return `'${value.replaceAll("'", `'\"'\"'`)}'`;
   }
 
-  private resolveClaudeCommand(pathValue: string): string {
-    for (const entry of pathValue.split(delimiter).filter((value) => value.trim().length > 0)) {
-      const candidate = join(entry, "claude");
-      if (existsSync(candidate)) {
-        return candidate;
-      }
+  private resolveClaudeCommand(pathValue: string, commandPathOverride?: string | null): string {
+    const explicitResolution = this.runtimeCommandResolver.resolveExplicit(commandPathOverride);
+    if (explicitResolution.command) {
+      return explicitResolution.command;
     }
-    return "claude";
+    if (commandPathOverride?.trim()) {
+      throw new Error(
+        `Claude CLI command override was not found (${commandPathOverride.trim()}). Update the override or use auto-detected CLI command, then try again.`,
+      );
+    }
+
+    const resolution = this.runtimeCommandResolver.resolve(pathValue, {
+      homeDirectory: this.environment.read("HOME") ?? process.env.HOME,
+    });
+    if (resolution.command) {
+      return resolution.command;
+    }
+
+    throw new Error(
+      "Claude CLI was not found in PATH. Install Claude CLI or add it to your shell PATH, then restart Nile.",
+    );
   }
 
   private escapeForAppleScript(value: string): string {

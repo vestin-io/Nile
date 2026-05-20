@@ -1,4 +1,5 @@
 import type { AgentHomes } from "../models/agent/Homes";
+import type { AgentRuntimeCommandOverrides } from "../models/agent/RuntimeCommands";
 import type { EnvironmentSource } from "../services/EnvironmentSource";
 import { CurrentSessionResolver } from "./Resolver";
 import { INTERACTIVE_SESSION_LOGIN_REGISTRY, type InteractiveSessionLoginRegistry } from "./Login";
@@ -24,6 +25,7 @@ export class SessionCredentialResolver {
       "signInAndRead"
     > = INTERACTIVE_SESSION_LOGIN_REGISTRY,
     private readonly openExternalUrl?: (url: string) => Promise<void>,
+    private readonly agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides,
   ) {
     this.currentSessionResolver = new CurrentSessionResolver(agentHomes, environment);
   }
@@ -43,6 +45,7 @@ export class SessionCredentialResolver {
     return await this.interactiveSessionLoginRegistry.signInAndRead(
       {
         agentHomes: this.agentHomes,
+        agentRuntimeCommandOverrides: this.agentRuntimeCommandOverrides,
         environment: this.environment,
         openExternalUrl: this.openExternalUrl,
       },

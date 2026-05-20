@@ -1,4 +1,5 @@
 import type { AgentHomes } from "../../models/agent/Homes";
+import type { AgentRuntimeCommandOverrides } from "../../models/agent/RuntimeCommands";
 import type {
   StoredCredential,
 } from "../../services/credential/Types";
@@ -21,12 +22,14 @@ export class LocalCredentialResolver {
       "signInAndRead"
     > = INTERACTIVE_SESSION_LOGIN_REGISTRY,
     openExternalUrl?: (url: string) => Promise<void>,
+    agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides,
   ) {
     this.sessionCredentialResolver = new SessionCredentialResolver(
       agentHomes,
       environment,
       interactiveSessionLoginRegistry,
       openExternalUrl,
+      agentRuntimeCommandOverrides,
     );
   }
 

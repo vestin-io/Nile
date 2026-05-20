@@ -21,6 +21,96 @@
 
 - `npm run typecheck`
 
+### Codex CLI resolution hardening
+
+- Hardened Codex CLI discovery so Nile no longer trusts the first `codex` file in `PATH` blindly:
+  - added a Codex-owned CLI resolver that validates the packaged vendor binary behind each candidate launcher
+  - skipped broken installs such as stale Homebrew/global wrappers whose vendor binary is missing
+  - surfaced a direct user-facing error when every discovered Codex install is broken instead of spawning a known-bad command and reporting only `exit code 1`
+- Added a plugin-owned local runtime info hook on agent modules and used it in desktop settings state.
+- Exposed the resolved CLI command in the agent detail `Agent home` section so the active Codex launcher path is visible from the UI.
+
+#### Key findings
+
+- The new validation only trusts Codex installs whose packaged vendor binary exists for the current platform/arch tuple.
+- If Finder/login-shell `PATH` still does not contain a working Codex install, the home panel now shows that no working CLI command was found instead of implying Nile picked one successfully.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/codex/src/CodexSessionLogin.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+### Desktop-local CLI command override
+
+- Added a desktop-local per-agent runtime command override path:
+  - stored in a new desktop-only SQLite table `desktop_agent_runtime_commands`
+  - exposed through IPC and preload
+  - editable from the agent detail `Agent home` section
+- Kept the override outside shared connection/provider/session state:
+  - desktop state now injects the override into local runtime info queries for display
+  - desktop connection/login flows inject the override into interactive session login context for execution
+- Codex now applies the command resolution priority as:
+  - desktop-local override
+  - working `PATH` candidate
+  - working `~/.nvm/versions/node/*/bin/codex` fallback
+
+#### Key findings
+
+- This setting should persist locally on the machine; keeping it memory-only would make Finder-launch recovery disappear on every restart.
+- The override remains desktop-specific and does not belong in shared saved connection/domain state because it only describes how this one local runtime should find its CLI launcher.
+- The resolved runtime command remains the source of truth for what Nile will execute, but showing override and resolved values as separate controls created needless friction. The home panel now exposes a single CLI path input seeded from the current resolved command, with warning state when resolution fails and reset-to-auto-detected behavior when users want to drop a local override.
+
+### Runtime command capability generalization
+
+- Generalized the desktop-local command-path feature from Codex-specific `cliCommand*` state into a shared runtime-command capability:
+  - core local-runtime info now reports `runtimeCommandPath`
+  - desktop state and agent detail UI now consume generic `runtimeCommand*` fields
+  - agents opt in by exposing `localRuntimeInfo`, instead of the desktop treating Codex as a one-off special case
+- Added Gemini as the second implementation of this capability:
+  - Gemini now resolves its CLI command from `PATH`, falls back to common `~/.nvm` installs, and honors the desktop-local runtime command override during sign-in
+  - Gemini agent home now shows the same local runtime command path control as Codex
+- Added Claude as the third CLI-backed implementation:
+  - Claude now resolves its local CLI command from `PATH` and common `~/.nvm` installs
+  - Claude sign-in now honors the same desktop-local runtime command override used by the agent home UI
+- Extended the same agent-home runtime command discovery to Cursor and OpenClaw:
+  - Cursor now resolves `agent`
+  - OpenClaw now resolves `openclaw`
+  - both show the same local runtime command path control in desktop settings
+
+#### Key findings
+
+- Codex and Gemini need different validity checks: Codex must verify its packaged vendor binary, while Gemini currently only needs to confirm the launcher exists and is reachable with a matching `node` in `PATH`.
+- The Terminal-based Gemini login flow also needed the resolved command directory in the exported `PATH`; an absolute launcher path alone is not enough for `#!/usr/bin/env node` wrappers.
+- The broader product-facing meaning of this field is “which local executable represents this agent on this machine,” not only “which command does the login flow spawn.” Under that definition, Cursor (`agent`) and OpenClaw (`openclaw`) belong in the same agent-home runtime command UI even though Nile does not yet spawn those binaries elsewhere today.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/gemini/src/GeminiSessionLogin.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/AgentRuntimeCommandsStore.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/desktop/src/state/Surface.test.ts packages/agents/codex/src/CodexSessionLogin.test.ts`
+- `npm run typecheck`
+
+### Codex .nvm fallback
+
+- Extended Codex CLI discovery so Finder/login-shell sessions can recover when `PATH` contains only broken wrappers:
+  - if `PATH` does not yield a working Codex install, Nile now probes `~/.nvm/versions/node/*/bin/codex`
+  - candidates are validated with the same packaged-vendor-binary check as `PATH` entries
+  - the selected CLI directory is prepended to the spawned `PATH` so `#!/usr/bin/env node` launchers can still find the matching Node runtime
+- The agent detail `Resolved CLI command` field now reflects `.nvm` fallback results too.
+
+#### Key findings
+
+- A direct absolute path to `codex` is not sufficient by itself for npm global launchers; the sibling `node` binary must also be reachable in `PATH`.
+- Finder-launch failures on this machine came from two layers at once: a broken Homebrew `codex` in `PATH`, and a working `.nvm` install that was invisible to the login-shell environment.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/codex/src/CodexSessionLogin.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run typecheck`
+
 ### Desktop Codex browser-oauth release fix
 
 - Fixed desktop OpenAI sign-in so packaged builds no longer depend on `codex login` opening the browser by itself:

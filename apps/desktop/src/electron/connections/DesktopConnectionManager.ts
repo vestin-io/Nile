@@ -19,7 +19,7 @@ import {
   type StoredCredential,
   type CredentialStore,
 } from "@nile/core/services/credential";
-import { isAgentId, type AgentHomes } from "@nile/core/models/agent";
+import { isAgentId, type AgentHomes, type AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
 import { LocalCredentialResolver } from "@nile/builtins/local";
 import {
   runWithCursorUsageWorkspace,
@@ -45,6 +45,7 @@ import { SessionRunner } from "./SessionRunner";
 type DesktopConnectionManagerOptions = {
   databasePath: string;
   agentHomes?: AgentHomes;
+  agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides;
   environment: EnvironmentSource;
   openExternalUrl?: (url: string) => Promise<void>;
   managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
@@ -76,6 +77,7 @@ export class DesktopConnectionManager {
       this.options.environment,
       interactiveSessionLoginRegistry,
       this.options.openExternalUrl,
+      this.options.agentRuntimeCommandOverrides,
     );
     this.managedApiKeyEnvironment = this.options.managedApiKeyEnvironment ?? new NoopManagedApiKeyEnvironment();
     this.sessions = new SessionRunner(this);

@@ -1,5 +1,8 @@
+import type { AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
+import { AGENT_MODULE_REGISTRY } from "@nile/core/models/agent/module";
 import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
+import type { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import type { NileSession } from "@nile/builtins/runtime";
 
 import { DesktopConnectionListPresenter } from "./connection/List";
@@ -15,6 +18,8 @@ import { DesktopUsageCache } from "./UsageCache";
 import type { DesktopUsageState } from "./UsageSummary";
 
 type DesktopSettingsStateQueryOptions = {
+  agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides;
+  environment: EnvironmentSource;
   resolveDesktopAgentHome(agentId: AgentId): string;
   resolveDefaultDesktopAgentHome(agentId: AgentId): string;
 };
@@ -172,6 +177,7 @@ export class DesktopSettingsStateQuery {
         agentLabel: this.lists.formatAgentLabel(agentId),
         path: this.options.resolveDesktopAgentHome(agentId),
         defaultPath: this.options.resolveDefaultDesktopAgentHome(agentId),
+        ...this.readAgentHomeRuntimeInfo(agentId),
       })),
       supportedAgents: SUPPORTED_AGENT_IDS.map((agentId) => ({
         agentId,
@@ -179,6 +185,27 @@ export class DesktopSettingsStateQuery {
       })),
       savedConnectionCount: savedConnections.length,
       importableSetupCount: scan.importableCount,
+    };
+  }
+
+  private readAgentHomeRuntimeInfo(
+    agentId: AgentId,
+  ): { runtimeCommandOverridePath?: string | null; runtimeCommandPath?: string | null } {
+    const module = AGENT_MODULE_REGISTRY.list().find((entry) => entry.manifest.id === agentId);
+    if (!module?.localRuntimeInfo) {
+      return {};
+    }
+
+    const commandPathOverride = this.options.agentRuntimeCommandOverrides?.[agentId]?.trim() || null;
+    const runtimeInfo = module.localRuntimeInfo.read({
+      runtimeCommandPathOverride: commandPathOverride,
+      environment: this.options.environment,
+    });
+    return runtimeInfo.runtimeCommandPath !== undefined ? {
+      runtimeCommandOverridePath: commandPathOverride,
+      ...runtimeInfo,
+    } : {
+      runtimeCommandOverridePath: commandPathOverride,
     };
   }
 }
