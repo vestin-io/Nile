@@ -13,9 +13,17 @@ export class CurrentSessionResolver {
   ) {}
 
   resolve(request: CurrentSessionCredentialRequest): CurrentSessionStoredCredential {
-    return CURRENT_SESSION_SOURCE_REGISTRY.resolve({
+    return CURRENT_SESSION_SOURCE_REGISTRY.resolve(this.readContext(), request);
+  }
+
+  async recoverUnauthorizedUsage(request: CurrentSessionCredentialRequest): Promise<boolean> {
+    return await CURRENT_SESSION_SOURCE_REGISTRY.recoverUnauthorizedUsage(this.readContext(), request);
+  }
+
+  private readContext() {
+    return {
       agentHomes: this.agentHomes,
       environment: this.environment,
-    }, request);
+    };
   }
 }

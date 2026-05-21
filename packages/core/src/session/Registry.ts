@@ -37,6 +37,22 @@ export class CurrentSessionSourceRegistry {
     return manifest.resolve(context, request);
   }
 
+  async recoverUnauthorizedUsage(
+    context: CurrentSessionResolveContext,
+    request: CurrentSessionCredentialRequest,
+  ): Promise<boolean> {
+    const manifest = this.read(request.source);
+    if (request.authMode !== manifest.authMode) {
+      throw new Error(`Current session source ${request.source} does not support auth mode ${request.authMode}`);
+    }
+    if (!manifest.recoverUnauthorizedUsage) {
+      return false;
+    }
+
+    await manifest.recoverUnauthorizedUsage(context, request);
+    return true;
+  }
+
   private buildIndex() {
     return new IndexedRegistry(
       listCurrentSessionSourceManifests(),

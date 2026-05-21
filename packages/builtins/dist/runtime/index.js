@@ -83,6 +83,7 @@ var RecoveringUsage = class {
     if (!request) {
       return null;
     }
+    await this.recoverUnauthorizedCurrentSession(connectionId, access.authMode, request);
     let credential;
     try {
       credential = this.currentSessionResolver.resolve(request);
@@ -123,6 +124,27 @@ var RecoveringUsage = class {
       errorCode: retried.errorCode
     });
     return retried;
+  }
+  async recoverUnauthorizedCurrentSession(connectionId, authMode, request) {
+    try {
+      const recovered = await this.currentSessionResolver.recoverUnauthorizedUsage(request);
+      if (!recovered) {
+        return;
+      }
+    } catch (error) {
+      this.logger.warn("connection-usage.current-session-refresh.failed", {
+        connectionId,
+        authMode,
+        source: request.source,
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return;
+    }
+    this.logger.info("connection-usage.current-session-refresh.succeeded", {
+      connectionId,
+      authMode,
+      source: request.source
+    });
   }
   readRecoveryRequest(authMode) {
     if (authMode === "api_key" || authMode === "openclaw_openai_session") {

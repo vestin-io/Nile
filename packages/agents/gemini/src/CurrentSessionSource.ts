@@ -1,6 +1,9 @@
 import type { CurrentSessionSourceManifest } from "@nile/core/session/Types";
 import { resolveAgentHome } from "@nile/core/models/agent/homes";
+import { GeminiSessionRefresh } from "./SessionRefresh";
 import { GeminiSessionStores } from "./Stores";
+
+const sessionRefresh = new GeminiSessionRefresh();
 
 export const GEMINI_CURRENT_SESSION_SOURCE = {
   id: "current_gemini",
@@ -8,6 +11,10 @@ export const GEMINI_CURRENT_SESSION_SOURCE = {
   authMode: "gemini_cli_session",
   label: "Current Gemini session",
   usageUnauthorizedRecovery: "sync_current_session_and_retry",
+  recoverUnauthorizedUsage: async (context) => {
+    const geminiHome = resolveAgentHome("gemini", context.agentHomes);
+    await sessionRefresh.refresh(geminiHome, context.environment);
+  },
   resolve: (context) => {
     const geminiHome = resolveAgentHome("gemini", context.agentHomes);
     const session = GeminiSessionStores.open(geminiHome).reader.read();

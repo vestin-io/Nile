@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -10,17 +10,29 @@ import { NileSession } from "./NileSession";
 
 const tempDirs: string[] = [];
 const originalFetch = globalThis.fetch;
+const originalPath = process.env.PATH;
 
 afterEach(() => {
   while (tempDirs.length > 0) {
     rmSync(tempDirs.pop()!, { recursive: true, force: true });
   }
   globalThis.fetch = originalFetch;
+  process.env.PATH = originalPath;
 });
 
 describe("RecoveringUsage", () => {
-  it("syncs the current Gemini session and retries quota after an unauthorized saved credential", async () => {
+  it("refreshes the current Gemini session and retries quota after an unauthorized saved credential", async () => {
     const setup = createSetup();
+    const binDir = join(setup.rootDir, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFakeGeminiRefreshCommand(binDir, {
+      accessToken: "fresh-access",
+      refreshToken: "fresh-refresh",
+      email: "gemini.primary@example.test",
+      subject: "google-sub-123",
+    });
+    process.env.PATH = binDir;
+
     seedSavedGeminiConnection(setup.dbPath, setup.credentialStore, {
       accessToken: "stale-access",
       refreshToken: "stale-refresh",
@@ -28,8 +40,8 @@ describe("RecoveringUsage", () => {
       subject: "google-sub-123",
     });
     seedGeminiLocalSession(setup.geminiHome, {
-      accessToken: "fresh-access",
-      refreshToken: "fresh-refresh",
+      accessToken: "stale-local-access",
+      refreshToken: "stale-local-refresh",
       email: "gemini.primary@example.test",
       subject: "google-sub-123",
     });
@@ -131,6 +143,7 @@ describe("RecoveringUsage", () => {
 
   it("does not overwrite a saved Gemini connection when the current local session belongs to another identity", async () => {
     const setup = createSetup();
+    process.env.PATH = join(setup.rootDir, "empty-bin");
     seedSavedGeminiConnection(setup.dbPath, setup.credentialStore, {
       accessToken: "stale-access",
       refreshToken: "stale-refresh",
@@ -202,6 +215,7 @@ function createSetup() {
   return {
     dbPath: join(dir, "switcher.sqlite"),
     geminiHome,
+    rootDir: dir,
     credentialStore: new StubCredentialStore(),
   };
 }
@@ -289,6 +303,35 @@ function seedGeminiLocalSession(
 
 function createJwt(payload: Record<string, string>): string {
   return `header.${Buffer.from(JSON.stringify(payload)).toString("base64url")}.signature`;
+}
+
+function writeFakeGeminiRefreshCommand(
+  binDir: string,
+  input: {
+    accessToken: string;
+    refreshToken: string;
+    email: string;
+    subject: string;
+  },
+): void {
+  const scriptPath = join(binDir, "gemini");
+  writeFileSync(
+    scriptPath,
+    [
+      "#!/bin/sh",
+      "/bin/cat > \"$GEMINI_CLI_HOME/oauth_creds.json\" <<'EOF'",
+      "{",
+      `  "access_token": "${input.accessToken}",`,
+      `  "refresh_token": "${input.refreshToken}",`,
+      `  "id_token": "${createJwt({ email: input.email, sub: input.subject })}",`,
+      '  "expiry_date": 1800000000000',
+      "}",
+      "EOF",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  chmodSync(scriptPath, 0o755);
 }
 
 class StubCredentialStore {

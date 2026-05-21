@@ -43,6 +43,8 @@ export class RecoveringUsage {
       return null;
     }
 
+    await this.recoverUnauthorizedCurrentSession(connectionId, access.authMode, request);
+
     let credential: StoredCredential;
     try {
       credential = this.currentSessionResolver.resolve(request);
@@ -86,6 +88,33 @@ export class RecoveringUsage {
       errorCode: retried.errorCode,
     });
     return retried;
+  }
+
+  private async recoverUnauthorizedCurrentSession(
+    connectionId: string,
+    authMode: "api_key" | "claude_session" | "cursor_session" | "gemini_cli_session" | "openai_session" | "openclaw_openai_session",
+    request: CurrentSessionCredentialRequest,
+  ): Promise<void> {
+    try {
+      const recovered = await this.currentSessionResolver.recoverUnauthorizedUsage(request);
+      if (!recovered) {
+        return;
+      }
+    } catch (error) {
+      this.logger.warn("connection-usage.current-session-refresh.failed", {
+        connectionId,
+        authMode,
+        source: request.source,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+
+    this.logger.info("connection-usage.current-session-refresh.succeeded", {
+      connectionId,
+      authMode,
+      source: request.source,
+    });
   }
 
   private readRecoveryRequest(

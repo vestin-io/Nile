@@ -286,3 +286,63 @@
 
 - `./node_modules/.bin/vitest run packages/builtins/src/runtime/RecoveringUsage.test.ts packages/core/src/actions/usage/Usage.test.ts apps/desktop/src/state/UsageCache.test.ts`
 - `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Gemini quota unauthorized CLI refresh
+
+- moved Gemini unauthorized quota recovery closer to ClaudeBar's live-session behavior:
+  - current-session source manifests can now declare an optional unauthorized-usage recovery hook
+  - `RecoveringUsage` calls that hook before resolving/syncing the current session snapshot
+  - Gemini's current-session source now uses that hook to run `gemini`, feed `/quit`, wait briefly for `oauth_creds.json` to settle, then resolve the refreshed local session
+- added a Gemini-local `SessionRefresh` helper instead of baking spawn logic into core:
+  - resolves the `gemini` command from PATH/NVM
+  - sets `GEMINI_CLI_HOME` and `HOME` for the target Gemini home
+  - kills the refresh attempt after 15s and reports a focused error
+- tightened regression coverage around the new path:
+  - a fake `gemini` executable rewrites `oauth_creds.json`, proving unauthorized quota can recover via live CLI refresh
+  - identity-mismatch still refuses to overwrite the saved connection
+  - Gemini refresh helper has a direct unit test for command/env/input wiring
+
+### Key findings
+
+- The earlier auto-sync fix only solved saved-vs-local credential drift. It could not recover cases where the current local `oauth_creds.json` itself needed the Gemini CLI to rotate tokens first.
+- Putting the refresh hook on `CurrentSessionSourceManifest` keeps the provider-specific side effect in the Gemini plugin package while core stays generic.
+- The refresh path still intentionally stops at one CLI run and one quota retry. If Google starts requiring a fully interactive re-login instead of silent startup refresh, Nile will still surface the unauthorized error rather than loop or guess.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/gemini/src/SessionRefresh.test.ts packages/builtins/src/runtime/RecoveringUsage.test.ts packages/core/src/actions/usage/Usage.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Gemini CLI refresh failure diagnostics
+
+- extended `GeminiSessionRefresh` to capture short stdout/stderr snippets from the background `gemini` refresh run
+- non-zero exit and timeout errors now include a compact CLI output summary, so desktop logs show more than just the exit code
+- added a focused regression proving stderr text is surfaced in the thrown refresh error
+
+### Key findings
+
+- Exit code alone was not enough to debug why the silent `gemini` refresh sometimes failed after dev restarts.
+- Keeping the output snippet capped and normalized avoids flooding logs while still exposing the actionable part of the CLI failure.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/gemini/src/SessionRefresh.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Gemini headless refresh args
+
+- changed Gemini unauthorized refresh from a bare interactive launch plus `/quit` stdin to an explicit headless invocation:
+  - `--skip-trust`
+  - `--prompt "refresh auth"`
+- kept `GEMINI_CLI_TRUST_WORKSPACE=true` in the env so both the CLI flag and env-based trust path are satisfied
+- updated the refresh tests to assert the new args and empty stdin behavior
+
+### Key findings
+
+- After fixing the workspace trust gate, Gemini CLI 0.42.0 still rejected the old refresh flow because a plain launch in this environment expected either stdin content or an explicit `--prompt`.
+- Using the documented headless `--prompt` path is less brittle than relying on a fast interactive startup followed by `/quit`.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/gemini/src/SessionRefresh.test.ts packages/builtins/src/runtime/RecoveringUsage.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`

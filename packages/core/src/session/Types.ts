@@ -29,6 +29,10 @@ export type CurrentSessionSourceManifest = {
   authMode: CurrentSessionCredentialRequest["authMode"];
   label: string;
   usageUnauthorizedRecovery?: "sync_current_session_and_retry";
+  recoverUnauthorizedUsage?(
+    context: CurrentSessionResolveContext,
+    request: CurrentSessionCredentialRequest,
+  ): void | Promise<void>;
   resolve(
     context: CurrentSessionResolveContext,
     request: CurrentSessionCredentialRequest,
