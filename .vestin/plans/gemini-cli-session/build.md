@@ -260,3 +260,29 @@
 
 - `./node_modules/.bin/vitest run packages/connections/src/catalog/Catalog.test.ts packages/agents/gemini/src/SettingsStore.test.ts packages/agents/gemini/src/ApplySelection.test.ts packages/core/src/actions/usage/Usage.test.ts`
 - `npm run typecheck`
+
+### Gemini quota unauthorized auto-resync
+
+- Added a narrow current-session recovery path around runtime quota reads instead of broadening provider detection or import flows:
+  - Gemini quota 401/403 results now carry a structured `errorCode: "credential_unauthorized"`
+  - current-session manifests can opt into `usageUnauthorizedRecovery`
+  - Gemini opts in with `sync_current_session_and_retry`
+- Builtins runtime now wraps shared usage reads with a retry flow that:
+  - only activates on structured unauthorized quota errors
+  - resolves the current local session from the manifest registry
+  - compares the current session identity key against the saved connection identity key
+  - only syncs the saved credential and retries quota when the identity still matches
+- Added integration coverage for both branches:
+  - stale saved Gemini credential recovers from the current local Gemini session and succeeds on retry
+  - current local Gemini session for a different Google identity does not overwrite the saved connection
+
+### Key findings
+
+- The real Gemini drift problem was not account matching; it was credential freshness. Nile already matched the same `identityKey`, but quota reads still used the older saved session snapshot.
+- Auto-syncing on every `valid_matched` detect would have turned background detection into an implicit write path. Restricting the write to `credential_unauthorized` quota failures keeps the side effect much narrower.
+- Identity matching is required before auto-sync. Without that guard, a local Gemini login to another Google account could silently retarget an existing saved connection.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/builtins/src/runtime/RecoveringUsage.test.ts packages/core/src/actions/usage/Usage.test.ts apps/desktop/src/state/UsageCache.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`

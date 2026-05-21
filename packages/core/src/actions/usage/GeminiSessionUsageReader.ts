@@ -53,17 +53,18 @@ export class GeminiSessionUsageReader {
       return this.buildError(
         input,
         "Gemini session is expired or unauthorized. Refresh the Gemini CLI session and try again.",
+        "credential_unauthorized",
       );
     }
     if (!response.ok) {
-      return this.buildError(input, `Gemini usage request failed with status ${response.status}`);
+      return this.buildError(input, `Gemini quota request failed with status ${response.status}`);
     }
 
     let payload: GeminiRetrieveQuotaPayload;
     try {
       payload = await response.json() as GeminiRetrieveQuotaPayload;
     } catch {
-      return this.buildError(input, "Gemini usage response could not be parsed");
+      return this.buildError(input, "Gemini quota response could not be parsed");
     }
 
     const windows = this.readWindows(payload);
@@ -76,7 +77,7 @@ export class GeminiSessionUsageReader {
         status: "unavailable",
         source: "remote_api",
         planLabel: "Gemini",
-        message: "Gemini usage response did not include recognizable quota buckets",
+        message: "Gemini quota response did not include recognizable quota buckets",
         windows: [],
       };
     }
@@ -115,6 +116,7 @@ export class GeminiSessionUsageReader {
         result: this.buildError(
           input,
           "Gemini session is expired or unauthorized. Refresh the Gemini CLI session and try again.",
+          "credential_unauthorized",
         ),
       };
     }
@@ -150,7 +152,7 @@ export class GeminiSessionUsageReader {
           status: "unavailable",
           source: "remote_api",
           planLabel: "Gemini",
-          message: "Gemini usage project metadata is unavailable for this session.",
+          message: "Gemini quota project metadata is unavailable for this session.",
           windows: [],
         },
       };
@@ -344,13 +346,18 @@ export class GeminiSessionUsageReader {
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
   }
 
-  private buildError(input: ReaderInput, message: string): ConnectionUsageResult {
+  private buildError(
+    input: ReaderInput,
+    message: string,
+    errorCode?: ConnectionUsageResult["errorCode"],
+  ): ConnectionUsageResult {
     return {
       connectionId: input.connectionId,
       connectionLabel: input.connectionLabel,
       endpointFamily: "gemini",
       endpointLabel: input.endpointLabel,
       status: "error",
+      ...(errorCode ? { errorCode } : {}),
       source: "remote_api",
       planLabel: "Gemini",
       message,
@@ -360,11 +367,11 @@ export class GeminiSessionUsageReader {
 
   private readFetchErrorMessage(error: unknown): string {
     if (this.isAbortError(error)) {
-      return `Gemini usage request timed out after ${REQUEST_TIMEOUT_MS}ms`;
+      return `Gemini quota request timed out after ${REQUEST_TIMEOUT_MS}ms`;
     }
     return error instanceof Error
-      ? `Gemini usage request failed: ${error.message}`
-      : "Gemini usage request failed";
+      ? `Gemini quota request failed: ${error.message}`
+      : "Gemini quota request failed";
   }
 
   private isAbortError(error: unknown): boolean {

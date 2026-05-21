@@ -24,6 +24,7 @@ export type ConnectionUsageResult = {
   endpointFamily: EndpointFamily;
   endpointLabel: string;
   status: ConnectionUsageStatus;
+  errorCode?: "credential_unauthorized";
   source: ConnectionUsageSource;
   freshness?: ConnectionUsageFreshness;
   lastFetchedAt?: string;

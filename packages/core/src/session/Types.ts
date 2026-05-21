@@ -28,6 +28,7 @@ export type CurrentSessionSourceManifest = {
   familyId: ConnectionFamilyId;
   authMode: CurrentSessionCredentialRequest["authMode"];
   label: string;
+  usageUnauthorizedRecovery?: "sync_current_session_and_retry";
   resolve(
     context: CurrentSessionResolveContext,
     request: CurrentSessionCredentialRequest,

@@ -7,6 +7,7 @@ export const GEMINI_CURRENT_SESSION_SOURCE = {
   familyId: "gemini-cli-session",
   authMode: "gemini_cli_session",
   label: "Current Gemini session",
+  usageUnauthorizedRecovery: "sync_current_session_and_retry",
   resolve: (context) => {
     const geminiHome = resolveAgentHome("gemini", context.agentHomes);
     const session = GeminiSessionStores.open(geminiHome).reader.read();

@@ -6,7 +6,7 @@ import {
 import { LocalConnectionWorkflows } from "@nile/core/application/local/ConnectionWorkflows";
 import type { LocalCredentialResolver } from "@nile/core/application/local/LocalCredentialResolver";
 import { LocalWorkspaceState } from "@nile/core/application/local/WorkspaceState";
-import type { Usage } from "@nile/core/actions/usage/Usage";
+import { CurrentSessionResolver } from "@nile/core/session";
 import type { AgentAdapterLookup } from "@nile/core/models/agent";
 import type { AgentId } from "@nile/core/models/agent/Definitions";
 import { AgentConnectionSettings } from "@nile/core/models/agent-settings";
@@ -18,9 +18,11 @@ import {
 } from "@nile/core/models/connection/Runtime";
 import { AgentSelection } from "@nile/core/models/selection/Selection";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import { NileLogger } from "@nile/core/services/NileLogger";
 import type { MatchedImportStateSnapshot } from "@nile/core/runtime-local/import-state";
 import type { AgentWorkspaceContext } from "@nile/core/runtime-local/AgentWorkspaceContext";
 import type { SessionRuntimeOptions } from "./Types";
+import { RecoveringUsage } from "./RecoveringUsage";
 
 export class SessionWorkspaceResources {
   private workspaceState: LocalWorkspaceState | null = null;
@@ -32,7 +34,7 @@ export class SessionWorkspaceResources {
   private connectionModelCatalog: ConnectionModelCatalogContract | null = null;
   private localModelCatalogSources: LocalModelCatalogSource[] | null = null;
   private agentActions: LocalAgentWorkflows | null = null;
-  private usage: Usage | null = null;
+  private usage: RecoveringUsage | null = null;
 
   constructor(
     private readonly options: SessionRuntimeOptions,
@@ -64,8 +66,16 @@ export class SessionWorkspaceResources {
     ));
   }
 
-  getUsage(): Usage {
-    return (this.usage ??= this.getWorkspaceState().createUsage());
+  getUsage(): RecoveringUsage {
+    return (this.usage ??= new RecoveringUsage(
+      this.getWorkspaceState().createUsage(),
+      this.getWorkspaceState().getAccessRegistry(),
+      new CurrentSessionResolver(
+        this.options.agentHomes,
+        this.options.environment ?? EnvironmentSource.empty(),
+      ),
+      this.options.logger ?? NileLogger.silent(),
+    ));
   }
 
   getConnectionModelCatalog(connectionId: string) {
