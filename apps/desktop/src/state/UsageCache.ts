@@ -1,6 +1,7 @@
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { NileSession } from "@nile/builtins/runtime";
 import type { NileLogger } from "@nile/core/services/NileLogger";
+import type { ConnectionUsageResult } from "@nile/core/actions/usage/Result";
 
 import { type DesktopUsageState, UsageSummary } from "./UsageSummary";
 
@@ -93,7 +94,9 @@ export class DesktopUsageCache {
   ): Promise<DesktopUsageState | null> {
     try {
       const result = await session.getConnectionUsage(connectionId);
-      return UsageSummary.fromResult(result);
+      const summary = UsageSummary.fromResult(result);
+      this.logGeminiQuotaResult(result, summary);
+      return summary;
     } catch (error) {
       this.logger.warn("desktop.usage.read_failed", {
         connectionId,
@@ -101,5 +104,23 @@ export class DesktopUsageCache {
       });
       return null;
     }
+  }
+
+  private logGeminiQuotaResult(
+    result: ConnectionUsageResult,
+    summary: DesktopUsageState | null,
+  ): void {
+    if (result.endpointFamily !== "gemini") {
+      return;
+    }
+
+    this.logger.info("desktop.gemini.quota.read_result", {
+      connectionId: result.connectionId,
+      status: result.status,
+      source: result.source,
+      windowCount: result.windows.length,
+      summaryVisible: summary !== null,
+      ...(result.message?.trim() ? { message: result.message.trim() } : {}),
+    });
   }
 }

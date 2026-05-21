@@ -43,7 +43,7 @@ export class CursorUsageReader {
     const binding = this.bindingRegistry.get(input.connectionId);
 
     if (!binding) {
-      return this.buildFallbackResult(input, snapshot, "Bind a Cursor web session for this connection to enable live usage.");
+      return this.buildFallbackResult(input, snapshot, "Bind a Cursor web session for this connection to enable live quota.");
     }
 
     if (!CursorUsageIdentity.matches(localFingerprint, binding.accountFingerprint)) {
@@ -51,7 +51,7 @@ export class CursorUsageReader {
       return this.buildFallbackResult(
         input,
         this.snapshotStore.updateFreshness(input.connectionId, this.readFailureFreshness(snapshot, true)),
-        "Cursor usage binding no longer matches the saved connection identity.",
+        "Cursor quota binding no longer matches the saved connection identity.",
       );
     }
 
@@ -104,7 +104,7 @@ export class CursorUsageReader {
       return this.buildFallbackResult(
         input,
         this.snapshotStore.updateFreshness(input.connectionId, this.readFailureFreshness(snapshot, false)),
-        `Cursor usage request failed with status ${response.status}`,
+        `Cursor quota request failed with status ${response.status}`,
       );
     }
 
@@ -114,7 +114,7 @@ export class CursorUsageReader {
       return this.buildFallbackResult(
         input,
         this.snapshotStore.updateFreshness(input.connectionId, this.readFailureFreshness(snapshot, false)),
-        "Cursor usage response did not include recognizable usage fields.",
+        "Cursor quota response did not include recognizable quota fields.",
       );
     }
 
@@ -286,11 +286,11 @@ export class CursorUsageReader {
 
   private readFetchErrorMessage(error: unknown): string {
     if (this.isAbortError(error)) {
-      return `Cursor usage request timed out after ${REQUEST_TIMEOUT_MS}ms`;
+      return `Cursor quota request timed out after ${REQUEST_TIMEOUT_MS}ms`;
     }
     return error instanceof Error
-      ? `Cursor usage request failed: ${error.message}`
-      : "Cursor usage request failed";
+      ? `Cursor quota request failed: ${error.message}`
+      : "Cursor quota request failed";
   }
 
   private isAbortError(error: unknown): boolean {

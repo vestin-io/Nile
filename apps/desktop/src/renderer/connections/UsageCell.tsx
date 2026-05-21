@@ -3,6 +3,7 @@ import type { Translator } from "../shared/I18n";
 import { formatUsageText } from "../shared/DisplayText";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { ConnectionQuotaSection } from "./ConnectionQuotaSection";
+import { useConnectionQuotaMetricPreferences } from "../shared/useConnectionQuotaMetricPreferences";
 
 type ConnectionUsageCellProps = {
   connection: DesktopConnection;
@@ -13,7 +14,9 @@ export function ConnectionUsageCell({
   connection,
   t,
 }: ConnectionUsageCellProps) {
-  const summary = formatUsageText(connection, t);
+  const quotaMetricPreferences = useConnectionQuotaMetricPreferences();
+  const preferredMetricKey = quotaMetricPreferences.readPreference(connection.id);
+  const summary = formatUsageText(connection, t, preferredMetricKey);
   const hasQuotaDetail = connection.usage?.status === "available" && connection.usage.windows.length > 0;
 
   if (!hasQuotaDetail) {
@@ -38,9 +41,13 @@ export function ConnectionUsageCell({
             connection={connection}
             framed
             maxWindows={3}
+            preferredMetricKey={preferredMetricKey}
             showPlanLabel
             t={t}
             title={t("common.usage")}
+            onPreferredMetricKeyChange={(metricKey) => {
+              quotaMetricPreferences.setPreference(connection.id, metricKey);
+            }}
           />
         </TooltipContent>
       </Tooltip>

@@ -2,6 +2,11 @@ import type { AgentId } from "@nile/core/models/agent/definitions";
 
 import type { MenubarState } from "../../state/Types";
 import type { DesktopMenubarDisplayState } from "../state/MenubarDisplayStore";
+import type { ConnectionQuotaMetricPreferences } from "../../state/ConnectionQuotaMetricPreferences";
+import {
+  readConnectionQuotaMetricPreference,
+} from "../../state/ConnectionQuotaMetricPreferences";
+import { resolveDesktopUsageSummary } from "../../state/UsageSummary";
 
 export class DesktopTrayTickerTitle {
   static readSelectedAgentIds(
@@ -34,6 +39,7 @@ export class DesktopTrayTickerTitle {
   static format(
     state: MenubarState | null,
     preferences: DesktopMenubarDisplayState,
+    connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences = {},
   ): string {
     if (preferences.mode !== "ticker" || !state) {
       return "";
@@ -43,10 +49,15 @@ export class DesktopTrayTickerTitle {
     const parts = state.agents
       .filter((agent) => selectedAgentIds.has(agent.agentId))
       .map((agent) => {
-        if (agent.currentUsage?.status !== "available") {
+        if (!agent.currentConnection || agent.currentUsage?.status !== "available") {
           return null;
         }
-        return `${agent.agentLabel} ${agent.currentUsage.remainingPercent}%`;
+        const preferredMetricKey = readConnectionQuotaMetricPreference(
+          connectionQuotaMetricPreferences,
+          agent.currentConnection.id,
+        );
+        const summary = resolveDesktopUsageSummary(agent.currentUsage, preferredMetricKey);
+        return summary ? `${agent.agentLabel} ${summary.remainingPercent}%` : null;
       })
       .filter((value): value is string => value !== null);
 

@@ -10,7 +10,9 @@ type ConnectionQuotaSectionProps = {
   framed?: boolean;
   hideWhenUnavailable?: boolean;
   maxWindows?: number;
+  preferredMetricKey?: string | null;
   showPlanLabel?: boolean;
+  onPreferredMetricKeyChange?(metricKey: string | null): void;
 };
 
 export function ConnectionQuotaSection({
@@ -21,7 +23,9 @@ export function ConnectionQuotaSection({
   framed = true,
   hideWhenUnavailable = false,
   maxWindows,
+  preferredMetricKey,
   showPlanLabel = false,
+  onPreferredMetricKeyChange,
 }: ConnectionQuotaSectionProps) {
   const usage = connection.usage;
   const hasWindows = usage?.status === "available" && usage.windows.length > 0;
@@ -34,10 +38,12 @@ export function ConnectionQuotaSection({
       className={className}
       framed={framed}
       maxWindows={maxWindows}
+      preferredMetricKey={preferredMetricKey}
       showPlanLabel={showPlanLabel}
       t={t}
       title={title}
       usage={usage}
+      onPreferredMetricKeyChange={onPreferredMetricKeyChange}
     />
   );
 }

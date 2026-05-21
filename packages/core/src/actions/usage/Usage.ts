@@ -69,7 +69,7 @@ export class Usage {
       endpointLabel: endpoint.label,
       status: "unsupported",
       source: "remote_api",
-      message: `Usage is unavailable for ${this.resolveEndpointFamily(endpoint)}/${access.authMode} connections. This connection can still be selected for supported agents.`,
+      message: `Quota is unavailable for ${this.resolveEndpointFamily(endpoint)}/${access.authMode} connections. This connection can still be selected for supported agents.`,
       windows: [],
     };
   }

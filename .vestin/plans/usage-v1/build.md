@@ -31,3 +31,16 @@
 - Added mutation-history snapshot cleanup on failed inserts so partially written secure/file snapshots do not linger orphaned.
 - Hardened apply and rollback failure paths so `markFailed(...)` errors no longer mask the original failure.
 - Reworked saved-connection and status list paths to preload endpoint/access data instead of doing repeated per-row registry lookups.
+
+## 2026-05-21
+
+### Surface Terminology Alignment
+
+- Updated user-visible CLI quota output so connection summaries, detailed reads, and Cursor follow-up messages now say `quota` instead of `usage`.
+- Updated surfaced provider and Cursor fallback/error messages that are shown directly to operators so they consistently refer to quota requests, quota responses, and live quota availability.
+- Updated desktop English copy for quota alerts and profile settings labels to remove the remaining visible `usage` wording.
+
+#### Key findings
+
+- Command names, module names, and internal type/file names still use `usage`; this change was intentionally limited to user-visible text so it would not broaden into a CLI/API rename.
+- Non-English desktop translations were already using quota-oriented wording for the affected surfaces, so only the remaining English strings needed edits in this pass.

@@ -8,6 +8,10 @@ import {
   parseLanguagePreferenceFromDesktopPreferences,
   type LanguagePreference,
 } from "../../state/UiPreferences";
+import {
+  parseConnectionQuotaMetricPreferencesFromDesktopPreferences,
+  type ConnectionQuotaMetricPreferences,
+} from "../../state/ConnectionQuotaMetricPreferences";
 import type { DesktopNotificationTarget } from "../notifications/contracts";
 
 type DesktopShellOptions = {
@@ -106,6 +110,15 @@ export class DesktopShell {
     await shell.openExternal("mailto:info@vestin.io");
   }
 
+  async readConnectionQuotaMetricPreferences(): Promise<ConnectionQuotaMetricPreferences> {
+    try {
+      const raw = await this.readDesktopPreferencesRaw();
+      return parseConnectionQuotaMetricPreferencesFromDesktopPreferences(raw);
+    } catch {
+      return {};
+    }
+  }
+
   readDesktopPackageVersion(): string {
     const packageJsonPath = join(this.options.currentDir, "..", "..", "package.json");
     const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: unknown };
@@ -178,16 +191,8 @@ export class DesktopShell {
   }
 
   private async readInitialLanguagePreference(): Promise<LanguagePreference | null> {
-    const settingsWindow = this.readSettingsWindowForSend();
-    if (!settingsWindow) {
-      return null;
-    }
     try {
-      await this.waitForSettingsWindowLoad(settingsWindow);
-      const raw = await settingsWindow.webContents.executeJavaScript(
-        `window.localStorage.getItem(${JSON.stringify(DesktopShell.preferencesStorageKey)})`,
-        true,
-      );
+      const raw = await this.readDesktopPreferencesRaw();
       return parseLanguagePreferenceFromDesktopPreferences(typeof raw === "string" ? raw : null);
     } catch {
       return null;
@@ -214,6 +219,20 @@ export class DesktopShell {
       settingsWindow.webContents.once("did-finish-load", settle);
       settingsWindow.webContents.once("did-fail-load", settle);
     });
+  }
+
+  private async readDesktopPreferencesRaw(): Promise<string | null> {
+    const settingsWindow = this.readSettingsWindowForSend();
+    if (!settingsWindow) {
+      return null;
+    }
+
+    await this.waitForSettingsWindowLoad(settingsWindow);
+    const raw = await settingsWindow.webContents.executeJavaScript(
+      `window.localStorage.getItem(${JSON.stringify(DesktopShell.preferencesStorageKey)})`,
+      true,
+    );
+    return typeof raw === "string" ? raw : null;
   }
 
   private async popTrayMenu(): Promise<void> {

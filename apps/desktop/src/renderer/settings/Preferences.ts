@@ -6,11 +6,16 @@ import {
   type LanguagePreference,
   type ThemePreference,
 } from "../../state/UiPreferences";
+import {
+  normalizeConnectionQuotaMetricPreferences,
+  type ConnectionQuotaMetricPreferences,
+} from "../../state/ConnectionQuotaMetricPreferences";
 
 export type AgentOrderPreference = AgentId[];
 
 export type DesktopPreferences = {
   agentOrder: AgentOrderPreference;
+  connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences;
   language: LanguagePreference;
   quickSetupDismissed: boolean;
   theme: ThemePreference;
@@ -34,6 +39,7 @@ export class DesktopPreferencesStore {
   load(): DesktopPreferences {
     const fallback: DesktopPreferences = {
       agentOrder: readDefaultAgentOrder(),
+      connectionQuotaMetricPreferences: {},
       language: "en",
       quickSetupDismissed: false,
       theme: "system",
@@ -47,6 +53,9 @@ export class DesktopPreferencesStore {
       const parsed = JSON.parse(raw) as Partial<DesktopPreferences>;
       return {
         agentOrder: normalizeAgentOrder(parsed.agentOrder),
+        connectionQuotaMetricPreferences: normalizeConnectionQuotaMetricPreferences(
+          parsed.connectionQuotaMetricPreferences,
+        ),
         language: normalizeLanguagePreference(parsed.language),
         quickSetupDismissed: parsed.quickSetupDismissed === true,
         theme: normalizeThemePreference(parsed.theme),

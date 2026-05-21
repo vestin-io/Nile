@@ -151,7 +151,7 @@ export class ConnectionPresenter {
 
   formatUsage(result: ConnectionUsageResult): string {
     const lines = [
-      "Connection usage",
+      "Connection quota",
       `connection: ${result.connectionLabel}`,
       `endpoint: ${this.endpointLabels.formatEndpointLabel(result.endpointLabel)}`,
     ];
@@ -161,7 +161,7 @@ export class ConnectionPresenter {
     }
 
     if (result.status !== "available") {
-      lines.push(`status: ${result.status === "unsupported" ? "usage unavailable" : result.status}`);
+      lines.push(`status: ${result.status === "unsupported" ? "quota unavailable" : result.status}`);
       if (result.message) {
         lines.push(`note: ${result.message}`);
       }
@@ -191,7 +191,7 @@ export class ConnectionPresenter {
 
   formatCursorUsageBindingSummary(result: BindCursorUsageResult): string {
     return [
-      "Cursor usage binding saved",
+      "Cursor quota binding saved",
       `connection: ${result.connectionLabel}`,
       `id: ${result.connectionId}`,
       `endpoint: ${this.endpointLabels.formatEndpointLabel(result.endpointLabel)}`,
@@ -203,7 +203,7 @@ export class ConnectionPresenter {
   formatCursorUsageAutoBindSummary(result: CursorUsageAutoBindResult): string {
     if (result.status === "bound") {
       return [
-        "Cursor usage auto-bound",
+        "Cursor quota auto-bound",
         `connection: ${result.binding.connectionLabel}`,
         `id: ${result.connectionId}`,
         `source: ${result.sourceLabel} (${result.locationLabel})`,
@@ -213,11 +213,11 @@ export class ConnectionPresenter {
     }
 
     if (result.status === "already_bound") {
-      return `Cursor usage is already bound for ${result.connectionId}`;
+      return `Cursor quota is already bound for ${result.connectionId}`;
     }
 
     if (result.status === "no_session_found") {
-      return `No matching Cursor usage session was found for ${result.connectionId}`;
+      return `No matching Cursor quota session was found for ${result.connectionId}`;
     }
 
     return `Connection ${result.connectionId} is not an auto-bindable Cursor session`;
@@ -270,7 +270,7 @@ export class ConnectionPresenter {
   private formatUsageSummaryLines(result: ConnectionUsageResult): string[] {
     if (result.status !== "available") {
       const statusLabel = result.status === "unsupported" ? "unavailable" : result.status;
-      return [`usage: ${statusLabel}${result.message ? ` (${result.message})` : ""}`];
+      return [`quota: ${statusLabel}${result.message ? ` (${result.message})` : ""}`];
     }
 
     const parts: string[] = [];
@@ -289,10 +289,10 @@ export class ConnectionPresenter {
     }
 
     if (parts.length === 0) {
-      return ["usage: available"];
+      return ["quota: available"];
     }
 
-    return [`usage: ${parts.join(" · ")}`];
+    return [`quota: ${parts.join(" · ")}`];
   }
 
   private formatScanState(state: ScanLocalSetupsResult["items"][number]["state"]): string {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { UsageSummary } from "./UsageSummary";
+import { resolveDesktopUsageSummary, UsageSummary } from "./UsageSummary";
 
 describe("UsageSummary", () => {
   it("builds an available desktop usage summary from connection usage data", () => {
@@ -30,13 +30,13 @@ describe("UsageSummary", () => {
       endpointFamily: "cursor",
       status: "unavailable",
       freshness: "stale",
-      message: "Bind a Cursor web session for this connection to enable live usage.",
+      message: "Bind a Cursor web session for this connection to enable live quota.",
       windows: [],
     })).toEqual({
       status: "unavailable",
       freshness: "stale",
-      message: "Bind a Cursor web session for this connection to enable live usage.",
-      text: "Bind a Cursor web session for this connection to enable live usage.",
+      message: "Bind a Cursor web session for this connection to enable live quota.",
+      text: "Bind a Cursor web session for this connection to enable live quota.",
       windows: [],
     });
   });
@@ -45,8 +45,27 @@ describe("UsageSummary", () => {
     expect(UsageSummary.fromResult({
       endpointFamily: "openai",
       status: "unsupported",
-      message: "Usage is unavailable for openai/api_key connections.",
+      message: "Quota is unavailable for openai/api_key connections.",
       windows: [],
     })).toBeNull();
+  });
+
+  it("resolves a preferred metric key when one is configured", () => {
+    const usage = UsageSummary.fromResult({
+      endpointFamily: "openai",
+      status: "available",
+      freshness: "cached",
+      windows: [
+        { label: "5h", remainingPercent: 62 },
+        { label: "7d", remainingPercent: 31 },
+      ],
+    });
+
+    expect(resolveDesktopUsageSummary(usage, "5h")).toEqual({
+      key: "5h",
+      label: "5h",
+      remainingPercent: 62,
+      text: "5h 62% left (cached)",
+    });
   });
 });

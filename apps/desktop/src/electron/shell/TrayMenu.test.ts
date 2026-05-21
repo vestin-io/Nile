@@ -172,6 +172,7 @@ describe("DesktopTrayMenu", () => {
       peekState: () => createMenubarState(),
       peekSettingsState: () => createSettingsState(),
       readLanguagePreference: () => "en",
+      readConnectionQuotaMetricPreferences: async () => ({}),
       readMenubarDisplay: () => ({ hasConfiguredTickerAgents: false, mode: "app_entry", tickerAgentIds: [] }),
       refreshState: async () => createMenubarState(),
       refreshSettingsState: async () => createSettingsState(),
@@ -290,6 +291,7 @@ function createMenu(options: {
     peekState: () => menubarState,
     peekSettingsState: () => settingsState,
     readLanguagePreference: () => options.language ?? "en",
+    readConnectionQuotaMetricPreferences: async () => ({}),
     readMenubarDisplay: options.readMenubarDisplay ?? (() => ({
       hasConfiguredTickerAgents: false,
       mode: "app_entry",
@@ -326,7 +328,10 @@ function createMenubarState(): MenubarState {
         currentConnection: codexWork,
         currentUsage: {
           status: "available",
-          windows: [],
+          windows: [
+            { key: "5h", label: "5h", remainingPercent: 72, resetsAt: null },
+            { key: "weekly", label: "weekly", remainingPercent: 88, resetsAt: null },
+          ],
           windowLabel: "5h",
           remainingPercent: 72,
           text: "5h 72% left",
@@ -339,7 +344,9 @@ function createMenubarState(): MenubarState {
         currentConnection: null,
         currentUsage: {
           status: "available",
-          windows: [],
+          windows: [
+            { key: "monthly", label: "monthly", remainingPercent: 6, resetsAt: null },
+          ],
           windowLabel: "monthly",
           remainingPercent: 6,
           text: "monthly 6% left",

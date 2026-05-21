@@ -35,7 +35,7 @@ class ResolvedConnectionUsageReaderRegistry {
     this.registry = new IndexedRegistry(
       readers,
       (reader) => reader.authMode,
-      (authMode) => `Unsupported usage auth mode: ${authMode}`,
+      (authMode) => `Unsupported quota auth mode: ${authMode}`,
     );
   }
 

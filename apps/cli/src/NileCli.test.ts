@@ -1297,7 +1297,7 @@ describe("NileCli", () => {
     const result = await cli.run(["usage", "work-example-com"]);
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("Connection usage");
+    expect(result.stdout).toContain("Connection quota");
     expect(result.stdout).toContain("connection: work@example.com");
     expect(result.stdout).toContain("endpoint: OpenAI");
     expect(result.stdout).toContain("plan: Plus");
@@ -1341,7 +1341,7 @@ describe("NileCli", () => {
     ]);
 
     expect(bind.exitCode).toBe(0);
-    expect(bind.stdout).toContain("Cursor usage binding saved");
+    expect(bind.stdout).toContain("Cursor quota binding saved");
     expect(bind.stdout).toContain("connection: cursor.user@example.com");
 
     globalThis.fetch = (async () => new Response(JSON.stringify({
@@ -1362,7 +1362,7 @@ describe("NileCli", () => {
     const usage = await cli.run(["usage", "cursor-work"]);
 
     expect(usage.exitCode).toBe(0);
-    expect(usage.stdout).toContain("Connection usage");
+    expect(usage.stdout).toContain("Connection quota");
     expect(usage.stdout).toContain("connection: cursor.user@example.com");
     expect(usage.stdout).toContain("plan: Cursor");
     expect(usage.stdout).toContain("Total: 88% left");
@@ -1417,7 +1417,7 @@ describe("NileCli", () => {
     const bind = await cli.run(["cursor", "usage", "auto-bind", "cursor-work"]);
 
     expect(bind.exitCode).toBe(0);
-    expect(bind.stdout).toContain("Cursor usage auto-bound");
+    expect(bind.stdout).toContain("Cursor quota auto-bound");
     expect(bind.stdout).toContain("connection: cursor.user@example.com");
     expect(bind.stdout).toContain("source: Chrome (Profile 1)");
   });
@@ -1476,11 +1476,11 @@ describe("NileCli", () => {
       expect.arrayContaining([
         expect.objectContaining({
           title: "Saved connections",
-          message: expect.stringContaining("usage: plan Plus · 5h 75% left · 7d 90% left"),
+          message: expect.stringContaining("quota: plan Plus · 5h 75% left · 7d 90% left"),
         }),
       ]),
     );
-    expect(prompt.loadingMessages).toEqual(["Fetching usage…"]);
+    expect(prompt.loadingMessages).toEqual(["Fetching quota…"]);
   });
 
   it("rolls back the latest nile change for a scoped agent", async () => {

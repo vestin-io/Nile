@@ -26,7 +26,7 @@ export class CursorUsageBinder {
     }
     if (access.authMode !== "cursor_session") {
       throw new CursorUsageBindingValidationError(
-        `Connection ${connectionId} must use cursor_session auth for Cursor usage binding`,
+        `Connection ${connectionId} must use cursor_session auth for Cursor quota binding`,
       );
     }
 
@@ -39,7 +39,7 @@ export class CursorUsageBinder {
     const usageFingerprint = CursorUsageIdentity.fromUsageSessionToken(sessionToken);
     if (!CursorUsageIdentity.matches(localFingerprint, usageFingerprint)) {
       throw new CursorUsageBindingValidationError(
-        "Cursor usage session belongs to a different account than the saved connection",
+        "Cursor quota session belongs to a different account than the saved connection",
       );
     }
 

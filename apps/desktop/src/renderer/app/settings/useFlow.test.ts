@@ -23,6 +23,7 @@ describe("runDesktopStateReset", () => {
       setPreferences(updater) {
         const current: DesktopPreferences = {
           agentOrder: [],
+          connectionQuotaMetricPreferences: {},
           language: "en",
           quickSetupDismissed: true,
           theme: "system",

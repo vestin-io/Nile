@@ -4,22 +4,33 @@ import type {
   DesktopOnboardingState,
 } from "../../state/Types";
 import type { Translator } from "./I18n";
-import type { DesktopUsageState } from "../../state/UsageSummary";
+import {
+  resolveDesktopUsageSummary,
+  type DesktopUsageState,
+} from "../../state/UsageSummary";
 import { formatOpenClawLiveIssue } from "./OpenClawIssueFormatter";
 import { formatDesktopOptionalTimestamp, formatDesktopTimestamp } from "./TimeFormatter";
 
-export function formatUsageText(connection: DesktopConnection | null | undefined, t: Translator): string {
-  return formatUsageValue(connection?.usage, t);
+export function formatUsageText(
+  connection: DesktopConnection | null | undefined,
+  t: Translator,
+  preferredMetricKey?: string | null,
+): string {
+  return formatUsageValue(connection?.usage, t, preferredMetricKey);
 }
 
-export function formatUsageValue(usage: DesktopUsageState | null | undefined, t: Translator): string {
+export function formatUsageValue(
+  usage: DesktopUsageState | null | undefined,
+  t: Translator,
+  preferredMetricKey?: string | null,
+): string {
   if (!usage) {
     return t("common.unknown");
   }
   if (usage.status !== "available") {
     return t("common.unknown");
   }
-  return usage.text;
+  return resolveDesktopUsageSummary(usage, preferredMetricKey)?.text ?? usage.text;
 }
 
 export function formatLiveIssue(issue: string, t: Translator): string {

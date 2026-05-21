@@ -57,18 +57,18 @@ export class CursorUsageIdentity {
   static fromUsageSessionToken(token: string): CursorAccountFingerprint {
     const parsed = this.parseUsageSessionToken(token);
     const payload = this.parseJwtPayload(parsed.jwt);
-    const authId = this.requireString(payload, "sub", "Cursor usage session token is missing sub");
+    const authId = this.requireString(payload, "sub", "Cursor quota session token is missing sub");
     const tokenType = this.readString(payload.type);
     if (tokenType && tokenType !== "web" && tokenType !== "access" && tokenType !== "session") {
-      throw new CursorUsageIdentityError(`Cursor usage session token has unsupported type: ${tokenType}`);
+      throw new CursorUsageIdentityError(`Cursor quota session token has unsupported type: ${tokenType}`);
     }
 
     const workosUserId = this.parseWorkosUserId(authId);
     if (!workosUserId) {
-      throw new CursorUsageIdentityError("Cursor usage session token sub does not contain a workos user id");
+      throw new CursorUsageIdentityError("Cursor quota session token sub does not contain a workos user id");
     }
     if (parsed.workosUserId !== workosUserId) {
-      throw new CursorUsageIdentityError("Cursor usage session token prefix does not match token subject identity");
+      throw new CursorUsageIdentityError("Cursor quota session token prefix does not match token subject identity");
     }
 
     return {
@@ -81,7 +81,7 @@ export class CursorUsageIdentity {
     const normalized = this.normalizeToken(token);
     const separator = normalized.indexOf("::");
     if (separator <= 0 || separator === normalized.length - 2) {
-      throw new CursorUsageIdentityError("Cursor usage session token must use user::<jwt> format");
+      throw new CursorUsageIdentityError("Cursor quota session token must use user::<jwt> format");
     }
 
     return {
@@ -101,7 +101,7 @@ export class CursorUsageIdentity {
       : trimmed;
     const firstCookie = unprefixed.split(";")[0]?.trim() ?? "";
     if (!firstCookie) {
-      throw new CursorUsageIdentityError("Cursor usage session token is empty");
+      throw new CursorUsageIdentityError("Cursor quota session token is empty");
     }
 
     try {
@@ -144,11 +144,11 @@ export class CursorUsageIdentity {
   private static parseJwtPayload(jwt: string): CursorWebPayload {
     const parts = jwt.split(".");
     if (parts.length !== 3) {
-      throw new CursorUsageIdentityError("Cursor usage session token JWT is malformed");
+      throw new CursorUsageIdentityError("Cursor quota session token JWT is malformed");
     }
     const payload = parts[1];
     if (!payload) {
-      throw new CursorUsageIdentityError("Cursor usage session token JWT payload is missing");
+      throw new CursorUsageIdentityError("Cursor quota session token JWT payload is missing");
     }
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
     const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
@@ -156,11 +156,11 @@ export class CursorUsageIdentity {
     try {
       const parsed = JSON.parse(raw) as unknown;
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        throw new CursorUsageIdentityError("Cursor usage session token payload is invalid");
+        throw new CursorUsageIdentityError("Cursor quota session token payload is invalid");
       }
       return parsed as CursorWebPayload;
     } catch {
-      throw new CursorUsageIdentityError("Cursor usage session token payload is not valid JSON");
+      throw new CursorUsageIdentityError("Cursor quota session token payload is not valid JSON");
     }
   }
 

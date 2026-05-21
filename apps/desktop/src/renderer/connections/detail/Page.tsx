@@ -21,6 +21,7 @@ import { Badge } from "../../ui/badge";
 import { Button } from "../../ui/button";
 import { FieldCard } from "../../ui/field";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../ui/tooltip";
+import { useConnectionQuotaMetricPreferences } from "../../shared/useConnectionQuotaMetricPreferences";
 
 type ConnectionDetailPageProps = {
   connection: DesktopConnection;
@@ -63,11 +64,13 @@ export function ConnectionDetailPage({
 }: ConnectionDetailPageProps) {
   const [isRemoveDialogOpen, setIsRemoveDialogOpen] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const quotaMetricPreferences = useConnectionQuotaMetricPreferences();
   const canRepairUsage =
     connection.endpointFamily === "cursor"
     && connection.authMode === "cursor_session"
     && (!connection.usage || connection.usage.status === "unavailable");
   const canRemove = connection.selectedByAgents.length === 0;
+  const preferredMetricKey = quotaMetricPreferences.readPreference(connection.id);
 
   return (
     <div className="space-y-5">
@@ -176,9 +179,13 @@ export function ConnectionDetailPage({
         <ConnectionQuotaSection
           className="h-full"
           connection={connection}
+          preferredMetricKey={preferredMetricKey}
           showPlanLabel
           t={t}
           title={t("common.usage")}
+          onPreferredMetricKeyChange={(metricKey) => {
+            quotaMetricPreferences.setPreference(connection.id, metricKey);
+          }}
         />
         <ConnectionModelCatalogSection
           connectionId={connection.id}

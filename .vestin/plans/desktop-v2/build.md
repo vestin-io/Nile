@@ -21,6 +21,45 @@
 
 - `npm run typecheck`
 
+## 2026-05-21
+
+### Connection quota metric preference
+
+- Added a desktop-local per-connection quota metric preference that does not touch shared connection state or SQLite:
+  - stored inside the existing desktop renderer preference payload
+  - keyed by saved `connectionId`
+  - removable so the UI can fall back to automatic metric selection
+- Kept the default behavior unchanged when no preference is set:
+  - Nile still picks the tightest quota window
+  - OpenAI/Codex summaries still normalize `7d` into `weekly`
+- Updated desktop quota displays so a pinned metric overrides the default summary everywhere that shows a single headline metric:
+  - connection list summary cells
+  - agent connection indicators
+  - current-connection picker indicators
+  - detached menubar renderer summary
+  - native macOS tray ticker title
+  - native macOS tray quota submenu label
+- Added a lightweight row-level telescope toggle beside each quota progress bar so the operator can pin or clear a metric directly from the existing quota panel instead of opening a separate settings control.
+- Refined the telescope toggle styling so the inactive state sits greyed out while the active state lights up with a warmer highlight, matching the intent of a focused watch target better than a generic checkbox.
+- Kept the row action on `Telescope` after UI review; the angled silhouette reads more naturally than `Binoculars` as a compact “watch this metric” control in the quota row.
+- Added Gemini quota instrumentation at the desktop usage-cache boundary so logs now capture:
+  - raw Gemini quota `status`
+  - `windowCount`
+  - whether the desktop summary kept or hid the result
+  - any returned Gemini message for unavailable/error outcomes
+
+#### Key findings
+
+- Keeping the preference in renderer-local preferences was fine for persistence, but native tray surfaces still needed explicit main-process reads from the hidden settings window's `localStorage`; otherwise ticker and tray labels would drift from the renderer.
+- The preference intentionally changes only which metric is surfaced as the single summary field. It does not alter raw quota windows, alert metrics, or provider usage reads.
+- Existing `desktop.usage.read_failed` logs only covered thrown exceptions. Gemini was also disappearing through normal `unavailable` results that the desktop summary intentionally collapses to `null`, so that path needed its own explicit instrumentation.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/state/ConnectionQuotaMetricPreferences.test.ts apps/desktop/src/state/UsageSummary.test.ts apps/desktop/src/renderer/settings/Preferences.test.ts apps/desktop/src/electron/shell/TickerTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
 ### Codex CLI resolution hardening
 
 - Hardened Codex CLI discovery so Nile no longer trusts the first `codex` file in `PATH` blindly:

@@ -193,10 +193,10 @@ export class InteractivePrompt {
     loading.start(message);
     try {
       const result = await work();
-      loading.stop("Usage loaded");
+      loading.stop("Quota loaded");
       return result;
     } catch (error) {
-      loading.stop("Usage fetch failed");
+      loading.stop("Quota fetch failed");
       throw error;
     }
   }

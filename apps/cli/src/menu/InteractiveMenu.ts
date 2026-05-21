@@ -84,7 +84,7 @@ export class InteractiveMenu {
       if (selection.value === "list") {
         const connections = this.connectionCommands.listConnections(options);
         const usage = await this.prompt.withLoading(
-          "Fetching usage…",
+          "Fetching quota…",
           () =>
             this.usageCommands.getUsageMap(
               options,

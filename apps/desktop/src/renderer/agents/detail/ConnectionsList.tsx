@@ -10,6 +10,8 @@ import { Card, CardContent } from "../../ui/card";
 import { Field } from "../../ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table";
 import { TextButton } from "../../ui/text-button";
+import { useConnectionQuotaMetricPreferences } from "../../shared/useConnectionQuotaMetricPreferences";
+import { resolveDesktopUsageSummary } from "../../../state/UsageSummary";
 
 type AgentConnectionsListProps = {
   agent: DesktopAgentState;
@@ -31,6 +33,7 @@ export function AgentConnectionsList({
   onSwitch,
 }: AgentConnectionsListProps) {
   const actionButtonClassName = "min-w-[88px]";
+  const quotaMetricPreferences = useConnectionQuotaMetricPreferences();
 
   return (
     <>
@@ -51,7 +54,10 @@ export function AgentConnectionsList({
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <UsageIndicator
-                      remainingPercent={readUsageRemainingPercent(connection)}
+                      remainingPercent={readUsageRemainingPercent(
+                        connection,
+                        quotaMetricPreferences.readPreference(connection.id),
+                      )}
                       showPercent={false}
                     />
                     <div className="font-medium">{connection.label}</div>
@@ -115,7 +121,10 @@ export function AgentConnectionsList({
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <UsageIndicator
-                        remainingPercent={readUsageRemainingPercent(connection)}
+                        remainingPercent={readUsageRemainingPercent(
+                          connection,
+                          quotaMetricPreferences.readPreference(connection.id),
+                        )}
                         showPercent={false}
                       />
                       <span className="font-medium">{connection.label}</span>
@@ -224,12 +233,15 @@ function ModelEditButton({
   );
 }
 
-function readUsageRemainingPercent(connection: DesktopConnection): number | null {
+function readUsageRemainingPercent(
+  connection: DesktopConnection,
+  preferredMetricKey: string | null,
+): number | null {
   if (connection.usage?.status !== "available") {
     return null;
   }
 
-  return connection.usage.remainingPercent;
+  return resolveDesktopUsageSummary(connection.usage, preferredMetricKey)?.remainingPercent ?? connection.usage.remainingPercent;
 }
 
 function readModelText(connection: DesktopConnection, t: Translator): string {

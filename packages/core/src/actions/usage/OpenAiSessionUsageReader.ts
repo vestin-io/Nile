@@ -53,14 +53,14 @@ export class OpenAiSessionUsageReader {
     }
 
     if (!response.ok) {
-      return this.buildErrorResult(input, `Usage request failed with status ${response.status}`);
+      return this.buildErrorResult(input, `Quota request failed with status ${response.status}`);
     }
 
     let payload: OpenAiUsagePayload;
     try {
       payload = await response.json() as OpenAiUsagePayload;
     } catch {
-      return this.buildErrorResult(input, "Usage response could not be parsed");
+      return this.buildErrorResult(input, "Quota response could not be parsed");
     }
 
     const windows = this.buildWindows(payload);
@@ -73,7 +73,7 @@ export class OpenAiSessionUsageReader {
         status: "unavailable",
         source: "remote_api",
         planLabel: this.mapPlanLabel(payload.plan_type),
-        message: "Usage response did not include recognizable quota windows",
+        message: "Quota response did not include recognizable quota windows",
         windows: [],
       };
     }
@@ -116,11 +116,11 @@ export class OpenAiSessionUsageReader {
 
   private readFetchErrorMessage(error: unknown): string {
     if (this.isAbortError(error)) {
-      return `Usage request timed out after ${USAGE_REQUEST_TIMEOUT_MS}ms`;
+      return `Quota request timed out after ${USAGE_REQUEST_TIMEOUT_MS}ms`;
     }
     return error instanceof Error
-      ? `Usage request failed: ${error.message}`
-      : "Usage request failed";
+      ? `Quota request failed: ${error.message}`
+      : "Quota request failed";
   }
 
   private isAbortError(error: unknown): boolean {

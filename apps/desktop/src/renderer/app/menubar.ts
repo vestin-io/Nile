@@ -2,6 +2,8 @@ import { registerBuiltinAgentDeclarations } from "@nile/builtins/agents";
 import { createTranslator } from "../shared/I18n";
 import { DesktopPreferencesStore } from "../settings/Preferences";
 import { authModeLabel } from "../shared/DisplayText";
+import { readConnectionQuotaMetricPreference } from "../../state/ConnectionQuotaMetricPreferences";
+import { resolveDesktopUsageSummary } from "../../state/UsageSummary";
 
 type MenubarState = Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarState>>;
 
@@ -55,10 +57,24 @@ function renderCurrent(
   }
 
   currentElement.textContent = agent?.currentConnection
-    ? `${agent.currentConnection.endpointLabel} / ${agent.currentConnection.label}${agent.currentUsage?.status === "available" ? ` · ${agent.currentUsage.text}` : ""}`
+    ? `${agent.currentConnection.endpointLabel} / ${agent.currentConnection.label}${renderUsageSummary(agent)}`
     : t("menubar.currentConnectionEmpty");
 
   driftElement.classList.add("is-hidden");
+}
+
+function renderUsageSummary(agent: NonNullable<MenubarState["agents"][number] | null>): string {
+  if (!agent.currentConnection || agent.currentUsage?.status !== "available") {
+    return "";
+  }
+
+  const preferences = preferencesStore.load();
+  const preferredMetricKey = readConnectionQuotaMetricPreference(
+    preferences.connectionQuotaMetricPreferences,
+    agent.currentConnection.id,
+  );
+  const summary = resolveDesktopUsageSummary(agent.currentUsage, preferredMetricKey);
+  return summary ? ` · ${summary.text}` : "";
 }
 
 function renderConnections(

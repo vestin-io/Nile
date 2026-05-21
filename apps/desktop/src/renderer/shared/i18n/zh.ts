@@ -145,6 +145,8 @@ export const ZH_MESSAGES: Messages = {
     "connections.authHelp.openaiSession": "这里使用的是你的 OpenAI 登录会话，不是 API Key。",
     "connections.inUseByAgent": "{agent} 在使用",
     "connections.renewsAt": "下次重置 {time}",
+    "connections.metricPreference.pin": "固定显示 {metric} 作为额度摘要",
+    "connections.metricPreference.clear": "取消固定 {metric} 这个额度摘要",
     "connections.more": "更多",
     "connections.usedBy": "当前使用方",
     "connections.editTitle": "编辑连接",

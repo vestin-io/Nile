@@ -11,6 +11,11 @@ import type { DesktopNotificationIntent } from "../notifications/Types";
 import type { WorkspaceProfile } from "../profiles/Store";
 import type { DesktopMenubarDisplayState } from "../state/MenubarDisplayStore";
 import { DesktopTrayTickerTitle } from "./TickerTitle";
+import type { ConnectionQuotaMetricPreferences } from "../../state/ConnectionQuotaMetricPreferences";
+import {
+  readConnectionQuotaMetricPreference,
+} from "../../state/ConnectionQuotaMetricPreferences";
+import { resolveDesktopUsageSummary } from "../../state/UsageSummary";
 
 type DesktopTrayMenuOptions = {
   isProfileFeatureEnabled(): boolean;
@@ -19,6 +24,7 @@ type DesktopTrayMenuOptions = {
   peekSettingsState(): SettingsState | null;
   readLanguagePreference(): LanguagePreference;
   readMenubarDisplay(): DesktopMenubarDisplayState;
+  readConnectionQuotaMetricPreferences(): Promise<ConnectionQuotaMetricPreferences>;
   refreshState(): Promise<MenubarState>;
   refreshSettingsState(): Promise<SettingsState>;
   listProfiles(): WorkspaceProfile[];
@@ -48,7 +54,14 @@ export class DesktopTrayMenu {
       });
       return this.options.peekSettingsState();
     });
-    return this.buildTemplate(state, settingsState, this.options.listProfiles(), this.readTranslator());
+    const connectionQuotaMetricPreferences = await this.options.readConnectionQuotaMetricPreferences().catch(() => ({}));
+    return this.buildTemplate(
+      state,
+      settingsState,
+      this.options.listProfiles(),
+      this.readTranslator(),
+      connectionQuotaMetricPreferences,
+    );
   }
 
   private buildTemplate(
@@ -56,6 +69,7 @@ export class DesktopTrayMenu {
     settingsState: SettingsState | null,
     profiles: WorkspaceProfile[],
     t: Translator,
+    connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences,
   ): MenuItemConstructorOptions[] {
     const menubarDisplay = this.options.readMenubarDisplay();
     const selectedTickerAgentIds = new Set(DesktopTrayTickerTitle.readSelectedAgentIds(state, menubarDisplay));
@@ -82,7 +96,12 @@ export class DesktopTrayMenu {
         { label: t("tray.openMainWindow"), click: () => this.options.showSettings() },
         { type: "separator" },
         ...(profileMenu ? [profileMenu, { type: "separator" as const }] : []),
-        ...state.agents.map((agent) => this.buildAgentSubmenu(agent, selectedTickerAgentIds, t)),
+        ...state.agents.map((agent) => this.buildAgentSubmenu(
+          agent,
+          selectedTickerAgentIds,
+          t,
+          connectionQuotaMetricPreferences,
+        )),
         { type: "separator" },
         { label: t("tray.quit"), click: () => this.options.quitApp() },
       ];
@@ -120,6 +139,7 @@ export class DesktopTrayMenu {
     agent: MenubarAgentState,
     selectedTickerAgentIds: Set<AgentId>,
     t: Translator,
+    connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences,
   ): MenuItemConstructorOptions {
     if (agent.connections.length === 0) {
       return {
@@ -129,9 +149,15 @@ export class DesktopTrayMenu {
     }
 
     const submenu: MenuItemConstructorOptions[] = [];
-    if (agent.currentUsage?.status === "available") {
+    if (agent.currentConnection && agent.currentUsage?.status === "available") {
+      const preferredMetricKey = readConnectionQuotaMetricPreference(
+        connectionQuotaMetricPreferences,
+        agent.currentConnection.id,
+      );
+      const summary = resolveDesktopUsageSummary(agent.currentUsage, preferredMetricKey);
+      if (summary) {
       submenu.push({
-        label: t("tray.quota", { text: agent.currentUsage.text }),
+        label: t("tray.quota", { text: summary.text }),
         submenu: [{
           label: t("tray.showInTicker"),
           type: "checkbox",
@@ -142,6 +168,7 @@ export class DesktopTrayMenu {
         }],
       });
       submenu.push({ type: "separator" });
+      }
     }
 
     submenu.push(...agent.connections.map<MenuItemConstructorOptions>((connection) => ({

@@ -180,6 +180,7 @@ export class DesktopMain {
       peekSettingsState: () => this.stateStore.peekSettingsState(),
       isProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       readLanguagePreference: () => this.languageStore.read(),
+      readConnectionQuotaMetricPreferences: () => this.shell.readConnectionQuotaMetricPreferences(),
       readMenubarDisplay: () => this.menubarDisplayStore.read(),
       refreshState: async () => await this.stateStore.refreshMenubarState(),
       refreshSettingsState: async () => await this.stateStore.getSettingsState({ refreshUsage: false }),
@@ -463,10 +464,16 @@ export class DesktopMain {
   }
 
   private syncTrayTitle(): void {
+    void this.syncTrayTitleAsync();
+  }
+
+  private async syncTrayTitleAsync(): Promise<void> {
+    const connectionQuotaMetricPreferences = await this.shell.readConnectionQuotaMetricPreferences().catch(() => ({}));
     this.shell.setTrayTitle(
       DesktopTrayTickerTitle.format(
         this.stateStore.peekMenubarState(),
         this.menubarDisplayStore.read(),
+        connectionQuotaMetricPreferences,
       ),
     );
   }

@@ -32,6 +32,22 @@ describe("DesktopPreferencesStore", () => {
 
     expect(store.load().agentOrder).toEqual(["codex", "claude", "cursor", "openclaw", "gemini"]);
   });
+
+  it("preserves normalized connection quota metric preferences", () => {
+    const storage = createStorage({
+      "nile.desktop.preferences": JSON.stringify({
+        connectionQuotaMetricPreferences: {
+          " codex-work ": " weekly ",
+          "cursor-work": "",
+        },
+      }),
+    });
+    const store = new DesktopPreferencesStore(storage, createRootElement());
+
+    expect(store.load().connectionQuotaMetricPreferences).toEqual({
+      "codex-work": "weekly",
+    });
+  });
 });
 
 function createStorage(values: Record<string, string>): Storage {

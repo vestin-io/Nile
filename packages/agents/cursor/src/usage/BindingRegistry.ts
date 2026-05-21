@@ -124,7 +124,7 @@ export class CursorUsageBindingRegistry {
   private getOrThrow(connectionId: string): CursorUsageBindingRecord {
     const record = this.bindingStore.get(connectionId);
     if (!record) {
-      throw new CursorUsageBindingValidationError(`Cursor usage binding not found: ${connectionId}`);
+      throw new CursorUsageBindingValidationError(`Cursor quota binding not found: ${connectionId}`);
     }
     return record;
   }
@@ -132,17 +132,17 @@ export class CursorUsageBindingRegistry {
   private normalizeInput(input: CursorUsageBindingInput, timestamp: string): CursorUsageBindingRecord {
     const connectionId = input.connectionId.trim();
     if (!connectionId) {
-      throw new CursorUsageBindingValidationError("Cursor usage binding connection id is required");
+      throw new CursorUsageBindingValidationError("Cursor quota binding connection id is required");
     }
 
     const authId = input.accountFingerprint.authId.trim();
     const workosUserId = input.accountFingerprint.workosUserId.trim();
     const email = input.accountFingerprint.email?.trim();
     if (!authId) {
-      throw new CursorUsageBindingValidationError("Cursor usage binding authId is required");
+      throw new CursorUsageBindingValidationError("Cursor quota binding authId is required");
     }
     if (!workosUserId) {
-      throw new CursorUsageBindingValidationError("Cursor usage binding workosUserId is required");
+      throw new CursorUsageBindingValidationError("Cursor quota binding workosUserId is required");
     }
 
     return {
@@ -196,7 +196,7 @@ export class CursorUsageBindingRegistry {
       this.credentialStore.update(credentialSource.reference, credential);
     } catch {
       throw new CursorUsageBindingValidationError(
-        `Failed to restore Cursor usage credential for ${credentialSource.reference}`,
+        `Failed to restore Cursor quota credential for ${credentialSource.reference}`,
       );
     }
   }
@@ -206,7 +206,7 @@ export class CursorUsageBindingRegistry {
       this.credentialStore.create(credentialSource.reference, credential);
     } catch {
       throw new CursorUsageBindingValidationError(
-        `Failed to restore Cursor usage credential for ${credentialSource.reference}`,
+        `Failed to restore Cursor quota credential for ${credentialSource.reference}`,
       );
     }
   }

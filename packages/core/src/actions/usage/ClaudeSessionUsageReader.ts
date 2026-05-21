@@ -128,7 +128,7 @@ export class ClaudeSessionUsageReader {
 
   private async buildResult(input: ReaderInput, response: Response): Promise<ConnectionUsageResult> {
     if (!response.ok) {
-      return this.buildError(input, `Claude usage request failed with ${response.status}`);
+      return this.buildError(input, `Claude quota request failed with ${response.status}`);
     }
 
     const payload = await response.json() as Record<string, unknown>;
@@ -141,7 +141,7 @@ export class ClaudeSessionUsageReader {
         endpointLabel: input.endpointLabel,
         status: "unavailable",
         source: "remote_api",
-        message: "Claude usage response did not include any quota windows",
+        message: "Claude quota response did not include any quota windows",
         windows: [],
       };
     }
@@ -242,11 +242,11 @@ export class ClaudeSessionUsageReader {
 
   private readFetchErrorMessage(error: unknown): string {
     if (this.isAbortError(error)) {
-      return `Claude usage request timed out after ${REQUEST_TIMEOUT_MS}ms`;
+      return `Claude quota request timed out after ${REQUEST_TIMEOUT_MS}ms`;
     }
     return error instanceof Error
-      ? `Claude usage request failed: ${error.message}`
-      : "Claude usage request failed";
+      ? `Claude quota request failed: ${error.message}`
+      : "Claude quota request failed";
   }
 
   private isAbortError(error: unknown): boolean {

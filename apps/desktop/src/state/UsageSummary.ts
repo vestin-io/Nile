@@ -27,6 +27,13 @@ export type DesktopUnavailableUsage = {
 
 export type DesktopUsageState = DesktopAvailableUsage | DesktopUnavailableUsage;
 
+export type DesktopResolvedUsageSummary = {
+  key: string;
+  label: string;
+  remainingPercent: number;
+  text: string;
+};
+
 type UsageInput = {
   endpointFamily: string;
   planLabel?: string;
@@ -87,22 +94,27 @@ export class UsageSummary {
       return null;
     }
 
-    const tightestWindow = windows.reduce((lowest, current) =>
-      current.remainingPercent < lowest.remainingPercent ? current : lowest,
-    );
-    const windowLabel = tightestWindow.label;
-    const remainingPercent = tightestWindow.remainingPercent;
+    const resolved = resolveDesktopUsageSummary({
+      status: "available",
+      planLabel: result.planLabel,
+      freshness: result.freshness,
+      windows,
+      windowLabel: windows[0].label,
+      remainingPercent: windows[0].remainingPercent,
+      text: "",
+    });
+    if (!resolved) {
+      return null;
+    }
 
     return {
       status: "available",
       planLabel: result.planLabel,
       freshness: result.freshness,
       windows,
-      windowLabel,
-      remainingPercent,
-      text: result.freshness && result.freshness !== "live"
-        ? `${windowLabel} ${remainingPercent}% left (${result.freshness})`
-        : `${windowLabel} ${remainingPercent}% left`,
+      windowLabel: resolved.label,
+      remainingPercent: resolved.remainingPercent,
+      text: resolved.text,
     };
   }
 
@@ -113,4 +125,29 @@ export class UsageSummary {
     }
     return label.trim();
   }
+}
+
+export function resolveDesktopUsageSummary(
+  usage: DesktopUsageState | null | undefined,
+  preferredMetricKey?: string | null,
+): DesktopResolvedUsageSummary | null {
+  if (!usage || usage.status !== "available" || usage.windows.length === 0) {
+    return null;
+  }
+
+  const preferredWindow = preferredMetricKey
+    ? usage.windows.find((window) => window.key === preferredMetricKey)
+    : null;
+  const selectedWindow = preferredWindow ?? usage.windows.reduce((lowest, current) =>
+    current.remainingPercent < lowest.remainingPercent ? current : lowest,
+  );
+
+  return {
+    key: selectedWindow.key,
+    label: selectedWindow.label,
+    remainingPercent: selectedWindow.remainingPercent,
+    text: usage.freshness && usage.freshness !== "live"
+      ? `${selectedWindow.label} ${selectedWindow.remainingPercent}% left (${usage.freshness})`
+      : `${selectedWindow.label} ${selectedWindow.remainingPercent}% left`,
+  };
 }

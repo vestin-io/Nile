@@ -2,6 +2,8 @@ import type { DesktopAgentState } from "../../../state/Types";
 import type { Translator } from "../../shared/I18n";
 import { UsagePanel } from "../../shared/UsagePanel";
 import { UsageIndicator } from "../../shared/UsageIndicator";
+import { useConnectionQuotaMetricPreferences } from "../../shared/useConnectionQuotaMetricPreferences";
+import { resolveDesktopUsageSummary } from "../../../state/UsageSummary";
 import {
   Select,
   SelectContent,
@@ -23,6 +25,8 @@ export function AgentCurrentConnectionPanel({
   t,
   onSwitch,
 }: AgentCurrentConnectionPanelProps) {
+  const quotaMetricPreferences = useConnectionQuotaMetricPreferences();
+
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(22rem,1fr)] lg:items-start">
       <div className="space-y-2">
@@ -46,7 +50,10 @@ export function AgentCurrentConnectionPanel({
                   meta={(
                     <UsageIndicator
                       remainingPercent={connection.usage?.status === "available"
-                        ? connection.usage.remainingPercent
+                        ? (resolveDesktopUsageSummary(
+                            connection.usage,
+                            quotaMetricPreferences.readPreference(connection.id),
+                          )?.remainingPercent ?? connection.usage.remainingPercent)
                         : null}
                       showPercent={false}
                     />

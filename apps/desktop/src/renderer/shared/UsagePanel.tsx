@@ -12,9 +12,11 @@ type UsagePanelProps = {
   framed?: boolean;
   loading?: boolean;
   maxWindows?: number;
+  preferredMetricKey?: string | null;
   planLabel?: string | null;
   showPlanLabel?: boolean;
   showRenewalAt?: boolean;
+  onPreferredMetricKeyChange?(metricKey: string | null): void;
 };
 
 export function UsagePanel({
@@ -25,9 +27,11 @@ export function UsagePanel({
   framed = true,
   loading = false,
   maxWindows,
+  preferredMetricKey,
   planLabel,
   showPlanLabel = false,
   showRenewalAt = true,
+  onPreferredMetricKeyChange,
 }: UsagePanelProps) {
   const hasWindows = usage?.status === "available" && usage.windows.length > 0;
   const windows = hasWindows
@@ -59,7 +63,11 @@ export function UsagePanel({
           {windows.map((window) => (
             <QuotaMeter
               key={window.key}
+              checked={preferredMetricKey === window.key}
               label={window.label}
+              onCheckedChange={onPreferredMetricKeyChange
+                ? (checked) => onPreferredMetricKeyChange(checked ? window.key : null)
+                : undefined}
               remainingPercent={window.remainingPercent}
               renewalAt={showRenewalAt ? formatUsageResetAt(window.resetsAt ?? null) : undefined}
               t={t}

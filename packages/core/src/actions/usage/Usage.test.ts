@@ -164,7 +164,7 @@ describe("Usage", () => {
       endpointLabel: "Cursor",
       status: "unavailable",
       source: "remote_api",
-      message: "Bind a Cursor web session for this connection to enable live usage.",
+      message: "Bind a Cursor web session for this connection to enable live quota.",
       windows: [],
     });
 
@@ -360,7 +360,7 @@ describe("Usage", () => {
       status: "unavailable",
       source: "remote_api",
       planLabel: "Gemini",
-      message: "Gemini usage project metadata is unavailable for this session.",
+      message: "Gemini quota project metadata is unavailable for this session.",
       windows: [],
     });
 
@@ -517,7 +517,7 @@ describe("Usage", () => {
       freshness: "cached",
       lastFetchedAt: "2026-05-01T08:00:00.000Z",
       planLabel: "Cursor",
-      message: "Bind a Cursor web session for this connection to enable live usage.",
+      message: "Bind a Cursor web session for this connection to enable live quota.",
       windows: [
         expect.objectContaining({ label: "Total", remainingPercent: 58 }),
         expect.objectContaining({ label: "Auto + Composer", remainingPercent: 50 }),
