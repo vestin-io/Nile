@@ -75,7 +75,6 @@ describe("Gemini RollbackLatestMutation", () => {
           context.sharedContext.accessRegistry,
           context.agentSelection,
           context.sharedContext.agentConnectionSettings,
-          setup.credentialStore,
           NileLogger.silent(),
           (message) => new Error(message),
           (input) => GEMINI_PROJECTION.resolve(input),

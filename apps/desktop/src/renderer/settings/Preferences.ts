@@ -1,4 +1,5 @@
 import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import {
   LANGUAGE_SELF_LABELS,
   SUPPORTED_LANGUAGES,
@@ -16,12 +17,17 @@ export type AgentOrderPreference = AgentId[];
 export type DesktopPreferences = {
   agentOrder: AgentOrderPreference;
   connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences;
+  defaultCredentialStorageBackend: CredentialStorageBackend | null;
   language: LanguagePreference;
   quickSetupDismissed: boolean;
   theme: ThemePreference;
 };
 
 const STORAGE_KEY = "nile.desktop.preferences";
+const SUPPORTED_CREDENTIAL_STORAGE_BACKENDS: CredentialStorageBackend[] = [
+  "system_secure_storage",
+  "encrypted_local_storage",
+];
 export { SUPPORTED_LANGUAGES };
 export { LANGUAGE_SELF_LABELS };
 export type { LanguagePreference, ThemePreference };
@@ -40,6 +46,7 @@ export class DesktopPreferencesStore {
     const fallback: DesktopPreferences = {
       agentOrder: readDefaultAgentOrder(),
       connectionQuotaMetricPreferences: {},
+      defaultCredentialStorageBackend: null,
       language: "en",
       quickSetupDismissed: false,
       theme: "system",
@@ -55,6 +62,9 @@ export class DesktopPreferencesStore {
         agentOrder: normalizeAgentOrder(parsed.agentOrder),
         connectionQuotaMetricPreferences: normalizeConnectionQuotaMetricPreferences(
           parsed.connectionQuotaMetricPreferences,
+        ),
+        defaultCredentialStorageBackend: normalizeCredentialStorageBackendPreference(
+          parsed.defaultCredentialStorageBackend,
         ),
         language: normalizeLanguagePreference(parsed.language),
         quickSetupDismissed: parsed.quickSetupDismissed === true,
@@ -124,4 +134,16 @@ function normalizeAgentOrder(value: unknown): AgentOrderPreference {
   }
 
   return uniqueAgents;
+}
+
+function normalizeCredentialStorageBackendPreference(
+  value: unknown,
+): CredentialStorageBackend | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return typeof value === "string"
+    && SUPPORTED_CREDENTIAL_STORAGE_BACKENDS.includes(value as CredentialStorageBackend)
+    ? value as CredentialStorageBackend
+    : null;
 }

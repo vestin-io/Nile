@@ -31,6 +31,26 @@ export function useDesktopData() {
       const settingsStatePromise = options?.usage === "snapshot"
         ? window.nileDesktop.state.getSettingsStateSnapshot()
         : window.nileDesktop.state.getSettingsState();
+      if (options?.usage === "snapshot") {
+        const nextSettingsState = await settingsStatePromise;
+        if (!isMountedRef.current || requestId !== requestIdRef.current) {
+          return false;
+        }
+        setSettingsState(nextSettingsState);
+        setError(null);
+        setIsLoading(false);
+        const [nextHistoryState, nextDefinitions] = await Promise.all([
+          window.nileDesktop.state.getHistoryState(),
+          window.nileDesktop.connections.listConnectionDefinitions(),
+        ]);
+        if (!isMountedRef.current || requestId !== requestIdRef.current) {
+          return false;
+        }
+        setHistoryState(nextHistoryState);
+        setDefinitions(nextDefinitions);
+        return true;
+      }
+
       const [nextSettingsState, nextHistoryState, nextDefinitions] = await Promise.all([
         settingsStatePromise,
         window.nileDesktop.state.getHistoryState(),
@@ -83,10 +103,27 @@ export function useDesktopData() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    void read({ markLoading: true });
-    return window.nileDesktopEvents.onStateChanged(() => {
+    let followupRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+    void read({ markLoading: true, usage: "snapshot" }).then((loaded) => {
+      if (!loaded || !isMountedRef.current) {
+        return;
+      }
+      followupRefreshTimer = setTimeout(() => {
+        if (!isMountedRef.current) {
+          return;
+        }
+        void read();
+      }, 0);
+    });
+    const unsubscribe = window.nileDesktopEvents.onStateChanged(() => {
       void read();
     });
+    return () => {
+      if (followupRefreshTimer !== null) {
+        clearTimeout(followupRefreshTimer);
+      }
+      unsubscribe();
+    };
   }, [read]);
 
   useEffect(() => () => {

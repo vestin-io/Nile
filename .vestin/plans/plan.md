@@ -48,6 +48,8 @@ Nile currently ships a local-first connection switcher with:
 
 ## Active Planning Tracks
 
+- Credential storage backends:
+  - `.vestin/plans/credential-storage-backends/plan.md`
 - Gemini CLI session integration:
   - `.vestin/plans/gemini-cli-session/build.md`
   - `.vestin/plans/gemini-cli-session/extension-observations.md`

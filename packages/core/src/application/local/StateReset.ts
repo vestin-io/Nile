@@ -2,6 +2,7 @@ import { existsSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import {
+  buildCredentialStoreTarget,
   type CredentialStore,
   CredentialNotFoundError,
   CredentialStoreCommandError,
@@ -21,6 +22,11 @@ export type ResetStateResult = {
 
 type ResetRefRow = {
   value: string;
+};
+
+type ResetAccessCredentialRow = {
+  reference: string;
+  backend: string | null;
 };
 
 export class StateReset {
@@ -69,10 +75,13 @@ export class StateReset {
             ? [module.localConnectionSupportFactory.credentialRefQuery]
             : []);
 
-      const credentialRefs = new Set([
-        ...this.readRefs(database, "SELECT credential_source_ref AS value FROM accesses"),
-        ...agentCredentialQueries.flatMap((q) => this.readRefs(database, q)),
-      ]);
+      const credentialRefs = [
+        ...this.readAccessCredentialRefs(database),
+        ...agentCredentialQueries.flatMap((q) => this.readRefs(database, q)).map((reference) => ({
+          reference,
+          backend: undefined,
+        })),
+      ];
       const secureSnapshotRefs = new Set(
         this.readRefs(
           database,
@@ -81,13 +90,13 @@ export class StateReset {
       );
 
       for (const credentialRef of credentialRefs) {
-        this.removeCredential(credentialRef);
+        this.removeCredential(credentialRef.reference, credentialRef.backend);
       }
       for (const snapshotRef of secureSnapshotRefs) {
         this.secureSnapshotStore.removeSnapshot(snapshotRef);
       }
 
-      return credentialRefs.size > 0 || secureSnapshotRefs.size > 0;
+      return credentialRefs.length > 0 || secureSnapshotRefs.size > 0;
     } finally {
       database.close();
     }
@@ -107,9 +116,43 @@ export class StateReset {
     }
   }
 
-  private removeCredential(reference: string): void {
+  private readAccessCredentialRefs(
+    database: SqliteDatabase,
+  ): Array<{ reference: string; backend: "system_secure_storage" | "encrypted_local_storage" | undefined }> {
     try {
-      this.credentialStore.remove(reference);
+      return database
+        .query<ResetAccessCredentialRow>(
+          `
+            SELECT
+              credential_source_ref AS reference,
+              credential_storage_backend AS backend
+            FROM accesses
+          `,
+        )
+        .all()
+        .flatMap((row) => {
+          const reference = row.reference.trim();
+          if (!reference) {
+            return [];
+          }
+          return [{
+            reference,
+            backend: row.backend === "system_secure_storage" || row.backend === "encrypted_local_storage"
+              ? row.backend
+              : undefined,
+          }];
+        });
+    } catch {
+      return [];
+    }
+  }
+
+  private removeCredential(
+    reference: string,
+    backend: "system_secure_storage" | "encrypted_local_storage" | undefined,
+  ): void {
+    try {
+      this.credentialStore.remove(buildCredentialStoreTarget(reference, backend));
     } catch (error) {
       if (
         error instanceof CredentialNotFoundError

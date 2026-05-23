@@ -6,6 +6,7 @@ import {
   CredentialStoreCommandError,
   CredentialStoreValidationError,
   KeychainCredentialStore,
+  SystemSecureCredentialStoreDeniedError,
 } from "./KeychainCredentialStore";
 import { type StoredCredential } from "./Types";
 import { type SecurityCliResult, SecurityCli } from "./SecurityCli";
@@ -219,6 +220,17 @@ describe("KeychainCredentialStore", () => {
     const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
 
     expect(() => store.remove("openai-work")).toThrow(CredentialStoreCommandError);
+  });
+
+  it("maps system secure storage denial clearly", () => {
+    const writer = new StubGenericPasswordWriter([
+      { exitCode: 128, stdout: "", stderr: "User interaction is not allowed." },
+    ]);
+    const store = new KeychainCredentialStore("nile.test", undefined, undefined, undefined, writer);
+
+    expect(() => store.create("openai-work", { kind: "api_key", apiKey: "secret-value" })).toThrow(
+      SystemSecureCredentialStoreDeniedError,
+    );
   });
 });
 

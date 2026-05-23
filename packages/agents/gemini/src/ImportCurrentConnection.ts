@@ -7,6 +7,7 @@ import {
   LiveSetupImportSupport,
   requireResolvedImportCandidate,
 } from "@nile/core/actions/live-setup";
+import type { ImportCurrentConnectionInput } from "@nile/core/models/agent/Adapter";
 import { AgentWorkspaceBinding } from "@nile/core/runtime-local/AgentWorkspaceBinding";
 import type { AgentWorkspaceContext } from "@nile/core/runtime-local/AgentWorkspaceContext";
 import { GeminiAccountsStore } from "./AccountsStore";
@@ -77,10 +78,11 @@ export class ImportCurrentConnection {
     private readonly ownedContext: { close(): void } | null = null,
   ) {}
 
-  async importCurrent() {
+  async importCurrent(input?: ImportCurrentConnectionInput) {
     return await this.importSupport.importDetected(
       this.detector.detect(),
       () => requireResolvedImportCandidate("Gemini", this.reader.read()),
+      input,
     );
   }
 

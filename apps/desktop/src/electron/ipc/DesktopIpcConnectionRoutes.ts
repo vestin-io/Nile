@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 
 import { SHARED_CONNECTION_CATALOG } from "@nile/builtins/connections";
+import { NileLogger } from "@nile/core/services/NileLogger";
 
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
 import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
@@ -12,15 +13,24 @@ type DesktopIpcConnectionRoutesOptions = {
   inputs: DesktopIpcInputValidator;
   refreshAll(): void;
   stateStore: DesktopStateStore;
+  logger?: NileLogger;
 };
 
 export class DesktopIpcConnectionRoutes {
-  constructor(private readonly options: DesktopIpcConnectionRoutesOptions) {}
+  private readonly logger: NileLogger;
+
+  constructor(private readonly options: DesktopIpcConnectionRoutesOptions) {
+    this.logger = options.logger ?? NileLogger.silent().child({ scope: "ipc-connection-routes" });
+  }
 
   register(): void {
     const { connectionManager, inputs, stateStore } = this.options;
 
     ipcMain.handle("desktop:list-connection-definitions", () => SHARED_CONNECTION_CATALOG.listDefinitions());
+    ipcMain.handle("desktop:get-credential-storage-state", () => connectionManager.getCredentialStorageState());
+    ipcMain.handle("desktop:unlock-encrypted-local-storage", (_event, passphrase: unknown) =>
+      connectionManager.unlockEncryptedLocalStorage(inputs.readRequiredString(passphrase, "passphrase")),
+    );
     ipcMain.handle("desktop:choose-openai-auth-json-path", async (_event, defaultPath?: unknown) => {
       return await this.options.chooseOpenAiAuthJsonPath(inputs.readOptionalString(defaultPath, "defaultPath"));
     });
@@ -54,10 +64,30 @@ export class DesktopIpcConnectionRoutes {
       this.options.refreshAll();
       return result;
     });
-    ipcMain.handle("desktop:import-current-connection", async (_event, agentId: unknown) => {
-      const result = await stateStore.importCurrentConnection(inputs.readAgentId(agentId));
-      this.options.refreshAll();
-      return result;
+    ipcMain.handle("desktop:import-current-connection", async (_event, input: unknown) => {
+      const normalizedInput = inputs.readImportCurrentConnectionInput(input);
+      const startedAt = Date.now();
+      this.logger.info("desktop.import_current_connection.ipc.start", {
+        agentId: normalizedInput.agentId,
+        credentialStorageBackend: normalizedInput.credentialStorageBackend ?? "default",
+      });
+      try {
+        const result = await stateStore.importCurrentConnection(normalizedInput);
+        this.logger.info("desktop.import_current_connection.ipc.succeeded", {
+          agentId: normalizedInput.agentId,
+          connectionId: result.id,
+          reused: result.reused ?? false,
+          durationMs: Date.now() - startedAt,
+        });
+        this.options.refreshAll();
+        return result;
+      } catch (error) {
+        this.logger.error("desktop.import_current_connection.ipc.failed", error, {
+          agentId: normalizedInput.agentId,
+          durationMs: Date.now() - startedAt,
+        });
+        throw error;
+      }
     });
     ipcMain.handle("desktop:remove-connection", (_event, connectionId: unknown) => {
       const result = stateStore.removeConnection(inputs.readRequiredString(connectionId, "connectionId"));

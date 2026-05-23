@@ -11,6 +11,7 @@ import { EndpointShape, type EndpointFamily, type EndpointRegistryInput } from "
 import { SHARED_CONNECTION_AGENT_POLICY } from "../../models/connection/AgentPolicy";
 import type { AgentSelection } from "../../models/selection/Selection";
 import type { StoredCredential } from "../../services/credential/Types";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 import type { NileLogger } from "../../services/NileLogger";
 import type { DetectedAgentState, ImportCurrentConnectionResult } from "../../models/agent";
 import { joinEndpointUrl } from "../../projection/Url";
@@ -50,6 +51,7 @@ export class LiveSetupImportSupport {
   async importDetected(
     detected: DetectedAgentState,
     resolveCandidate: () => AgentImportCandidate,
+    input?: { credentialStorageBackend?: CredentialStorageBackend },
   ): Promise<ImportCurrentConnectionResult> {
     if (detected.validity === "invalid_structure" || detected.validity === "invalid_semantics") {
       throw new Error(detected.issues.join("; ") || `Current ${this.agentLabel} state is not importable`);
@@ -64,7 +66,7 @@ export class LiveSetupImportSupport {
 
     const candidate = await this.enrichCandidate(resolveCandidate());
     if (detected.validity === "valid_matched" && detected.matchedConnection) {
-      this.refreshMatchedConnection(detected.matchedConnection, candidate);
+      this.refreshMatchedConnection(detected.matchedConnection, candidate, input);
       this.writeModelSetting(detected.matchedConnection.accessId, candidate.modelId);
       return this.selectAndSummarize(
         detected.matchedConnection.endpointId,
@@ -75,15 +77,16 @@ export class LiveSetupImportSupport {
 
     const result = this.upsert.upsert({
       endpoint: candidate.endpoint,
-      access: {
-        label: candidate.access.label,
-        authMode: candidate.access.authMode,
-        credential: candidate.credential,
-        identityKey: candidate.access.identityKey ?? null,
-        enabledAgents: this.readImportedEnabledAgents(candidate.endpoint, candidate.access.authMode),
-        enabledAgentsMode: "merge",
-        apiKeyEnvKeyFallback: candidate.endpoint.protocols.openai?.envKeyOverride,
-      },
+        access: {
+          label: candidate.access.label,
+          authMode: candidate.access.authMode,
+          credential: candidate.credential,
+          identityKey: candidate.access.identityKey ?? null,
+          credentialStorageBackend: input?.credentialStorageBackend,
+          enabledAgents: this.readImportedEnabledAgents(candidate.endpoint, candidate.access.authMode),
+          enabledAgentsMode: "merge",
+          apiKeyEnvKeyFallback: candidate.endpoint.protocols.openai?.envKeyOverride,
+        },
     });
     this.logger.info(`${this.agentId}.import-current.created`, {
       endpointId: result.endpoint.id,
@@ -98,6 +101,7 @@ export class LiveSetupImportSupport {
   private refreshMatchedConnection(
     matchedConnection: NonNullable<DetectedAgentState["matchedConnection"]>,
     candidate: AgentImportCandidate,
+    input?: { credentialStorageBackend?: CredentialStorageBackend },
   ): void {
     const currentEndpoint = this.endpointRegistry.get(matchedConnection.endpointId);
     if (!currentEndpoint) {
@@ -109,10 +113,14 @@ export class LiveSetupImportSupport {
 
     const accessUpdate: {
       identityKey?: string | null;
+      credentialStorageBackend?: CredentialStorageBackend;
       enabledAgents?: AgentId[];
     } = {};
     if (candidate.access.identityKey !== undefined) {
       accessUpdate.identityKey = candidate.access.identityKey ?? null;
+    }
+    if (input?.credentialStorageBackend) {
+      accessUpdate.credentialStorageBackend = input.credentialStorageBackend;
     }
     const currentAccess = this.accessRegistry.get(matchedConnection.accessId);
     if (!currentAccess) {

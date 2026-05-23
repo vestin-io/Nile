@@ -13,11 +13,13 @@ import type {
   AddConnectionSubmitInput,
   PreparedConnectionDraft,
 } from "../../connections/add/Types";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
 type UseSettingsConnectionActionsOptions = {
   addConnectionReturnTarget: AddConnectionReturnTarget;
   reload(): Promise<void>;
   refresh(): Promise<void>;
+  requestEncryptedLocalUnlock(): Promise<void>;
   reusedConnectionDialog: ReusedConnectionDialogState;
   settingsState: SettingsState;
   setCurrentPage(page: PageId): void;
@@ -33,6 +35,7 @@ export function useSettingsConnectionActions({
   addConnectionReturnTarget,
   reload,
   refresh,
+  requestEncryptedLocalUnlock,
   reusedConnectionDialog,
   settingsState,
   setCurrentPage,
@@ -51,6 +54,8 @@ export function useSettingsConnectionActions({
       endpointUrl: input.endpointUrl,
       enabledAgents: input.enabledAgents,
       allowUndetectedGateway: input.allowUndetectedGateway,
+      credentialStorageBackend: input.credentialStorageBackend,
+      encryptedLocalPassphrase: input.encryptedLocalPassphrase,
       apiKeySource: input.apiKeySource,
       apiKey: input.apiKey,
       envKey: input.envKey,
@@ -67,6 +72,8 @@ export function useSettingsConnectionActions({
       label: input.label,
       endpointUrl: input.endpointUrl,
       enabledAgents: input.enabledAgents,
+      credentialStorageBackend: input.credentialStorageBackend,
+      encryptedLocalPassphrase: input.encryptedLocalPassphrase,
       apiKeySource: input.apiKeySource,
       apiKey: input.apiKey,
       envKey: input.envKey,
@@ -80,9 +87,26 @@ export function useSettingsConnectionActions({
     await completeConnectionMutation(created.id, created.reused === true);
   };
 
-  const importCurrentConnection = async (agentId: AgentId) => {
-    await window.nileDesktop.connections.importCurrentConnection(agentId);
-    await refresh();
+  const importCurrentConnection = async (
+    agentId: AgentId,
+    input?: {
+      credentialStorageBackend?: CredentialStorageBackend;
+      encryptedLocalPassphrase?: string;
+    },
+  ) => {
+    onActionError(null);
+    try {
+      await window.nileDesktop.connections.importCurrentConnection({
+        agentId,
+        credentialStorageBackend: input?.credentialStorageBackend,
+        encryptedLocalPassphrase: input?.encryptedLocalPassphrase,
+      });
+      void refresh();
+    } catch (error) {
+      const message = describeActionError(error);
+      onActionError(message);
+      throw new Error(message);
+    }
   };
 
   const openConnection = (connectionId: string, agentId: AgentId) => {
@@ -130,6 +154,17 @@ export function useSettingsConnectionActions({
       await window.nileDesktop.connections.switchConnection(agentId, connectionId);
     } catch (error) {
       const message = describeActionError(error);
+      if (isEncryptedLocalUnlockError(message)) {
+        try {
+          await requestEncryptedLocalUnlock();
+          await window.nileDesktop.connections.switchConnection(agentId, connectionId);
+          return;
+        } catch (unlockError) {
+          const unlockMessage = describeActionError(unlockError);
+          onActionError(unlockMessage);
+          throw new Error(unlockMessage);
+        }
+      }
       onActionError(message);
       throw new Error(message);
     }
@@ -193,4 +228,8 @@ function describeActionError(error: unknown): string {
     return error.message.replace(/^Error invoking remote method '[^']+':\s*/, "");
   }
   return String(error);
+}
+
+function isEncryptedLocalUnlockError(message: string): boolean {
+  return message.toLowerCase().includes("encrypted local storage is locked");
 }

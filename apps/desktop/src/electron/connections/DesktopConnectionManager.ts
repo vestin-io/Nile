@@ -15,7 +15,9 @@ import {
   type InteractiveSessionLoginRegistry,
 } from "@nile/builtins/session";
 import {
+  type CredentialStorageBackend,
   isEnvKeyApiKeyCredential,
+  SystemSecureCredentialStoreDeniedError,
   type StoredCredential,
   type CredentialStore,
 } from "@nile/core/services/credential";
@@ -50,6 +52,11 @@ type DesktopConnectionManagerOptions = {
   openExternalUrl?: (url: string) => Promise<void>;
   managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
   credentialStore: CredentialStore;
+  credentialStorageSession?: {
+    hasEncryptedLocalVault(): boolean;
+    isEncryptedLocalUnlocked(): boolean;
+    unlockEncryptedLocalStorage(passphrase: string): void;
+  };
   maxPreparedDrafts?: number;
   preparedDraftTtlMs?: number;
 };
@@ -88,42 +95,53 @@ export class DesktopConnectionManager {
   }
 
   async addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary> {
-    return await this.sessions.runAsync(async (session) => {
-      const created = this.applyCursorUsageFollowUp(
-        await session.createLocalConnection(
-          this.buildLocalConnectionInput(input),
-          this.localCredentialResolver,
-        ),
-      );
-      const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, created.id);
-      return this.buildConnectionSummary(ensured ?? created);
-    });
+    try {
+      return await this.sessions.runAsync(async (session) => {
+        this.prepareCredentialStorage(input.credentialStorageBackend, input.encryptedLocalPassphrase, {
+          allowCreate: true,
+        });
+        const created = this.applyCursorUsageFollowUp(
+          await session.createLocalConnection(
+            this.buildLocalConnectionInput(input),
+            this.localCredentialResolver,
+          ),
+        );
+        const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, created.id);
+        return this.buildConnectionSummary(ensured ?? created);
+      });
+    } catch (error) {
+      throw this.mapCredentialStorageError(error, input.credentialStorageBackend);
+    }
   }
 
   async updateConnection(input: DesktopUpdateConnectionInput): Promise<DesktopConnectionSummary> {
-    return await this.sessions.runAsync(async (session) => {
-      const existing = session.listSavedConnections().find((connection) => connection.id === input.connectionId);
-      if (!existing) {
-        throw new Error(`Connection not found: ${input.connectionId}`);
-      }
-      const updated = await session.updateConnection({
-        connectionId: input.connectionId,
-        label: input.label?.trim() || undefined,
-        enabledAgents: input.enabledAgents,
-        endpointUrl: input.endpointUrl?.trim() || undefined,
-        credentialRequest: this.resolveUpdateCredentialRequest(input, existing.authMode),
-      });
-      const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, updated.id);
-      if (input.syncSelectedAgents) {
-        for (const selectedAgentId of (ensured ?? updated).selectedByAgents) {
-          if (!isAgentId(selectedAgentId)) {
-            continue;
-          }
-          session.useConnection(selectedAgentId, (ensured ?? updated).id);
+    try {
+      return await this.sessions.runAsync(async (session) => {
+        const existing = session.listSavedConnections().find((connection) => connection.id === input.connectionId);
+        if (!existing) {
+          throw new Error(`Connection not found: ${input.connectionId}`);
         }
-      }
-      return this.buildConnectionSummary(ensured ?? updated);
-    });
+        const updated = await session.updateConnection({
+          connectionId: input.connectionId,
+          label: input.label?.trim() || undefined,
+          enabledAgents: input.enabledAgents,
+          endpointUrl: input.endpointUrl?.trim() || undefined,
+          credentialRequest: this.resolveUpdateCredentialRequest(input, existing.authMode),
+        });
+        const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, updated.id);
+        if (input.syncSelectedAgents) {
+          for (const selectedAgentId of (ensured ?? updated).selectedByAgents) {
+            if (!isAgentId(selectedAgentId)) {
+              continue;
+            }
+            session.useConnection(selectedAgentId, (ensured ?? updated).id);
+          }
+        }
+        return this.buildConnectionSummary(ensured ?? updated);
+      });
+    } catch (error) {
+      throw this.mapCredentialStorageError(error, "system_secure_storage");
+    }
   }
 
   async describeConnectionOnboarding(input: DesktopAddConnectionInput) {
@@ -168,34 +186,43 @@ export class DesktopConnectionManager {
   }
 
   async prepareConnectionDraft(input: DesktopAddConnectionInput): Promise<DesktopPreparedConnectionDraft> {
-    return await this.sessions.runAsync(async (session) => {
-      const credential = await this.localCredentialResolver.resolveAsync(this.resolveCredentialRequest(input));
-      const onboarding = await session.describeConnectionOnboarding({
-        preset: input.preset,
-        authMode: input.authMode,
-        credential,
-        endpointUrl: input.endpointUrl,
-        label: input.label?.trim() || undefined,
-        allowUndetectedGateway: input.allowUndetectedGateway,
+    try {
+      return await this.sessions.runAsync(async (session) => {
+        this.prepareCredentialStorage(input.credentialStorageBackend, input.encryptedLocalPassphrase, {
+          allowCreate: false,
+        });
+        const credential = await this.localCredentialResolver.resolveAsync(this.resolveCredentialRequest(input));
+        const onboarding = await session.describeConnectionOnboarding({
+          preset: input.preset,
+          authMode: input.authMode,
+          credential,
+          endpointUrl: input.endpointUrl,
+          label: input.label?.trim() || undefined,
+          allowUndetectedGateway: input.allowUndetectedGateway,
+        });
+        const id = this.preparedDrafts.save({
+          authMode: input.authMode,
+          credential,
+          credentialStorageBackend: input.credentialStorageBackend,
+          encryptedLocalPassphrase: input.encryptedLocalPassphrase?.trim() || undefined,
+          endpointUrl: input.endpointUrl,
+          onboarding,
+          preset: input.preset,
+        });
+        const labelSuggestion = this.labeler.suggestAccessLabel(input.preset, input.authMode, credential, {
+          endpointUrl: input.endpointUrl,
+        });
+        return {
+          id,
+          authMode: input.authMode,
+          labelSuggestion,
+          configurableAgents: onboarding.configurableAgents,
+          defaultEnabledAgents: onboarding.defaultEnabledAgents,
+        };
       });
-      const id = this.preparedDrafts.save({
-        authMode: input.authMode,
-        credential,
-        endpointUrl: input.endpointUrl,
-        onboarding,
-        preset: input.preset,
-      });
-      const labelSuggestion = this.labeler.suggestAccessLabel(input.preset, input.authMode, credential, {
-        endpointUrl: input.endpointUrl,
-      });
-      return {
-        id,
-        authMode: input.authMode,
-        labelSuggestion,
-        configurableAgents: onboarding.configurableAgents,
-        defaultEnabledAgents: onboarding.defaultEnabledAgents,
-      };
-    });
+    } catch (error) {
+      throw this.mapCredentialStorageError(error, input.credentialStorageBackend);
+    }
   }
 
   async savePreparedConnection(input: DesktopSavePreparedConnectionInput): Promise<DesktopConnectionSummary> {
@@ -206,10 +233,14 @@ export class DesktopConnectionManager {
 
     try {
       return await this.sessions.runAsync(async (session) => {
+        this.prepareCredentialStorage(draft.credentialStorageBackend, draft.encryptedLocalPassphrase, {
+          allowCreate: true,
+        });
         const created = this.applyCursorUsageFollowUp(await session.createConnection({
           preset: draft.preset,
           authMode: draft.authMode,
           credential: draft.credential,
+          credentialStorageBackend: draft.credentialStorageBackend,
           endpointUrl: draft.endpointUrl,
           label: input.label?.trim() || undefined,
           enabledAgents: input.enabledAgents ?? draft.onboarding.defaultEnabledAgents,
@@ -217,6 +248,8 @@ export class DesktopConnectionManager {
         const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, created.id);
         return this.buildConnectionSummary(ensured ?? created);
       });
+    } catch (error) {
+      throw this.mapCredentialStorageError(error, draft.credentialStorageBackend);
     } finally {
       this.preparedDrafts.discard(input.draftId);
     }
@@ -241,6 +274,20 @@ export class DesktopConnectionManager {
     this.preparedDrafts.clear();
   }
 
+  getCredentialStorageState() {
+    return {
+      encryptedLocalVaultExists: this.options.credentialStorageSession?.hasEncryptedLocalVault() ?? false,
+      encryptedLocalUnlocked: this.options.credentialStorageSession?.isEncryptedLocalUnlocked() ?? false,
+    };
+  }
+
+  unlockEncryptedLocalStorage(passphrase: string): void {
+    if (!this.options.credentialStorageSession) {
+      throw new Error("Encrypted local storage is not available in this desktop session.");
+    }
+    this.options.credentialStorageSession.unlockEncryptedLocalStorage(passphrase);
+  }
+
   private resolveCredentialRequest(input: DesktopAddConnectionInput): LocalCredentialRequest {
     return this.requestBuilder.build({
       authMode: input.authMode,
@@ -261,6 +308,7 @@ export class DesktopConnectionManager {
       preset: input.preset,
       authMode: input.authMode,
       credentialRequest: this.resolveCredentialRequest(input),
+      credentialStorageBackend: input.credentialStorageBackend,
       endpointUrl: input.endpointUrl,
       label: input.label,
       enabledAgents: input.enabledAgents,
@@ -345,5 +393,51 @@ export class DesktopConnectionManager {
       credentialStore: this.options.credentialStore,
       sessionProbe: this.cursorUsageSessionProbeFactory.create(this.options.agentHomes),
     }, (workspace) => workspace.applyFollowUp(result));
+  }
+
+  private prepareCredentialStorage(
+    backend: CredentialStorageBackend | undefined,
+    passphrase: string | undefined,
+    options: { allowCreate: boolean },
+  ): void {
+    if (backend !== "encrypted_local_storage") {
+      return;
+    }
+    if (!this.options.credentialStorageSession) {
+      throw new Error("Encrypted local storage is not available in this desktop session.");
+    }
+    if (!this.options.credentialStorageSession.hasEncryptedLocalVault()) {
+      if (!passphrase?.trim()) {
+        throw new Error("Encrypted local storage passphrase is required.");
+      }
+      if (!options.allowCreate) {
+        return;
+      }
+    }
+    if (passphrase?.trim()) {
+      this.options.credentialStorageSession.unlockEncryptedLocalStorage(passphrase.trim());
+      return;
+    }
+    if (!this.options.credentialStorageSession.isEncryptedLocalUnlocked()) {
+      throw new Error("Encrypted local storage is locked. Enter your passphrase and try again.");
+    }
+  }
+
+  private mapCredentialStorageError(
+    error: unknown,
+    backend: CredentialStorageBackend | undefined,
+  ): Error {
+    if (
+      backend === "system_secure_storage"
+      && (
+        error instanceof SystemSecureCredentialStoreDeniedError
+        || (error instanceof Error && error.message.includes("System secure storage access was denied."))
+      )
+    ) {
+      return new Error(
+        "System secure storage was denied by macOS. Choose Encrypted local storage to continue without Keychain.",
+      );
+    }
+    return error instanceof Error ? error : new Error(String(error));
   }
 }

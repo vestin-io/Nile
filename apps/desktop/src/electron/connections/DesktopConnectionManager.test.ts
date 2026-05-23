@@ -10,7 +10,16 @@ import { EndpointRegistry } from "@nile/core/models/endpoint";
 import { CursorUsageBindingRegistry } from "@nile/builtins/cursor-usage";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import type { InteractiveSessionLoginContext } from "@nile/core/session";
-import { KeychainCredentialStore, SecurityCli, type StoredCredential, type SecurityCliResult } from "@nile/core/services/credential";
+import {
+  BackendCredentialStore,
+  KeychainCredentialStore,
+  SecurityCli,
+  type StoredCredential,
+  type SecurityCliResult,
+  SystemSecureCredentialStoreDeniedError,
+  normalizeCredentialStoreTarget,
+  type CredentialStoreTarget,
+} from "@nile/core/services/credential";
 import type { InteractiveSessionLoginRegistry } from "@nile/builtins/session";
 
 import { DesktopConnectionGateway } from "./DesktopConnectionGateway";
@@ -322,6 +331,52 @@ describe("DesktopConnectionManager", () => {
         authMode: "api_key",
       }),
     );
+  });
+
+  it("surfaces an explicit encrypted-local fallback when system secure storage is denied", async () => {
+    const setup = createSetup();
+    stubGatewayProbe();
+
+    const manager = new DesktopConnectionManager({
+      databasePath: setup.dbPath,
+      agentHomes: { codex: setup.codexHome },
+      environment: EnvironmentSource.empty(),
+      credentialStore: new DenyingCredentialStore(),
+    });
+
+    await expect(manager.addConnection({
+      preset: "gateway",
+      authMode: "api_key",
+      endpointUrl: "https://router.example/v1",
+      apiKey: "router-secret",
+      credentialStorageBackend: "system_secure_storage",
+    })).rejects.toThrow(
+      "System secure storage was denied by macOS. Choose Encrypted local storage to continue without Keychain.",
+    );
+  });
+
+  it("does not create an encrypted local vault while only preparing a draft", async () => {
+    const setup = createSetup();
+    const credentialStore = new BackendCredentialStore(setup.dbPath, new StubCredentialStore());
+    stubGatewayProbe();
+    const manager = new DesktopConnectionManager({
+      databasePath: setup.dbPath,
+      agentHomes: { codex: setup.codexHome },
+      environment: EnvironmentSource.empty(),
+      credentialStore,
+      credentialStorageSession: credentialStore,
+    });
+
+    await manager.prepareConnectionDraft({
+      preset: "gateway",
+      authMode: "api_key",
+      endpointUrl: "https://router.example/v1",
+      apiKey: "router-secret",
+      credentialStorageBackend: "encrypted_local_storage",
+      encryptedLocalPassphrase: "passphrase-123",
+    });
+
+    expect(credentialStore.hasEncryptedLocalVault()).toBe(false);
   });
 
   it("uses the shared Claude login helper when desktop onboarding requests a sign-in", async () => {
@@ -1161,15 +1216,16 @@ function writeGeminiSession(geminiHome: string, email: string, subject: string):
 class StubCredentialStore extends KeychainCredentialStore {
   private readonly credentials = new Map<string, StoredCredential>();
 
-  override create(credentialId: string, credential: StoredCredential): void {
-    this.credentials.set(credentialId, credential);
+  override create(target: CredentialStoreTarget, credential: StoredCredential): void {
+    this.credentials.set(normalizeCredentialStoreTarget(target).reference, credential);
   }
 
-  override update(credentialId: string, credential: StoredCredential): void {
-    this.credentials.set(credentialId, credential);
+  override update(target: CredentialStoreTarget, credential: StoredCredential): void {
+    this.credentials.set(normalizeCredentialStoreTarget(target).reference, credential);
   }
 
-  override get(credentialId: string): StoredCredential {
+  override get(target: CredentialStoreTarget): StoredCredential {
+    const credentialId = normalizeCredentialStoreTarget(target).reference;
     const credential = this.credentials.get(credentialId);
     if (!credential) {
       throw new Error(`Missing stub credential: ${credentialId}`);
@@ -1177,12 +1233,18 @@ class StubCredentialStore extends KeychainCredentialStore {
     return credential;
   }
 
-  override has(credentialId: string): boolean {
-    return this.credentials.has(credentialId);
+  override has(target: CredentialStoreTarget): boolean {
+    return this.credentials.has(normalizeCredentialStoreTarget(target).reference);
   }
 
-  override remove(credentialId: string): void {
-    this.credentials.delete(credentialId);
+  override remove(target: CredentialStoreTarget): void {
+    this.credentials.delete(normalizeCredentialStoreTarget(target).reference);
+  }
+}
+
+class DenyingCredentialStore extends KeychainCredentialStore {
+  override create(_target: CredentialStoreTarget, _credential: StoredCredential): void {
+    throw new SystemSecureCredentialStoreDeniedError();
   }
 }
 

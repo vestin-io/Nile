@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import type { DesktopPreferences } from "../../settings/Preferences";
 import { runDesktopStateReset } from "./useFlow";
 
 describe("runDesktopStateReset", () => {
@@ -20,25 +19,10 @@ describe("runDesktopStateReset", () => {
       resetState: async () => {
         events.push("reset-state");
       },
-      setPreferences(updater) {
-        const current: DesktopPreferences = {
-          agentOrder: [],
-          connectionQuotaMetricPreferences: {},
-          language: "en",
-          quickSetupDismissed: true,
-          theme: "system",
-        };
-        const next = typeof updater === "function"
-          ? updater(current)
-          : updater;
-        events.push(`quick-setup-dismissed:${String(next.quickSetupDismissed)}`);
-        return next;
-      },
     });
 
     expect(events).toEqual([
       "reset-state",
-      "quick-setup-dismissed:false",
       "complete",
       "refresh-settings",
       "refresh-profiles",

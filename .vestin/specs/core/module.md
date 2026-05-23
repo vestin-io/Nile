@@ -7,6 +7,7 @@ The core module is the stable kernel. It owns shared state, shared contracts, st
 - persist endpoints, accesses, saved connection views, and selections
 - persist connection-scoped usage metadata when a feature needs non-sensitive cached state
 - keep secrets out of SQLite
+- define credential storage backend contracts and secret-boundary rules
 - define runtime contracts for connection operations and builtin composition
 - define shared agent and connection ids, requirements, and registries
 - record mutation history and rollback state
@@ -37,3 +38,11 @@ The core module is the stable kernel. It owns shared state, shared contracts, st
 - Core may expose contracts and shared orchestration primitives, but it must not embed UI formatting.
 - Core may persist references to credentials, but not raw secrets.
 - Usage features may add connection-scoped bindings or snapshots, but they must stay separate from saved connection truth unless the connection itself changes.
+
+## Feature Index
+
+- [Workspace State](./features/workspace-state.md)
+- [Agent Runtime](./features/agent-runtime.md)
+- [Mutation History](./features/mutation-history.md)
+- [Usage](./features/usage.md)
+- [Credential Storage Backends](./features/credential-storage-backends.md)

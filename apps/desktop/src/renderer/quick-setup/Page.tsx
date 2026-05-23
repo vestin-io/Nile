@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/definitions";
-import { ArrowRight } from "lucide-react";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 
 import {
   hasCompatibleConnections,
@@ -12,33 +13,62 @@ import { nileMarkSvg } from "../shared/NileMark";
 import { QuickSetupAgentCard } from "./AgentCard";
 import { QuickSetupConnectionDialog } from "./ConnectionDialog";
 import { QuickSetupGuide } from "./Guide";
+import { QuickSetupStorageStep } from "./StorageStep";
+import { CredentialStorageDialog } from "../connections/dialogs/CredentialStorage";
 import { Button } from "../ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
+import { Card, CardContent } from "../ui/card";
 
 type QuickSetupPageProps = {
   canConfigureAgent(agentId: AgentId): boolean;
+  credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
+  defaultCredentialStorageBackend: CredentialStorageBackend | null;
   state: SettingsState;
   t: Translator;
   onConfigureAgent(agentId: AgentId): void;
-  onConfirmAgent(agentId: AgentId): Promise<void>;
+  onRefreshCredentialStorageState(): Promise<Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>>;
+  onRememberDefaultCredentialStorageBackend(backend: CredentialStorageBackend): void;
+  onSaveAgent(
+    agentId: AgentId,
+    input: {
+      credentialStorageBackend: CredentialStorageBackend;
+      encryptedLocalPassphrase?: string;
+    },
+  ): Promise<void>;
   onDone(): void;
   onOpenModelSetup(agentId: AgentId): void;
   onUpdateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): Promise<void>;
   onUseExistingConnection(agentId: AgentId, connectionId: string): Promise<void>;
 };
 
+type Step = "storage" | "agents";
+
 export function QuickSetupPage({
   canConfigureAgent,
+  credentialStorageState,
+  defaultCredentialStorageBackend,
   state,
   t,
   onConfigureAgent,
-  onConfirmAgent,
+  onRefreshCredentialStorageState,
+  onRememberDefaultCredentialStorageBackend,
+  onSaveAgent,
   onDone,
   onOpenModelSetup,
   onUpdateAgentConnectionModel,
   onUseExistingConnection,
 }: QuickSetupPageProps) {
   const [configureAgentId, setConfigureAgentId] = useState<AgentId | null>(null);
+  const [credentialStorageBackend, setCredentialStorageBackend] = useState<CredentialStorageBackend>(
+    defaultCredentialStorageBackend ?? "system_secure_storage",
+  );
+  const [encryptedLocalPassphrase, setEncryptedLocalPassphrase] = useState("");
+  const [encryptedLocalPassphraseConfirmation, setEncryptedLocalPassphraseConfirmation] = useState("");
+  const [credentialStorageError, setCredentialStorageError] = useState<string | null>(null);
+  const [isCredentialStorageDialogOpen, setIsCredentialStorageDialogOpen] = useState(false);
+  const [pendingSaveAgentId, setPendingSaveAgentId] = useState<AgentId | null>(null);
+  const [optimisticallySavedAgentIds, setOptimisticallySavedAgentIds] = useState<AgentId[]>([]);
+  const [step, setStep] = useState<Step>(defaultCredentialStorageBackend === null ? "storage" : "agents");
   const detectedSetupsByAgent = new Map(
     state.detectedSetups.items.map((item) => [item.agentId, item]),
   );
@@ -51,6 +81,141 @@ export function QuickSetupPage({
     },
     [configureAgentId, state],
   );
+
+  useEffect(() => {
+    if (defaultCredentialStorageBackend === null) {
+      setCredentialStorageBackend("system_secure_storage");
+      setStep("storage");
+      return;
+    }
+    setCredentialStorageBackend(defaultCredentialStorageBackend);
+  }, [defaultCredentialStorageBackend]);
+
+  const persistSelectedDefault = () => {
+    onRememberDefaultCredentialStorageBackend(credentialStorageBackend);
+  };
+
+  const markAgentSaved = (agentId: AgentId) => {
+    setOptimisticallySavedAgentIds((current) => (
+      current.includes(agentId) ? current : [...current, agentId]
+    ));
+  };
+
+  const continueFromStorageStep = async () => {
+    if (
+      credentialStorageBackend === "encrypted_local_storage"
+      && !credentialStorageState.encryptedLocalVaultExists
+    ) {
+      setCredentialStorageError(null);
+      setIsCredentialStorageDialogOpen(true);
+      return;
+    }
+    persistSelectedDefault();
+    setStep("agents");
+  };
+
+  const saveAgent = async (agentId: AgentId): Promise<"requirements" | "saved"> => {
+    if (
+      credentialStorageBackend === "encrypted_local_storage"
+      && !credentialStorageState.encryptedLocalUnlocked
+    ) {
+      setPendingSaveAgentId(agentId);
+      setCredentialStorageError(null);
+      setIsCredentialStorageDialogOpen(true);
+      return "requirements";
+    }
+    await onSaveAgent(agentId, {
+      credentialStorageBackend,
+      encryptedLocalPassphrase: credentialStorageBackend === "encrypted_local_storage"
+        ? encryptedLocalPassphrase.trim() || undefined
+        : undefined,
+    });
+    markAgentSaved(agentId);
+    return "saved";
+  };
+
+  if (step === "storage") {
+    return (
+      <div className="space-y-8">
+        <Empty className="gap-5">
+          <EmptyHeader>
+            <div
+              aria-hidden="true"
+              className="flex h-12 w-12 items-center justify-center text-foreground/85 [&_svg]:h-12 [&_svg]:w-12"
+              dangerouslySetInnerHTML={{ __html: nileMarkSvg }}
+            />
+            <EmptyTitle>{t("quickSetup.title")}</EmptyTitle>
+            <EmptyDescription>{t("quickSetup.description")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+
+        <QuickSetupStorageStep
+          backend={credentialStorageBackend}
+          t={t}
+          onBackendChange={setCredentialStorageBackend}
+          onContinue={() => {
+            void continueFromStorageStep();
+          }}
+        />
+
+        <CredentialStorageDialog
+          backend={credentialStorageBackend}
+          errorMessage={credentialStorageError}
+          encryptedLocalPassphrase={encryptedLocalPassphrase}
+        encryptedLocalPassphraseConfirmation={encryptedLocalPassphraseConfirmation}
+        encryptedLocalUnlocked={credentialStorageState.encryptedLocalUnlocked}
+        encryptedLocalVaultExists={credentialStorageState.encryptedLocalVaultExists}
+        open={isCredentialStorageDialogOpen}
+        t={t}
+        onConfirm={() => {
+          void (async () => {
+            try {
+              await window.nileDesktop.connections.unlockEncryptedLocalStorage(encryptedLocalPassphrase);
+            } catch (error) {
+              setCredentialStorageError(error instanceof Error ? error.message : String(error));
+              return;
+            }
+
+            setCredentialStorageError(null);
+            setIsCredentialStorageDialogOpen(false);
+            await onRefreshCredentialStorageState();
+            const nextPendingSaveAgentId = pendingSaveAgentId;
+            setPendingSaveAgentId(null);
+            if (nextPendingSaveAgentId) {
+              try {
+                await onSaveAgent(nextPendingSaveAgentId, {
+                  credentialStorageBackend,
+                  encryptedLocalPassphrase: encryptedLocalPassphrase.trim() || undefined,
+                });
+                markAgentSaved(nextPendingSaveAgentId);
+              } catch {
+                return;
+              }
+              return;
+            }
+            persistSelectedDefault();
+            setStep("agents");
+          })();
+        }}
+          onEncryptedLocalPassphraseChange={(value) => {
+            setCredentialStorageError(null);
+            setEncryptedLocalPassphrase(value);
+          }}
+          onEncryptedLocalPassphraseConfirmationChange={(value) => {
+            setCredentialStorageError(null);
+            setEncryptedLocalPassphraseConfirmation(value);
+          }}
+          onOpenChange={(open) => {
+            setIsCredentialStorageDialogOpen(open);
+            if (!open) {
+              setCredentialStorageError(null);
+              setPendingSaveAgentId(null);
+            }
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -67,6 +232,30 @@ export function QuickSetupPage({
       </Empty>
 
       <div className="space-y-5">
+        <Card className="rounded-2xl border-border/80 bg-muted/20">
+          <CardContent className="flex items-center justify-between gap-4 pt-6">
+            <div className="space-y-1">
+              <div className="text-sm uppercase tracking-[0.2em] text-muted-foreground/80">
+                {t("quickSetup.storageSummary.eyebrow")}
+              </div>
+              <div className="text-lg font-medium text-foreground">
+                {credentialStorageBackend === "system_secure_storage"
+                  ? t("addConnection.storage.system.title")
+                  : t("addConnection.storage.encrypted.title")}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {credentialStorageBackend === "system_secure_storage"
+                  ? t("addConnection.storage.system.description")
+                  : t("addConnection.storage.encrypted.description")}
+              </div>
+            </div>
+            <Button variant="outline" className="rounded-xl" onClick={() => setStep("storage")}>
+              <ArrowLeft className="h-4 w-4" />
+              {t("quickSetup.storageSummary.change")}
+            </Button>
+          </CardContent>
+        </Card>
+
         <QuickSetupGuide onboarding={state.detectedSetups} t={t} />
 
         <div className="space-y-4">
@@ -76,8 +265,9 @@ export function QuickSetupPage({
               agent={agent}
               canConfigure={canConfigureAgent(agent.agentId)}
               detectedSetup={detectedSetupsByAgent.get(agent.agentId) ?? null}
+              optimisticallySaved={optimisticallySavedAgentIds.includes(agent.agentId)}
               t={t}
-              onConfirm={onConfirmAgent}
+              onConfirm={saveAgent}
               onConfigure={(agentId) => {
                 if (!hasCompatibleConnections(state, agentId)) {
                   onConfigureAgent(agentId);

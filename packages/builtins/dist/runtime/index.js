@@ -478,8 +478,8 @@ var NileSession = class _NileSession {
       localCredentialResolver
     );
   }
-  async importCurrentConnection(agentId) {
-    return await this.resources.getAgentAdapterRegistry().get(agentId).importCurrentConnection();
+  async importCurrentConnection(agentId, input) {
+    return await this.resources.getAgentAdapterRegistry().get(agentId).importCurrentConnection(input);
   }
   rollbackLatestMutation(agentId) {
     return this.resources.getAgentAdapterRegistry().get(agentId).rollbackLatestMutation();

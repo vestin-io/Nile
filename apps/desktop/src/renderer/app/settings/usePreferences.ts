@@ -42,6 +42,14 @@ export function useDesktopPreferences(): DesktopPreferencesState {
     return () => media.removeEventListener("change", syncSystemTheme);
   }, [preferences.theme, preferencesStore]);
 
+  useEffect(() => window.nileDesktopEvents.onLocalStateReset(() => {
+    setPreferences((current) => ({
+      ...current,
+      defaultCredentialStorageBackend: null,
+      quickSetupDismissed: false,
+    }));
+  }), []);
+
   const t = useMemo(() => createTranslator(preferences.language), [preferences.language]);
 
   return {

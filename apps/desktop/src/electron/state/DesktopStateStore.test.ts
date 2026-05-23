@@ -1,21 +1,33 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 import type { RollbackLatestAgentResult } from "@nile/core/models/agent";
 import type { RemoveConnectionResult, ResetStateResult } from "@nile/builtins/local";
 import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/builtins/cursor-usage";
+import { SqliteDatabase } from "@nile/core/services/database";
 
 import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
 import type { DesktopAddConnectionInput, DesktopConnectionSummary } from "../connections/contracts";
 import { DesktopStateStore } from "./DesktopStateStore";
 
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  while (tempDirs.length > 0) {
+    rmSync(tempDirs.pop()!, { recursive: true, force: true });
+  }
+});
+
 describe("DesktopStateStore", () => {
   it("caches completed state reads until invalidated", async () => {
     const surface = new StubSurface();
     const manager = new StubConnectionManager();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: new StubConnectionGateway() as never,
       connectionManager: manager as never,
@@ -31,7 +43,7 @@ describe("DesktopStateStore", () => {
   it("deduplicates in-flight refreshes for the same state", async () => {
     const surface = new StubSurface();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: new StubConnectionGateway() as never,
       connectionManager: new StubConnectionManager() as never,
@@ -49,7 +61,7 @@ describe("DesktopStateStore", () => {
   it("does not let stale in-flight refreshes clear later invalidations", async () => {
     const surface = new DeferredMenubarSurface();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: new StubConnectionGateway() as never,
       connectionManager: new StubConnectionManager() as never,
@@ -75,7 +87,7 @@ describe("DesktopStateStore", () => {
     const surface = new StubSurface();
     const gateway = new StubConnectionGateway();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: gateway as never,
       connectionManager: new StubConnectionManager() as never,
@@ -96,7 +108,7 @@ describe("DesktopStateStore", () => {
   it("exposes the latest cached menubar state without triggering a refresh", async () => {
     const surface = new StubSurface();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: new StubConnectionGateway() as never,
       connectionManager: new StubConnectionManager() as never,
@@ -113,7 +125,7 @@ describe("DesktopStateStore", () => {
   it("forces a new menubar refresh when explicitly requested", async () => {
     const surface = new StubSurface();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: new StubConnectionGateway() as never,
       connectionManager: new StubConnectionManager() as never,
@@ -125,11 +137,29 @@ describe("DesktopStateStore", () => {
     expect(surface.getMenubarStateCalls).toBe(2);
   });
 
+  it("primes startup menubar and settings state into cache together", async () => {
+    const surface = new StubSurface();
+    const databasePath = createDatabasePath();
+    const store = new DesktopStateStore({
+      databasePath,
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.primeStartupState();
+
+    expect(surface.primeStartupStateCalls).toBe(1);
+    expect(store.peekMenubarState()).toEqual({ agents: [] });
+    expect(store.peekSettingsState()).toEqual(await surface.getSettingsState());
+    expect(surface.getMenubarStateCalls).toBe(0);
+  });
+
   it("invalidates every cached desktop state when requested", async () => {
     const surface = new StubSurface();
     const manager = new StubConnectionManager();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: new StubConnectionGateway() as never,
       connectionManager: manager as never,
@@ -153,8 +183,9 @@ describe("DesktopStateStore", () => {
   it("invalidates cached state after a reset", async () => {
     const surface = new StubSurface();
     const stateReset = new StubStateReset();
+    const databasePath = createDatabasePath();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath,
       surface: surface as never,
       connectionGateway: new StubConnectionGateway() as never,
       connectionManager: new StubConnectionManager() as never,
@@ -169,13 +200,13 @@ describe("DesktopStateStore", () => {
     await store.getSettingsState();
 
     expect(result).toEqual({
-      databasePath: "/tmp/test.sqlite",
+      databasePath,
       historyPath: "/tmp/history",
       credentialsRemoved: true,
       databaseRemoved: true,
       historyRemoved: true,
     });
-    expect(stateReset.databasePaths).toEqual(["/tmp/test.sqlite"]);
+    expect(stateReset.databasePaths).toEqual([databasePath]);
     expect(surface.getMenubarStateCalls).toBe(2);
     expect(surface.getSettingsStateCalls).toBe(2);
   });
@@ -184,7 +215,7 @@ describe("DesktopStateStore", () => {
     const surface = new StubSurface();
     const gateway = new StubConnectionGateway();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: gateway as never,
       connectionManager: new StubConnectionManager() as never,
@@ -214,7 +245,7 @@ describe("DesktopStateStore", () => {
     const surface = new StubSurface();
     const gateway = new StubConnectionGateway();
     const store = new DesktopStateStore({
-      databasePath: "/tmp/test.sqlite",
+      databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: gateway as never,
       connectionManager: new StubConnectionManager() as never,
@@ -230,12 +261,159 @@ describe("DesktopStateStore", () => {
     expect(surface.getSettingsStateCalls).toBe(2);
     expect(surface.getMenubarStateCalls).toBe(0);
   });
+
+  it("hydrates cached menubar and settings state from the persisted desktop snapshot", async () => {
+    const databasePath = createDatabasePath();
+    const writerSurface = new StubSurface();
+    const writer = new DesktopStateStore({
+      databasePath,
+      surface: writerSurface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await writer.getMenubarState();
+    await writer.getSettingsState();
+
+    const readerSurface = new StubSurface();
+    const reader = new DesktopStateStore({
+      databasePath,
+      surface: readerSurface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    expect(reader.peekMenubarState()).toEqual({ agents: [] });
+    expect(reader.peekSettingsState()).toEqual(await writerSurface.getSettingsState());
+    await expect(reader.getSettingsStateSnapshot()).resolves.toEqual(await writerSurface.getSettingsState());
+    expect(readerSurface.getSettingsStateCalls).toBe(0);
+    await expect(reader.getMenubarState()).resolves.toEqual({ agents: [] });
+    await expect(reader.getSettingsState()).resolves.toEqual({
+      onboarding: null,
+      currentConnection: null,
+      currentConnectionState: "none",
+      liveConnection: null,
+      reconciliationState: "unavailable",
+      connections: [],
+      currentAgentConnections: [],
+      agents: [],
+      detectedSetups: {
+        mode: "empty",
+        importableCount: 0,
+        items: [],
+      },
+      advanced: {
+        agentHomes: [],
+        supportedAgents: [],
+        savedConnectionCount: 0,
+        importableSetupCount: 0,
+      },
+    });
+    expect(readerSurface.getMenubarStateCalls).toBe(1);
+    expect(readerSurface.getSettingsStateCalls).toBe(1);
+  });
+
+  it("keeps live settings refreshes after an initial snapshot read", async () => {
+    const surface = new StubSurface();
+    const store = new DesktopStateStore({
+      databasePath: createDatabasePath(),
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.getSettingsStateSnapshot();
+    await store.getSettingsState();
+
+    expect(surface.getSettingsStateCalls).toBe(2);
+  });
+
+  it("does not let startup prewarm overwrite an existing persisted settings snapshot", async () => {
+    const databasePath = createDatabasePath();
+    const writer = new DesktopStateStore({
+      databasePath,
+      surface: new UsageSurface("persisted") as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+    await writer.getSettingsState();
+
+    const surface = new UsageSurface("prewarm");
+    const store = new DesktopStateStore({
+      databasePath,
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.primeStartupState();
+
+    expect(surface.primeStartupStateCalls).toBe(1);
+    expect(store.peekSettingsState()?.connections[0]?.usage?.text).toBe("persisted");
+  });
+
+  it("keeps startup-prewarmed settings dirty so the first live read still refreshes", async () => {
+    const surface = new StubSurface();
+    const store = new DesktopStateStore({
+      databasePath: createDatabasePath(),
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.primeStartupState();
+    expect(surface.primeStartupStateCalls).toBe(1);
+
+    await store.getSettingsState();
+
+    expect(surface.getSettingsStateCalls).toBe(2);
+  });
+
+  it("ignores invalid persisted settings snapshots", async () => {
+    const databasePath = createDatabasePath();
+    const database = SqliteDatabase.open(databasePath);
+    try {
+      database.exec(`
+        CREATE TABLE desktop_state_snapshots (
+          snapshot_key TEXT PRIMARY KEY,
+          version INTEGER NOT NULL,
+          payload TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        )
+      `);
+      database.run(
+        `
+          INSERT INTO desktop_state_snapshots (snapshot_key, version, payload, updated_at)
+          VALUES ('settings_state', 1, ?, CURRENT_TIMESTAMP)
+        `,
+        JSON.stringify({ invalid: true }),
+      );
+    } finally {
+      database.close();
+    }
+
+    const store = new DesktopStateStore({
+      databasePath,
+      surface: new StubSurface() as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    expect(store.peekSettingsState()).toBeNull();
+  });
 });
+
+function createDatabasePath(): string {
+  const dir = mkdtempSync(join(tmpdir(), "nile-desktop-state-store-"));
+  tempDirs.push(dir);
+  return join(dir, "desktop.sqlite");
+}
 
 class StubSurface {
   getMenubarStateCalls = 0;
   getSettingsStateCalls = 0;
   getHistoryStateCalls = 0;
+  primeStartupStateCalls = 0;
 
   async getMenubarState(): Promise<MenubarState> {
     this.getMenubarStateCalls += 1;
@@ -278,6 +456,27 @@ class StubSurface {
   }
 
   async refreshMenubarUsage(): Promise<void> {}
+
+  async primeStartupState(): Promise<{ menubarState: MenubarState; settingsState: SettingsState }> {
+    this.primeStartupStateCalls += 1;
+    return {
+      menubarState: {
+        agents: [],
+      },
+      settingsState: await this.getSettingsState(),
+    };
+  }
+}
+
+class UsageSurface extends StubSurface {
+  constructor(private readonly usageText: string) {
+    super();
+  }
+
+  override async getSettingsState(): Promise<SettingsState> {
+    this.getSettingsStateCalls += 1;
+    return createSettingsState(this.usageText);
+  }
 }
 
 class DeferredMenubarSurface extends StubSurface {
@@ -417,4 +616,48 @@ class StubStateReset {
       historyRemoved: true,
     };
   }
+}
+
+function createSettingsState(usageText: string): SettingsState {
+  return {
+    onboarding: null,
+    currentConnection: null,
+    currentConnectionState: "none",
+    liveConnection: null,
+    reconciliationState: "unavailable",
+    connections: [
+      {
+        id: "work",
+        label: "Work",
+        endpointLabel: "OpenAI",
+        endpointFamily: "openai",
+        authMode: "api_key",
+        isCurrent: false,
+        usage: {
+          status: "available",
+          text: usageText,
+          windowLabel: "5h",
+          remainingPercent: 80,
+          windows: [],
+        },
+        activeAlertCount: 0,
+        enabledAgents: [],
+        configurableAgents: [],
+        selectedByAgents: [],
+      },
+    ],
+    currentAgentConnections: [],
+    agents: [],
+    detectedSetups: {
+      mode: "empty",
+      importableCount: 0,
+      items: [],
+    },
+    advanced: {
+      agentHomes: [],
+      supportedAgents: [],
+      savedConnectionCount: 1,
+      importableSetupCount: 0,
+    },
+  };
 }

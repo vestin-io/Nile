@@ -10,6 +10,7 @@ import type {
 import type { EndpointRegistryInput } from "../endpoint";
 import type { AgentSelection } from "../selection/Selection";
 import type { StoredCredential } from "../../services/credential/Types";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 import type { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import type { EnvironmentSource } from "../../services/EnvironmentSource";
 import type { LocalModelCatalogSource } from "../../application/local/ModelCatalogSourceTypes";
@@ -29,6 +30,7 @@ export type CreateConnectionInput = {
   label?: string;
   enabledAgents?: AgentId[];
   allowUndetectedGateway?: boolean;
+  credentialStorageBackend?: CredentialStorageBackend;
 };
 
 export type CreateConnectionResult = {
@@ -48,6 +50,7 @@ export type UpdateConnectionInput = {
   endpointUrl?: string;
   credential?: StoredCredential;
   probeCredential?: StoredCredential;
+  credentialStorageBackend?: CredentialStorageBackend;
 };
 
 export type ConnectionModelCatalogResult = {

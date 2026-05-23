@@ -4,12 +4,17 @@ import {
   SUPPORTED_CONNECTION_PRESET_FAMILIES,
   type ConnectionPresetFamily,
 } from "@nile/core/models/connection";
+import {
+  SUPPORTED_CREDENTIAL_STORAGE_BACKENDS,
+  type CredentialStorageBackend,
+} from "@nile/core/services/credential";
 
 import type {
   DesktopAddConnectionInput,
   DesktopDescribeSavedConnectionOnboardingInput,
   DesktopDiscardPreparedConnectionDraftInput,
   DesktopGetConnectionModelCatalogInput,
+  DesktopImportCurrentConnectionInput,
   DesktopSavePreparedConnectionInput,
   DesktopUpdateAgentConnectionModelInput,
   DesktopUpdateConnectionInput,
@@ -137,6 +142,15 @@ export class DesktopIpcInputValidator {
     };
   }
 
+  readImportCurrentConnectionInput(input: unknown): DesktopImportCurrentConnectionInput {
+    const record = this.readRecord(input, "import current connection input");
+    return {
+      agentId: this.readAgentId(record.agentId, "agentId"),
+      credentialStorageBackend: this.readOptionalCredentialStorageBackend(record.credentialStorageBackend),
+      encryptedLocalPassphrase: this.readOptionalString(record.encryptedLocalPassphrase, "encryptedLocalPassphrase"),
+    };
+  }
+
   readCreateConnectionAlertInput(input: unknown): CreateConnectionAlertInput {
     const record = this.readRecord(input, "create connection alert input");
     const base = {
@@ -260,7 +274,22 @@ export class DesktopIpcInputValidator {
       envKey: this.readOptionalString(record.envKey, "envKey"),
       sessionSource: this.readOptionalSessionSource(record.sessionSource),
       sessionAuthJsonPath: this.readOptionalString(record.sessionAuthJsonPath, "sessionAuthJsonPath"),
+      credentialStorageBackend: this.readOptionalCredentialStorageBackend(record.credentialStorageBackend),
+      encryptedLocalPassphrase: this.readOptionalString(record.encryptedLocalPassphrase, "encryptedLocalPassphrase"),
     };
+  }
+
+  private readOptionalCredentialStorageBackend(value: unknown): CredentialStorageBackend | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (
+      typeof value !== "string"
+      || !SUPPORTED_CREDENTIAL_STORAGE_BACKENDS.includes(value as CredentialStorageBackend)
+    ) {
+      throw new Error("credentialStorageBackend is not supported");
+    }
+    return value as CredentialStorageBackend;
   }
 
   private readOptionalAgentIds(value: unknown, fieldName: string): AgentId[] | undefined {

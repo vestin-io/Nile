@@ -5,6 +5,7 @@ import { EnabledAgentsPolicy } from "@nile/core/models/connection/enabled-agents
 import type { DesktopConnection } from "../../../state/Types";
 import { sameAgentSelection } from "../../shared/AgentSelection";
 import type { Definition } from "../../shared/DesktopData";
+import { useEncryptedLocalAccessRecovery } from "../../shared/EncryptedLocalAccess";
 
 type UseGatewaySupportStateOptions = {
   apiKey: string;
@@ -27,6 +28,7 @@ export function useGatewaySupportState({
   envKey,
   onEnabledAgentsChanged,
 }: UseGatewaySupportStateOptions) {
+  const { recover } = useEncryptedLocalAccessRecovery();
   const [agentsDirty, setAgentsDirty] = useState(false);
   const [gatewayTrustConfirmed, setGatewayTrustConfirmed] = useState(false);
   const [hasProbedSupport, setHasProbedSupport] = useState(false);
@@ -93,6 +95,7 @@ export function useGatewaySupportState({
       enabledAgentsPolicy,
       endpointUrl,
       envKey,
+      recover,
       onConfigurableAgents: setResolvedConfigurableAgents,
       onEnabledAgents: onEnabledAgentsChanged,
       onProbing: setIsProbingSupport,
@@ -126,6 +129,7 @@ async function probeSupport(input: {
   enabledAgentsPolicy: EnabledAgentsPolicy;
   endpointUrl: string;
   envKey: string;
+  recover<T>(operation: () => Promise<T>): Promise<T>;
   onConfigurableAgents(nextAgents: AgentId[]): void;
   onEnabledAgents(nextAgents: AgentId[]): void;
   onProbing(probing: boolean): void;
@@ -135,13 +139,13 @@ async function probeSupport(input: {
   input.onProbing(true);
   input.onProbeRecorded?.(true);
   try {
-    const onboarding = await window.nileDesktop.connections.describeSavedConnectionOnboarding({
+    const onboarding = await input.recover(async () => await window.nileDesktop.connections.describeSavedConnectionOnboarding({
       connectionId: input.connectionId,
       endpointUrl: input.endpointUrl.trim() || undefined,
       apiKeySource: input.apiKeySource,
       apiKey: input.apiKeySource === "direct" ? input.apiKey.trim() || undefined : undefined,
       envKey: input.apiKeySource === "env_key" ? input.envKey.trim() || undefined : undefined,
-    });
+    }));
     const nextConfigurableAgents = mergeConfigurableAgents(onboarding.configurableAgents);
     input.onDetectedAgents(onboarding.defaultEnabledAgents);
     input.onConfigurableAgents(nextConfigurableAgents);

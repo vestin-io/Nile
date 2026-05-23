@@ -48,6 +48,28 @@ describe("DesktopPreferencesStore", () => {
       "codex-work": "weekly",
     });
   });
+
+  it("keeps a valid default credential storage backend", () => {
+    const storage = createStorage({
+      "nile.desktop.preferences": JSON.stringify({
+        defaultCredentialStorageBackend: "encrypted_local_storage",
+      }),
+    });
+
+    const store = new DesktopPreferencesStore(storage, createRootElement());
+    expect(store.load().defaultCredentialStorageBackend).toBe("encrypted_local_storage");
+  });
+
+  it("drops an invalid default credential storage backend", () => {
+    const storage = createStorage({
+      "nile.desktop.preferences": JSON.stringify({
+        defaultCredentialStorageBackend: "plaintext_file",
+      }),
+    });
+
+    const store = new DesktopPreferencesStore(storage, createRootElement());
+    expect(store.load().defaultCredentialStorageBackend).toBeNull();
+  });
 });
 
 function createStorage(values: Record<string, string>): Storage {

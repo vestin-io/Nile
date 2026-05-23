@@ -1,6 +1,29 @@
 {
   "schema_version": "1",
   "initiative": "nile",
+  "glossary": {
+    "system-secure-storage": "The platform-native credential store used by Nile when the user accepts OS-managed secret storage, such as macOS Keychain.",
+    "encrypted-local-storage": "A Nile-managed local credential vault encrypted with a user-provided passphrase and stored in local files instead of the platform credential store.",
+    "credential-backend": "The concrete storage backend selected for a saved connection's secret material.",
+    "global-default-credential-backend": "The desktop-local default backend preference used to preselect storage mode for newly created connections only."
+  },
+  "invariants": [
+    {
+      "id": "INV-001",
+      "statement": "Nile must not persist raw connection secrets or encrypted-local passphrases in SQLite, desktop preferences, logs, or test fixtures.",
+      "verification": "Unit test credential persistence and desktop preference serialization so only backend metadata and credential references are stored; manually inspect the SQLite database and desktop preferences after creating connections."
+    },
+    {
+      "id": "INV-002",
+      "statement": "A saved connection's credential backend selection is connection-scoped metadata and may persist across restarts, but changing the desktop global default must not rewrite existing saved connections.",
+      "verification": "Unit test connection create/update persistence plus desktop preference reads so existing connection backend metadata stays unchanged after changing the global default; manually create two connections before and after changing the default and verify only the later connection inherits the new default."
+    },
+    {
+      "id": "INV-003",
+      "statement": "Encrypted local storage must require a user-provided passphrase and must never silently downgrade to plaintext local files or SQLite secret storage.",
+      "verification": "Unit test encrypted-local credential writes to fail without a passphrase and to reject fallback-to-plaintext paths; manually deny system-secure storage and verify desktop only offers encrypted-local storage as the fallback."
+    }
+  ],
   "modules": [
     {
       "id": "core",
@@ -27,6 +50,11 @@
           "id": "usage",
           "name": "Usage",
           "spec_path": ".vestin/specs/core/features/usage.md"
+        },
+        {
+          "id": "credential-storage-backends",
+          "name": "Credential Storage Backends",
+          "spec_path": ".vestin/specs/core/features/credential-storage-backends.md"
         }
       ]
     },
@@ -97,8 +125,23 @@
           "id": "desktop-surface",
           "name": "Desktop Surface",
           "spec_path": ".vestin/specs/surfaces/features/desktop-surface.md"
+        },
+        {
+          "id": "desktop-credential-storage-choice",
+          "name": "Desktop Credential Storage Choice",
+          "spec_path": ".vestin/specs/surfaces/features/desktop-credential-storage-choice.md",
+          "depends_on": [
+            {
+              "module": "core",
+              "feature": "credential-storage-backends"
+            }
+          ]
         }
       ]
     }
-  ]
+  ],
+  "change_policy": {
+    "specs_are_stable": true,
+    "planning_lives_in": ".vestin/plans/"
+  }
 }

@@ -19,9 +19,11 @@ import { useNotificationTargetNavigation, type NotificationTargetNavigatorOption
 import { useDesktopReleaseInfo } from "./useReleaseInfo";
 import { UpdatePrompt } from "./UpdatePrompt";
 import { useSettingsConnectionActions } from "./useConnectionActions";
+import { useCredentialStorageSession } from "./useCredentialStorageSession";
 import { useSettingsFlow } from "./useFlow";
 import { readCurrentProfile } from "../../../profiles/CurrentProfile";
 import { useWorkspaceProfiles, type WorkspaceProfileAssignment } from "../../profiles/useProfiles";
+import { EncryptedLocalAccessProvider } from "../../shared/EncryptedLocalAccess";
 
 export function SettingsApp() {
   const {
@@ -121,18 +123,10 @@ export function SettingsApp() {
     setPreferences,
   });
 
-  const addConnectionDefinitions = useMemo(
-    () => readDefinitionsForAgent(addConnectionTargetAgentId),
-    [addConnectionTargetAgentId, readDefinitionsForAgent],
-  );
-  const defaultOpenAiAuthJsonPath = useMemo(
-    () => readCodexAuthJsonPath(settingsState?.advanced.agentHomes),
-    [settingsState?.advanced.agentHomes],
-  );
-  const repairUsageConnection =
-    settingsState?.connections.find((connection) => connection.id === repairUsageConnectionId) ?? null;
-  const selectedConnectionContextAgent =
-    settingsState?.agents.find((agent) => agent.agentId === selectedConnectionContextAgentId) ?? null;
+  const addConnectionDefinitions = useMemo(() => readDefinitionsForAgent(addConnectionTargetAgentId), [addConnectionTargetAgentId, readDefinitionsForAgent]);
+  const defaultOpenAiAuthJsonPath = useMemo(() => readCodexAuthJsonPath(settingsState?.advanced.agentHomes), [settingsState?.advanced.agentHomes]);
+  const repairUsageConnection = settingsState?.connections.find((connection) => connection.id === repairUsageConnectionId) ?? null;
+  const selectedConnectionContextAgent = settingsState?.agents.find((agent) => agent.agentId === selectedConnectionContextAgentId) ?? null;
   const currentProfile = useMemo(
     () => profileFeatureEnabled
       ? readCurrentProfile(profiles, settingsState?.agents ?? [], settingsState?.advanced.agentHomes ?? [])
@@ -178,10 +172,21 @@ export function SettingsApp() {
       : null,
     [releaseInfo],
   );
-  const shouldShowUpdatePrompt =
-    releaseInfo !== null &&
-    (releaseInfo.status === "ready" || releaseInfo.status === "error") &&
-    updatePromptKey !== dismissedUpdatePromptKey;
+  const shouldShowUpdatePrompt = releaseInfo !== null
+    && (releaseInfo.status === "ready" || releaseInfo.status === "error")
+    && updatePromptKey !== dismissedUpdatePromptKey;
+  const {
+    credentialStorageState,
+    isUnlockEncryptedLocalStorageDialogOpen,
+    isUnlockingEncryptedLocalStorage,
+    refreshCredentialStorageState,
+    requestEncryptedLocalUnlock,
+    setUnlockEncryptedLocalStorageDialogOpen,
+    unlockEncryptedLocalStorage,
+    unlockEncryptedLocalStorageError,
+  } = useCredentialStorageSession({
+    onActionError: setActionError,
+  });
 
   useEffect(() => {
     setDismissedUpdatePromptKey((current) => (
@@ -245,6 +250,7 @@ export function SettingsApp() {
     setSelectedConnectionContextAgentId,
     setSelectedConnectionId,
     onActionError: setActionError,
+    requestEncryptedLocalUnlock,
   });
 
   return (
@@ -275,157 +281,173 @@ export function SettingsApp() {
       }}
       onSidebarOpenChange={setSidebarOpen}
     >
-      <SettingsPageContent
-        addConnectionDefinitions={addConnectionDefinitions}
-        addConnectionTargetAgentId={addConnectionTargetAgentId}
-        canConfigureAgent={canConfigureAgent}
-        defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
-        definitions={definitions}
-        historyState={historyState}
-        isLoadedNotificationMute={isNotificationMuteLoaded}
-        isLoadedMenubarDisplay={isMenubarDisplayLoaded}
-        isLoadingNotificationHistory={isLoadingNotificationHistory}
-        isMarkingNotificationHistoryRead={isMarkingNotificationHistoryRead}
-        isSavingMenubarDisplay={isSavingMenubarDisplay}
-        isSavingNotificationMute={isSavingNotificationMute}
-        isResetting={isResetting}
-        language={preferences.language}
-        menubarDisplayMode={menubarDisplayMode}
-        notificationsMuted={notificationsMuted}
-        notificationHistoryFilter={notificationHistoryFilter}
-        notificationHistoryConnections={notificationHistoryConnections}
-        notificationHistoryState={notificationHistoryState}
-        preferences={preferences}
-        profileFeatureEnabled={profileFeatureEnabled}
-        isSavingProfileFeature={isSavingProfileFeature}
-        releaseInfo={releaseInfo}
-        profileError={profileError}
-        profiles={profiles}
-        selectedAgentDetailId={selectedAgentDetailId}
-        selectedAgentDetailTab={selectedAgentDetailTab}
-        selectedConnectionContextAgent={selectedConnectionContextAgent}
-        selectedConnectionId={selectedConnectionId}
-        selectedProfileId={selectedProfileId}
-        settingsState={settingsState}
-        showQuickSetupNav={showQuickSetupNav}
-        showProfiles={showProfiles}
-        t={t}
-        visiblePage={visiblePage}
-        onAddConnection={addConnection}
-        onAgentOrderChange={(agentOrder) => setPreferences((current) => ({ ...current, agentOrder }))}
-        onBackFromAgentDetail={() => setCurrentPage("agents")}
-        onBindCursorUsage={bindCursorUsage}
-        onCreateConnectionAlert={async (input) => {
-          await window.nileDesktop.connections.createUsageAlert(input);
-          await reload();
-        }}
-        onCheckForUpdates={async () => {
-          await window.nileDesktop.updates.checkForUpdates().catch(() => ({ status: "unavailable" as const }));
-        }}
-        onCloseAddConnectionPage={closeAddConnectionPage}
-        onCompleteQuickSetup={completeQuickSetup}
-        onApplyProfile={async (profileId) => {
-          await window.nileDesktop.profiles.applyProfile(profileId);
-          await refresh();
-        }}
-        onCreateProfile={async (name, emoji, assignments: WorkspaceProfileAssignment[]) => {
-          const profile = await window.nileDesktop.profiles.createProfile(name, emoji, assignments);
-          await refreshProfiles();
-          return profile.id;
-        }}
-        onDeleteProfile={async (profileId) => {
-          await window.nileDesktop.profiles.deleteProfile(profileId);
-          await refreshProfiles();
-        }}
-        onDeleteConnectionAlert={async (connectionId, alertId) => {
-          await window.nileDesktop.connections.deleteUsageAlert(connectionId, alertId);
-          await reload();
-        }}
-        onConfigureAgent={(agentId) => openAddConnectionPage(agentId)}
-        onConfirmImportAgent={importCurrentConnection}
-        onInstallUpdate={async () => {
-          await window.nileDesktop.updates.installUpdate().catch(() => ({ status: "unavailable" as const }));
-        }}
-        onLanguageChange={(language) => setPreferences((current) => ({ ...current, language }))}
-        onMenubarDisplayModeChange={setMenubarDisplayMode}
-        onNotificationsMutedChange={setNotificationsMuted}
-        onNotificationHistoryFilterChange={(filter) => {
-          setNotificationHistoryFilter(filter);
-          setCurrentPage("notifications");
-        }}
-        onMarkNotificationHistoryRead={markNotificationHistoryRead}
-        onMarkNotificationHistoryReadByFilter={async (filter) => {
-          await markNotificationHistoryReadByFilter(filter);
-        }}
-        onOpenAddConnection={() => openAddConnectionPage()}
-        onOpenConnection={openConnection}
-        onOpenNotificationTarget={openNotificationTarget}
-        onOpenProvidersLink={async (url) => {
-          await window.nileDesktop.app.openExternalUrl(url);
-        }}
-        onOpenQuickSetup={openQuickSetup}
-        onOpenQuickSetupModelSetup={(agentId) => {
-          setSelectedAgentDetailId(agentId);
-          setSelectedAgentDetailTab("connections");
-          setCurrentPage("agents");
-        }}
-        onProfileFeatureEnabledChange={setProfileFeatureEnabled}
-        onPrepareConnectionDraft={prepareConnectionDraft}
-        onRefresh={refresh}
-        onRefreshNotificationHistory={reloadNotificationHistory}
-        onRemoveConnection={removeConnection}
-        onReset={() => setResetDialogOpen(true)}
-        onRollbackAgent={rollbackAgent}
-        onSavePreparedConnection={savePreparedConnection}
-        onUseExistingQuickSetupConnection={useExistingConnectionForAgent}
-        onSelectAgentDetail={(agentId) => {
-          setSelectedAgentDetailId(agentId);
-          if (!agentId) {
+      <EncryptedLocalAccessProvider requestUnlock={requestEncryptedLocalUnlock}>
+        <SettingsPageContent
+          addConnectionDefinitions={addConnectionDefinitions}
+          addConnectionTargetAgentId={addConnectionTargetAgentId}
+          canConfigureAgent={canConfigureAgent}
+          defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
+          definitions={definitions}
+          historyState={historyState}
+          isLoadedNotificationMute={isNotificationMuteLoaded}
+          isLoadedMenubarDisplay={isMenubarDisplayLoaded}
+          isLoadingNotificationHistory={isLoadingNotificationHistory}
+          isMarkingNotificationHistoryRead={isMarkingNotificationHistoryRead}
+          isSavingMenubarDisplay={isSavingMenubarDisplay}
+          isSavingNotificationMute={isSavingNotificationMute}
+          isResetting={isResetting}
+          language={preferences.language}
+          menubarDisplayMode={menubarDisplayMode}
+          notificationsMuted={notificationsMuted}
+          notificationHistoryFilter={notificationHistoryFilter}
+          notificationHistoryConnections={notificationHistoryConnections}
+          notificationHistoryState={notificationHistoryState}
+          preferences={preferences}
+          profileFeatureEnabled={profileFeatureEnabled}
+          credentialStorageState={credentialStorageState}
+          isSavingProfileFeature={isSavingProfileFeature}
+          releaseInfo={releaseInfo}
+          profileError={profileError}
+          profiles={profiles}
+          selectedAgentDetailId={selectedAgentDetailId}
+          selectedAgentDetailTab={selectedAgentDetailTab}
+          selectedConnectionContextAgent={selectedConnectionContextAgent}
+          selectedConnectionId={selectedConnectionId}
+          selectedProfileId={selectedProfileId}
+          settingsState={settingsState}
+          showQuickSetupNav={showQuickSetupNav}
+          showProfiles={showProfiles}
+          t={t}
+          visiblePage={visiblePage}
+          onAddConnection={addConnection}
+          onAgentOrderChange={(agentOrder) => setPreferences((current) => ({ ...current, agentOrder }))}
+          onBackFromAgentDetail={() => setCurrentPage("agents")}
+          onBindCursorUsage={bindCursorUsage}
+          onCreateConnectionAlert={async (input) => {
+            await window.nileDesktop.connections.createUsageAlert(input);
+            await reload();
+          }}
+          onCheckForUpdates={async () => {
+            await window.nileDesktop.updates.checkForUpdates().catch(() => ({ status: "unavailable" as const }));
+          }}
+          onCloseAddConnectionPage={closeAddConnectionPage}
+          onCompleteQuickSetup={completeQuickSetup}
+          onRefreshCredentialStorageState={refreshCredentialStorageState}
+          onApplyProfile={async (profileId) => {
+            await window.nileDesktop.profiles.applyProfile(profileId);
+            await refresh();
+          }}
+          onCreateProfile={async (name, emoji, assignments: WorkspaceProfileAssignment[]) => {
+            const profile = await window.nileDesktop.profiles.createProfile(name, emoji, assignments);
+            await refreshProfiles();
+            return profile.id;
+          }}
+          onDeleteProfile={async (profileId) => {
+            await window.nileDesktop.profiles.deleteProfile(profileId);
+            await refreshProfiles();
+          }}
+          onDeleteConnectionAlert={async (connectionId, alertId) => {
+            await window.nileDesktop.connections.deleteUsageAlert(connectionId, alertId);
+            await reload();
+          }}
+          onConfigureAgent={(agentId) => openAddConnectionPage(agentId)}
+          onConfirmImportAgent={importCurrentConnection}
+          onDefaultCredentialStorageBackendChange={(backend) => setPreferences((current) => ({
+            ...current,
+            defaultCredentialStorageBackend: backend,
+          }))}
+          onQuickSetupSaveAgent={importCurrentConnection}
+          onInstallUpdate={async () => {
+            await window.nileDesktop.updates.installUpdate().catch(() => ({ status: "unavailable" as const }));
+          }}
+          onLanguageChange={(language) => setPreferences((current) => ({ ...current, language }))}
+          onMenubarDisplayModeChange={setMenubarDisplayMode}
+          onNotificationsMutedChange={setNotificationsMuted}
+          onNotificationHistoryFilterChange={(filter) => {
+            setNotificationHistoryFilter(filter);
+            setCurrentPage("notifications");
+          }}
+          onMarkNotificationHistoryRead={markNotificationHistoryRead}
+          onMarkNotificationHistoryReadByFilter={async (filter) => {
+            await markNotificationHistoryReadByFilter(filter);
+          }}
+          onOpenAddConnection={() => openAddConnectionPage()}
+          onOpenConnection={openConnection}
+          onOpenNotificationTarget={openNotificationTarget}
+          onOpenProvidersLink={async (url) => {
+            await window.nileDesktop.app.openExternalUrl(url);
+          }}
+          onOpenQuickSetup={openQuickSetup}
+          onOpenQuickSetupModelSetup={(agentId) => {
+            setSelectedAgentDetailId(agentId);
             setSelectedAgentDetailTab("connections");
-          }
-        }}
-        onSelectAgentDetailTab={setSelectedAgentDetailTab}
-        onSelectConnection={setSelectedConnectionId}
-        onSelectConnectionContextAgent={setSelectedConnectionContextAgentId}
-        onSelectProfile={setSelectedProfileId}
-        onThemeChange={(theme) => setPreferences((current) => ({ ...current, theme }))}
-        onUpdateAgentHome={async (agentId, path) => {
-          await window.nileDesktop.app.updateAgentHome(agentId, path);
-        }}
-        onUpdateAgentRuntimeCommand={async (agentId, path) => {
-          await window.nileDesktop.app.updateAgentRuntimeCommand(agentId, path);
-        }}
-        onUpdateAgentConnectionModel={async (agentId, connectionId, modelId) => {
-          await window.nileDesktop.connections.updateAgentConnectionModel({
-            agentId,
-            connectionId,
-            modelId,
-          });
-          const agent = settingsState.agents.find((entry) => entry.agentId === agentId) ?? null;
-          if (agent?.currentConnection?.id === connectionId) {
-            await window.nileDesktop.connections.switchConnection(agentId, connectionId);
-          }
-          await refresh();
-        }}
-        onUpdateConnectionAlert={async (input) => {
-          await window.nileDesktop.connections.updateUsageAlert(input);
-          await reload();
-        }}
-        onSaveProfile={async (profileId, name, emoji, assignments) => {
-          await window.nileDesktop.profiles.updateProfile(profileId, name, emoji, assignments);
-          await refreshProfiles();
-        }}
-        onUpdateConnection={updateConnection}
-        onUseConnection={useConnection}
-      />
+            setCurrentPage("agents");
+          }}
+          onProfileFeatureEnabledChange={setProfileFeatureEnabled}
+          onPrepareConnectionDraft={prepareConnectionDraft}
+          onRememberDefaultCredentialStorageBackend={(backend) => setPreferences((current) => ({
+            ...current,
+            defaultCredentialStorageBackend: backend,
+          }))}
+          onRefresh={refresh}
+          onRefreshNotificationHistory={reloadNotificationHistory}
+          onRemoveConnection={removeConnection}
+          onReset={() => setResetDialogOpen(true)}
+          onRollbackAgent={rollbackAgent}
+          onSavePreparedConnection={savePreparedConnection}
+          onUseExistingQuickSetupConnection={useExistingConnectionForAgent}
+          onSelectAgentDetail={(agentId) => {
+            setSelectedAgentDetailId(agentId);
+            if (!agentId) {
+              setSelectedAgentDetailTab("connections");
+            }
+          }}
+          onSelectAgentDetailTab={setSelectedAgentDetailTab}
+          onSelectConnection={setSelectedConnectionId}
+          onSelectConnectionContextAgent={setSelectedConnectionContextAgentId}
+          onSelectProfile={setSelectedProfileId}
+          onThemeChange={(theme) => setPreferences((current) => ({ ...current, theme }))}
+          onUpdateAgentHome={async (agentId, path) => {
+            await window.nileDesktop.app.updateAgentHome(agentId, path);
+          }}
+          onUpdateAgentRuntimeCommand={async (agentId, path) => {
+            await window.nileDesktop.app.updateAgentRuntimeCommand(agentId, path);
+          }}
+          onUpdateAgentConnectionModel={async (agentId, connectionId, modelId) => {
+            await window.nileDesktop.connections.updateAgentConnectionModel({
+              agentId,
+              connectionId,
+              modelId,
+            });
+            const agent = settingsState.agents.find((entry) => entry.agentId === agentId) ?? null;
+            if (agent?.currentConnection?.id === connectionId) {
+              await window.nileDesktop.connections.switchConnection(agentId, connectionId);
+            }
+            await refresh();
+          }}
+          onUpdateConnectionAlert={async (input) => {
+            await window.nileDesktop.connections.updateUsageAlert(input);
+            await reload();
+          }}
+          onSaveProfile={async (profileId, name, emoji, assignments) => {
+            await window.nileDesktop.profiles.updateProfile(profileId, name, emoji, assignments);
+            await refreshProfiles();
+          }}
+          onUpdateConnection={updateConnection}
+          onUseConnection={useConnection}
+        />
+      </EncryptedLocalAccessProvider>
 
       <SettingsDialogs
         isResetDialogOpen={resetDialogOpen}
         isResetting={isResetting}
         isSupportOpen={nileDialogOpen}
+        isUnlockEncryptedLocalStorageDialogOpen={isUnlockEncryptedLocalStorageDialogOpen}
+        isUnlockingEncryptedLocalStorage={isUnlockingEncryptedLocalStorage}
         repairUsageConnection={repairUsageConnection}
         reusedConnectionDialog={reusedConnectionDialog}
         t={t}
+        unlockEncryptedLocalStorageError={unlockEncryptedLocalStorageError}
         onBindCursorUsage={async (connectionId, sessionToken) => {
           await window.nileDesktop.connections.bindCursorUsage(connectionId, sessionToken);
         }}
@@ -443,6 +465,8 @@ export function SettingsApp() {
         }}
         onSetNileDialogOpen={setNileDialogOpen}
         onSetResetDialogOpen={setResetDialogOpen}
+        onSetUnlockEncryptedLocalStorageDialogOpen={setUnlockEncryptedLocalStorageDialogOpen}
+        onUnlockEncryptedLocalStorage={unlockEncryptedLocalStorage}
       />
 
       {shouldShowUpdatePrompt ? (

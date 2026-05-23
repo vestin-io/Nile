@@ -1,4 +1,5 @@
 import type { CredentialSource } from "../../services/credential/Source";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 import type { AuthMode } from "./AuthMode";
 import type { AgentId } from "../agent";
 
@@ -8,6 +9,7 @@ export type AccessRegistryInput = {
   label: string;
   authMode: AuthMode;
   identityKey?: string;
+  credentialStorageBackend?: CredentialStorageBackend;
   enabledAgents?: AgentId[];
 };
 
@@ -16,6 +18,7 @@ export type AccessRegistryUpdate = {
   label?: string;
   authMode?: AuthMode;
   identityKey?: string | null;
+  credentialStorageBackend?: CredentialStorageBackend;
   enabledAgents?: AgentId[];
 };
 
@@ -36,6 +39,7 @@ export type AccessRecord = {
   envKey?: string;
   enabledAgents: AgentId[];
   credentialSource: CredentialSource;
+  credentialStorageBackend?: CredentialStorageBackend;
   credentialSyncIssue?: string;
   credentialSyncState?: AccessCredentialSyncState;
   createdAt: string;

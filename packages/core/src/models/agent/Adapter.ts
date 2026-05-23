@@ -2,6 +2,7 @@ import type { AuthMode } from "../access";
 import type { EndpointFamily } from "../endpoint";
 import type { AgentSelectionRecord } from "../selection/Types";
 import type { AgentId } from "./Ids";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 
 export type AgentCapabilitySupport = "yes" | "partial" | "no";
 
@@ -69,6 +70,10 @@ export type ImportCurrentConnectionResult = {
   reused?: boolean;
 };
 
+export type ImportCurrentConnectionInput = {
+  credentialStorageBackend?: CredentialStorageBackend;
+};
+
 export type RollbackLatestAgentResult = {
   agentId: AgentId;
   rolledBackMutationId: string;
@@ -81,7 +86,7 @@ export interface AgentAdapter {
 
   detectAgentSelection(): AgentDetectionResult;
   applySelection(connectionId: string): ApplyAgentSelectionResult;
-  importCurrentConnection(): Promise<ImportCurrentConnectionResult>;
+  importCurrentConnection(input?: ImportCurrentConnectionInput): Promise<ImportCurrentConnectionResult>;
   rollbackLatestMutation(): RollbackLatestAgentResult;
 }
 

@@ -1,8 +1,9 @@
 import {
+  buildCredentialStoreTarget,
   type CredentialStore,
   CredentialAlreadyExistsError,
   CredentialNotFoundError,
-} from "../../services/credential/Store";
+} from "../../services/credential";
 import type { StoredCredential } from "../../services/credential/Types";
 import { AccessRegistryConsistencyError } from "./Errors";
 import type { AccessCredentialSyncState, AccessRecord } from "./Types";
@@ -29,7 +30,7 @@ export class AccessCredentials {
 
   syncUpdated(record: AccessRecord, credential: StoredCredential): void {
     try {
-      this.credentialStore.update(record.credentialSource.reference, credential);
+      this.credentialStore.update(this.buildTarget(record), credential);
       this.markReady(record);
     } catch (error) {
       this.markFailure(record, "write_failed", error);
@@ -61,7 +62,7 @@ export class AccessCredentials {
     }
 
     try {
-      return this.credentialStore.get(record.credentialSource.reference);
+      return this.credentialStore.get(this.buildTarget(record));
     } catch (error) {
       if (error instanceof CredentialNotFoundError) {
         this.markFailure(record, "write_failed", error);
@@ -79,18 +80,18 @@ export class AccessCredentials {
 
   private createOrUpdate(record: AccessRecord, credential: StoredCredential): void {
     try {
-      this.credentialStore.create(record.credentialSource.reference, credential);
+      this.credentialStore.create(this.buildTarget(record), credential);
     } catch (error) {
       if (!(error instanceof CredentialAlreadyExistsError)) {
         throw error;
       }
-      this.credentialStore.update(record.credentialSource.reference, credential);
+      this.credentialStore.update(this.buildTarget(record), credential);
     }
   }
 
   private removeIfPresent(record: AccessRecord): void {
     try {
-      this.credentialStore.remove(record.credentialSource.reference);
+      this.credentialStore.remove(this.buildTarget(record));
     } catch (error) {
       if (error instanceof CredentialNotFoundError) {
         return;
@@ -101,6 +102,13 @@ export class AccessCredentials {
 
   private markReady(record: AccessRecord): void {
     this.writeState(record, "ready", null);
+  }
+
+  private buildTarget(record: AccessRecord) {
+    return buildCredentialStoreTarget(
+      record.credentialSource.reference,
+      record.credentialStorageBackend,
+    );
   }
 
   private markFailure(

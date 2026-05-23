@@ -16,10 +16,13 @@ import {
 } from "../../ui/select";
 import { Separator } from "../../ui/separator";
 import type { DesktopReleaseInfo } from "../../../state/Types";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { SettingsSection } from "./Section";
+import { CredentialStorageSection } from "./CredentialStorageSection";
 import { UpdateSection } from "./UpdateSection";
 
 type SettingsPageProps = {
+  credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
   isLoadedNotificationMute: boolean;
   isLoadedMenubarDisplay: boolean;
   isSavingMenubarDisplay: boolean;
@@ -32,12 +35,14 @@ type SettingsPageProps = {
   profileFeatureEnabled: boolean;
   releaseInfo: DesktopReleaseInfo | null;
   onCheckForUpdates(): Promise<void>;
+  onDefaultCredentialStorageBackendChange(backend: CredentialStorageBackend): void;
   onInstallUpdate(): Promise<void>;
   onMenubarDisplayModeChange(
     mode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"],
   ): Promise<void>;
   onNotificationsMutedChange(muted: boolean): Promise<void>;
   onProfileFeatureEnabledChange(enabled: boolean): Promise<void>;
+  onRefreshCredentialStorageState(): Promise<Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>>;
   onReset(): void;
   onLanguageChange(language: LanguagePreference): void;
   onThemeChange(theme: ThemePreference): void;
@@ -45,6 +50,7 @@ type SettingsPageProps = {
 };
 
 export function SettingsPage({
+  credentialStorageState,
   isLoadedNotificationMute,
   isLoadedMenubarDisplay,
   isSavingMenubarDisplay,
@@ -57,10 +63,12 @@ export function SettingsPage({
   profileFeatureEnabled,
   releaseInfo,
   onCheckForUpdates,
+  onDefaultCredentialStorageBackendChange,
   onInstallUpdate,
   onMenubarDisplayModeChange,
   onNotificationsMutedChange,
   onProfileFeatureEnabledChange,
+  onRefreshCredentialStorageState,
   onReset,
   onLanguageChange,
   onThemeChange,
@@ -174,6 +182,16 @@ export function SettingsPage({
           </SelectContent>
         </Select>
       </SettingsSection>
+
+      <Separator />
+
+      <CredentialStorageSection
+        credentialStorageState={credentialStorageState}
+        defaultBackend={preferences.defaultCredentialStorageBackend}
+        t={t}
+        onDefaultBackendChange={onDefaultCredentialStorageBackendChange}
+        onRefreshCredentialStorageState={onRefreshCredentialStorageState}
+      />
 
       <Separator />
 

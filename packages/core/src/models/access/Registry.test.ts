@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { LocalCredentialSourceFactory } from "../../services/credential/Factory";
 import { type StoredCredential } from "../../services/credential/Types";
 import { KeychainCredentialStore } from "../../services/credential/KeychainCredentialStore";
+import { normalizeCredentialStoreTarget, type CredentialStoreTarget } from "../../services/credential";
 import { SqliteDatabase } from "../../services/database/SqliteDatabase";
 import { EndpointRegistry } from "../endpoint";
 import { SqliteAccessStore } from "./SqliteAccessStore";
@@ -112,6 +113,41 @@ describe("AccessRegistry", () => {
     });
 
     registry.close();
+  });
+
+  it("persists credential storage backend metadata across reloads", () => {
+    const dbPath = createTempDatabasePath();
+    const credentialStore = new StubCredentialStore();
+    seedEndpoint(dbPath, {
+      id: "gateway",
+      label: "Gateway",
+      rootUrl: "https://gateway.example.test",
+      protocols: {
+        openai: {
+          wireApis: ["responses"],
+          authSchemes: ["bearer"],
+        },
+      },
+    });
+
+    const registry = AccessRegistry.open(dbPath, credentialStore);
+    registry.add(
+      {
+        id: "gateway-team",
+        endpointId: "gateway",
+        label: "Gateway Team",
+        authMode: "api_key",
+        credentialStorageBackend: "encrypted_local_storage",
+      },
+      { kind: "api_key", apiKey: "gateway-secret" },
+    );
+    registry.close();
+
+    const reopened = AccessRegistry.open(dbPath, credentialStore);
+    expect(reopened.get("gateway-team")).toEqual(expect.objectContaining({
+      credentialStorageBackend: "encrypted_local_storage",
+    }));
+    reopened.close();
   });
 
   it("removes credentials when access is removed", () => {
@@ -428,15 +464,16 @@ function seedEndpoint(
 class StubCredentialStore extends KeychainCredentialStore {
   readonly records = new Map<string, StoredCredential>();
 
-  override create(reference: string, credential: StoredCredential): void {
-    this.records.set(reference, credential);
+  override create(target: CredentialStoreTarget, credential: StoredCredential): void {
+    this.records.set(normalizeCredentialStoreTarget(target).reference, credential);
   }
 
-  override update(reference: string, credential: StoredCredential): void {
-    this.records.set(reference, credential);
+  override update(target: CredentialStoreTarget, credential: StoredCredential): void {
+    this.records.set(normalizeCredentialStoreTarget(target).reference, credential);
   }
 
-  override get(reference: string): StoredCredential {
+  override get(target: CredentialStoreTarget): StoredCredential {
+    const reference = normalizeCredentialStoreTarget(target).reference;
     const credential = this.records.get(reference);
     if (!credential) {
       throw new Error(`Missing stub credential: ${reference}`);
@@ -444,12 +481,12 @@ class StubCredentialStore extends KeychainCredentialStore {
     return credential;
   }
 
-  override has(reference: string): boolean {
-    return this.records.has(reference);
+  override has(target: CredentialStoreTarget): boolean {
+    return this.records.has(normalizeCredentialStoreTarget(target).reference);
   }
 
-  override remove(reference: string): void {
-    this.records.delete(reference);
+  override remove(target: CredentialStoreTarget): void {
+    this.records.delete(normalizeCredentialStoreTarget(target).reference);
   }
 }
 

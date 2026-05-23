@@ -7,6 +7,7 @@ import {
   LiveSetupImportSupport,
   requireResolvedImportCandidate,
 } from "@nile/core/actions/live-setup";
+import type { ImportCurrentConnectionInput } from "@nile/core/models/agent/Adapter";
 import { LiveSetupMatcher } from "@nile/core/actions/live-setup";
 import {
   AgentWorkspaceBinding,
@@ -81,10 +82,11 @@ export class ImportCurrentConnection {
     private readonly ownedContext: { close(): void } | null = null,
   ) {}
 
-  async importCurrent() {
+  async importCurrent(input?: ImportCurrentConnectionInput) {
     return await this.importSupport.importDetected(
       this.detector.detect(),
       () => requireResolvedImportCandidate("OpenClaw", this.reader.read()),
+      input,
     );
   }
 

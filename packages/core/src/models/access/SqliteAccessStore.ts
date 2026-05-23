@@ -1,4 +1,5 @@
 import type { CredentialSource } from "../../services/credential/Source";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 import { SchemaMigrations, SqliteDatabase } from "../../services/database";
 import type { AgentId } from "../agent";
 import type { AuthMode } from "./AuthMode";
@@ -10,6 +11,7 @@ type AccessRow = {
   label: string;
   auth_mode: string;
   identity_key: string | null;
+  credential_storage_backend: string | null;
   api_key_source: string | null;
   env_key: string | null;
   enabled_agents: string;
@@ -35,6 +37,7 @@ export class SqliteAccessStore {
           label,
           auth_mode,
           identity_key,
+          credential_storage_backend,
           api_key_source,
           env_key,
           enabled_agents,
@@ -44,13 +47,14 @@ export class SqliteAccessStore {
           credential_sync_issue,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       record.id,
       record.endpointId,
       record.label,
       record.authMode,
       record.identityKey ?? null,
+      record.credentialStorageBackend ?? null,
       record.apiKeySource ?? null,
       record.envKey ?? null,
       JSON.stringify(record.enabledAgents),
@@ -71,6 +75,7 @@ export class SqliteAccessStore {
             label = ?,
             auth_mode = ?,
             identity_key = ?,
+            credential_storage_backend = ?,
             api_key_source = ?,
             env_key = ?,
             enabled_agents = ?,
@@ -83,6 +88,7 @@ export class SqliteAccessStore {
       record.label,
       record.authMode,
       record.identityKey ?? null,
+      record.credentialStorageBackend ?? null,
       record.apiKeySource ?? null,
       record.envKey ?? null,
       JSON.stringify(record.enabledAgents),
@@ -124,6 +130,7 @@ export class SqliteAccessStore {
             label,
             auth_mode,
             identity_key,
+            credential_storage_backend,
             api_key_source,
             env_key,
             enabled_agents,
@@ -152,6 +159,7 @@ export class SqliteAccessStore {
             label,
             auth_mode,
             identity_key,
+            credential_storage_backend,
             api_key_source,
             env_key,
             enabled_agents,
@@ -202,16 +210,19 @@ export class SqliteAccessStore {
         statements: ["ALTER TABLE accesses ADD COLUMN credential_sync_state TEXT NOT NULL DEFAULT 'ready';"],
       },
       { version: 6, statements: ["ALTER TABLE accesses ADD COLUMN credential_sync_issue TEXT;"] },
+      { version: 7, statements: ["ALTER TABLE accesses ADD COLUMN credential_storage_backend TEXT;"] },
     ]);
   }
 
   private mapRow(row: AccessRow): AccessRecord {
+    const credentialStorageBackend = this.mapCredentialStorageBackend(row.credential_storage_backend);
     return {
       id: row.id,
       endpointId: row.endpoint_id,
       label: row.label,
       authMode: row.auth_mode as AuthMode,
       ...(row.identity_key ? { identityKey: row.identity_key } : {}),
+      ...(credentialStorageBackend ? { credentialStorageBackend } : {}),
       ...(row.api_key_source === "direct" || row.api_key_source === "env_key"
         ? { apiKeySource: row.api_key_source }
         : {}),
@@ -249,6 +260,13 @@ export class SqliteAccessStore {
       return value;
     }
     return "ready";
+  }
+
+  private mapCredentialStorageBackend(value: string | null): CredentialStorageBackend | undefined {
+    if (value === "system_secure_storage" || value === "encrypted_local_storage") {
+      return value;
+    }
+    return undefined;
   }
 
   private parseEnabledAgents(value: string): AgentId[] {

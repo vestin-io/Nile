@@ -5,6 +5,7 @@ import type { BindCursorUsageResult } from "@nile/builtins/cursor-usage";
 import type { AuthMode } from "@nile/core/models/access";
 import type { ConnectionPresetFamily, ConnectionOnboardingSuggestion, ConnectionModelCatalogResult } from "@nile/core/models/connection";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
 import type { DesktopConnectionAlert, DesktopConnection } from "../../state/Types";
 import type { CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../alerts/Store";
@@ -15,6 +16,8 @@ export type DesktopConnectionCredentialInput = {
   envKey?: string;
   sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
   sessionAuthJsonPath?: string;
+  credentialStorageBackend?: CredentialStorageBackend;
+  encryptedLocalPassphrase?: string;
 };
 
 export type DesktopAddConnectionInput = DesktopConnectionCredentialInput & {
@@ -47,6 +50,11 @@ export type DesktopPreparedConnectionDraft = {
   defaultEnabledAgents: AgentId[];
 };
 
+export type DesktopCredentialStorageState = {
+  encryptedLocalVaultExists: boolean;
+  encryptedLocalUnlocked: boolean;
+};
+
 export type DesktopConnectionModelCatalog = ConnectionModelCatalogResult;
 
 export type DesktopGetConnectionModelCatalogInput = {
@@ -58,6 +66,10 @@ export type DesktopSavePreparedConnectionInput = {
   draftId: string;
   label?: string;
   enabledAgents?: AgentId[];
+};
+
+export type DesktopImportCurrentConnectionInput = DesktopConnectionCredentialInput & {
+  agentId: AgentId;
 };
 
 export type DesktopDiscardPreparedConnectionDraftInput = {
@@ -85,6 +97,8 @@ export type DesktopUpdateAgentConnectionModelInput = {
 
 export type DesktopConnectionBridge = {
   listConnectionDefinitions(): Promise<import("@nile/core/models/connection").ConnectionDefinition[]>;
+  getCredentialStorageState(): Promise<DesktopCredentialStorageState>;
+  unlockEncryptedLocalStorage(passphrase: string): Promise<void>;
   chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null>;
   describeConnectionOnboarding(input: DesktopAddConnectionInput): Promise<ConnectionOnboardingSuggestion>;
   describeSavedConnectionOnboarding(input: DesktopDescribeSavedConnectionOnboardingInput): Promise<ConnectionOnboardingSuggestion>;
@@ -96,7 +110,7 @@ export type DesktopConnectionBridge = {
   addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary>;
   updateConnection(input: DesktopUpdateConnectionInput): Promise<DesktopConnectionSummary>;
   importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult>;
-  importCurrentConnection(agentId: AgentId): Promise<DesktopConnectionSummary>;
+  importCurrentConnection(input: DesktopImportCurrentConnectionInput): Promise<DesktopConnectionSummary>;
   removeConnection(connectionId: string): Promise<RemoveConnectionResult>;
   updateAgentConnectionModel(input: DesktopUpdateAgentConnectionModelInput): Promise<string | null>;
   getConnectionModelCatalog(input: DesktopGetConnectionModelCatalogInput): Promise<DesktopConnectionModelCatalog>;

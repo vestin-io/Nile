@@ -36,6 +36,13 @@ export function AgentHomeSection({
   const [runtimeCommandInputPath, setRuntimeCommandInputPath] = useState(runtimeCommandPath ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
+  const normalizedPath = path.trim() ? path : null;
+  const normalizedCurrentPath = currentPath.trim() ? currentPath : null;
+  const normalizedRuntimeCommandPath = runtimeCommandInputPath.trim() ? runtimeCommandInputPath : null;
+  const normalizedCurrentRuntimeCommandPath = runtimeCommandPath?.trim() ? runtimeCommandPath : null;
+  const isDirty = normalizedPath !== normalizedCurrentPath
+    || normalizedRuntimeCommandPath !== normalizedCurrentRuntimeCommandPath;
+
   useEffect(() => {
     setPath(currentPath);
   }, [currentPath]);
@@ -51,51 +58,19 @@ export function AgentHomeSection({
 
     setIsSaving(true);
     try {
-      await onSaveHome(agentId, path.trim() ? path : null);
+      await onSaveHome(agentId, normalizedPath);
+      await onSaveRuntimeCommand(agentId, normalizedRuntimeCommandPath);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleReset = async () => {
-    if (isSaving) {
-      return;
-    }
-
+  const handleReset = () => {
     setPath(defaultPath);
-    setIsSaving(true);
-    try {
-      await onSaveHome(agentId, null);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
-  const handleRuntimeCommandSave = async () => {
-    if (isSaving) {
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await onSaveRuntimeCommand(agentId, runtimeCommandInputPath.trim() ? runtimeCommandInputPath : null);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleRuntimeCommandReset = async () => {
-    if (isSaving) {
-      return;
-    }
-
+  const handleRuntimeCommandReset = () => {
     setRuntimeCommandInputPath("");
-    setIsSaving(true);
-    try {
-      await onSaveRuntimeCommand(agentId, null);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   return (
@@ -126,12 +101,9 @@ export function AgentHomeSection({
             />
           </Field>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void handleSave()} disabled={isSaving}>
-              {isSaving ? t("agents.home.saving") : t("common.save")}
-            </Button>
             <Button
               variant="outline"
-              onClick={() => void handleReset()}
+              onClick={handleReset}
               disabled={isSaving}
             >
               {t("agents.home.resetDefault", { path: defaultPath })}
@@ -162,14 +134,8 @@ export function AgentHomeSection({
             </Field>
             <div className="flex flex-wrap gap-2">
               <Button
-                onClick={() => void handleRuntimeCommandSave()}
-                disabled={isSaving}
-              >
-                {isSaving ? t("agents.home.saving") : t("common.save")}
-              </Button>
-              <Button
                 variant="outline"
-                onClick={() => void handleRuntimeCommandReset()}
+                onClick={handleRuntimeCommandReset}
                 disabled={isSaving}
               >
                 {t("agents.home.resetCliCommandOverride")}
@@ -178,6 +144,12 @@ export function AgentHomeSection({
           </CardContent>
         </Card>
       ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => void handleSave()} disabled={isSaving || !isDirty}>
+          {isSaving ? t("agents.home.saving") : t("common.save")}
+        </Button>
+      </div>
     </div>
   );
 }

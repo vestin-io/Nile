@@ -32,7 +32,10 @@ export function AgentLocalSetupSection({
         detectedSetup={detectedSetup}
         t={t}
         onConfigure={onConfigure}
-        onSave={onImport}
+        onSave={async (agentId) => {
+          await onImport(agentId);
+          return "saved";
+        }}
       />
     </div>
   );
