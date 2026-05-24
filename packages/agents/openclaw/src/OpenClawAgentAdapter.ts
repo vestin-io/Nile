@@ -5,7 +5,11 @@ import type { CredentialStore } from "@nile/core/services/credential";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import { SecureSnapshotStore } from "@nile/core/services/history";
 import { NileLogger } from "@nile/core/services/NileLogger";
-import type { AgentAdapter, RollbackLatestAgentResult } from "@nile/core/models/agent/Adapter";
+import type {
+  AgentAdapter,
+  ImportCurrentConnectionInput,
+  RollbackLatestAgentResult,
+} from "@nile/core/models/agent/Adapter";
 import type { AgentWorkspaceContext } from "@nile/core/runtime-local/AgentWorkspaceContext";
 import { AgentOperationRuntime } from "@nile/core/runtime-local/AgentOperationRuntime";
 import { ApplySelection } from "./ApplySelection";
@@ -75,8 +79,11 @@ export class OpenClawAgentAdapter implements AgentAdapter {
     return AgentOperationRuntime.run(this.openApplyOperation, (applySelection) => applySelection.apply(connectionId));
   }
 
-  async importCurrentConnection() {
-    return await AgentOperationRuntime.runAsync(this.openImportOperation, async (importer) => await importer.importCurrent());
+  async importCurrentConnection(input?: ImportCurrentConnectionInput) {
+    return await AgentOperationRuntime.runAsync(
+      this.openImportOperation,
+      async (importer) => await importer.importCurrent(input),
+    );
   }
 
   rollbackLatestMutation(): RollbackLatestAgentResult {

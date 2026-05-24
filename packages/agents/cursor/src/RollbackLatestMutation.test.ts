@@ -79,7 +79,6 @@ describe("RollbackLatestMutation", () => {
       context.sharedContext.accessRegistry,
       context.agentSelection,
       context.sharedContext.agentConnectionSettings,
-      setup.credentialStore,
       NileLogger.silent(),
       (message: string) => new Error(message),
       (input) => CURSOR_PROJECTION.resolve(input),

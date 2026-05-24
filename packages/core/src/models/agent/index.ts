@@ -14,6 +14,7 @@ export type {
   DetectedAgentAccess,
   DetectedAgentEndpoint,
   DetectedAgentState,
+  ImportCurrentConnectionInput,
   ImportCurrentConnectionResult,
   MatchedAgentConnection,
   RollbackLatestAgentResult,

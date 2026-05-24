@@ -1,5 +1,6 @@
 import type { ReusedConnectionDialogState } from "./useNavigation";
 import { CursorUsageRepairDialog } from "../../connections/dialogs/RepairUsage";
+import { UnlockEncryptedLocalStorageDialog } from "../../connections/dialogs/UnlockEncryptedLocalStorage";
 import { ResetStateDialog } from "../../settings/dialogs/ResetState";
 import { ReusedConnectionDialog } from "../../connections/dialogs/Reused";
 import { NileDialog } from "../../settings/dialogs/Nile";
@@ -10,9 +11,13 @@ type SettingsDialogsProps = {
   isResetting: boolean;
   isSupportOpen: boolean;
   isResetDialogOpen: boolean;
+  isUnlockingEncryptedLocalStorage: boolean;
+  isUnlockEncryptedLocalStorageDialogOpen: boolean;
+  unlockEncryptedLocalStorageHint: string | null;
   repairUsageConnection: DesktopConnection | null;
   reusedConnectionDialog: ReusedConnectionDialogState;
   t: Translator;
+  unlockEncryptedLocalStorageError: string | null;
   onBindCursorUsage(connectionId: string, sessionToken: string): Promise<void>;
   onCloseRepairUsage(): void;
   onOpenGitHubIssues(): Promise<void>;
@@ -22,15 +27,21 @@ type SettingsDialogsProps = {
   onContinueReusedConnection(): void;
   onSetNileDialogOpen(open: boolean): void;
   onSetResetDialogOpen(open: boolean): void;
+  onSetUnlockEncryptedLocalStorageDialogOpen(open: boolean): void;
+  onUnlockEncryptedLocalStorage(passphrase: string): Promise<void>;
 };
 
 export function SettingsDialogs({
   isResetting,
   isSupportOpen,
   isResetDialogOpen,
+  isUnlockingEncryptedLocalStorage,
+  isUnlockEncryptedLocalStorageDialogOpen,
+  unlockEncryptedLocalStorageHint,
   repairUsageConnection,
   reusedConnectionDialog,
   t,
+  unlockEncryptedLocalStorageError,
   onBindCursorUsage,
   onCloseRepairUsage,
   onOpenGitHubIssues,
@@ -40,6 +51,8 @@ export function SettingsDialogs({
   onContinueReusedConnection,
   onSetNileDialogOpen,
   onSetResetDialogOpen,
+  onSetUnlockEncryptedLocalStorageDialogOpen,
+  onUnlockEncryptedLocalStorage,
 }: SettingsDialogsProps) {
   return (
     <>
@@ -70,6 +83,16 @@ export function SettingsDialogs({
         open={reusedConnectionDialog !== null}
         t={t}
         onContinue={onContinueReusedConnection}
+      />
+
+      <UnlockEncryptedLocalStorageDialog
+        errorMessage={unlockEncryptedLocalStorageError}
+        hintMessage={unlockEncryptedLocalStorageHint}
+        isSubmitting={isUnlockingEncryptedLocalStorage}
+        open={isUnlockEncryptedLocalStorageDialogOpen}
+        t={t}
+        onOpenChange={onSetUnlockEncryptedLocalStorageDialogOpen}
+        onSubmit={onUnlockEncryptedLocalStorage}
       />
 
       <NileDialog

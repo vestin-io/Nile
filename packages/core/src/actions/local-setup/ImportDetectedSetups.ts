@@ -15,7 +15,7 @@ export class ImportDetectedSetups {
   async run(input: ImportDetectedSetupsInput): Promise<ImportDetectedSetupsResult> {
     const selections = this.uniqueSelections(input);
     const scan = this.scanner.run(selections);
-    const results = await Promise.all(selections.map((agentId) => this.importSelection(agentId, scan.items)));
+    const results = await Promise.all(selections.map((agentId) => this.importSelection(agentId, input, scan.items)));
     return { results };
   }
 
@@ -25,6 +25,7 @@ export class ImportDetectedSetups {
 
   private async importSelection(
     agentId: AgentId,
+    input: ImportDetectedSetupsInput,
     items: ReturnType<ScanLocalSetups["run"]>["items"],
   ): Promise<ImportDetectedSetupResult> {
     const item = items.find((candidate) => candidate.scanId === agentId);
@@ -37,7 +38,9 @@ export class ImportDetectedSetups {
     }
 
     try {
-      const result = await this.agentAdapterRegistry.get(agentId).importCurrentConnection();
+      const result = await this.agentAdapterRegistry.get(agentId).importCurrentConnection({
+        credentialStorageBackend: input.credentialStorageBackend,
+      });
       return {
         scanId: agentId,
         status: result.reused ? "reused" : "created",

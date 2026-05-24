@@ -3,6 +3,7 @@ import type { AgentId } from "../agent";
 import type { EndpointRecord, EndpointRegistry, EndpointRegistryInput } from "../endpoint";
 import { EndpointShape } from "../endpoint";
 import type { StoredCredential } from "../../services/credential/Types";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 import { ConnectionAccessMatchSupport } from "./AccessMatch";
 import { ConnectionNaming } from "./Naming";
 import { OpenAiSessionCompatibility } from "./OpenAiSessionCompatibility";
@@ -14,6 +15,7 @@ export type ConnectionUpsertInput = {
     label: string;
     authMode: AuthMode;
     credential: StoredCredential;
+    credentialStorageBackend: CredentialStorageBackend;
     identityKey?: string | null;
     enabledAgents: AgentId[];
     enabledAgentsMode: "replace" | "merge";
@@ -119,6 +121,7 @@ export class ConnectionUpsert {
           authMode,
           identityKey: input.identityKey ?? null,
           enabledAgents,
+          credentialStorageBackend: existing.credentialStorageBackend,
         }, credential),
         reused: true,
       };
@@ -131,6 +134,7 @@ export class ConnectionUpsert {
         label: input.label,
         authMode: input.authMode,
         enabledAgents: input.enabledAgents,
+        credentialStorageBackend: input.credentialStorageBackend,
         ...(input.identityKey?.trim() ? { identityKey: input.identityKey.trim() } : {}),
       }, input.credential),
       reused: false,

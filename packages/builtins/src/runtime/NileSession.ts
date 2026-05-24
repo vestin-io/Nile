@@ -12,6 +12,7 @@ import type {
 import type {
   AgentCapabilitySupport,
   ApplyAgentSelectionResult,
+  ImportCurrentConnectionInput,
   ImportCurrentConnectionResult,
   RollbackLatestAgentResult,
 } from "@nile/core/models/agent";
@@ -174,8 +175,11 @@ export class NileSession {
     );
   }
 
-  async importCurrentConnection(agentId: AgentId): Promise<ImportCurrentConnectionResult> {
-    return await this.resources.getAgentAdapterRegistry().get(agentId).importCurrentConnection();
+  async importCurrentConnection(
+    agentId: AgentId,
+    input?: ImportCurrentConnectionInput,
+  ): Promise<ImportCurrentConnectionResult> {
+    return await this.resources.getAgentAdapterRegistry().get(agentId).importCurrentConnection(input);
   }
 
   rollbackLatestMutation(agentId: AgentId): RollbackLatestAgentResult {

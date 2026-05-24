@@ -48,6 +48,28 @@ describe("DesktopPreferencesStore", () => {
       "codex-work": "weekly",
     });
   });
+
+  it("keeps a valid credential storage mode", () => {
+    const storage = createStorage({
+      "nile.desktop.preferences": JSON.stringify({
+        credentialStorageMode: "encrypted_local_storage",
+      }),
+    });
+
+    const store = new DesktopPreferencesStore(storage, createRootElement());
+    expect(store.load().credentialStorageMode).toBe("encrypted_local_storage");
+  });
+
+  it("drops an invalid credential storage mode", () => {
+    const storage = createStorage({
+      "nile.desktop.preferences": JSON.stringify({
+        credentialStorageMode: "plaintext_file",
+      }),
+    });
+
+    const store = new DesktopPreferencesStore(storage, createRootElement());
+    expect(store.load().credentialStorageMode).toBeNull();
+  });
 });
 
 function createStorage(values: Record<string, string>): Storage {

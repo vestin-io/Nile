@@ -407,6 +407,8 @@ function createSettingsState(): SettingsState {
       ],
       savedConnectionCount: 4,
       importableSetupCount: 0,
+      credentialStorageMode: "system_secure_storage",
+      credentialStorageModeMixed: false,
     },
   };
 }

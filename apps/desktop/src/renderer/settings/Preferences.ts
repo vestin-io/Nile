@@ -1,4 +1,5 @@
 import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import {
   LANGUAGE_SELF_LABELS,
   SUPPORTED_LANGUAGES,
@@ -15,6 +16,7 @@ export type AgentOrderPreference = AgentId[];
 
 export type DesktopPreferences = {
   agentOrder: AgentOrderPreference;
+  credentialStorageMode: CredentialStorageBackend | null;
   connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences;
   language: LanguagePreference;
   quickSetupDismissed: boolean;
@@ -22,6 +24,10 @@ export type DesktopPreferences = {
 };
 
 const STORAGE_KEY = "nile.desktop.preferences";
+const SUPPORTED_CREDENTIAL_STORAGE_BACKENDS: CredentialStorageBackend[] = [
+  "system_secure_storage",
+  "encrypted_local_storage",
+];
 export { SUPPORTED_LANGUAGES };
 export { LANGUAGE_SELF_LABELS };
 export type { LanguagePreference, ThemePreference };
@@ -39,6 +45,7 @@ export class DesktopPreferencesStore {
   load(): DesktopPreferences {
     const fallback: DesktopPreferences = {
       agentOrder: readDefaultAgentOrder(),
+      credentialStorageMode: null,
       connectionQuotaMetricPreferences: {},
       language: "en",
       quickSetupDismissed: false,
@@ -53,6 +60,9 @@ export class DesktopPreferencesStore {
       const parsed = JSON.parse(raw) as Partial<DesktopPreferences>;
       return {
         agentOrder: normalizeAgentOrder(parsed.agentOrder),
+        credentialStorageMode: normalizeCredentialStorageBackendPreference(
+          parsed.credentialStorageMode,
+        ),
         connectionQuotaMetricPreferences: normalizeConnectionQuotaMetricPreferences(
           parsed.connectionQuotaMetricPreferences,
         ),
@@ -124,4 +134,16 @@ function normalizeAgentOrder(value: unknown): AgentOrderPreference {
   }
 
   return uniqueAgents;
+}
+
+function normalizeCredentialStorageBackendPreference(
+  value: unknown,
+): CredentialStorageBackend | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return typeof value === "string"
+    && SUPPORTED_CREDENTIAL_STORAGE_BACKENDS.includes(value as CredentialStorageBackend)
+    ? value as CredentialStorageBackend
+    : null;
 }

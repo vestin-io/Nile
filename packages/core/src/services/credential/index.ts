@@ -31,9 +31,21 @@ export {
   CredentialAlreadyExistsError,
   CredentialNotFoundError,
   CredentialStoreCommandError,
+  EncryptedLocalCredentialStoreCorruptedError,
+  EncryptedLocalCredentialStoreLockedError,
+  EncryptedLocalCredentialStorePassphraseError,
   CredentialStoreValidationError,
+  SystemSecureCredentialStoreDeniedError,
+  SUPPORTED_CREDENTIAL_STORAGE_BACKENDS,
+  normalizeCredentialStoreTarget,
 } from "./Store";
-export type { CredentialStore } from "./Store";
+export type {
+  CredentialStorageBackend,
+  CredentialStore,
+  CredentialStoreTarget,
+} from "./Store";
 export { KeychainCredentialStore } from "./KeychainCredentialStore";
+export { EncryptedLocalCredentialStore } from "./EncryptedLocalCredentialStore";
+export { BackendCredentialStore, buildCredentialStoreTarget } from "./BackendCredentialStore";
 export { GenericPasswordWriter } from "./GenericPasswordWriter";
 export { SecurityCli, type SecurityCliResult } from "./SecurityCli";

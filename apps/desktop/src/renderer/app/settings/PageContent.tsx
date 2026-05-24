@@ -17,6 +17,7 @@ import type {
   LanguagePreference,
   ThemePreference,
 } from "../../settings/Preferences";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import type { HistoryState, NotificationHistoryState, SettingsState } from "../../shared/DesktopData";
 import type { Definition } from "../../shared/DesktopData";
 import type { Translator } from "../../shared/I18n";
@@ -28,7 +29,11 @@ import type {
   PreparedConnectionDraft,
 } from "../../connections/add/Types";
 
-type SettingsPageContentProps = {
+export type SettingsPageContentProps = {
+  credentialStorageMode: CredentialStorageBackend | null;
+  isCredentialStorageModeLocked: boolean;
+  isCredentialStorageModeMixed: boolean;
+  credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
   addConnectionDefinitions: Definition[];
   addConnectionTargetAgentId: AgentId | null;
   canConfigureAgent(agentId: AgentId): boolean;
@@ -73,8 +78,17 @@ type SettingsPageContentProps = {
   onCheckForUpdates(): Promise<void>;
   onCloseAddConnectionPage(): void;
   onConfigureAgent(agentId: AgentId): void;
+  onRememberCredentialStorageMode(backend: CredentialStorageBackend): void;
   onConfirmImportAgent(agentId: AgentId): Promise<void>;
+  onQuickSetupSaveAgent(
+    agentId: AgentId,
+    input: {
+      credentialStorageBackend: CredentialStorageBackend;
+      encryptedLocalPassphrase?: string;
+    },
+  ): Promise<void>;
   onCompleteQuickSetup(): void;
+  onRefreshCredentialStorageState(): Promise<Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>>;
   onOpenQuickSetupModelSetup(agentId: AgentId): void;
   onUseExistingQuickSetupConnection(agentId: AgentId, connectionId: string): Promise<void>;
   onUpdateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): Promise<void>;
@@ -129,9 +143,13 @@ type SettingsPageContentProps = {
 };
 
 export function SettingsPageContent({
+  credentialStorageMode,
   addConnectionDefinitions,
   addConnectionTargetAgentId,
   canConfigureAgent,
+  credentialStorageState,
+  isCredentialStorageModeLocked,
+  isCredentialStorageModeMixed,
   defaultOpenAiAuthJsonPath,
   definitions,
   historyState,
@@ -174,7 +192,9 @@ export function SettingsPageContent({
   onCloseAddConnectionPage,
   onConfigureAgent,
   onConfirmImportAgent,
+  onQuickSetupSaveAgent,
   onCompleteQuickSetup,
+  onRefreshCredentialStorageState,
   onOpenQuickSetupModelSetup,
   onUseExistingQuickSetupConnection,
   onCreateProfile,
@@ -193,6 +213,7 @@ export function SettingsPageContent({
   onOpenQuickSetup,
   onProfileFeatureEnabledChange,
   onPrepareConnectionDraft,
+  onRememberCredentialStorageMode,
   onRefresh,
   onRefreshNotificationHistory,
   onRemoveConnection,
@@ -218,12 +239,18 @@ export function SettingsPageContent({
     return (
       <QuickSetupPage
         canConfigureAgent={canConfigureAgent}
+        credentialStorageState={credentialStorageState}
+        credentialStorageMode={credentialStorageMode}
         state={settingsState}
+        isCredentialStorageModeLocked={isCredentialStorageModeLocked}
+        isCredentialStorageModeMixed={isCredentialStorageModeMixed}
         t={t}
         onConfigureAgent={onConfigureAgent}
-        onConfirmAgent={onConfirmImportAgent}
+        onSaveAgent={onQuickSetupSaveAgent}
         onDone={onCompleteQuickSetup}
+        onRefreshCredentialStorageState={onRefreshCredentialStorageState}
         onOpenModelSetup={onOpenQuickSetupModelSetup}
+        onRememberCredentialStorageMode={onRememberCredentialStorageMode}
         onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
         onUseExistingConnection={onUseExistingQuickSetupConnection}
       />
@@ -264,8 +291,11 @@ export function SettingsPageContent({
   if (visiblePage === "connections") {
     return (
       <ConnectionsPage
-        detailContextAgent={selectedConnectionContextAgent}
-        defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
+          credentialStorageMode={credentialStorageMode}
+          credentialStorageState={credentialStorageState}
+          detailContextAgent={selectedConnectionContextAgent}
+          defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
+          isCredentialStorageModeMixed={isCredentialStorageModeMixed}
         definitions={definitions}
         language={language}
         state={settingsState}
@@ -340,13 +370,19 @@ export function SettingsPageContent({
     return (
       <AddConnectionPage
         key={addConnectionTargetAgentId ?? "all"}
+        credentialStorageMode={credentialStorageMode}
+        isCredentialStorageModeLocked={isCredentialStorageModeLocked}
+        isCredentialStorageModeMixed={isCredentialStorageModeMixed}
         defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
+        credentialStorageState={credentialStorageState}
         definitions={addConnectionDefinitions}
         language={language}
         targetAgentId={addConnectionTargetAgentId}
         t={t}
         onBack={onCloseAddConnectionPage}
+        onRememberCredentialStorageMode={onRememberCredentialStorageMode}
         onPrepareDraft={onPrepareConnectionDraft}
+        onRefreshCredentialStorageState={onRefreshCredentialStorageState}
         onSavePrepared={onSavePreparedConnection}
         onSubmit={onAddConnection}
       />
@@ -360,6 +396,9 @@ export function SettingsPageContent({
         isLoadedMenubarDisplay={isLoadedMenubarDisplay}
         isSavingMenubarDisplay={isSavingMenubarDisplay}
         menubarDisplayMode={menubarDisplayMode}
+        credentialStorageMode={credentialStorageMode}
+        isCredentialStorageModeLocked={isCredentialStorageModeLocked}
+        isCredentialStorageModeMixed={isCredentialStorageModeMixed}
         isSavingNotificationMute={isSavingNotificationMute}
         isResetting={isResetting}
         isSavingProfileFeature={isSavingProfileFeature}

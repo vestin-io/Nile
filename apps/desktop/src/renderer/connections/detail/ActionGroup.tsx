@@ -7,6 +7,8 @@ import { cn } from "../../ui/cn";
 
 type ConnectionActionGroupProps = {
   canRemove: boolean;
+  canEdit?: boolean;
+  canRefresh?: boolean;
   t: Translator;
   onEdit(): void;
   onRefresh(): Promise<void>;
@@ -15,6 +17,8 @@ type ConnectionActionGroupProps = {
 
 export function ConnectionActionGroup({
   canRemove,
+  canEdit = true,
+  canRefresh = true,
   t,
   onEdit,
   onRefresh,
@@ -26,18 +30,22 @@ export function ConnectionActionGroup({
     <DetailActionGroup
       items={[
         {
+          disabled: !canEdit,
           icon: <Pencil className="h-4 w-4" />,
           label: t("common.edit"),
           onClick: () => {
+            if (!canEdit) {
+              return;
+            }
             onEdit();
           },
         },
         {
-          disabled: isRefreshing,
+          disabled: !canRefresh || isRefreshing,
           icon: <RefreshCw className={cn("h-4 w-4", isRefreshing && "animate-spin")} />,
           label: t("common.refresh"),
           onClick: () => {
-            if (isRefreshing) {
+            if (!canRefresh || isRefreshing) {
               return;
             }
             setIsRefreshing(true);

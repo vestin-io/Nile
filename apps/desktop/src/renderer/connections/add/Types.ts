@@ -1,4 +1,5 @@
 import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
 import type { Definition } from "../../shared/DesktopData";
 
@@ -9,6 +10,8 @@ export type AddConnectionSubmitInput = {
   endpointUrl?: string;
   enabledAgents?: AgentId[];
   allowUndetectedGateway?: boolean;
+  credentialStorageBackend: CredentialStorageBackend;
+  encryptedLocalPassphrase?: string;
   apiKeySource?: "direct" | "env_key";
   apiKey?: string;
   envKey?: string;

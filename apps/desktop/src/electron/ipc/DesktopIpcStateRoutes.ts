@@ -12,6 +12,7 @@ type DesktopIpcStateRoutesOptions = {
   getNotificationsMuted(): boolean;
   getProfileFeatureEnabled(): boolean;
   inputs: DesktopIpcInputValidator;
+  notifyLocalStateReset(): void;
   notifyNotificationHistoryChanged(): void;
   refreshAll(): void;
   refreshDesktopState(options: { invalidate: boolean; notifyRenderer: boolean }): Promise<void>;
@@ -34,7 +35,7 @@ export class DesktopIpcStateRoutes {
     ipcMain.handle("desktop:get-menubar-state", () => stateStore.getMenubarState());
     ipcMain.handle("desktop:get-menubar-display", () => this.options.getMenubarDisplay());
     ipcMain.handle("desktop:get-settings-state", () => stateStore.getSettingsState());
-    ipcMain.handle("desktop:get-settings-state-snapshot", () => stateStore.getSettingsState({ refreshUsage: false }));
+    ipcMain.handle("desktop:get-settings-state-snapshot", () => stateStore.getSettingsStateSnapshot());
     ipcMain.handle("desktop:get-history-state", () => stateStore.getHistoryState());
     ipcMain.handle("desktop:get-notification-history", (_event, filter: unknown) =>
       stateStore.getNotificationHistory(inputs.readNotificationHistoryFilter(filter)));
@@ -87,6 +88,7 @@ export class DesktopIpcStateRoutes {
     });
     ipcMain.handle("desktop:reset-state", () => {
       const result = stateStore.resetState();
+      this.options.notifyLocalStateReset();
       this.options.refreshAll();
       return result;
     });

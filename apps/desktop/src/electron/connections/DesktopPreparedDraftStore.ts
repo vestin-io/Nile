@@ -8,6 +8,8 @@ import type { DesktopAddConnectionInput } from "./contracts";
 export type PreparedConnectionDraftRecord = {
   authMode: DesktopAddConnectionInput["authMode"];
   credential: StoredCredential;
+  credentialStorageBackend?: DesktopAddConnectionInput["credentialStorageBackend"];
+  encryptedLocalPassphrase?: string;
   endpointUrl?: string;
   expiresAt: number;
   onboarding: ConnectionOnboardingSuggestion;

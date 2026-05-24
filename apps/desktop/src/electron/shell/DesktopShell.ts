@@ -43,6 +43,10 @@ export class DesktopShell {
     this.sendToSettingsWindow("desktop:state-changed");
   }
 
+  notifyLocalStateReset(): void {
+    this.sendToSettingsWindow("desktop:local-state-reset");
+  }
+
   notifyNotificationHistoryChanged(): void {
     this.sendToSettingsWindow("desktop:notification-history-changed");
   }

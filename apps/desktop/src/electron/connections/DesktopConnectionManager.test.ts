@@ -10,7 +10,16 @@ import { EndpointRegistry } from "@nile/core/models/endpoint";
 import { CursorUsageBindingRegistry } from "@nile/builtins/cursor-usage";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import type { InteractiveSessionLoginContext } from "@nile/core/session";
-import { KeychainCredentialStore, SecurityCli, type StoredCredential, type SecurityCliResult } from "@nile/core/services/credential";
+import {
+  BackendCredentialStore,
+  KeychainCredentialStore,
+  SecurityCli,
+  type StoredCredential,
+  type SecurityCliResult,
+  SystemSecureCredentialStoreDeniedError,
+  normalizeCredentialStoreTarget,
+  type CredentialStoreTarget,
+} from "@nile/core/services/credential";
 import type { InteractiveSessionLoginRegistry } from "@nile/builtins/session";
 
 import { DesktopConnectionGateway } from "./DesktopConnectionGateway";
@@ -46,6 +55,7 @@ describe("DesktopConnectionManager", () => {
       authMode: "api_key",
       endpointUrl: "https://router.example/v1",
       apiKey: "router-secret",
+      credentialStorageBackend: "system_secure_storage",
     });
     const second = await manager.addConnection({
       preset: "gateway",
@@ -91,6 +101,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "current_codex",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -120,6 +131,7 @@ describe("DesktopConnectionManager", () => {
       authMode: "openai_session",
       sessionSource: "current_codex",
       sessionAuthJsonPath: authPath,
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -148,6 +160,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(loginRunner.signInCalls).toEqual([setup.codexHome]);
@@ -182,6 +195,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(draft.authMode).toBe("openai_session");
@@ -208,6 +222,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(loginRunner.commandOverrides).toEqual(["/tmp/codex-override/codex"]);
@@ -228,6 +243,7 @@ describe("DesktopConnectionManager", () => {
       preset: "anthropic",
       authMode: "claude_session",
       sessionSource: "current_claude",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -254,6 +270,7 @@ describe("DesktopConnectionManager", () => {
       preset: "gemini",
       authMode: "gemini_cli_session",
       sessionSource: "current_gemini",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -282,6 +299,7 @@ describe("DesktopConnectionManager", () => {
       preset: "gemini",
       authMode: "gemini_cli_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(loginRunner.signInCalls).toEqual([setup.geminiHome]);
@@ -313,6 +331,7 @@ describe("DesktopConnectionManager", () => {
       apiKey: "fallback-router-secret",
       enabledAgents: ["codex"],
       allowUndetectedGateway: true,
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -322,6 +341,52 @@ describe("DesktopConnectionManager", () => {
         authMode: "api_key",
       }),
     );
+  });
+
+  it("surfaces an explicit encrypted-local fallback when system secure storage is denied", async () => {
+    const setup = createSetup();
+    stubGatewayProbe();
+
+    const manager = new DesktopConnectionManager({
+      databasePath: setup.dbPath,
+      agentHomes: { codex: setup.codexHome },
+      environment: EnvironmentSource.empty(),
+      credentialStore: new DenyingCredentialStore(),
+    });
+
+    await expect(manager.addConnection({
+      preset: "gateway",
+      authMode: "api_key",
+      endpointUrl: "https://router.example/v1",
+      apiKey: "router-secret",
+      credentialStorageBackend: "system_secure_storage",
+    })).rejects.toThrow(
+      "System secure storage was denied by macOS. Choose Encrypted local storage to continue without Keychain.",
+    );
+  });
+
+  it("does not create an encrypted local vault while only preparing a draft", async () => {
+    const setup = createSetup();
+    const credentialStore = new BackendCredentialStore(setup.dbPath, new StubCredentialStore());
+    stubGatewayProbe();
+    const manager = new DesktopConnectionManager({
+      databasePath: setup.dbPath,
+      agentHomes: { codex: setup.codexHome },
+      environment: EnvironmentSource.empty(),
+      credentialStore,
+      credentialStorageSession: credentialStore,
+    });
+
+    await manager.prepareConnectionDraft({
+      preset: "gateway",
+      authMode: "api_key",
+      endpointUrl: "https://router.example/v1",
+      apiKey: "router-secret",
+      credentialStorageBackend: "encrypted_local_storage",
+      encryptedLocalPassphrase: "passphrase-123",
+    });
+
+    expect(credentialStore.hasEncryptedLocalVault()).toBe(false);
   });
 
   it("uses the shared Claude login helper when desktop onboarding requests a sign-in", async () => {
@@ -341,6 +406,7 @@ describe("DesktopConnectionManager", () => {
       preset: "anthropic",
       authMode: "claude_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(loginRunner.signInCalls).toEqual([setup.claudeHome]);
@@ -365,6 +431,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     manager.discardPreparedConnectionDraft({ draftId: draft.id });
@@ -393,6 +460,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     await vi.advanceTimersByTimeAsync(1_000);
@@ -420,11 +488,13 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
     const second = await manager.prepareConnectionDraft({
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     await expect(manager.savePreparedConnection({ draftId: first.id })).rejects.toThrow(
@@ -455,6 +525,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     manager.clearPreparedConnectionDrafts();
@@ -528,7 +599,10 @@ describe("DesktopConnectionManager", () => {
       credentialStore: setup.credentialStore,
     });
 
-    const imported = await gateway.importCurrentConnection("cursor");
+    const imported = await gateway.importCurrentConnection({
+      agentId: "cursor",
+      credentialStorageBackend: "system_secure_storage",
+    });
     const bindingRegistry = CursorUsageBindingRegistry.open(setup.dbPath, setup.credentialStore);
     try {
       expect(imported).toEqual(
@@ -638,6 +712,10 @@ describe("DesktopConnectionManager", () => {
   it("ensures managed env keys for batch detected-setup imports", async () => {
     const ensureCalls: string[] = [];
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         reconciliation: { state: "unavailable", issues: [] },
       }),
@@ -706,6 +784,10 @@ describe("DesktopConnectionManager", () => {
     const removeConnection = vi.fn();
     const restoreMatchedImportState = vi.fn();
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         reconciliation: { state: "unavailable", issues: [] },
       }),
@@ -769,6 +851,10 @@ describe("DesktopConnectionManager", () => {
       modelSetting: null,
     };
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         agentId: "claude",
         liveConnection: {
@@ -825,6 +911,10 @@ describe("DesktopConnectionManager", () => {
     const removeConnection = vi.fn();
     const removeForConnection = vi.fn();
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         reconciliation: { state: "unavailable", issues: [] },
       }),
@@ -898,6 +988,10 @@ describe("DesktopConnectionManager", () => {
       modelSetting: null,
     };
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         agentId: "claude",
         liveConnection: {
@@ -1161,15 +1255,16 @@ function writeGeminiSession(geminiHome: string, email: string, subject: string):
 class StubCredentialStore extends KeychainCredentialStore {
   private readonly credentials = new Map<string, StoredCredential>();
 
-  override create(credentialId: string, credential: StoredCredential): void {
-    this.credentials.set(credentialId, credential);
+  override create(target: CredentialStoreTarget, credential: StoredCredential): void {
+    this.credentials.set(normalizeCredentialStoreTarget(target).reference, credential);
   }
 
-  override update(credentialId: string, credential: StoredCredential): void {
-    this.credentials.set(credentialId, credential);
+  override update(target: CredentialStoreTarget, credential: StoredCredential): void {
+    this.credentials.set(normalizeCredentialStoreTarget(target).reference, credential);
   }
 
-  override get(credentialId: string): StoredCredential {
+  override get(target: CredentialStoreTarget): StoredCredential {
+    const credentialId = normalizeCredentialStoreTarget(target).reference;
     const credential = this.credentials.get(credentialId);
     if (!credential) {
       throw new Error(`Missing stub credential: ${credentialId}`);
@@ -1177,12 +1272,18 @@ class StubCredentialStore extends KeychainCredentialStore {
     return credential;
   }
 
-  override has(credentialId: string): boolean {
-    return this.credentials.has(credentialId);
+  override has(target: CredentialStoreTarget): boolean {
+    return this.credentials.has(normalizeCredentialStoreTarget(target).reference);
   }
 
-  override remove(credentialId: string): void {
-    this.credentials.delete(credentialId);
+  override remove(target: CredentialStoreTarget): void {
+    this.credentials.delete(normalizeCredentialStoreTarget(target).reference);
+  }
+}
+
+class DenyingCredentialStore extends KeychainCredentialStore {
+  override create(_target: CredentialStoreTarget, _credential: StoredCredential): void {
+    throw new SystemSecureCredentialStoreDeniedError();
   }
 }
 

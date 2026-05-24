@@ -26,12 +26,10 @@ type RunDesktopStateResetOptions = {
   refresh(): Promise<void>;
   refreshProfiles(): Promise<void>;
   resetState(): Promise<void>;
-  setPreferences: Dispatch<SetStateAction<DesktopPreferences>>;
 };
 
 export async function runDesktopStateReset(options: RunDesktopStateResetOptions): Promise<void> {
   await options.resetState();
-  options.setPreferences((current) => ({ ...current, quickSetupDismissed: false }));
   options.onComplete?.();
   await options.refresh();
   await options.refreshProfiles();
@@ -50,7 +48,6 @@ export function useSettingsFlow(options: UseSettingsFlowOptions): SettingsFlow {
         resetState: async () => {
           await window.nileDesktop.connections.resetState();
         },
-        setPreferences: options.setPreferences,
       });
     } finally {
       setIsResetting(false);

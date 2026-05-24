@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
 import { EnabledAgentsPolicy } from "@nile/core/models/connection/enabled-agents-policy";
 
@@ -21,6 +22,9 @@ type AddConnectionFormState = {
   apiKeySource: "direct" | "env_key";
   authMode: string;
   authJsonPath: string;
+  credentialStorageBackend: CredentialStorageBackend;
+  encryptedLocalPassphrase: string;
+  encryptedLocalPassphraseConfirmation: string;
   envKey: string;
   endpointUrl: string;
   enabledAgents: AgentId[];
@@ -32,12 +36,18 @@ export type SetEnabledAgentsOptions = {
   userEdited?: boolean;
 };
 
-function createInitialFormState(defaultOpenAiAuthJsonPath: string): AddConnectionFormState {
+function createInitialFormState(
+  defaultOpenAiAuthJsonPath: string,
+  credentialStorageMode: CredentialStorageBackend | null,
+): AddConnectionFormState {
   return {
     apiKey: "",
     apiKeySource: "direct",
     authMode: "",
     authJsonPath: defaultOpenAiAuthJsonPath,
+    credentialStorageBackend: credentialStorageMode ?? "system_secure_storage",
+    encryptedLocalPassphrase: "",
+    encryptedLocalPassphraseConfirmation: "",
     envKey: "",
     endpointUrl: "",
     enabledAgents: [],
@@ -46,12 +56,17 @@ function createInitialFormState(defaultOpenAiAuthJsonPath: string): AddConnectio
   };
 }
 
-export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAuthJsonPath: string) {
+export function useAddConnectionForm(
+  definitions: Definition[],
+  defaultOpenAiAuthJsonPath: string,
+  credentialStorageMode: CredentialStorageBackend | null,
+) {
   const enabledAgentsPolicy = useMemo(() => new EnabledAgentsPolicy(), []);
   const previousDefaultOpenAiAuthJsonPath = useRef(defaultOpenAiAuthJsonPath);
+  const previousCredentialStorageMode = useRef(credentialStorageMode);
   const [enabledAgentsManuallyEdited, setEnabledAgentsManuallyEdited] = useState(false);
   const [formState, setFormState] = useState<AddConnectionFormState>(() =>
-    createInitialFormState(defaultOpenAiAuthJsonPath),
+    createInitialFormState(defaultOpenAiAuthJsonPath, credentialStorageMode),
   );
 
   useEffect(() => {
@@ -96,6 +111,30 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
       };
     });
   }, [defaultOpenAiAuthJsonPath]);
+
+  useEffect(() => {
+    const previousMode = previousCredentialStorageMode.current;
+    previousCredentialStorageMode.current = credentialStorageMode;
+    if (previousMode === credentialStorageMode) {
+      return;
+    }
+    setFormState((current) => {
+      if (current.credentialStorageBackend !== (previousMode ?? "system_secure_storage")) {
+        return current;
+      }
+      const nextCredentialStorageBackend = credentialStorageMode ?? "system_secure_storage";
+      return {
+        ...current,
+        credentialStorageBackend: nextCredentialStorageBackend,
+        encryptedLocalPassphrase: nextCredentialStorageBackend === "encrypted_local_storage"
+          ? current.encryptedLocalPassphrase
+          : "",
+        encryptedLocalPassphraseConfirmation: nextCredentialStorageBackend === "encrypted_local_storage"
+          ? current.encryptedLocalPassphraseConfirmation
+          : "",
+      };
+    });
+  }, [credentialStorageMode]);
 
   useEffect(() => {
     if (!selectedDefinition) {
@@ -176,6 +215,30 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
     (authMode: string) => setFormState((current) => ({ ...current, authMode })),
     [],
   );
+  const setCredentialStorageBackend = useCallback(
+    (credentialStorageBackend: CredentialStorageBackend) => setFormState((current) => ({
+      ...current,
+      credentialStorageBackend,
+      encryptedLocalPassphrase: credentialStorageBackend === "encrypted_local_storage"
+        ? current.encryptedLocalPassphrase
+        : "",
+      encryptedLocalPassphraseConfirmation: credentialStorageBackend === "encrypted_local_storage"
+        ? current.encryptedLocalPassphraseConfirmation
+        : "",
+    })),
+    [],
+  );
+  const setEncryptedLocalPassphrase = useCallback(
+    (encryptedLocalPassphrase: string) => setFormState((current) => ({ ...current, encryptedLocalPassphrase })),
+    [],
+  );
+  const setEncryptedLocalPassphraseConfirmation = useCallback(
+    (encryptedLocalPassphraseConfirmation: string) => setFormState((current) => ({
+      ...current,
+      encryptedLocalPassphraseConfirmation,
+    })),
+    [],
+  );
   const setEnvKey = useCallback(
     (envKey: string) => setFormState((current) => ({ ...current, envKey })),
     [],
@@ -214,6 +277,9 @@ export function useAddConnectionForm(definitions: Definition[], defaultOpenAiAut
     setApiKeySource,
     setAuthJsonPath,
     setAuthMode,
+    setCredentialStorageBackend,
+    setEncryptedLocalPassphrase,
+    setEncryptedLocalPassphraseConfirmation,
     setEnvKey,
     setEndpointUrl,
     setEnabledAgents,

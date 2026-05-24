@@ -1,6 +1,34 @@
 {
   "schema_version": "1",
   "initiative": "nile",
+  "glossary": {
+    "system-secure-storage": "The platform-native credential store used by Nile when the user accepts OS-managed secret storage, such as macOS Keychain, Windows Credential Manager/DPAPI, or Linux Secret Service.",
+    "encrypted-local-storage": "A Nile-managed local credential vault encrypted with a user-provided passphrase and stored in local files instead of the platform credential store.",
+    "credential-storage-mode": "The single machine-level credential storage strategy active for one local Nile workspace instance; once any saved connection exists, the mode is locked until explicit reset.",
+    "legacy-credential-backend": "Older per-connection backend metadata that may still exist for upgrade compatibility but is no longer the desired source of truth for new saves."
+  },
+  "invariants": [
+    {
+      "id": "INV-001",
+      "statement": "Nile must not persist raw connection secrets or encrypted-local passphrases in SQLite, desktop preferences, logs, or test fixtures.",
+      "verification": "Unit test credential persistence and desktop preference serialization so only backend metadata and credential references are stored; manually inspect the SQLite database and desktop preferences after creating connections."
+    },
+    {
+      "id": "INV-002",
+      "statement": "A local Nile workspace instance must use exactly one active credential storage mode for new saved credentials, and that mode becomes immutable until explicit reset once any saved connection exists.",
+      "verification": "Unit test first-save mode selection, later-save reuse of the same mode, and reset-driven mode clearing; manually save one connection, attempt another save through a different surface, and verify the same mode is enforced."
+    },
+    {
+      "id": "INV-003",
+      "statement": "Encrypted local storage must require a user-provided passphrase and must never silently downgrade to plaintext local files or SQLite secret storage.",
+      "verification": "Unit test encrypted-local credential writes to fail without a passphrase and to reject fallback-to-plaintext paths; manually deny system-secure storage and verify desktop only offers encrypted-local storage as the fallback."
+    },
+    {
+      "id": "INV-004",
+      "statement": "Portable credential export/import must build on encrypted local storage semantics and must not require product-level renaming or behavioral forks for OS-specific secure stores.",
+      "verification": "Review core and surface specs to confirm `system_secure_storage` remains platform-abstract and `encrypted_local_storage` remains the portable vault foundation for future export/import work."
+    }
+  ],
   "modules": [
     {
       "id": "core",
@@ -27,6 +55,11 @@
           "id": "usage",
           "name": "Usage",
           "spec_path": ".vestin/specs/core/features/usage.md"
+        },
+        {
+          "id": "credential-storage-backends",
+          "name": "Credential Storage Backends",
+          "spec_path": ".vestin/specs/core/features/credential-storage-backends.md"
         }
       ]
     },
@@ -97,8 +130,23 @@
           "id": "desktop-surface",
           "name": "Desktop Surface",
           "spec_path": ".vestin/specs/surfaces/features/desktop-surface.md"
+        },
+        {
+          "id": "desktop-credential-storage-choice",
+          "name": "Desktop Credential Storage Choice",
+          "spec_path": ".vestin/specs/surfaces/features/desktop-credential-storage-choice.md",
+          "depends_on": [
+            {
+              "module": "core",
+              "feature": "credential-storage-backends"
+            }
+          ]
         }
       ]
     }
-  ]
+  ],
+  "change_policy": {
+    "specs_are_stable": true,
+    "planning_lives_in": ".vestin/plans/"
+  }
 }

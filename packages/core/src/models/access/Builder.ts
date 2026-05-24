@@ -2,6 +2,7 @@ import {
   LocalCredentialSourceFactory,
   type CredentialSourceFactory,
 } from "../../services/credential/Factory";
+import { SUPPORTED_CREDENTIAL_STORAGE_BACKENDS, type CredentialStorageBackend } from "../../services/credential/Store";
 import { isEnvKeyApiKeyCredential, type StoredCredential } from "../../services/credential/Types";
 import { SUPPORTED_AGENT_IDS, type AgentId } from "../agent";
 import { EndpointRegistry, type EndpointRecord } from "../endpoint";
@@ -44,6 +45,7 @@ export class AccessRecordBuilder {
         label: input.label ?? current.label,
         authMode,
         identityKey: input.identityKey === null ? undefined : input.identityKey ?? current.identityKey,
+        credentialStorageBackend: input.credentialStorageBackend ?? current.credentialStorageBackend,
         enabledAgents: input.enabledAgents ?? current.enabledAgents,
       },
       endpoint,
@@ -65,6 +67,7 @@ export class AccessRecordBuilder {
     const label = input.label.trim();
     const authMode = input.authMode.trim();
     const identityKey = input.identityKey?.trim();
+    const credentialStorageBackend = this.normalizeCredentialStorageBackend(input.credentialStorageBackend);
     const enabledAgents = this.normalizeEnabledAgents(input.enabledAgents, endpoint);
 
     if (!id) {
@@ -97,6 +100,7 @@ export class AccessRecordBuilder {
       label,
       authMode: authMode as AuthMode,
       ...(identityKey ? { identityKey } : {}),
+      ...(credentialStorageBackend ? { credentialStorageBackend } : {}),
       ...(credentialMetadata?.apiKeySource ? { apiKeySource: credentialMetadata.apiKeySource } : {}),
       ...(credentialMetadata?.envKey ? { envKey: credentialMetadata.envKey } : {}),
       enabledAgents,
@@ -150,6 +154,18 @@ export class AccessRecordBuilder {
       throw new AccessRegistryValidationError(`Endpoint not found: ${endpointId}`);
     }
     return endpoint;
+  }
+
+  private normalizeCredentialStorageBackend(
+    backend: CredentialStorageBackend | undefined,
+  ): CredentialStorageBackend | undefined {
+    if (backend === undefined) {
+      return undefined;
+    }
+    if (!SUPPORTED_CREDENTIAL_STORAGE_BACKENDS.includes(backend)) {
+      throw new AccessRegistryValidationError(`Unsupported credential storage backend: ${backend}`);
+    }
+    return backend;
   }
 
   private normalizeEnabledAgents(

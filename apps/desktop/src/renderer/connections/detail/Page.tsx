@@ -22,10 +22,12 @@ import { Button } from "../../ui/button";
 import { FieldCard } from "../../ui/field";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../ui/tooltip";
 import { useConnectionQuotaMetricPreferences } from "../../shared/useConnectionQuotaMetricPreferences";
+import { Alert, AlertDescription } from "../../ui/alert";
 
 type ConnectionDetailPageProps = {
   connection: DesktopConnection;
   contextAgentLabel?: string | null;
+  isCredentialStorageModeMixed?: boolean;
   t: Translator;
   onBack(): void;
   onBackToAgentList?(): void;
@@ -49,6 +51,7 @@ type ConnectionDetailPageProps = {
 export function ConnectionDetailPage({
   connection,
   contextAgentLabel = null,
+  isCredentialStorageModeMixed = false,
   t,
   onBack,
   onBackToAgentList,
@@ -149,6 +152,8 @@ export function ConnectionDetailPage({
             ) : null}
             <ConnectionActionGroup
               canRemove={canRemove}
+              canEdit={!isCredentialStorageModeMixed}
+              canRefresh={!isCredentialStorageModeMixed}
               t={t}
               onEdit={onEdit}
               onRefresh={onRefresh}
@@ -159,6 +164,12 @@ export function ConnectionDetailPage({
           </div>
         </div>
       </div>
+
+      {isCredentialStorageModeMixed ? (
+        <Alert variant="destructive">
+          <AlertDescription>{t("settings.credentialStorage.mixedDescription")}</AlertDescription>
+        </Alert>
+      ) : null}
 
       <section className="grid gap-4 lg:grid-cols-2">
         {shouldShowEndpointField(connection) ? (

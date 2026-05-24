@@ -5,7 +5,6 @@ import type { EndpointRegistry } from "../../models/endpoint";
 import type { EndpointRecord } from "../../models/endpoint";
 import type { AgentSelection } from "../../models/selection/Selection";
 import type { AgentProjection, ProjectionInput } from "../../projection/Types";
-import type { CredentialStore } from "../../services/credential/Store";
 import type { StoredCredential } from "../../services/credential/Types";
 import type { NileLogger } from "../../services/NileLogger";
 import type { ApplyAgentSelectionResult } from "../../models/agent";
@@ -30,7 +29,6 @@ export class AgentApplySupport {
     private readonly accessRegistry: AccessRegistry,
     private readonly agentSelection: AgentSelection,
     private readonly agentConnectionSettings: AgentConnectionSettings,
-    private readonly credentialStore: CredentialStore,
     private readonly logger: NileLogger,
     private readonly buildValidationError: BuildValidationError,
     private readonly resolveProjection: ResolveProjection,
@@ -40,7 +38,7 @@ export class AgentApplySupport {
     const access = this.requireAccess(connectionId);
     const endpoint = this.requireEndpoint(access.endpointId);
 
-    const credential = this.credentialStore.get(access.credentialSource.reference);
+    const credential = this.accessRegistry.readCredential(access.id);
     const modelId = this.readModelId(connectionId, access);
     let projection: AgentProjection;
     try {

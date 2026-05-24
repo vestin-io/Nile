@@ -159,6 +159,13 @@ function createState(input: {
     currentAgentConnections: [],
     agents: [],
     detectedSetups: { mode: "empty", importableCount: 0, items: [] },
-    advanced: { agentHomes: [], supportedAgents: [], savedConnectionCount: 1, importableSetupCount: 0 },
+    advanced: {
+      agentHomes: [],
+      supportedAgents: [],
+      savedConnectionCount: 1,
+      importableSetupCount: 0,
+      credentialStorageMode: "system_secure_storage",
+      credentialStorageModeMixed: false,
+    },
   };
 }

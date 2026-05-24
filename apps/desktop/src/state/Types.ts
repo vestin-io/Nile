@@ -3,6 +3,7 @@ import type { AuthMode } from "@nile/core/models/access";
 import type { AgentSetupReconciliationState } from "@nile/core/actions/local-setup/reconciliation";
 import type { ConnectionApplyRequirements } from "@nile/core/models/connection/requirements";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import type { DesktopUsageState } from "./UsageSummary";
 
 export type DesktopConnectionAlertMetric = {
@@ -141,6 +142,8 @@ export type DesktopAdvancedState = {
   }>;
   savedConnectionCount: number;
   importableSetupCount: number;
+  credentialStorageMode: CredentialStorageBackend | null;
+  credentialStorageModeMixed: boolean;
 };
 
 export type DesktopLiveSetupSection = {

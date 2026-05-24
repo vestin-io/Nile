@@ -35,6 +35,7 @@ export class ConnectionCreator {
         label: prepared.label,
         authMode: input.authMode,
         credential: input.credential,
+        credentialStorageBackend: input.credentialStorageBackend,
         identityKey: prepared.identityKey,
         enabledAgents: prepared.enabledAgents,
         enabledAgentsMode: "replace",

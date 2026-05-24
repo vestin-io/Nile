@@ -4,10 +4,13 @@ import { type StoredCredential } from "./Types";
 import { NileLogger } from "../../services/NileLogger";
 import {
   type CredentialStore,
+  type CredentialStoreTarget,
   CredentialAlreadyExistsError,
   CredentialNotFoundError,
   CredentialStoreCommandError,
+  SystemSecureCredentialStoreDeniedError,
   CredentialStoreValidationError,
+  normalizeCredentialStoreTarget,
 } from "./Store";
 
 export {
@@ -15,6 +18,7 @@ export {
   CredentialNotFoundError,
   CredentialStoreCommandError,
   CredentialStoreValidationError,
+  SystemSecureCredentialStoreDeniedError,
 } from "./Store";
 
 export class KeychainCredentialStore implements CredentialStore {
@@ -28,7 +32,8 @@ export class KeychainCredentialStore implements CredentialStore {
     private readonly genericPasswordWriter: GenericPasswordWriter = new GenericPasswordWriter(),
   ) {}
 
-  create(credentialId: string, credential: StoredCredential): void {
+  create(target: CredentialStoreTarget, credential: StoredCredential): void {
+    const credentialId = normalizeCredentialStoreTarget(target).reference;
     this.validateCredentialId(credentialId);
     const serialized = this.serializeCredential(credential);
     this.logger.debug("credential.create.start", {
@@ -58,6 +63,13 @@ export class KeychainCredentialStore implements CredentialStore {
       });
       throw new CredentialAlreadyExistsError(credentialId);
     }
+    if (this.isAccessDeniedError(result)) {
+      this.logger.warn("credential.create.denied", {
+        credentialId,
+        kind: credential.kind,
+      });
+      throw new SystemSecureCredentialStoreDeniedError();
+    }
 
     this.logger.error("credential.create.failed", result.stderr, {
       credentialId,
@@ -66,7 +78,8 @@ export class KeychainCredentialStore implements CredentialStore {
     throw new CredentialStoreCommandError(this.buildCommandError("create", credentialId, result));
   }
 
-  update(credentialId: string, credential: StoredCredential): void {
+  update(target: CredentialStoreTarget, credential: StoredCredential): void {
+    const credentialId = normalizeCredentialStoreTarget(target).reference;
     this.validateCredentialId(credentialId);
     const serialized = this.serializeCredential(credential);
     this.logger.debug("credential.update.start", {
@@ -93,6 +106,13 @@ export class KeychainCredentialStore implements CredentialStore {
       });
       return;
     }
+    if (this.isAccessDeniedError(result)) {
+      this.logger.warn("credential.update.denied", {
+        credentialId,
+        kind: credential.kind,
+      });
+      throw new SystemSecureCredentialStoreDeniedError();
+    }
 
     this.logger.error("credential.update.failed", result.stderr, {
       credentialId,
@@ -101,7 +121,8 @@ export class KeychainCredentialStore implements CredentialStore {
     throw new CredentialStoreCommandError(this.buildCommandError("update", credentialId, result));
   }
 
-  get(credentialId: string): StoredCredential {
+  get(target: CredentialStoreTarget): StoredCredential {
+    const credentialId = normalizeCredentialStoreTarget(target).reference;
     this.validateCredentialId(credentialId);
     const cached = this.cache.get(credentialId);
     if (cached) {
@@ -125,12 +146,17 @@ export class KeychainCredentialStore implements CredentialStore {
       this.logger.warn("credential.get.missing", { credentialId });
       throw new CredentialNotFoundError(credentialId);
     }
+    if (this.isAccessDeniedError(result)) {
+      this.logger.warn("credential.get.denied", { credentialId });
+      throw new SystemSecureCredentialStoreDeniedError();
+    }
 
     this.logger.error("credential.get.failed", result.stderr, { credentialId });
     throw new CredentialStoreCommandError(this.buildCommandError("get", credentialId, result));
   }
 
-  has(credentialId: string): boolean {
+  has(target: CredentialStoreTarget): boolean {
+    const credentialId = normalizeCredentialStoreTarget(target).reference;
     this.validateCredentialId(credentialId);
     if (this.cache.has(credentialId)) {
       this.logger.debug("credential.has.cache_hit", { credentialId });
@@ -151,12 +177,17 @@ export class KeychainCredentialStore implements CredentialStore {
       this.logger.debug("credential.has.false", { credentialId });
       return false;
     }
+    if (this.isAccessDeniedError(result)) {
+      this.logger.warn("credential.has.denied", { credentialId });
+      throw new SystemSecureCredentialStoreDeniedError();
+    }
 
     this.logger.error("credential.has.failed", result.stderr, { credentialId });
     throw new CredentialStoreCommandError(this.buildCommandError("has", credentialId, result));
   }
 
-  remove(credentialId: string): void {
+  remove(target: CredentialStoreTarget): void {
+    const credentialId = normalizeCredentialStoreTarget(target).reference;
     this.validateCredentialId(credentialId);
 
     const result = this.genericPasswordWriter.remove({
@@ -172,6 +203,10 @@ export class KeychainCredentialStore implements CredentialStore {
     if (this.isMissingError(result)) {
       this.logger.warn("credential.remove.missing", { credentialId });
       throw new CredentialNotFoundError(credentialId);
+    }
+    if (this.isAccessDeniedError(result)) {
+      this.logger.warn("credential.remove.denied", { credentialId });
+      throw new SystemSecureCredentialStoreDeniedError();
     }
 
     this.logger.error("credential.remove.failed", result.stderr, { credentialId });
@@ -221,6 +256,11 @@ export class KeychainCredentialStore implements CredentialStore {
 
   private isMissingError(result: SecurityCliResultLike): boolean {
     return /could not be found|item not found|errsecitemnotfound/i.test(result.stderr);
+  }
+
+  private isAccessDeniedError(result: SecurityCliResultLike): boolean {
+    const detail = `${result.stderr}\n${result.errorMessage ?? ""}`;
+    return /user interaction is not allowed|authorization was denied|user canceled|errsecauthfailed/i.test(detail);
   }
 
   private buildCommandError(action: string, credentialId: string, result: SecurityCliResultLike): string {

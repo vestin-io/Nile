@@ -12,21 +12,31 @@ type DetectedSetupSectionProps = {
   agentId: AgentId;
   canConfigure: boolean;
   detectedSetup: DesktopOnboardingItem | null;
+  optimisticallySaved?: boolean;
   t: Translator;
   onConfigure(agentId: AgentId): void;
-  onSave(agentId: AgentId): Promise<void>;
+  onSave(agentId: AgentId): Promise<"requirements" | "saved">;
 };
 
 export function DetectedSetupSection({
   agentId,
   canConfigure,
   detectedSetup,
+  optimisticallySaved = false,
   t,
   onConfigure,
   onSave,
 }: DetectedSetupSectionProps) {
   const [savePhase, setSavePhase] = useState<SavePhase>("idle");
-  const setupContent = LOCAL_SETUP_PRESENTATION.readSectionContent(agentId, detectedSetup, t);
+  const detectedSetupContent = LOCAL_SETUP_PRESENTATION.readSectionContent(agentId, detectedSetup, t);
+  const setupContent = optimisticallySaved
+    ? {
+      ...detectedSetupContent,
+      actionKind: "saved" as const,
+      badgeLabel: null,
+      isSaved: true,
+    }
+    : detectedSetupContent;
   const keepPendingSave = shouldKeepPendingSave({
     confirmed: setupContent.isSaved,
     hasLocalSetup: setupContent.hasLocalSetup,
@@ -58,9 +68,15 @@ export function DetectedSetupSection({
         onConfigure={onConfigure}
         onSave={(targetAgentId) => {
           setSavePhase("saving");
-          void onSave(targetAgentId).catch(() => {
-            setSavePhase("idle");
-          });
+          void onSave(targetAgentId)
+            .then((result) => {
+              if (result !== "saved") {
+                setSavePhase("idle");
+              }
+            })
+            .catch(() => {
+              setSavePhase("idle");
+            });
         }}
       />
     </div>

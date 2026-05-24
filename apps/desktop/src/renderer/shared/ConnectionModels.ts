@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEncryptedLocalAccessRecovery } from "./EncryptedLocalAccess";
 
 export type ConnectionModelCatalog = Awaited<ReturnType<typeof window.nileDesktop.connections.getConnectionModelCatalog>>;
 export type ConnectionModelFieldMode = "hidden" | "select" | "manual";
@@ -24,6 +25,7 @@ export function useConnectionModelCatalog({
   const [catalog, setCatalog] = useState<ConnectionModelCatalog | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { recover } = useEncryptedLocalAccessRecovery();
 
   const loadCatalog = useCallback(async (forceRefresh: boolean = false) => {
     if (!connectionId || !enabled) {
@@ -36,12 +38,16 @@ export function useConnectionModelCatalog({
       setIsLoading(true);
     }
     try {
-      const nextCatalog = await window.nileDesktop.connections.getConnectionModelCatalog({
+      const nextCatalog = await recover(async () => await window.nileDesktop.connections.getConnectionModelCatalog({
         connectionId,
         forceRefresh,
-      });
+      }));
       setCatalog(nextCatalog);
       return nextCatalog;
+    } catch (error) {
+      const failedCatalog = buildFailedCatalog(connectionId, error);
+      setCatalog(failedCatalog);
+      return failedCatalog;
     } finally {
       if (forceRefresh) {
         setIsRefreshing(false);
@@ -49,7 +55,7 @@ export function useConnectionModelCatalog({
         setIsLoading(false);
       }
     }
-  }, [connectionId, enabled]);
+  }, [connectionId, enabled, recover]);
 
   useEffect(() => {
     if (!connectionId || !enabled) {
@@ -62,13 +68,18 @@ export function useConnectionModelCatalog({
     let cancelled = false;
     setCatalog(null);
     setIsLoading(true);
-    void window.nileDesktop.connections.getConnectionModelCatalog({
+    void recover(async () => await window.nileDesktop.connections.getConnectionModelCatalog({
       connectionId,
       forceRefresh: forceRefreshOnLoad,
-    })
+    }))
       .then((nextCatalog) => {
         if (!cancelled) {
           setCatalog(nextCatalog);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setCatalog(buildFailedCatalog(connectionId, error));
         }
       })
       .finally(() => {
@@ -80,7 +91,7 @@ export function useConnectionModelCatalog({
     return () => {
       cancelled = true;
     };
-  }, [connectionId, enabled, forceRefreshOnLoad]);
+  }, [connectionId, enabled, forceRefreshOnLoad, recover]);
 
   return {
     catalog,
@@ -118,6 +129,15 @@ export function useConnectionModelSelectionState({
   return {
     ...catalogState,
     selection,
+  };
+}
+
+function buildFailedCatalog(connectionId: string, error: unknown): ConnectionModelCatalog {
+  return {
+    connectionId,
+    status: "error",
+    models: [],
+    message: error instanceof Error ? error.message : String(error),
   };
 }
 

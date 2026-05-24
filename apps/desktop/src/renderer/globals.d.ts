@@ -5,6 +5,7 @@ declare global {
   interface Window {
     nileDesktop: DesktopBridge;
     nileDesktopEvents: {
+      onLocalStateReset(callback: () => void): () => void;
       onNotificationHistoryChanged(callback: () => void): () => void;
       onStateChanged(callback: () => void): () => void;
       onNotificationTarget(callback: (target: DesktopNotificationTarget) => void): () => void;

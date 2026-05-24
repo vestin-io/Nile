@@ -1,10 +1,13 @@
 import type { AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
 import { AGENT_MODULE_REGISTRY } from "@nile/core/models/agent/module";
 import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentStatusView } from "@nile/core/actions/local-setup";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import type { NileSession } from "@nile/builtins/runtime";
 
+import type { DesktopStateReadContext } from "./ReadContext";
 import { DesktopConnectionListPresenter } from "./connection/List";
 import { DesktopConnectionStatusPresenter } from "./connection/Status";
 import type {
@@ -37,12 +40,22 @@ export class DesktopSettingsStateQuery {
   ) {}
 
   async read(session: NileSession, options: DesktopSettingsStateReadOptions = {}): Promise<SettingsState> {
-    const savedConnections = session.listSavedConnections();
-    const scan = this.buildOnboarding(session);
+    const context = this.createReadContext(session);
+    return await this.readFromContext(session, context, options);
+  }
+
+  async readFromContext(
+    session: NileSession,
+    context: DesktopStateReadContext,
+    options: DesktopSettingsStateReadOptions = {},
+  ): Promise<SettingsState> {
+    const savedConnections = context.savedConnections;
+    const scan = context.scan;
+    const statuses = context.statuses;
     const usageByConnectionId = options.refreshUsage === false
       ? this.usage.snapshotByConnectionId(savedConnections)
       : await this.usage.readByConnectionId(session, savedConnections);
-    const agentStates = this.buildAgentStates(session, savedConnections, usageByConnectionId);
+    const agentStates = this.buildAgentStates(session, savedConnections, usageByConnectionId, statuses);
     const codexState = agentStates.find((state) => state.agentId === CODEX_AGENT_ID);
     if (!codexState) {
       throw new Error("Codex agent state is missing from desktop settings state");
@@ -95,22 +108,41 @@ export class DesktopSettingsStateQuery {
     return state;
   }
 
-  private buildOnboarding(session: NileSession): DesktopOnboardingState {
-    const scan = session.scanLocalSetups();
-    const items = scan.items.map<DesktopOnboardingItem>((item) => ({
-      scanId: item.scanId,
-      agentId: item.agentId,
-      title: item.title,
-      subtitle: item.subtitle,
-      reconciliationState: item.state,
-      importable: item.importable,
-      defaultSelected: item.defaultSelected,
-      issues: [...item.issues],
-    }));
-
+  createReadContext(session: NileSession): DesktopStateReadContext {
+    const statuses = this.listStatuses(session);
     return {
-      mode: scan.importableCount === 0 ? "empty" : scan.importableCount === 1 ? "single" : "multi",
-      importableCount: scan.importableCount,
+      savedConnections: session.listSavedConnections(),
+      scan: this.buildOnboardingFromStatuses(statuses),
+      statuses,
+    };
+  }
+
+  private buildOnboardingFromStatuses(statuses: AgentStatusView[]): DesktopOnboardingState {
+    const items = statuses.map<DesktopOnboardingItem>((status) => {
+      const state = status.reconciliation.state === "unverified"
+        ? "unavailable"
+        : status.reconciliation.state;
+      const title = status.liveConnection
+        ? `${this.lists.formatAgentLabel(status.agent)} · ${status.liveConnection.label}`
+        : `${this.lists.formatAgentLabel(status.agent)} · No local setup`;
+      const subtitle = status.liveConnection
+        ? `${status.liveConnection.endpointLabel} • ${status.liveConnection.authMode}`
+        : status.liveIssues?.[0] ?? "No readable local setup detected";
+      return {
+        scanId: status.agent,
+        agentId: status.agent,
+        title,
+        subtitle,
+        reconciliationState: state,
+        importable: state === "new",
+        defaultSelected: state === "new",
+        issues: [...(status.liveIssues ?? [])],
+      };
+    });
+    const importableCount = items.filter((item) => item.importable).length;
+    return {
+      mode: importableCount === 0 ? "empty" : importableCount === 1 ? "single" : "multi",
+      importableCount,
       items,
     };
   }
@@ -119,12 +151,13 @@ export class DesktopSettingsStateQuery {
     session: NileSession,
     savedConnections: SavedConnectionSummary[],
     usageByConnectionId: Map<string, DesktopUsageState | null>,
+    statuses: AgentStatusView[],
   ): DesktopAgentState[] {
     const rollbackByAgent = new Map(
       session.listAgentRollbackSupport().map((entry) => [entry.agentId, entry.rollback]),
     );
-    return SUPPORTED_AGENT_IDS.map((agentId) => {
-      const status = session.getAgentStatus(agentId);
+    return statuses.map((status) => {
+      const agentId = status.agent;
       const currentConnection = this.status.resolveEffectiveCurrentConnection(status, savedConnections);
       const liveConnection = this.status.resolveLiveConnection(status.liveConnection, savedConnections, currentConnection);
       const selectionOverride = this.lists.createSelectionDisplayOverride(agentId, currentConnection?.id ?? null);
@@ -167,6 +200,10 @@ export class DesktopSettingsStateQuery {
     });
   }
 
+  private listStatuses(session: NileSession): AgentStatusView[] {
+    return session.listAgentStatuses([...SUPPORTED_AGENT_IDS]);
+  }
+
   private buildAdvancedState(
     savedConnections: SavedConnectionSummary[],
     scan: DesktopOnboardingState,
@@ -185,6 +222,24 @@ export class DesktopSettingsStateQuery {
       })),
       savedConnectionCount: savedConnections.length,
       importableSetupCount: scan.importableCount,
+      ...this.readCredentialStorageMode(savedConnections),
+    };
+  }
+
+  private readCredentialStorageMode(
+    savedConnections: SavedConnectionSummary[],
+  ): { credentialStorageMode: CredentialStorageBackend | null; credentialStorageModeMixed: boolean } {
+    const modes = [...new Set(savedConnections.map((connection) =>
+      connection.credentialStorageBackend ?? "system_secure_storage"))];
+    if (modes.length !== 1) {
+      return {
+        credentialStorageMode: null,
+        credentialStorageModeMixed: modes.length > 1,
+      };
+    }
+    return {
+      credentialStorageMode: modes[0] ?? null,
+      credentialStorageModeMixed: false,
     };
   }
 

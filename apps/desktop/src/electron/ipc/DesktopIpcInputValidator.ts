@@ -4,12 +4,17 @@ import {
   SUPPORTED_CONNECTION_PRESET_FAMILIES,
   type ConnectionPresetFamily,
 } from "@nile/core/models/connection";
+import {
+  SUPPORTED_CREDENTIAL_STORAGE_BACKENDS,
+  type CredentialStorageBackend,
+} from "@nile/core/services/credential";
 
 import type {
   DesktopAddConnectionInput,
   DesktopDescribeSavedConnectionOnboardingInput,
   DesktopDiscardPreparedConnectionDraftInput,
   DesktopGetConnectionModelCatalogInput,
+  DesktopImportCurrentConnectionInput,
   DesktopSavePreparedConnectionInput,
   DesktopUpdateAgentConnectionModelInput,
   DesktopUpdateConnectionInput,
@@ -79,7 +84,8 @@ export class DesktopIpcInputValidator {
     return {
       preset: this.readPreset(record.preset),
       authMode: this.readAuthMode(record.authMode),
-      ...this.readOptionalConnectionFields(record),
+      ...this.readOptionalCredentialFields(record),
+      ...this.readOptionalCredentialStorageModeFields(record),
       allowUndetectedGateway: this.readOptionalBoolean(record.allowUndetectedGateway, "allowUndetectedGateway"),
     };
   }
@@ -88,7 +94,7 @@ export class DesktopIpcInputValidator {
     const record = this.readRecord(input, "update connection input");
     return {
       connectionId: this.readRequiredString(record.connectionId, "connectionId"),
-      ...this.readOptionalConnectionFields(record),
+      ...this.readOptionalCredentialFields(record),
       syncSelectedAgents: this.readOptionalBoolean(record.syncSelectedAgents, "syncSelectedAgents"),
     };
   }
@@ -134,6 +140,14 @@ export class DesktopIpcInputValidator {
     const record = this.readRecord(input, "discard prepared connection draft input");
     return {
       draftId: this.readRequiredString(record.draftId, "draftId"),
+    };
+  }
+
+  readImportCurrentConnectionInput(input: unknown): DesktopImportCurrentConnectionInput {
+    const record = this.readRecord(input, "import current connection input");
+    return {
+      agentId: this.readAgentId(record.agentId, "agentId"),
+      ...this.readOptionalCredentialStorageModeFields(record),
     };
   }
 
@@ -247,10 +261,16 @@ export class DesktopIpcInputValidator {
     return preset as ConnectionPresetFamily;
   }
 
-  private readOptionalConnectionFields(record: Record<string, unknown>): Omit<
-    DesktopAddConnectionInput,
-    "preset" | "authMode" | "allowUndetectedGateway"
-  > {
+  private readOptionalCredentialFields(record: Record<string, unknown>): {
+    label?: string;
+    endpointUrl?: string;
+    enabledAgents?: AgentId[];
+    apiKeySource?: "direct" | "env_key";
+    apiKey?: string;
+    envKey?: string;
+    sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
+    sessionAuthJsonPath?: string;
+  } {
     return {
       label: this.readOptionalString(record.label, "label"),
       endpointUrl: this.readOptionalString(record.endpointUrl, "endpointUrl"),
@@ -261,6 +281,29 @@ export class DesktopIpcInputValidator {
       sessionSource: this.readOptionalSessionSource(record.sessionSource),
       sessionAuthJsonPath: this.readOptionalString(record.sessionAuthJsonPath, "sessionAuthJsonPath"),
     };
+  }
+
+  private readOptionalCredentialStorageModeFields(record: Record<string, unknown>): {
+    credentialStorageBackend?: CredentialStorageBackend;
+    encryptedLocalPassphrase?: string;
+  } {
+    return {
+      credentialStorageBackend: this.readOptionalCredentialStorageBackend(record.credentialStorageBackend),
+      encryptedLocalPassphrase: this.readOptionalString(record.encryptedLocalPassphrase, "encryptedLocalPassphrase"),
+    };
+  }
+
+  private readOptionalCredentialStorageBackend(value: unknown): CredentialStorageBackend | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+    if (
+      typeof value !== "string"
+      || !SUPPORTED_CREDENTIAL_STORAGE_BACKENDS.includes(value as CredentialStorageBackend)
+    ) {
+      throw new Error("credentialStorageBackend is not supported");
+    }
+    return value as CredentialStorageBackend;
   }
 
   private readOptionalAgentIds(value: unknown, fieldName: string): AgentId[] | undefined {

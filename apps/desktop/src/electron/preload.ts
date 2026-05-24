@@ -14,6 +14,8 @@ const bridge: DesktopBridge = {
   },
   connections: {
     listConnectionDefinitions: () => ipcRenderer.invoke("desktop:list-connection-definitions"),
+    getCredentialStorageState: () => ipcRenderer.invoke("desktop:get-credential-storage-state"),
+    unlockEncryptedLocalStorage: (passphrase) => ipcRenderer.invoke("desktop:unlock-encrypted-local-storage", passphrase),
     chooseOpenAiAuthJsonPath: (defaultPath) => ipcRenderer.invoke("desktop:choose-openai-auth-json-path", defaultPath),
     describeConnectionOnboarding: (input) => ipcRenderer.invoke("desktop:describe-connection-onboarding", input),
     describeSavedConnectionOnboarding: (input) => ipcRenderer.invoke("desktop:describe-saved-connection-onboarding", input),
@@ -26,7 +28,7 @@ const bridge: DesktopBridge = {
     addConnection: (input) => ipcRenderer.invoke("desktop:add-connection", input),
     updateConnection: (input) => ipcRenderer.invoke("desktop:update-connection", input),
     importDetectedSetups: (scanIds) => ipcRenderer.invoke("desktop:import-detected-setups", scanIds),
-    importCurrentConnection: (agentId) => ipcRenderer.invoke("desktop:import-current-connection", agentId),
+    importCurrentConnection: (input) => ipcRenderer.invoke("desktop:import-current-connection", input),
     removeConnection: (connectionId) => ipcRenderer.invoke("desktop:remove-connection", connectionId),
     updateAgentConnectionModel: (input) => ipcRenderer.invoke("desktop:update-agent-connection-model", input),
     bindCursorUsage: (connectionId, sessionToken) => ipcRenderer.invoke("desktop:bind-cursor-usage", connectionId, sessionToken),
@@ -86,6 +88,13 @@ contextBridge.exposeInMainWorld("nileDesktopEvents", {
     ipcRenderer.on("desktop:state-changed", listener);
     return () => {
       ipcRenderer.removeListener("desktop:state-changed", listener);
+    };
+  },
+  onLocalStateReset(callback: () => void) {
+    const listener = () => callback();
+    ipcRenderer.on("desktop:local-state-reset", listener);
+    return () => {
+      ipcRenderer.removeListener("desktop:local-state-reset", listener);
     };
   },
   onNotificationTarget(callback: (target: DesktopNotificationTarget) => void) {

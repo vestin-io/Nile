@@ -23,6 +23,48 @@
 
 ## 2026-05-21
 
+### Desktop startup status batching
+
+- Reduced one major source of desktop restart latency in the state query layer:
+  - `DesktopMenubarStateQuery` now reads all agent statuses through one `session.listAgentStatuses(...)` call and reuses that batch for both menubar rows and current-connection usage refresh targeting
+  - `DesktopSettingsStateQuery` now reads all agent statuses once per settings-state build instead of calling `session.getAgentStatus(...)` once per agent
+- Added a startup-only prewarm path so desktop boot can seed both menubar state and settings snapshot from one shared session:
+  - `DesktopSurface.primeStartupState()` now captures one shared read context and builds both state payloads from it
+  - onboarding scan data is derived from the already-batched agent statuses instead of running a second `scanLocalSetups()` selection sync
+  - `DesktopStateStore.primeStartupState()` stores both warmed values directly into cache without forcing an immediate live usage read
+- Added desktop-local persisted state snapshots so a full app relaunch can hydrate the last known menubar/settings state before any live scan:
+  - `DesktopStateSnapshotStore` writes renderer-safe JSON payloads into a dedicated SQLite table
+  - `DesktopStateStore` hydrates cached menubar/settings state from those persisted snapshots during construction
+  - successful menubar/settings refreshes now overwrite the persisted snapshot automatically
+- Followed up on review findings in the snapshot path:
+  - settings snapshot reads now go through a dedicated `getSettingsStateSnapshot()` path instead of poisoning the live `getSettingsState()` cache
+  - hydrated snapshots stay displayable but remain `dirty`, so the first live settings read still refreshes from the real surface
+  - startup prewarm now preserves an existing persisted settings snapshot instead of replacing it with an empty-usage in-memory snapshot before deferred quota refresh runs
+  - persisted snapshot payloads now get a minimal shape check before hydration so obviously stale/corrupt rows are ignored
+- Shifted first-render behavior toward cached-first rendering:
+  - desktop startup now primes cached state in the background instead of immediately forcing `refreshMenubarUsage()`
+  - initial settings renderer load now requests `getSettingsStateSnapshot()` first, then follows with an async live refresh after first paint
+  - startup usage refresh is deferred slightly instead of competing with the first visible render path
+- Added focused desktop-state unit coverage to lock the new query shape:
+  - [MenubarQuery.test.ts](/Users/jiatwork/Works/nile/apps/desktop/src/state/MenubarQuery.test.ts)
+  - [SettingsQuery.test.ts](/Users/jiatwork/Works/nile/apps/desktop/src/state/SettingsQuery.test.ts)
+
+#### Key findings
+
+- The main restart slowdown is still broader than this patch: startup currently rebuilds `settings-state`, `menubar-state`, and `menubar-usage-refresh` as separate scopes, so there are still multiple full live-detection rounds per launch.
+- The new startup prewarm merges the initial menubar/settings snapshot build into one session, but later explicit refresh paths still use the broader `refreshDesktopState()` flow.
+- The persisted snapshot is intentionally renderer-safe only. It does not store credentials, live secure payloads, or raw usage provider responses.
+- Snapshot freshness is still best-effort. If the app quits before a later mutation is followed by a successful state refresh, the next launch can briefly show the previous saved snapshot until live refresh catches up.
+- Snapshot validation is intentionally shallow right now. It protects against obviously wrong rows, but a future structural state change should still bump the snapshot version deliberately.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/state/MenubarQuery.test.ts apps/desktop/src/state/SettingsQuery.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts`
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+- `./node_modules/.bin/vitest run apps/desktop/src/state/MenubarQuery.test.ts apps/desktop/src/state/SettingsQuery.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+
 ### Connection quota metric preference
 
 - Added a desktop-local per-connection quota metric preference that does not touch shared connection state or SQLite:
@@ -96,6 +138,24 @@
 #### Key findings
 
 - This setting should persist locally on the machine; keeping it memory-only would make Finder-launch recovery disappear on every restart.
+
+### Agent home shared save
+
+- Simplified the agent detail `Agent home` editing flow so the home path and CLI command override now share one primary save action instead of presenting two separate `Save` buttons.
+- Kept the two fields visually separate, but changed the local form semantics so both values stage in the renderer until the operator clicks the shared save button.
+- Updated the reset actions to stay local-only:
+  - `Reset to default path` now only rewrites the input value
+  - `Use auto-detected CLI command` now only clears the override input
+  - neither reset writes immediately anymore, so the single save button remains the only persistence action on the page
+
+#### Key findings
+
+- This is still not a new atomic main-process save API. The renderer currently issues the existing `updateAgentHome(...)` and `updateAgentRuntimeCommand(...)` IPC calls sequentially under one UI action.
+- The unified save button only becomes enabled when either staged value differs from the currently persisted values, which avoids redundant double-write IPC calls on unchanged forms.
+
+### Verification
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
 - The override remains desktop-specific and does not belong in shared saved connection/domain state because it only describes how this one local runtime should find its CLI launcher.
 - The resolved runtime command remains the source of truth for what Nile will execute, but showing override and resolved values as separate controls created needless friction. The home panel now exposes a single CLI path input seeded from the current resolved command, with warning state when resolution fails and reset-to-auto-detected behavior when users want to drop a local override.
 

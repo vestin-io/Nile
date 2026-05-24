@@ -2,6 +2,7 @@ import { isDirectApiKeyCredential, type StoredCredential } from "@nile/core/serv
 import type { NileSession } from "@nile/builtins/runtime";
 import { AGENT_CAPABILITIES } from "@nile/core/models/agent";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
+import { NileLogger } from "@nile/core/services/NileLogger";
 
 import { DesktopEnvironmentStore } from "../environment/Store";
 import { DesktopShellEnvironment } from "../environment/Shell";
@@ -10,21 +11,41 @@ export class ManagedApiKeyEnvironment {
   constructor(
     private readonly store: DesktopEnvironmentStore,
     private readonly shellEnvironment: DesktopShellEnvironment = new DesktopShellEnvironment(),
+    private readonly logger: NileLogger = NileLogger.silent().child({ scope: "managed-api-key-environment" }),
   ) {}
 
   async ensureForConnection(session: NileSession, connectionId: string): Promise<SavedConnectionSummary | null> {
+    const startedAt = Date.now();
+    this.logger.info("desktop.import_current_connection.managed_env.start", {
+      connectionId,
+    });
     const connection = this.readConnection(session, connectionId);
     if (!connection || connection.authMode !== "api_key") {
+      this.logger.info("desktop.import_current_connection.managed_env.skip", {
+        connectionId,
+        reason: connection ? "non_api_key" : "missing_connection",
+        durationMs: Date.now() - startedAt,
+      });
       return connection;
     }
 
     const credential = session.readConnectionCredential(connectionId);
     if (!isDirectApiKeyCredential(credential)) {
+      this.logger.info("desktop.import_current_connection.managed_env.skip", {
+        connectionId,
+        reason: "non_direct_api_key_credential",
+        durationMs: Date.now() - startedAt,
+      });
       return connection;
     }
 
     const apiKey = credential.apiKey.trim();
     if (!apiKey) {
+      this.logger.info("desktop.import_current_connection.managed_env.skip", {
+        connectionId,
+        reason: "empty_api_key",
+        durationMs: Date.now() - startedAt,
+      });
       return connection;
     }
 
@@ -32,6 +53,12 @@ export class ManagedApiKeyEnvironment {
     const envKey = this.readEnvKey(connection, credential);
     if (previousEnvKey === envKey) {
       this.writeManagedEnvironment(connection, envKey, apiKey);
+      this.logger.info("desktop.import_current_connection.managed_env.succeeded", {
+        connectionId,
+        envKey,
+        updatedMetadata: false,
+        durationMs: Date.now() - startedAt,
+      });
       return connection;
     }
 
@@ -41,8 +68,19 @@ export class ManagedApiKeyEnvironment {
     } catch (error) {
       this.cleanupManagedEnvironment(envKey);
       session.setConnectionDirectApiKeyEnvKey(connectionId, previousEnvKey);
+      this.logger.error("desktop.import_current_connection.managed_env.failed", error, {
+        connectionId,
+        envKey,
+        durationMs: Date.now() - startedAt,
+      });
       throw error;
     }
+    this.logger.info("desktop.import_current_connection.managed_env.succeeded", {
+      connectionId,
+      envKey,
+      updatedMetadata: true,
+      durationMs: Date.now() - startedAt,
+    });
     return updated;
   }
 

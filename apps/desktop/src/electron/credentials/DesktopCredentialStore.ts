@@ -1,11 +1,12 @@
 import { basename, dirname, join } from "node:path";
 
-import type { StoredCredential } from "@nile/core/services/credential";
+import type { CredentialStoreTarget, StoredCredential } from "@nile/core/services/credential";
 import {
   CredentialAlreadyExistsError,
   CredentialNotFoundError,
   type CredentialStore,
   CredentialStoreValidationError,
+  normalizeCredentialStoreTarget,
 } from "@nile/core/services/credential";
 
 import { DesktopSecretFileStore } from "../storage/DesktopSecretFileStore";
@@ -18,8 +19,8 @@ export class DesktopCredentialStore implements CredentialStore {
     this.store = new DesktopSecretFileStore(readCredentialStorePath(databasePath));
   }
 
-  create(credentialId: string, credential: StoredCredential): void {
-    const normalizedCredentialId = this.normalizeCredentialId(credentialId);
+  create(target: CredentialStoreTarget, credential: StoredCredential): void {
+    const normalizedCredentialId = this.normalizeCredentialId(target);
     if (this.store.has(normalizedCredentialId)) {
       throw new CredentialAlreadyExistsError(normalizedCredentialId);
     }
@@ -28,8 +29,8 @@ export class DesktopCredentialStore implements CredentialStore {
     this.cache.set(normalizedCredentialId, credential);
   }
 
-  update(credentialId: string, credential: StoredCredential): void {
-    const normalizedCredentialId = this.normalizeCredentialId(credentialId);
+  update(target: CredentialStoreTarget, credential: StoredCredential): void {
+    const normalizedCredentialId = this.normalizeCredentialId(target);
     if (!this.store.has(normalizedCredentialId)) {
       throw new CredentialNotFoundError(normalizedCredentialId);
     }
@@ -38,8 +39,8 @@ export class DesktopCredentialStore implements CredentialStore {
     this.cache.set(normalizedCredentialId, credential);
   }
 
-  get(credentialId: string): StoredCredential {
-    const normalizedCredentialId = this.normalizeCredentialId(credentialId);
+  get(target: CredentialStoreTarget): StoredCredential {
+    const normalizedCredentialId = this.normalizeCredentialId(target);
     const cached = this.cache.get(normalizedCredentialId);
     if (cached) {
       return cached;
@@ -55,8 +56,8 @@ export class DesktopCredentialStore implements CredentialStore {
     return credential;
   }
 
-  has(credentialId: string): boolean {
-    const normalizedCredentialId = this.normalizeCredentialId(credentialId);
+  has(target: CredentialStoreTarget): boolean {
+    const normalizedCredentialId = this.normalizeCredentialId(target);
     if (this.cache.has(normalizedCredentialId)) {
       return true;
     }
@@ -64,8 +65,8 @@ export class DesktopCredentialStore implements CredentialStore {
     return this.store.has(normalizedCredentialId);
   }
 
-  remove(credentialId: string): void {
-    const normalizedCredentialId = this.normalizeCredentialId(credentialId);
+  remove(target: CredentialStoreTarget): void {
+    const normalizedCredentialId = this.normalizeCredentialId(target);
     const removed = this.store.remove(normalizedCredentialId);
     this.cache.delete(normalizedCredentialId);
     if (!removed) {
@@ -73,8 +74,8 @@ export class DesktopCredentialStore implements CredentialStore {
     }
   }
 
-  private normalizeCredentialId(credentialId: string): string {
-    const normalizedCredentialId = credentialId.trim();
+  private normalizeCredentialId(target: CredentialStoreTarget): string {
+    const normalizedCredentialId = normalizeCredentialStoreTarget(target).reference.trim();
     if (!normalizedCredentialId) {
       throw new CredentialStoreValidationError("Credential id is required");
     }
@@ -82,7 +83,7 @@ export class DesktopCredentialStore implements CredentialStore {
   }
 }
 
-function readCredentialStorePath(databasePath: string): string {
+export function readCredentialStorePath(databasePath: string): string {
   const databaseDir = dirname(databasePath);
   const databaseBaseName = basename(databasePath, ".sqlite");
   return join(databaseDir, `${databaseBaseName}.credentials.json`);

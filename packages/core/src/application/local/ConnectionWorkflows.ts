@@ -76,6 +76,7 @@ export class LocalConnectionWorkflows {
       label: input.label?.trim() || undefined,
       enabledAgents,
       allowUndetectedGateway: input.allowUndetectedGateway,
+      credentialStorageBackend: input.credentialStorageBackend,
     };
   }
 

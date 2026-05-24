@@ -177,7 +177,7 @@ function readUnpackedAsarPath(path: string): string {
   return path.includes("app.asar") ? path.replaceAll("app.asar", "app.asar.unpacked") : path;
 }
 
-function readDesktopEnvironmentStorePath(databasePath: string): string {
+export function readDesktopEnvironmentStorePath(databasePath: string): string {
   const databaseDir = dirname(databasePath);
   return join(databaseDir, "desktop-environment.json");
 }

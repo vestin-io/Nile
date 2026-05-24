@@ -10,8 +10,9 @@ type QuickSetupAgentCardProps = {
   agent: DesktopAgentState;
   canConfigure: boolean;
   detectedSetup: DesktopOnboardingItem | null;
+  optimisticallySaved?: boolean;
   t: Translator;
-  onConfirm(agentId: AgentId): Promise<void>;
+  onConfirm(agentId: AgentId): Promise<"requirements" | "saved">;
   onConfigure(agentId: AgentId): void;
 };
 
@@ -19,6 +20,7 @@ export function QuickSetupAgentCard({
   agent,
   canConfigure,
   detectedSetup,
+  optimisticallySaved = false,
   t,
   onConfirm,
   onConfigure,
@@ -31,6 +33,7 @@ export function QuickSetupAgentCard({
           agentId={agent.agentId}
           canConfigure={canConfigure}
           detectedSetup={detectedSetup}
+          optimisticallySaved={optimisticallySaved}
           t={t}
           onConfigure={onConfigure}
           onSave={onConfirm}

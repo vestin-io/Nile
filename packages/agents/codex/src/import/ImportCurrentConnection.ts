@@ -8,6 +8,7 @@ import {
   LiveSetupImportSupport,
   requireResolvedImportCandidate,
 } from "@nile/core/actions/live-setup";
+import type { ImportCurrentConnectionInput } from "@nile/core/models/agent/Adapter";
 import { CodexAuthStore } from "../stores/CodexAuthStore";
 import { CodexConfigStore } from "../stores/CodexConfigStore";
 import { AgentWorkspaceBinding } from "@nile/core/runtime-local/AgentWorkspaceBinding";
@@ -87,10 +88,11 @@ export class ImportCurrentConnection {
     private readonly ownedContext: { close(): void } | null = null,
   ) {}
 
-  async importCurrent() {
+  async importCurrent(input?: ImportCurrentConnectionInput) {
     return await this.importSupport.importDetected(
       this.detector.detect(),
       () => requireResolvedImportCandidate("Codex", this.reader.read()),
+      input,
     );
   }
 

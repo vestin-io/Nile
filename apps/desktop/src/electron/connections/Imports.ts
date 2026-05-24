@@ -3,23 +3,53 @@ import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup"
 import { NileSession } from "@nile/builtins/runtime";
 import type { MatchedImportStateSnapshot } from "@nile/core/runtime-local/import-state";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
+import { NileLogger } from "@nile/core/services/NileLogger";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
+import type { DesktopImportCurrentConnectionInput } from "./contracts";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 
 export class DesktopManagedConnectionImports {
   constructor(
     private readonly managedApiKeyEnvironment: ManagedApiKeyEnvironment | NoopManagedApiKeyEnvironment,
+    private readonly logger: NileLogger = NileLogger.silent().child({ scope: "managed-connection-imports" }),
   ) {}
 
   async importCurrentConnection(
     session: NileSession,
-    agentId: AgentId,
+    input: DesktopImportCurrentConnectionInput,
   ): Promise<ImportCurrentConnectionResult | SavedConnectionSummary> {
-    const snapshot = this.captureMatchedImportState(session, agentId);
-    const imported = await session.importCurrentConnection(agentId);
+    const startedAt = Date.now();
+    this.logger.info("desktop.import_current_connection.imports.start", {
+      agentId: input.agentId,
+      credentialStorageBackend: input.credentialStorageBackend,
+    });
+    const snapshot = this.captureMatchedImportState(session, input.agentId);
+    const imported = await session.importCurrentConnection(input.agentId, {
+      credentialStorageBackend: input.credentialStorageBackend,
+    });
+    this.logger.info("desktop.import_current_connection.imports.session_import_succeeded", {
+      agentId: input.agentId,
+      connectionId: imported.id,
+      reused: "reused" in imported ? imported.reused : false,
+      durationMs: Date.now() - startedAt,
+    });
     try {
-      return await this.ensureManagedConnection(session, imported);
+      const managed = await this.ensureManagedConnection(session, imported);
+      this.logger.info("desktop.import_current_connection.imports.succeeded", {
+        agentId: input.agentId,
+        connectionId: managed.id,
+        reused: "reused" in managed ? managed.reused : false,
+        durationMs: Date.now() - startedAt,
+      });
+      return managed;
     } catch (error) {
       this.rollbackImportedConnection(session, imported, snapshot);
+      this.logger.error("desktop.import_current_connection.imports.failed", error, {
+        agentId: input.agentId,
+        connectionId: imported.id,
+        reused: "reused" in imported ? imported.reused : false,
+        durationMs: Date.now() - startedAt,
+      });
       throw error;
     }
   }
@@ -27,8 +57,10 @@ export class DesktopManagedConnectionImports {
   async importDetectedSetups(
     session: NileSession,
     scanIds: AgentId[],
+    credentialStorageBackend: CredentialStorageBackend,
   ): Promise<ImportDetectedSetupsResult> {
     const result = await session.importDetectedSetups({
+      credentialStorageBackend,
       selections: scanIds.map((scanId) => ({ scanId })),
     });
     await this.ensureManagedDetectedSetups(session, result, scanIds);

@@ -75,7 +75,9 @@ describe("StateReset", () => {
     const databasePath = join(root, "switcher.sqlite");
     const database = SqliteDatabase.open(databasePath);
     try {
-      database.exec("CREATE TABLE accesses (credential_source_ref TEXT NOT NULL);");
+      database.exec(
+        "CREATE TABLE accesses (credential_source_ref TEXT NOT NULL, credential_storage_backend TEXT);",
+      );
       database.exec("CREATE TABLE cursor_usage_bindings (credential_source_ref TEXT NOT NULL);");
       database.exec(
         "CREATE TABLE mutation_history_files (before_snapshot_kind TEXT NOT NULL, before_snapshot_ref TEXT NOT NULL);",
@@ -128,13 +130,19 @@ describe("StateReset", () => {
 function seedResetRefs(databasePath: string): void {
   const database = SqliteDatabase.open(databasePath);
   try {
-    database.exec("CREATE TABLE accesses (credential_source_ref TEXT NOT NULL);");
+    database.exec(
+      "CREATE TABLE accesses (credential_source_ref TEXT NOT NULL, credential_storage_backend TEXT);",
+    );
     database.exec("CREATE TABLE cursor_usage_bindings (credential_source_ref TEXT NOT NULL);");
     database.exec(
       "CREATE TABLE mutation_history_files (before_snapshot_kind TEXT NOT NULL, before_snapshot_ref TEXT NOT NULL);",
     );
 
-    database.run("INSERT INTO accesses (credential_source_ref) VALUES (?)", "access:openai-work");
+    database.run(
+      "INSERT INTO accesses (credential_source_ref, credential_storage_backend) VALUES (?, ?)",
+      "access:openai-work",
+      "system_secure_storage",
+    );
     database.run(
       "INSERT INTO cursor_usage_bindings (credential_source_ref) VALUES (?)",
       "usage:cursor:cursor-work",

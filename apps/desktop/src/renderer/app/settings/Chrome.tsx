@@ -1,11 +1,12 @@
 import type { Translator } from "../../shared/I18n";
 import { nileMarkSvg } from "../../shared/NileMark";
-import { Bell } from "lucide-react";
+import { Bell, Lock } from "lucide-react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "../../ui/breadcrumb";
 import { Button } from "../../ui/button";
 import { Separator } from "../../ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "../../ui/alert";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "../../ui/sidebar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../ui/tooltip";
 import { SettingsSidebarNav } from "./SidebarNav";
 import type { PageId } from "./useNavigation";
 
@@ -27,6 +28,7 @@ type SettingsChromeProps = {
   currentProfileName: string | null;
   error: string | null;
   hasUnreadNotifications: boolean;
+  isEncryptedLocalLocked: boolean;
   isSidebarOpen: boolean;
   showAgents: boolean;
   showConnections: boolean;
@@ -34,6 +36,7 @@ type SettingsChromeProps = {
   showQuickSetup: boolean;
   t: Translator;
   onOpenAbout(): void;
+  onOpenEncryptedLocalUnlock(): void;
   onOpenNotifications(): void;
   onPageChange(page: PageId): void;
   onRefresh(): Promise<void>;
@@ -47,6 +50,7 @@ export function SettingsChrome({
   currentProfileName,
   error,
   hasUnreadNotifications,
+  isEncryptedLocalLocked,
   isSidebarOpen,
   showAgents,
   showConnections,
@@ -54,6 +58,7 @@ export function SettingsChrome({
   showQuickSetup,
   t,
   onOpenAbout,
+  onOpenEncryptedLocalUnlock,
   onOpenNotifications,
   onPageChange,
   onRefresh,
@@ -81,6 +86,25 @@ export function SettingsChrome({
           </Breadcrumb>
           <div className="ml-auto" style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
             <div className="flex items-center gap-1">
+              {isEncryptedLocalLocked ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label={t("connections.lockedTooltip")}
+                        className="h-9 rounded-xl border border-amber-500/70 bg-amber-100/95 px-3 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-200/95 hover:text-amber-950 dark:border-amber-200 dark:bg-amber-300 dark:text-amber-950 dark:shadow-[0_8px_24px_rgba(252,211,77,0.2)] dark:hover:bg-amber-200 dark:hover:text-amber-950"
+                        title={t("connections.lockedBadge")}
+                        variant="outline"
+                        onClick={onOpenEncryptedLocalUnlock}
+                      >
+                        <Lock className="mr-1.5 h-3.5 w-3.5" />
+                        {t("connections.lockedBadge")}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("connections.lockedTooltip")}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : null}
               <Button
                 aria-label={t("page.notifications")}
                 className="relative h-9 w-9 rounded-xl p-0"

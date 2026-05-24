@@ -44,7 +44,7 @@ export class AgentWorkspaceBinding {
 
   createApplySupport(
     agentId: AgentId,
-    credentialStore: CredentialStore,
+    _credentialStore: CredentialStore,
     logger: NileLogger,
     buildValidationError: BuildValidationError,
     resolveProjection: ResolveProjection,
@@ -55,7 +55,6 @@ export class AgentWorkspaceBinding {
       this.context.accessRegistry,
       this.context.agentSelection,
       this.context.agentConnectionSettings,
-      credentialStore,
       logger,
       buildValidationError,
       resolveProjection,

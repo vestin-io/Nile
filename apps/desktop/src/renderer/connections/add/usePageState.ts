@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
 import type { Definition } from "../../shared/DesktopData";
 import {
@@ -11,16 +12,24 @@ import { useAddConnectionForm } from "./useForm";
 import { useAddConnectionOnboardingState } from "./useOnboardingState";
 
 type UseAddConnectionPageStateOptions = {
+  credentialStorageMode: CredentialStorageBackend | null;
+  credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
   defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
+  isCredentialStorageModeLocked: boolean;
+  onRememberCredentialStorageMode(backend: CredentialStorageBackend): void;
   onPrepareDraft(input: AddConnectionSubmitInput): Promise<PreparedConnectionDraft>;
   onSavePrepared(input: AddConnectionPreparedSaveInput): Promise<void>;
   onSubmit(input: AddConnectionSubmitInput): Promise<void>;
 };
 
 export function useAddConnectionPageState({
+  credentialStorageMode,
+  credentialStorageState,
   defaultOpenAiAuthJsonPath,
   definitions,
+  isCredentialStorageModeLocked,
+  onRememberCredentialStorageMode,
   onPrepareDraft,
   onSavePrepared,
   onSubmit,
@@ -33,12 +42,15 @@ export function useAddConnectionPageState({
     setApiKeySource,
     setAuthJsonPath,
     setAuthMode,
+    setCredentialStorageBackend,
+    setEncryptedLocalPassphrase,
+    setEncryptedLocalPassphraseConfirmation,
     setEnvKey,
     setEndpointUrl,
     setEnabledAgents,
     setPreset,
     setSessionSource,
-  } = useAddConnectionForm(definitions, defaultOpenAiAuthJsonPath);
+  } = useAddConnectionForm(definitions, defaultOpenAiAuthJsonPath, credentialStorageMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreparingDraft, setIsPreparingDraft] = useState(false);
   const [isChoosingAuthJsonPath, setIsChoosingAuthJsonPath] = useState(false);
@@ -60,6 +72,18 @@ export function useAddConnectionPageState({
   const hasResolvedApiKeyInput = formState.apiKeySource === "env_key"
     ? Boolean(formState.envKey.trim())
     : Boolean(formState.apiKey.trim());
+  const requiresEncryptedLocalPassphrase = formState.credentialStorageBackend === "encrypted_local_storage"
+    && !credentialStorageState.encryptedLocalUnlocked;
+  const requiresEncryptedLocalConfirmation = requiresEncryptedLocalPassphrase
+    && !credentialStorageState.encryptedLocalVaultExists;
+  const encryptedLocalPassphraseInvalid = requiresEncryptedLocalPassphrase
+    && (
+      !formState.encryptedLocalPassphrase.trim()
+      || (
+        requiresEncryptedLocalConfirmation
+        && formState.encryptedLocalPassphrase !== formState.encryptedLocalPassphraseConfirmation
+      )
+    );
 
   useEffect(() => {
     if (!requiresSessionPreparation) {
@@ -84,6 +108,9 @@ export function useAddConnectionPageState({
     formState.apiKeySource,
     formState.authJsonPath,
     formState.authMode,
+    formState.credentialStorageBackend,
+    formState.encryptedLocalPassphrase,
+    formState.encryptedLocalPassphraseConfirmation,
     formState.endpointUrl,
     formState.envKey,
     formState.preset,
@@ -95,12 +122,18 @@ export function useAddConnectionPageState({
       return null;
     }
 
+    const activeCredentialStorageMode = credentialStorageMode ?? formState.credentialStorageBackend;
+
     return {
       preset: selectedDefinition.preset,
       authMode: formState.authMode as Definition["supportedAuthModes"][number],
       endpointUrl: formState.endpointUrl.trim() || undefined,
       enabledAgents: formState.enabledAgents,
       allowUndetectedGateway: gatewayProbeError !== null,
+      credentialStorageBackend: activeCredentialStorageMode,
+      encryptedLocalPassphrase: activeCredentialStorageMode === "encrypted_local_storage"
+        ? formState.encryptedLocalPassphrase.trim() || undefined
+        : undefined,
       apiKeySource: formState.apiKeySource,
       apiKey: formState.apiKeySource === "direct" ? formState.apiKey.trim() || undefined : undefined,
       envKey: formState.apiKeySource === "env_key" ? formState.envKey.trim() || undefined : undefined,
@@ -139,13 +172,19 @@ export function useAddConnectionPageState({
   const displayedEnabledAgents = shouldShowEnabledAgents
     ? formState.enabledAgents
     : preparedDraft?.defaultEnabledAgents ?? selectedDefinition?.defaultEnabledAgents ?? [];
+  const shouldRememberCredentialStorageMode = credentialStorageMode === null && !isCredentialStorageModeLocked;
   const gatewayCapabilityResolved = !requiresGatewayPreparation || gatewayPrepared || gatewayProbeError !== null;
   const showPostPreparationFields =
     (!requiresSessionPreparation || preparedDraft !== null)
     && gatewayCapabilityResolved;
 
   const submit = async () => {
-    if (enabledAgentsSelectionInvalid || isSubmitting || !showPostPreparationFields) {
+    if (
+      enabledAgentsSelectionInvalid
+      || encryptedLocalPassphraseInvalid
+      || isSubmitting
+      || !showPostPreparationFields
+    ) {
       return;
     }
 
@@ -157,6 +196,9 @@ export function useAddConnectionPageState({
           draftId: preparedDraft.id,
           enabledAgents: formState.enabledAgents,
         });
+        if (shouldRememberCredentialStorageMode) {
+          onRememberCredentialStorageMode(formState.credentialStorageBackend);
+        }
         setPreparedDraft(null);
         return;
       }
@@ -167,6 +209,9 @@ export function useAddConnectionPageState({
       }
 
       await onSubmit(input);
+      if (shouldRememberCredentialStorageMode) {
+        onRememberCredentialStorageMode(formState.credentialStorageBackend);
+      }
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));
     } finally {
@@ -217,6 +262,8 @@ export function useAddConnectionPageState({
     gatewayProbeError,
     gatewayPrepared,
     gatewayTrustConfirmed,
+    credentialStorageState,
+    encryptedLocalPassphraseInvalid,
     hasResolvedApiKeyInput,
     isChoosingAuthJsonPath,
     isPreparedSessionFlow,
@@ -231,6 +278,9 @@ export function useAddConnectionPageState({
     setApiKey,
     setApiKeySource,
     setAuthMode,
+    setCredentialStorageBackend,
+    setEncryptedLocalPassphrase,
+    setEncryptedLocalPassphraseConfirmation,
     setEndpointUrl,
     setEnvKey,
     setEnabledAgents,
@@ -241,6 +291,8 @@ export function useAddConnectionPageState({
     shouldShowAuthJsonPath,
     shouldShowEnabledAgents,
     showPostPreparationFields,
+    requiresEncryptedLocalConfirmation,
+    requiresEncryptedLocalPassphrase,
     submit,
     detectedAgents,
     supportsCurrentCodexImport,

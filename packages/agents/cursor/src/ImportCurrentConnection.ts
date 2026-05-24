@@ -8,6 +8,7 @@ import {
   LiveSetupImportSupport,
   requireResolvedImportCandidate,
 } from "@nile/core/actions/live-setup";
+import type { ImportCurrentConnectionInput } from "@nile/core/models/agent/Adapter";
 import {
   AgentWorkspaceBinding,
 } from "@nile/core/runtime-local/AgentWorkspaceBinding";
@@ -93,10 +94,11 @@ export class ImportCurrentConnection {
     private readonly ownedContext: { close(): void } | null = null,
   ) {}
 
-  async importCurrent() {
+  async importCurrent(input?: ImportCurrentConnectionInput) {
     return await this.importSupport.importDetected(
       this.detector.detect(),
       () => requireResolvedImportCandidate("Cursor", this.reader.read()),
+      input,
     );
   }
 

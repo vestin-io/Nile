@@ -2,6 +2,7 @@ import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent
 import { StateReset, type RemoveConnectionResult, type ResetStateResult } from "@nile/builtins/local";
 import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/builtins/cursor-usage";
+import { NileLogger } from "@nile/core/services/NileLogger";
 
 import { DesktopSurface } from "../../state/Surface";
 import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";
@@ -13,12 +14,14 @@ import { DesktopConnectionManager } from "../connections/DesktopConnectionManage
 import { DesktopNotificationHistory } from "../notifications/History";
 import type {
   DesktopAddConnectionInput,
+  DesktopImportCurrentConnectionInput,
   DesktopConnectionSummary,
   DesktopSavePreparedConnectionInput,
   DesktopUpdateConnectionInput,
 } from "../connections/contracts";
 import { ConnectionAlerts } from "./ConnectionAlerts";
 import { NotificationHistoryState } from "./NotificationHistoryState";
+import { DesktopStateSnapshotStore } from "./SnapshotStore";
 
 type CachedValue<T> = {
   dirty: boolean;
@@ -41,6 +44,7 @@ type DesktopStateStoreOptions = {
   connectionAlertStore?: ConnectionAlertStore;
   notificationHistory?: DesktopNotificationHistory;
   stateReset?: Pick<StateReset, "reset">;
+  logger?: NileLogger;
 };
 
 type GetSettingsStateOptions = {
@@ -56,12 +60,17 @@ export class DesktopStateStore {
   private readonly connectionAlertOverlay: ConnectionAlertOverlay | null;
   private readonly connectionAlerts: ConnectionAlerts;
   private readonly notificationHistory: NotificationHistoryState;
+  private readonly snapshotStore: DesktopStateSnapshotStore;
+  private readonly logger: NileLogger;
 
   constructor(private readonly options: DesktopStateStoreOptions) {
+    this.logger = this.options.logger ?? NileLogger.silent().child({ scope: "state-store" });
     this.stateReset = options.stateReset ?? new StateReset();
     this.connectionAlertOverlay = options.connectionAlertOverlay ?? null;
     this.connectionAlerts = new ConnectionAlerts(options.connectionAlertStore ?? null);
     this.notificationHistory = new NotificationHistoryState(options.notificationHistory ?? null);
+    this.snapshotStore = new DesktopStateSnapshotStore(options.databasePath);
+    this.hydrateSnapshots();
   }
 
   peekMenubarState(): MenubarState | null {
@@ -83,8 +92,38 @@ export class DesktopStateStore {
     });
   }
 
+  async getSettingsStateSnapshot(): Promise<SettingsState> {
+    if (this.settingsState.value) {
+      return this.settingsState.value;
+    }
+
+    const state = await this.options.surface.getSettingsState({ refreshUsage: false });
+    const decorated = this.connectionAlertOverlay ? this.connectionAlertOverlay.decorateSettingsState(state) : state;
+    this.storeSnapshotValue(this.settingsState, decorated);
+    return decorated;
+  }
+
   async getHistoryState(): Promise<HistoryState> {
     return await this.readState(this.historyState, async () => await this.options.surface.getHistoryState());
+  }
+
+  async primeStartupState(): Promise<void> {
+    const menubarVersion = this.menubarState.version;
+    const settingsVersion = this.settingsState.version;
+    const result = await this.options.surface.primeStartupState();
+    if (this.menubarState.version === menubarVersion) {
+      this.storeResolvedValue(this.menubarState, result.menubarState);
+    }
+    if (this.settingsState.version === settingsVersion) {
+      const shouldPreserveSnapshot = this.settingsState.value !== null && this.settingsState.dirty;
+      if (shouldPreserveSnapshot) {
+        return;
+      }
+      const settingsState = this.connectionAlertOverlay
+        ? this.connectionAlertOverlay.decorateSettingsState(result.settingsState)
+        : result.settingsState;
+      this.storeSnapshotValue(this.settingsState, settingsState);
+    }
   }
 
   getNotificationHistory(filter?: DesktopNotificationHistoryFilterInput) {
@@ -179,13 +218,35 @@ export class DesktopStateStore {
     );
   }
 
-  async importCurrentConnection(agentId: AgentId): Promise<DesktopConnectionSummary> {
-    return await this.runAsyncMutation(
-      async () => await this.options.connectionGateway.importCurrentConnection(agentId),
-      this.menubarState,
-      this.settingsState,
-      this.historyState,
-    );
+  async importCurrentConnection(input: DesktopImportCurrentConnectionInput): Promise<DesktopConnectionSummary> {
+    const startedAt = Date.now();
+    this.logger.info("desktop.import_current_connection.state_store.start", {
+      agentId: input.agentId,
+      credentialStorageBackend: input.credentialStorageBackend ?? "unset",
+    });
+    try {
+      return await this.runAsyncMutation(
+        async () => {
+          const result = await this.options.connectionGateway.importCurrentConnection(input);
+          this.logger.info("desktop.import_current_connection.state_store.succeeded", {
+            agentId: input.agentId,
+            connectionId: result.id,
+            reused: result.reused ?? false,
+            durationMs: Date.now() - startedAt,
+          });
+          return result;
+        },
+        this.menubarState,
+        this.settingsState,
+        this.historyState,
+      );
+    } catch (error) {
+      this.logger.error("desktop.import_current_connection.state_store.failed", error, {
+        agentId: input.agentId,
+        durationMs: Date.now() - startedAt,
+      });
+      throw error;
+    }
   }
 
   removeConnection(connectionId: string): RemoveConnectionResult {
@@ -262,8 +323,7 @@ export class DesktopStateStore {
     let refreshPromise: Promise<T>;
     refreshPromise = refresh().then((value) => {
       if (cached.version === version) {
-        cached.value = value;
-        cached.dirty = false;
+        this.storeResolvedValue(cached, value);
       }
       return value;
     }).finally(() => {
@@ -308,5 +368,39 @@ export class DesktopStateStore {
       refresh: null,
       version: 0,
     };
+  }
+
+  private storeResolvedValue<T>(cached: CachedValue<T>, value: T): void {
+    cached.value = value;
+    cached.dirty = false;
+    this.persistSnapshot(cached, value);
+  }
+
+  private storeSnapshotValue<T>(cached: CachedValue<T>, value: T): void {
+    cached.value = value;
+    cached.dirty = true;
+    this.persistSnapshot(cached, value);
+  }
+
+  private hydrateSnapshots(): void {
+    const snapshot = this.snapshotStore.read();
+    if (snapshot.menubarState) {
+      this.menubarState.value = snapshot.menubarState;
+      this.menubarState.dirty = true;
+    }
+    if (snapshot.settingsState) {
+      this.settingsState.value = snapshot.settingsState;
+      this.settingsState.dirty = true;
+    }
+  }
+
+  private persistSnapshot<T>(cached: CachedValue<T>, value: T): void {
+    if (cached === this.menubarState) {
+      this.snapshotStore.writeMenubarState(value as MenubarState);
+      return;
+    }
+    if (cached === this.settingsState) {
+      this.snapshotStore.writeSettingsState(value as SettingsState);
+    }
   }
 }

@@ -1,4 +1,5 @@
 import type { CredentialStore } from "../../services/credential/Store";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 import {
   isEnvKeyApiKeyCredential,
   type StoredCredential,
@@ -27,6 +28,7 @@ export type SavedConnectionSummary = {
   authMode: AuthMode;
   apiKeySource?: "direct" | "env_key";
   envKey?: string | null;
+  credentialStorageBackend?: CredentialStorageBackend;
   enabledAgents: AgentId[];
   configurableAgents: AgentId[];
   selectedByAgents: string[];
@@ -189,6 +191,7 @@ export class SavedConnections {
       endpointFamily: this.readEndpointFamily(endpoint) ?? null,
       authMode: access.authMode,
       ...(apiKeyMetadata ?? {}),
+      credentialStorageBackend: access.credentialStorageBackend ?? "system_secure_storage",
       enabledAgents: this.readEnabledAgents(access, endpoint),
       configurableAgents: this.readConfigurableAgents(access, endpoint),
       selectedByAgents,

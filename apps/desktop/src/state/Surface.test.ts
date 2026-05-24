@@ -177,6 +177,7 @@ describe("DesktopSurface", () => {
     });
   });
 
+
   it("shows settings state as current, live, sync state, and saved connections", async () => {
     const setup = createSetup();
     seedProvider(setup.dbPath, {
@@ -221,8 +222,8 @@ describe("DesktopSurface", () => {
       onboarding: null,
       currentConnection: expect.objectContaining({
         activeAlertCount: 0,
+        agentModelId: "gpt-5.4",
         apiKeySource: "direct",
-        appliedAt: expect.any(String),
         id: "azure-account",
         label: "Azure Account",
         endpointLabel: "Azure Work",
@@ -231,7 +232,7 @@ describe("DesktopSurface", () => {
         isCurrent: true,
         enabledAgents: ["codex"],
         configurableAgents: ["codex", "openclaw"],
-        selectedByAgents: [],
+        selectedByAgents: ["codex"],
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         envKey: null,
       }),
@@ -248,7 +249,7 @@ describe("DesktopSurface", () => {
         isCurrent: true,
         enabledAgents: ["codex"],
         configurableAgents: ["codex", "openclaw"],
-        selectedByAgents: [],
+        selectedByAgents: ["codex"],
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         envKey: null,
       }),
@@ -310,6 +311,7 @@ describe("DesktopSurface", () => {
       }),
     });
   });
+
 
   it("marks an orphaned current connection in settings after the saved connection is removed", async () => {
     const setup = createSetup();

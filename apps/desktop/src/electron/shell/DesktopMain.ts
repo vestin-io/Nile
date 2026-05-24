@@ -7,13 +7,13 @@ import type { AgentHomes, AgentRuntimeCommandOverrides } from "@nile/core/models
 import { mergeAgentHomes, type AgentId } from "@nile/core/models/agent";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import {
+  BackendCredentialStore,
   type CredentialStore,
-  KeychainCredentialStore,
 } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { ShellEnvironment } from "@nile/host-local";
 
-import { DesktopCredentialStore } from "../credentials/DesktopCredentialStore";
+import { DesktopCredentialStore, readCredentialStorePath } from "../credentials/DesktopCredentialStore";
 import { DesktopSurface } from "../../state/Surface";
 import { DesktopApplicationMenu } from "./DesktopApplicationMenu";
 import { AgentHomesStore } from "../state/AgentHomesStore";
@@ -28,7 +28,7 @@ import { ManagedApiKeyEnvironment } from "../connections/ManagedApiKeyEnvironmen
 import { DesktopOpenClawEnvironmentReader } from "../environment/OpenClaw";
 import { DesktopEnvironmentSource } from "../environment/Source";
 import { DesktopShellEnvironment } from "../environment/Shell";
-import { DesktopEnvironmentStore } from "../environment/Store";
+import { DesktopEnvironmentStore, readDesktopEnvironmentStorePath } from "../environment/Store";
 import { DesktopIpcAppRoutes } from "../ipc/DesktopIpcAppRoutes";
 import { DesktopIpcConnectionRoutes } from "../ipc/DesktopIpcConnectionRoutes";
 import { DesktopIpcInputValidator } from "../ipc/DesktopIpcInputValidator";
@@ -52,16 +52,9 @@ import { DesktopStateStore } from "../state/DesktopStateStore";
 import { DesktopWorkspaceWatcher } from "./DesktopWorkspaceWatcher";
 import { DesktopTrayTickerTitle } from "./TickerTitle";
 
-const currentDir =
-  typeof __dirname === "string"
-    ? __dirname
-    : dirname(fileURLToPath(import.meta.url));
+const currentDir = typeof __dirname === "string" ? __dirname : dirname(fileURLToPath(import.meta.url));
 
-type DesktopMainOptions = {
-  databasePath: string;
-  agentHomes?: AgentHomes;
-  credentialStore?: CredentialStore;
-};
+type DesktopMainOptions = { databasePath: string; agentHomes?: AgentHomes; credentialStore?: CredentialStore };
 
 export class DesktopMain {
   private readonly logger: NileLogger;
@@ -129,15 +122,30 @@ export class DesktopMain {
       agentRuntimeCommandOverrides: this.agentRuntimeCommandOverrides,
       environment: this.environment,
       openExternalUrl: async (url) => await this.shell.openExternalUrl(url),
-      managedApiKeyEnvironment: new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment),
+      managedApiKeyEnvironment: new ManagedApiKeyEnvironment(
+        this.environmentStore,
+        this.shellEnvironment,
+        this.logger.child({ scope: "managed-api-key-environment", path: "connection-manager" }),
+      ),
       credentialStore: this.credentialStore,
+      credentialStorageSession: this.credentialStore instanceof BackendCredentialStore
+        ? this.credentialStore
+        : undefined,
     });
     this.connectionGateway = new DesktopConnectionGateway({
       databasePath: options.databasePath,
       agentHomes: this.agentHomes,
       environment: this.environment,
-      managedApiKeyEnvironment: new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment),
+      managedApiKeyEnvironment: new ManagedApiKeyEnvironment(
+        this.environmentStore,
+        this.shellEnvironment,
+        this.logger.child({ scope: "managed-api-key-environment", path: "connection-gateway" }),
+      ),
       credentialStore: this.credentialStore,
+      credentialStorageSession: this.credentialStore instanceof BackendCredentialStore
+        ? this.credentialStore
+        : undefined,
+      logger: this.logger.child({ scope: "connection-gateway" }),
     });
     this.stateStore = new DesktopStateStore({
       databasePath: options.databasePath,
@@ -145,7 +153,11 @@ export class DesktopMain {
       connectionGateway: this.connectionGateway,
       connectionManager: this.connectionManager,
       stateReset: new DesktopStateReset({
-        localStatePaths: [],
+        localStatePaths: [
+          join(dirname(options.databasePath), "credentials"),
+          readCredentialStorePath(options.databasePath),
+          readDesktopEnvironmentStorePath(options.databasePath),
+        ],
         onBeforeResetLocalState: () => this.clearManagedApiKeyEnvironment(),
         onResetLocalState: () => this.resetDesktopLocalState(),
         stateReset: new StateReset(this.credentialStore),
@@ -153,6 +165,7 @@ export class DesktopMain {
       connectionAlertOverlay: new ConnectionAlertOverlay(this.connectionAlertStore),
       connectionAlertStore: this.connectionAlertStore,
       notificationHistory: this.notificationHistory,
+      logger: this.logger.child({ scope: "state-store" }),
     });
     this.profileManager = new WorkspaceProfileManager({
       stateStore: this.stateStore,
@@ -267,17 +280,25 @@ export class DesktopMain {
     this.syncTrayTitle();
     await this.syncManagedApiKeyEnvironment();
     this.workspaceWatcher.start();
-    void this.stateStore.refreshMenubarState().catch((error) => {
-      this.logger.error("desktop.startup.refresh_menubar_failed", error);
+    void this.stateStore.primeStartupState().catch((error) => {
+      this.logger.error("desktop.startup.prime_state_failed", error);
     });
-    void this.refreshMenubarUsage().catch((error) => {
-      this.logger.error("desktop.startup.refresh_usage_failed", error);
-    });
+    setTimeout(() => {
+      if (this.isQuitting) {
+        return;
+      }
+      void this.refreshMenubarUsage().catch((error) => {
+        this.logger.error("desktop.startup.refresh_usage_failed", error);
+      });
+    }, 1500);
     void this.autoBindCursorUsageInBackground();
 
     app.on("before-quit", () => {
       this.isQuitting = true;
       this.connectionManager.clearPreparedConnectionDrafts();
+      if (this.credentialStore instanceof BackendCredentialStore) {
+        this.credentialStore.clearUnlockedCredentials();
+      }
       this.workspaceWatcher.stop();
     });
     app.on("activate", () => {
@@ -291,6 +312,7 @@ export class DesktopMain {
       getNotificationsMuted: () => this.notificationMuteStore.read(),
       getProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       inputs: this.inputs,
+      notifyLocalStateReset: () => this.shell.notifyLocalStateReset(),
       notifyNotificationHistoryChanged: () => this.shell.notifyNotificationHistoryChanged(),
       refreshAll: () => this.reloadAll(),
       refreshDesktopState: (options) => this.refreshDesktopState(options),
@@ -315,6 +337,7 @@ export class DesktopMain {
       chooseOpenAiAuthJsonPath: (defaultPath) => this.shell.chooseOpenAiAuthJsonPath(defaultPath),
       connectionManager: this.connectionManager,
       inputs: this.inputs,
+      logger: this.logger.child({ scope: "ipc-connection-routes" }),
       refreshAll: () => this.reloadAll(),
       stateStore: this.stateStore,
     }).register();
@@ -354,11 +377,7 @@ export class DesktopMain {
     });
   }
 
-  private installDesktopUpdate() {
-    this.isQuitting = true;
-    this.shell.prepareForUpdateInstall();
-    return this.autoUpdateManager.installUpdate();
-  }
+  private installDesktopUpdate() { this.isQuitting = true; this.shell.prepareForUpdateInstall(); return this.autoUpdateManager.installUpdate(); }
 
   private updateAgentHome(agentId: AgentId, path: string | null): void {
     const next = mergeAgentHomes(this.options.agentHomes, this.agentHomesStore.update(agentId, path));
@@ -379,6 +398,9 @@ export class DesktopMain {
   private resetDesktopLocalState(): void {
     this.connectionManager.clearPreparedConnectionDrafts();
     this.connectionAlertStore.clearCache();
+    if (this.credentialStore instanceof BackendCredentialStore) {
+      this.credentialStore.clearUnlockedCredentials();
+    }
     this.agentRuntimeCommandsStore.clear();
     const next = mergeAgentHomes(this.options.agentHomes, {});
     for (const key of Object.keys(this.agentHomes) as AgentId[]) {
@@ -467,9 +489,7 @@ export class DesktopMain {
     return this.menubarDisplayStore.writeTickerAgentIds(nextSelectedAgentIds);
   }
 
-  private syncTrayTitle(): void {
-    void this.syncTrayTitleAsync();
-  }
+  private syncTrayTitle(): void { void this.syncTrayTitleAsync(); }
 
   private async syncTrayTitleAsync(): Promise<void> {
     const connectionQuotaMetricPreferences = await this.shell.readConnectionQuotaMetricPreferences().catch(() => ({}));
@@ -485,8 +505,8 @@ export class DesktopMain {
 
 function createDesktopCredentialStore(databasePath: string): CredentialStore {
   if (process.platform === "darwin") {
-    return new KeychainCredentialStore();
+    return new BackendCredentialStore(databasePath);
   }
 
-  return new DesktopCredentialStore(databasePath);
+  return new BackendCredentialStore(databasePath, new DesktopCredentialStore(databasePath));
 }

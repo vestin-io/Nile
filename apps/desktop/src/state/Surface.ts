@@ -19,6 +19,7 @@ import { DesktopConnectionStatusPresenter } from "./connection/Status";
 import { DesktopStateErrorNormalizer } from "./ErrorNormalizer";
 import { DesktopHistoryStateQuery } from "./HistoryQuery";
 import { DesktopMenubarStateQuery } from "./MenubarQuery";
+import type { DesktopStateReadContext } from "./ReadContext";
 import { DesktopSettingsStateQuery } from "./SettingsQuery";
 import { DesktopUsageCache } from "./UsageCache";
 
@@ -89,6 +90,20 @@ export class DesktopSurface {
     return await this.withSession("settings-state", async (session) => await this.settings.read(session, options));
   }
 
+  async primeStartupState(): Promise<{ menubarState: MenubarState; settingsState: SettingsState }> {
+    return await this.withSession("startup-state", async (session) => {
+      const context = this.createReadContext(session);
+      const [menubarState, settingsState] = await Promise.all([
+        this.menubar.readFromContext(context),
+        this.settings.readFromContext(session, context, { refreshUsage: false }),
+      ]);
+      return {
+        menubarState,
+        settingsState,
+      };
+    });
+  }
+
   async getHistoryState(): Promise<HistoryState> {
     return await this.withSession("history-state", async (session) => this.history.read(session));
   }
@@ -121,5 +136,9 @@ export class DesktopSurface {
     } finally {
       session.close();
     }
+  }
+
+  private createReadContext(session: NileSession): DesktopStateReadContext {
+    return this.settings.createReadContext(session);
   }
 }

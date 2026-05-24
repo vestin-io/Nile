@@ -1,6 +1,7 @@
 import type { LocalCredentialRequest } from "./CredentialRequest";
 import type { AgentId } from "../../models/agent/Definitions";
 import type { ConnectionPresetFamily } from "../../models/connection/preset";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 
 export type CreateLocalConnectionInput = {
   preset: ConnectionPresetFamily;
@@ -9,6 +10,7 @@ export type CreateLocalConnectionInput = {
   endpointUrl?: string;
   enabledAgents?: AgentId[];
   allowUndetectedGateway?: boolean;
+  credentialStorageBackend: CredentialStorageBackend;
   credentialRequest: LocalCredentialRequest;
 };
 

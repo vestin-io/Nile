@@ -42,6 +42,7 @@ describe("ConnectionCreator", () => {
       await expect(creator.create({
         preset: "openai",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         label: "Work Key",
         credential: {
           kind: "api_key",
@@ -85,6 +86,7 @@ describe("ConnectionCreator", () => {
       const result = await creator.create({
         preset: "azure-openai",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         label: "Azure Team",
         credential: {
@@ -118,6 +120,7 @@ describe("ConnectionCreator", () => {
         label: "Azure Team",
         authMode: "api_key",
         apiKeySource: "direct",
+        credentialStorageBackend: "system_secure_storage",
         enabledAgents: ["codex"],
         credentialSource: {
           kind: "local",
@@ -170,6 +173,7 @@ describe("ConnectionCreator", () => {
       const result = await creator.create({
         preset: "gateway",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         endpointUrl: "https://gateway.example.test",
         credential: {
           kind: "api_key",
@@ -225,6 +229,7 @@ describe("ConnectionCreator", () => {
       const result = await creator.create({
         preset: "gateway",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         endpointUrl: "https://gateway.example.test/v1",
         enabledAgents: ["codex"],
         allowUndetectedGateway: true,
@@ -276,6 +281,7 @@ describe("ConnectionCreator", () => {
       const created = await creator.create({
         preset: "azure-openai",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         credential: {
           kind: "api_key",
@@ -286,6 +292,7 @@ describe("ConnectionCreator", () => {
       const reused = await creator.create({
         preset: "azure-openai",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         credential: {
           kind: "api_key",
@@ -356,6 +363,7 @@ describe("ConnectionCreator", () => {
       const result = await creator.create({
         preset: "gateway",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         endpointUrl: "https://gateway.example.test",
         label: "Frank",
         credential: {
@@ -438,6 +446,7 @@ describe("ConnectionCreator", () => {
       const result = await creator.create({
         preset: "gateway",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         endpointUrl: "https://gateway.example.test",
         label: "Gateway Key",
         credential: {
@@ -534,6 +543,7 @@ describe("ConnectionCreator", () => {
       await creator.create({
         preset: "gateway",
         authMode: "api_key",
+        credentialStorageBackend: "system_secure_storage",
         endpointUrl: "https://gateway.example.test",
         label: "Frank",
         enabledAgents: ["claude"],
@@ -594,6 +604,7 @@ describe("ConnectionCreator", () => {
       const result = await creator.create({
         preset: "openai",
         authMode: "openai_session",
+        credentialStorageBackend: "system_secure_storage",
         credential: {
           kind: "openai_session",
           idToken: "header.new-token.signature",

@@ -16,10 +16,15 @@ import {
 } from "../../ui/select";
 import { Separator } from "../../ui/separator";
 import type { DesktopReleaseInfo } from "../../../state/Types";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { SettingsSection } from "./Section";
+import { CredentialStorageSection } from "./CredentialStorageSection";
 import { UpdateSection } from "./UpdateSection";
 
 type SettingsPageProps = {
+  credentialStorageMode: CredentialStorageBackend | null;
+  isCredentialStorageModeLocked: boolean;
+  isCredentialStorageModeMixed: boolean;
   isLoadedNotificationMute: boolean;
   isLoadedMenubarDisplay: boolean;
   isSavingMenubarDisplay: boolean;
@@ -45,6 +50,9 @@ type SettingsPageProps = {
 };
 
 export function SettingsPage({
+  credentialStorageMode,
+  isCredentialStorageModeLocked,
+  isCredentialStorageModeMixed,
   isLoadedNotificationMute,
   isLoadedMenubarDisplay,
   isSavingMenubarDisplay,
@@ -174,6 +182,15 @@ export function SettingsPage({
           </SelectContent>
         </Select>
       </SettingsSection>
+
+      <Separator />
+
+      <CredentialStorageSection
+        credentialStorageMode={credentialStorageMode}
+        isLocked={isCredentialStorageModeLocked}
+        isMixed={isCredentialStorageModeMixed}
+        t={t}
+      />
 
       <Separator />
 

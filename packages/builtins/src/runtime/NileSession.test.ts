@@ -41,6 +41,7 @@ describe("NileSession", () => {
       const result = await session.createLocalConnection({
         preset: "openai",
         authMode: "openai_session",
+        credentialStorageBackend: "system_secure_storage",
         credentialRequest: {
           authMode: "openai_session",
           source: "login",
