@@ -63,6 +63,13 @@ export class EncryptedLocalCredentialStorePassphraseError extends CredentialStor
   }
 }
 
+export class EncryptedLocalCredentialStoreCorruptedError extends CredentialStoreCommandError {
+  constructor(message = "Encrypted local storage vault is corrupted or unreadable.") {
+    super(message);
+    this.name = "EncryptedLocalCredentialStoreCorruptedError";
+  }
+}
+
 export interface CredentialStore {
   create(target: CredentialStoreTarget, credential: StoredCredential): void;
   update(target: CredentialStoreTarget, credential: StoredCredential): void;

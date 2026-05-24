@@ -31,6 +31,7 @@ export {
   CredentialAlreadyExistsError,
   CredentialNotFoundError,
   CredentialStoreCommandError,
+  EncryptedLocalCredentialStoreCorruptedError,
   EncryptedLocalCredentialStoreLockedError,
   EncryptedLocalCredentialStorePassphraseError,
   CredentialStoreValidationError,

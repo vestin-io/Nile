@@ -15,7 +15,7 @@ export type ConnectionUpsertInput = {
     label: string;
     authMode: AuthMode;
     credential: StoredCredential;
-    credentialStorageBackend?: CredentialStorageBackend;
+    credentialStorageBackend: CredentialStorageBackend;
     identityKey?: string | null;
     enabledAgents: AgentId[];
     enabledAgentsMode: "replace" | "merge";
@@ -134,7 +134,7 @@ export class ConnectionUpsert {
         label: input.label,
         authMode: input.authMode,
         enabledAgents: input.enabledAgents,
-        ...(input.credentialStorageBackend ? { credentialStorageBackend: input.credentialStorageBackend } : {}),
+        credentialStorageBackend: input.credentialStorageBackend,
         ...(input.identityKey?.trim() ? { identityKey: input.identityKey.trim() } : {}),
       }, input.credential),
       reused: false,

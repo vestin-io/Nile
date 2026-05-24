@@ -9,6 +9,7 @@ import { Label } from "../../ui/label";
 
 type UnlockEncryptedLocalStorageDialogProps = {
   errorMessage: string | null;
+  hintMessage?: string | null;
   isSubmitting: boolean;
   open: boolean;
   t: Translator;
@@ -18,6 +19,7 @@ type UnlockEncryptedLocalStorageDialogProps = {
 
 export function UnlockEncryptedLocalStorageDialog({
   errorMessage,
+  hintMessage,
   isSubmitting,
   open,
   t,
@@ -50,6 +52,12 @@ export function UnlockEncryptedLocalStorageDialog({
             void onSubmit(passphrase.trim());
           }}
         >
+          {hintMessage ? (
+            <Alert>
+              <AlertDescription>{hintMessage}</AlertDescription>
+            </Alert>
+          ) : null}
+
           <div className="grid gap-2">
             <Label htmlFor="encrypted-local-unlock-passphrase">
               {t("dialog.encryptedLocalUnlock.passphrase")}

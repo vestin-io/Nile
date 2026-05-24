@@ -307,6 +307,8 @@ describe("DesktopStateStore", () => {
         supportedAgents: [],
         savedConnectionCount: 0,
         importableSetupCount: 0,
+        credentialStorageMode: null,
+        credentialStorageModeMixed: false,
       },
     });
     expect(readerSurface.getMenubarStateCalls).toBe(1);
@@ -443,6 +445,8 @@ class StubSurface {
         supportedAgents: [],
         savedConnectionCount: 0,
         importableSetupCount: 0,
+        credentialStorageMode: null,
+        credentialStorageModeMixed: false,
       },
     };
   }
@@ -658,6 +662,8 @@ function createSettingsState(usageText: string): SettingsState {
       supportedAgents: [],
       savedConnectionCount: 1,
       importableSetupCount: 0,
+      credentialStorageMode: "system_secure_storage",
+      credentialStorageModeMixed: false,
     },
   };
 }

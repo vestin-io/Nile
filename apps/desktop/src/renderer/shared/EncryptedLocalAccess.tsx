@@ -2,12 +2,13 @@ import * as React from "react";
 
 type EncryptedLocalAccessContextValue = {
   recover<T>(operation: () => Promise<T>): Promise<T>;
+  requestUnlock(hint?: string): Promise<void>;
 };
 
 const EncryptedLocalAccessContext = React.createContext<EncryptedLocalAccessContextValue | null>(null);
 
 type EncryptedLocalAccessProviderProps = React.PropsWithChildren<{
-  requestUnlock(): Promise<void>;
+  requestUnlock(hint?: string): Promise<void>;
 }>;
 
 export function EncryptedLocalAccessProvider({
@@ -18,6 +19,7 @@ export function EncryptedLocalAccessProvider({
     () => ({
       recover: async <T,>(operation: () => Promise<T>) =>
         await runWithEncryptedLocalUnlockRetry(operation, requestUnlock),
+      requestUnlock,
     }),
     [requestUnlock],
   );
@@ -39,7 +41,7 @@ export function useEncryptedLocalAccessRecovery() {
 
 export async function runWithEncryptedLocalUnlockRetry<T>(
   operation: () => Promise<T>,
-  requestUnlock: () => Promise<void>,
+  requestUnlock: (hint?: string) => Promise<void>,
 ): Promise<T> {
   try {
     return await operation();

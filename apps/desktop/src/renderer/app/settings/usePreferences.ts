@@ -45,7 +45,7 @@ export function useDesktopPreferences(): DesktopPreferencesState {
   useEffect(() => window.nileDesktopEvents.onLocalStateReset(() => {
     setPreferences((current) => ({
       ...current,
-      defaultCredentialStorageBackend: null,
+      credentialStorageMode: null,
       quickSetupDismissed: false,
     }));
   }), []);

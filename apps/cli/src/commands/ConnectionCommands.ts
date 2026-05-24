@@ -44,7 +44,10 @@ export class ConnectionCommands {
       credentialResolver,
       describeOnboarding: async (options, input) =>
         await this.sessions.runAsync(options, "describe-connection-onboarding", async (session) =>
-          await session.describeConnectionOnboarding(input),
+          await session.describeConnectionOnboarding({
+            ...input,
+            credentialStorageBackend: this.resolveCliCredentialStorageMode(session),
+          }),
         ),
       onboardingPrompts,
       prompt,
@@ -81,9 +84,13 @@ export class ConnectionCommands {
     const input = await this.addFlow.resolveInput(options, flags);
     return await this.sessions.runAsync(options, "create-connection", async (session) => {
       const { selectedModelId, ...createInput } = input;
+      const credentialStorageBackend = this.resolveCliCredentialStorageMode(session);
       const created = this.applyCursorUsageFollowUp(
         options,
-        await session.createConnection(createInput),
+        await session.createConnection({
+          ...createInput,
+          credentialStorageBackend,
+        }),
       );
       this.applySelectedModelId(session, created.id, createInput.enabledAgents, selectedModelId);
       return this.buildAddConnectionResult(created);
@@ -94,9 +101,13 @@ export class ConnectionCommands {
     const input = await this.addFlow.resolveInput(options, new Map());
     return await this.sessions.runAsync(options, "create-connection", async (session) => {
       const { selectedModelId, ...createInput } = input;
+      const credentialStorageBackend = this.resolveCliCredentialStorageMode(session);
       const created = this.applyCursorUsageFollowUp(
         options,
-        await session.createConnection(createInput),
+        await session.createConnection({
+          ...createInput,
+          credentialStorageBackend,
+        }),
       );
       this.applySelectedModelId(session, created.id, createInput.enabledAgents, selectedModelId);
       return this.buildAddConnectionResult(created);
@@ -105,9 +116,12 @@ export class ConnectionCommands {
 
   async importCurrentConnection(options: ResolvedCliOptions, agentId: AgentId): Promise<AddConnectionResult> {
     return await this.sessions.runAsync(options, `${agentId}-import-current-connection`, async (session) => {
+      this.resolveCliCredentialStorageMode(session);
       const imported = this.applyCursorUsageFollowUp(
         options,
-        await session.importCurrentConnection(agentId),
+        await session.importCurrentConnection(agentId, {
+          credentialStorageBackend: "system_secure_storage",
+        }),
       );
       return this.buildAddConnectionResult(imported);
     });
@@ -121,8 +135,13 @@ export class ConnectionCommands {
     options: ResolvedCliOptions,
     input: ImportDetectedSetupsInput,
   ): Promise<ImportDetectedSetupsResult> {
-    return await this.sessions.runAsync(options, "import-detected-setups", async (session) =>
-      await session.importDetectedSetups(input));
+    return await this.sessions.runAsync(options, "import-detected-setups", async (session) => {
+      const credentialStorageBackend = this.resolveCliCredentialStorageMode(session);
+      return await session.importDetectedSetups({
+        ...input,
+        credentialStorageBackend,
+      });
+    });
   }
 
   useConnection(
@@ -183,4 +202,33 @@ export class ConnectionCommands {
       session.setAgentConnectionModel(agentId, connectionId, selectedModelId);
     }
   }
+
+  private resolveCliCredentialStorageMode(
+    session: Pick<ConnectionCommandsSession, "listSavedConnections">,
+  ): "system_secure_storage" {
+    const modes = [...new Set(session
+      .listSavedConnections()
+      .map((connection) => connection.credentialStorageBackend)
+      .filter((backend): backend is "system_secure_storage" | "encrypted_local_storage" =>
+        backend === "system_secure_storage" || backend === "encrypted_local_storage",
+      ))];
+
+    if (modes.length > 1) {
+      throw new Error(
+        "Saved connections on this machine use multiple credential storage backends. Reset local state in the desktop app before using CLI save or import commands.",
+      );
+    }
+
+    if (modes[0] === "encrypted_local_storage") {
+      throw new Error(
+        "This machine is configured to use Encrypted local storage. Save or import connections from the desktop app after unlocking encrypted local storage, or reset local state to choose a new storage mode.",
+      );
+    }
+
+    return "system_secure_storage";
+  }
 }
+
+type ConnectionCommandsSession = {
+  listSavedConnections(): SavedConnectionSummary[];
+};

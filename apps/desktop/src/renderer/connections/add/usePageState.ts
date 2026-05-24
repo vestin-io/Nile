@@ -12,22 +12,24 @@ import { useAddConnectionForm } from "./useForm";
 import { useAddConnectionOnboardingState } from "./useOnboardingState";
 
 type UseAddConnectionPageStateOptions = {
+  credentialStorageMode: CredentialStorageBackend | null;
   credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
   defaultOpenAiAuthJsonPath: string;
-  defaultCredentialStorageBackend: CredentialStorageBackend | null;
   definitions: Definition[];
-  onRememberDefaultCredentialStorageBackend(backend: CredentialStorageBackend): void;
+  isCredentialStorageModeLocked: boolean;
+  onRememberCredentialStorageMode(backend: CredentialStorageBackend): void;
   onPrepareDraft(input: AddConnectionSubmitInput): Promise<PreparedConnectionDraft>;
   onSavePrepared(input: AddConnectionPreparedSaveInput): Promise<void>;
   onSubmit(input: AddConnectionSubmitInput): Promise<void>;
 };
 
 export function useAddConnectionPageState({
+  credentialStorageMode,
   credentialStorageState,
   defaultOpenAiAuthJsonPath,
-  defaultCredentialStorageBackend,
   definitions,
-  onRememberDefaultCredentialStorageBackend,
+  isCredentialStorageModeLocked,
+  onRememberCredentialStorageMode,
   onPrepareDraft,
   onSavePrepared,
   onSubmit,
@@ -48,7 +50,7 @@ export function useAddConnectionPageState({
     setEnabledAgents,
     setPreset,
     setSessionSource,
-  } = useAddConnectionForm(definitions, defaultOpenAiAuthJsonPath, defaultCredentialStorageBackend);
+  } = useAddConnectionForm(definitions, defaultOpenAiAuthJsonPath, credentialStorageMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPreparingDraft, setIsPreparingDraft] = useState(false);
   const [isChoosingAuthJsonPath, setIsChoosingAuthJsonPath] = useState(false);
@@ -120,14 +122,16 @@ export function useAddConnectionPageState({
       return null;
     }
 
+    const activeCredentialStorageMode = credentialStorageMode ?? formState.credentialStorageBackend;
+
     return {
       preset: selectedDefinition.preset,
       authMode: formState.authMode as Definition["supportedAuthModes"][number],
       endpointUrl: formState.endpointUrl.trim() || undefined,
       enabledAgents: formState.enabledAgents,
       allowUndetectedGateway: gatewayProbeError !== null,
-      credentialStorageBackend: formState.credentialStorageBackend,
-      encryptedLocalPassphrase: formState.credentialStorageBackend === "encrypted_local_storage"
+      credentialStorageBackend: activeCredentialStorageMode,
+      encryptedLocalPassphrase: activeCredentialStorageMode === "encrypted_local_storage"
         ? formState.encryptedLocalPassphrase.trim() || undefined
         : undefined,
       apiKeySource: formState.apiKeySource,
@@ -168,7 +172,7 @@ export function useAddConnectionPageState({
   const displayedEnabledAgents = shouldShowEnabledAgents
     ? formState.enabledAgents
     : preparedDraft?.defaultEnabledAgents ?? selectedDefinition?.defaultEnabledAgents ?? [];
-  const shouldRememberDefaultCredentialStorageBackend = defaultCredentialStorageBackend === null;
+  const shouldRememberCredentialStorageMode = credentialStorageMode === null && !isCredentialStorageModeLocked;
   const gatewayCapabilityResolved = !requiresGatewayPreparation || gatewayPrepared || gatewayProbeError !== null;
   const showPostPreparationFields =
     (!requiresSessionPreparation || preparedDraft !== null)
@@ -192,8 +196,8 @@ export function useAddConnectionPageState({
           draftId: preparedDraft.id,
           enabledAgents: formState.enabledAgents,
         });
-        if (shouldRememberDefaultCredentialStorageBackend) {
-          onRememberDefaultCredentialStorageBackend(formState.credentialStorageBackend);
+        if (shouldRememberCredentialStorageMode) {
+          onRememberCredentialStorageMode(formState.credentialStorageBackend);
         }
         setPreparedDraft(null);
         return;
@@ -205,8 +209,8 @@ export function useAddConnectionPageState({
       }
 
       await onSubmit(input);
-      if (shouldRememberDefaultCredentialStorageBackend) {
-        onRememberDefaultCredentialStorageBackend(formState.credentialStorageBackend);
+      if (shouldRememberCredentialStorageMode) {
+        onRememberCredentialStorageMode(formState.credentialStorageBackend);
       }
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));

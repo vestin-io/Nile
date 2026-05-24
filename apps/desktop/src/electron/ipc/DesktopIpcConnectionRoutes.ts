@@ -2,8 +2,17 @@ import { ipcMain } from "electron";
 
 import { SHARED_CONNECTION_CATALOG } from "@nile/builtins/connections";
 import { NileLogger } from "@nile/core/services/NileLogger";
+import {
+  EncryptedLocalCredentialStoreCorruptedError,
+  EncryptedLocalCredentialStoreLockedError,
+  EncryptedLocalCredentialStorePassphraseError,
+} from "@nile/core/services/credential";
 
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
+import type {
+  DesktopUnlockEncryptedLocalStorageFailure,
+  DesktopUnlockEncryptedLocalStorageResult,
+} from "../connections/contracts";
 import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 
@@ -28,9 +37,21 @@ export class DesktopIpcConnectionRoutes {
 
     ipcMain.handle("desktop:list-connection-definitions", () => SHARED_CONNECTION_CATALOG.listDefinitions());
     ipcMain.handle("desktop:get-credential-storage-state", () => connectionManager.getCredentialStorageState());
-    ipcMain.handle("desktop:unlock-encrypted-local-storage", (_event, passphrase: unknown) =>
-      connectionManager.unlockEncryptedLocalStorage(inputs.readRequiredString(passphrase, "passphrase")),
-    );
+    ipcMain.handle("desktop:unlock-encrypted-local-storage", (_event, passphrase: unknown) => {
+      try {
+        connectionManager.unlockEncryptedLocalStorage(inputs.readRequiredString(passphrase, "passphrase"));
+        return { ok: true } satisfies DesktopUnlockEncryptedLocalStorageResult;
+      } catch (error) {
+        const result = this.mapEncryptedLocalUnlockError(error);
+        if (result.code === "unknown") {
+          this.logger.error("desktop.unlock_encrypted_local_storage.failed", {
+            errorName: error instanceof Error ? error.name : typeof error,
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return result;
+      }
+    });
     ipcMain.handle("desktop:choose-openai-auth-json-path", async (_event, defaultPath?: unknown) => {
       return await this.options.chooseOpenAiAuthJsonPath(inputs.readOptionalString(defaultPath, "defaultPath"));
     });
@@ -69,7 +90,7 @@ export class DesktopIpcConnectionRoutes {
       const startedAt = Date.now();
       this.logger.info("desktop.import_current_connection.ipc.start", {
         agentId: normalizedInput.agentId,
-        credentialStorageBackend: normalizedInput.credentialStorageBackend ?? "default",
+        credentialStorageBackend: normalizedInput.credentialStorageBackend ?? "unset",
       });
       try {
         const result = await stateStore.importCurrentConnection(normalizedInput);
@@ -124,5 +145,21 @@ export class DesktopIpcConnectionRoutes {
         inputs.readRequiredString(alertId, "alertId"),
       );
     });
+  }
+
+  private mapEncryptedLocalUnlockError(error: unknown): DesktopUnlockEncryptedLocalStorageFailure {
+    if (error instanceof EncryptedLocalCredentialStoreCorruptedError) {
+      return { ok: false, code: "corrupted" };
+    }
+    if (error instanceof EncryptedLocalCredentialStorePassphraseError) {
+      return { ok: false, code: "passphrase_or_corrupted" };
+    }
+    if (error instanceof EncryptedLocalCredentialStoreLockedError) {
+      return { ok: false, code: "locked" };
+    }
+    if (error instanceof Error && error.message.includes("not available in this desktop session")) {
+      return { ok: false, code: "unavailable" };
+    }
+    return { ok: false, code: "unknown" };
   }
 }

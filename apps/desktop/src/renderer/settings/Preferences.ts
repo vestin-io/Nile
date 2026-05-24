@@ -16,8 +16,8 @@ export type AgentOrderPreference = AgentId[];
 
 export type DesktopPreferences = {
   agentOrder: AgentOrderPreference;
+  credentialStorageMode: CredentialStorageBackend | null;
   connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences;
-  defaultCredentialStorageBackend: CredentialStorageBackend | null;
   language: LanguagePreference;
   quickSetupDismissed: boolean;
   theme: ThemePreference;
@@ -45,8 +45,8 @@ export class DesktopPreferencesStore {
   load(): DesktopPreferences {
     const fallback: DesktopPreferences = {
       agentOrder: readDefaultAgentOrder(),
+      credentialStorageMode: null,
       connectionQuotaMetricPreferences: {},
-      defaultCredentialStorageBackend: null,
       language: "en",
       quickSetupDismissed: false,
       theme: "system",
@@ -60,11 +60,11 @@ export class DesktopPreferencesStore {
       const parsed = JSON.parse(raw) as Partial<DesktopPreferences>;
       return {
         agentOrder: normalizeAgentOrder(parsed.agentOrder),
+        credentialStorageMode: normalizeCredentialStorageBackendPreference(
+          parsed.credentialStorageMode,
+        ),
         connectionQuotaMetricPreferences: normalizeConnectionQuotaMetricPreferences(
           parsed.connectionQuotaMetricPreferences,
-        ),
-        defaultCredentialStorageBackend: normalizeCredentialStorageBackendPreference(
-          parsed.defaultCredentialStorageBackend,
         ),
         language: normalizeLanguagePreference(parsed.language),
         quickSetupDismissed: parsed.quickSetupDismissed === true,

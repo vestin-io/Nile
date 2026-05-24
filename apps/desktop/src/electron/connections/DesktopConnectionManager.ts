@@ -43,6 +43,7 @@ import { DesktopConnectionModelCatalog } from "./ModelCatalog";
 import { DesktopPreparedDraftStore } from "./DesktopPreparedDraftStore";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 import { SessionRunner } from "./SessionRunner";
+import { resolveDesktopCredentialStorageMode } from "./CredentialStorageMode";
 
 type DesktopConnectionManagerOptions = {
   databasePath: string;
@@ -97,12 +98,16 @@ export class DesktopConnectionManager {
   async addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary> {
     try {
       return await this.sessions.runAsync(async (session) => {
-        this.prepareCredentialStorage(input.credentialStorageBackend, input.encryptedLocalPassphrase, {
+        const credentialStorageBackend = resolveDesktopCredentialStorageMode(
+          session,
+          input.credentialStorageBackend,
+        );
+        this.prepareCredentialStorage(credentialStorageBackend, input.encryptedLocalPassphrase, {
           allowCreate: true,
         });
         const created = this.applyCursorUsageFollowUp(
           await session.createLocalConnection(
-            this.buildLocalConnectionInput(input),
+            this.buildLocalConnectionInput(input, credentialStorageBackend),
             this.localCredentialResolver,
           ),
         );
@@ -145,9 +150,12 @@ export class DesktopConnectionManager {
   }
 
   async describeConnectionOnboarding(input: DesktopAddConnectionInput) {
-    return await this.sessions.runAsync(async (session) =>
-      await session.describeLocalConnectionOnboarding(
-        this.buildLocalConnectionInput(input),
+      return await this.sessions.runAsync(async (session) =>
+        await session.describeLocalConnectionOnboarding(
+          this.buildLocalConnectionInput(
+            input,
+            resolveDesktopCredentialStorageMode(session, input.credentialStorageBackend),
+        ),
         this.localCredentialResolver,
       ),
     );
@@ -179,6 +187,7 @@ export class DesktopConnectionManager {
         preset,
         authMode: existing.authMode,
         credential,
+        credentialStorageBackend: existing.credentialStorageBackend ?? "system_secure_storage",
         probeCredential: this.resolveProbeCredential(credentialRequest, credential, this.localCredentialResolver),
         endpointUrl: input.endpointUrl?.trim() || existing.endpointUrl || undefined,
       });
@@ -188,7 +197,11 @@ export class DesktopConnectionManager {
   async prepareConnectionDraft(input: DesktopAddConnectionInput): Promise<DesktopPreparedConnectionDraft> {
     try {
       return await this.sessions.runAsync(async (session) => {
-        this.prepareCredentialStorage(input.credentialStorageBackend, input.encryptedLocalPassphrase, {
+        const credentialStorageBackend = resolveDesktopCredentialStorageMode(
+          session,
+          input.credentialStorageBackend,
+        );
+        this.prepareCredentialStorage(credentialStorageBackend, input.encryptedLocalPassphrase, {
           allowCreate: false,
         });
         const credential = await this.localCredentialResolver.resolveAsync(this.resolveCredentialRequest(input));
@@ -196,6 +209,7 @@ export class DesktopConnectionManager {
           preset: input.preset,
           authMode: input.authMode,
           credential,
+          credentialStorageBackend,
           endpointUrl: input.endpointUrl,
           label: input.label?.trim() || undefined,
           allowUndetectedGateway: input.allowUndetectedGateway,
@@ -203,7 +217,7 @@ export class DesktopConnectionManager {
         const id = this.preparedDrafts.save({
           authMode: input.authMode,
           credential,
-          credentialStorageBackend: input.credentialStorageBackend,
+          credentialStorageBackend,
           encryptedLocalPassphrase: input.encryptedLocalPassphrase?.trim() || undefined,
           endpointUrl: input.endpointUrl,
           onboarding,
@@ -233,14 +247,18 @@ export class DesktopConnectionManager {
 
     try {
       return await this.sessions.runAsync(async (session) => {
-        this.prepareCredentialStorage(draft.credentialStorageBackend, draft.encryptedLocalPassphrase, {
+        const credentialStorageBackend = resolveDesktopCredentialStorageMode(
+          session,
+          draft.credentialStorageBackend,
+        );
+        this.prepareCredentialStorage(credentialStorageBackend, draft.encryptedLocalPassphrase, {
           allowCreate: true,
         });
         const created = this.applyCursorUsageFollowUp(await session.createConnection({
           preset: draft.preset,
           authMode: draft.authMode,
           credential: draft.credential,
-          credentialStorageBackend: draft.credentialStorageBackend,
+          credentialStorageBackend,
           endpointUrl: draft.endpointUrl,
           label: input.label?.trim() || undefined,
           enabledAgents: input.enabledAgents ?? draft.onboarding.defaultEnabledAgents,
@@ -299,7 +317,10 @@ export class DesktopConnectionManager {
     });
   }
 
-  private buildLocalConnectionInput(input: DesktopAddConnectionInput) {
+  private buildLocalConnectionInput(
+    input: DesktopAddConnectionInput,
+    credentialStorageBackend: CredentialStorageBackend,
+  ) {
     if (input.authMode === "openclaw_openai_session") {
       throw new Error("OpenClaw-only OpenAI sessions cannot be created from the add-connection form");
     }
@@ -308,7 +329,7 @@ export class DesktopConnectionManager {
       preset: input.preset,
       authMode: input.authMode,
       credentialRequest: this.resolveCredentialRequest(input),
-      credentialStorageBackend: input.credentialStorageBackend,
+      credentialStorageBackend,
       endpointUrl: input.endpointUrl,
       label: input.label,
       enabledAgents: input.enabledAgents,

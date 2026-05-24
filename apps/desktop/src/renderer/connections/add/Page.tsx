@@ -13,6 +13,8 @@ import {
 } from "../ConnectionFormParts";
 import type { Translator } from "../../shared/I18n";
 import { type Definition } from "../../shared/DesktopData";
+import { readEncryptedLocalUnlockErrorMessage } from "../../shared/EncryptedLocalUnlock";
+import { useEncryptedLocalAccessRecovery } from "../../shared/EncryptedLocalAccess";
 import type { LanguagePreference } from "../../settings/Preferences";
 import { useAddConnectionPageState } from "./usePageState";
 import type {
@@ -31,15 +33,17 @@ import { Card, CardContent } from "../../ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../ui/select";
 
 type AddConnectionPageProps = {
+  credentialStorageMode: CredentialStorageBackend | null;
   credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
   defaultOpenAiAuthJsonPath: string;
-  defaultCredentialStorageBackend: CredentialStorageBackend | null;
   definitions: Definition[];
+  isCredentialStorageModeLocked: boolean;
+  isCredentialStorageModeMixed: boolean;
   language: LanguagePreference;
   targetAgentId: AgentId | null;
   t: Translator;
   onBack(): void;
-  onRememberDefaultCredentialStorageBackend(backend: CredentialStorageBackend): void;
+  onRememberCredentialStorageMode(backend: CredentialStorageBackend): void;
   onPrepareDraft(input: AddConnectionSubmitInput): Promise<PreparedConnectionDraft>;
   onRefreshCredentialStorageState(): Promise<Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>>;
   onSavePrepared(input: AddConnectionPreparedSaveInput): Promise<void>;
@@ -47,20 +51,23 @@ type AddConnectionPageProps = {
 };
 
 export function AddConnectionPage({
+  credentialStorageMode,
   credentialStorageState,
   defaultOpenAiAuthJsonPath,
-  defaultCredentialStorageBackend,
   definitions,
+  isCredentialStorageModeLocked,
+  isCredentialStorageModeMixed,
   language,
   targetAgentId,
   t,
   onBack,
-  onRememberDefaultCredentialStorageBackend,
+  onRememberCredentialStorageMode,
   onPrepareDraft,
   onRefreshCredentialStorageState,
   onSavePrepared,
   onSubmit,
 }: AddConnectionPageProps) {
+  const { requestUnlock } = useEncryptedLocalAccessRecovery();
   const {
     actionError,
     chooseAuthJsonPath,
@@ -104,10 +111,11 @@ export function AddConnectionPage({
     detectedAgents,
   } = useAddConnectionPageState({
     defaultOpenAiAuthJsonPath,
-    defaultCredentialStorageBackend,
+    credentialStorageMode,
     credentialStorageState,
     definitions,
-    onRememberDefaultCredentialStorageBackend,
+    isCredentialStorageModeLocked,
+    onRememberCredentialStorageMode,
     onPrepareDraft,
     onSavePrepared,
     onSubmit,
@@ -144,10 +152,41 @@ export function AddConnectionPage({
     return t("common.addConnection");
   })();
   const isSessionStructureLocked = isPreparedSessionFlow;
-  const requiresCredentialStorageDialog = formState.credentialStorageBackend === "encrypted_local_storage"
+  const activeCredentialStorageMode = credentialStorageMode ?? formState.credentialStorageBackend;
+
+  if (isCredentialStorageModeMixed) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-10">
+        <AddConnectionHeader
+          targetAgentId={targetAgentId}
+          t={t}
+          onBack={onBack}
+        />
+        <Alert variant="destructive">
+          <AlertDescription>{t("settings.credentialStorage.mixedDescription")}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+  const requiresEncryptedLocalUnlock = activeCredentialStorageMode === "encrypted_local_storage"
+    && credentialStorageState.encryptedLocalVaultExists
     && !credentialStorageState.encryptedLocalUnlocked;
+  const requiresCredentialStorageDialog = activeCredentialStorageMode === "encrypted_local_storage"
+    && !credentialStorageState.encryptedLocalVaultExists;
 
   const runConnectionAction = (action: "prepare-draft" | "submit") => {
+    if (requiresEncryptedLocalUnlock) {
+      void requestUnlock(t("dialog.encryptedLocalUnlock.reasonSaveConnection"))
+        .then(async () => {
+          if (action === "prepare-draft") {
+            await prepareDraft();
+            return;
+          }
+          await submit();
+        })
+        .catch(() => undefined);
+      return;
+    }
     if (requiresCredentialStorageDialog) {
       setCredentialStorageError(null);
       setIsCredentialStorageDialogOpen(true);
@@ -161,7 +200,11 @@ export function AddConnectionPage({
   };
 
   const handleCredentialStorageConfirm = () => {
-    void window.nileDesktop.connections.unlockEncryptedLocalStorage(formState.encryptedLocalPassphrase).then(async () => {
+    void window.nileDesktop.connections.unlockEncryptedLocalStorage(formState.encryptedLocalPassphrase).then(async (result) => {
+      if (!result.ok) {
+        setCredentialStorageError(readEncryptedLocalUnlockErrorMessage(result, t));
+        return;
+      }
       setCredentialStorageError(null);
       setIsCredentialStorageDialogOpen(false);
       await onRefreshCredentialStorageState();
@@ -170,8 +213,8 @@ export function AddConnectionPage({
         return;
       }
       await submit();
-    }).catch((error) => {
-      setCredentialStorageError(error instanceof Error ? error.message : String(error));
+    }).catch(() => {
+      setCredentialStorageError(t("dialog.encryptedLocalUnlock.errorUnknown"));
     });
   };
 
@@ -223,24 +266,32 @@ export function AddConnectionPage({
 
             <FormField label={t("addConnection.storage.title")}>
               <div className="grid gap-3">
-                <Select
-                  value={formState.credentialStorageBackend}
-                  onValueChange={(value) => setCredentialStorageBackend(value as CredentialStorageBackend)}
-                >
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="system_secure_storage">
-                      {t("addConnection.storage.system.title")}
-                    </SelectItem>
-                    <SelectItem value="encrypted_local_storage">
-                      {t("addConnection.storage.encrypted.title")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+                {isCredentialStorageModeLocked ? (
+                  <div className="rounded-xl border px-4 py-3 text-sm text-foreground">
+                    {activeCredentialStorageMode === "encrypted_local_storage"
+                      ? t("addConnection.storage.encrypted.title")
+                      : t("addConnection.storage.system.title")}
+                  </div>
+                ) : (
+                  <Select
+                    value={formState.credentialStorageBackend}
+                    onValueChange={(value) => setCredentialStorageBackend(value as CredentialStorageBackend)}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="system_secure_storage">
+                        {t("addConnection.storage.system.title")}
+                      </SelectItem>
+                      <SelectItem value="encrypted_local_storage">
+                        {t("addConnection.storage.encrypted.title")}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
                 <div className="text-sm text-muted-foreground">
-                  {formState.credentialStorageBackend === "system_secure_storage"
+                  {activeCredentialStorageMode === "system_secure_storage"
                     ? t("addConnection.storage.system.description")
                     : t("addConnection.storage.encrypted.description")}
                 </div>

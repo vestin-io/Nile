@@ -10,20 +10,27 @@
   - [../../../specs/core/features/credential-storage-backends.md](../../../specs/core/features/credential-storage-backends.md)
   - [../../../specs/surfaces/features/desktop-credential-storage-choice.md](../../../specs/surfaces/features/desktop-credential-storage-choice.md)
 - Discovery success criteria:
-  - no standalone `.vestin/discovery.md` exists in this repo; use the approved spec requirements as the success criteria for this slice
+  - no standalone `.vestin/discovery.md` exists in this repo; use the approved product direction for machine-level single-mode storage as the success criteria for this slice
 
 ## 2) Milestone Goal
 
-Deliver the first user-facing credential storage choice flow for desktop:
+Deliver a simplified, cross-platform-safe credential storage model for desktop:
 
-- new credential-bearing desktop connection flows can save to either:
+- each desktop instance uses exactly one machine-level credential storage mode:
   - `System secure storage`
   - `Encrypted local storage`
-- desktop remembers a global default backend for future connection creation
-- encrypted-local storage works with a single desktop-local passphrase and keeps secrets out of SQLite and preferences
-- existing saved connections continue working unchanged
+- the first saved connection establishes the machine storage mode
+- once any saved connection exists, the machine storage mode becomes read-only
+- changing storage mode requires reset / reinitialize
+- encrypted-local unlock remains session-scoped and on-demand
+- `Encrypted local storage` remains the foundation for later export/import work
 
-Done means a user can create one new connection with each backend, restart the app, and still reopen both connections without any raw secret appearing in SQLite or desktop preferences.
+Done means a user can:
+
+- choose the machine storage mode once when saving the first credential-bearing connection
+- keep saving/importing subsequent connections without re-choosing per connection
+- see that storage mode is locked after the first saved connection exists
+- reset local state to start over with a different mode
 
 ## 3) Spec Coverage
 
@@ -31,11 +38,11 @@ Done means a user can create one new connection with each backend, restart the a
   - `core / credential-storage-backends`
   - `surfaces / desktop-credential-storage-choice`
 - Explicit exclusions:
-  - backend migration for existing saved connections
-  - in-place backend switching for already saved connections
-  - CLI credential-storage choice UX
-  - per-connection passphrases
-  - import/export tooling for encrypted-local vault files
+  - export/import UX and file transport
+  - multi-vault or per-profile local encrypted storage
+  - cross-machine migration tooling
+  - CLI-specific storage-mode UI
+  - in-place conversion between system-secure and encrypted-local secrets without reset
 
 ## 4) Features (Agent Execution Units)
 
@@ -51,61 +58,67 @@ Done means a user can create one new connection with each backend, restart the a
   - Current state: `unstarted`
 - Tree todo:
   - [ ] Prerequisite checks
-    - [ ] `PC-001` Confirm current saved-connection credential metadata shape and locate all backend-specific write/read entry points.
-    - [ ] `PC-002` Confirm existing secret-boundary tests for SQLite, preferences, and mutation history so the new backend can extend them instead of duplicating them.
+    - [ ] `PC-001` Audit all runtime and persistence call sites that still treat `credentialStorageBackend` as a connection-level field.
+    - [ ] `PC-002` Confirm what existing rows/configs can already contain mixed backend metadata and define the allowed compatibility outcome for that pre-release state.
   - [ ] Build
-    - [ ] `B-001` Define shared backend contract
+    - [ ] `B-001` Introduce machine-level storage-mode contract
       - Dependencies: `PC-001`
       - Work:
         - Files to modify:
-          - `packages/core/src/...` credential contracts, saved connection metadata, and local credential resolution types
-        - Scope notes:
-          - add backend vocabulary and per-connection backend metadata
-          - do not add migration logic for old connections
-      - Done when:
-        - all credential-bearing connection persistence paths can carry explicit backend metadata without guessing
-    - [ ] `B-002` Implement encrypted-local vault primitives
-      - Dependencies: `B-001`
-      - Work:
-        - Files to create/modify:
           - `packages/core/src/services/credential/...`
-          - any desktop-local storage helpers needed for a passphrase-encrypted vault
+          - `packages/core/src/application/local/...`
+          - any shared types that currently expose per-connection backend choice
         - Scope notes:
-          - choose a versioned authenticated-encryption format
-          - support write/read/unlock failure
-          - keep passphrase-derived material out of persisted state
+          - define a desktop-machine storage mode abstraction
+          - keep `System secure storage` platform-abstract
+          - do not add export/import implementation yet
       - Done when:
-        - core can store and read credential payloads through encrypted-local storage with an explicit passphrase input
-    - [ ] `B-003` Wire runtime credential resolution through backend metadata
-      - Dependencies: `B-001`, `B-002`
+        - core can reason about one machine storage mode without requiring every new connection input to choose a backend
+    - [ ] `B-002` Collapse connection-level backend writes into machine-mode enforcement
+      - Dependencies: `B-001`, `PC-002`
       - Work:
         - Files to modify:
-          - connection create/update paths
-          - runtime credential read paths
-          - any access/credential reference code that currently assumes one backend
+          - connection create/import/update workflows
+          - saved connection projections
+          - any access builders/upserts that currently persist backend as mutable per-connection state
         - Scope notes:
-          - existing keychain/system-secure behavior must remain intact
-          - no surface-specific prompting in core
+          - existing saved rows must still load safely
+          - no silent re-encryption or backend conversion
+          - mixed pre-release state may be tolerated only as a recoverable/reset-required condition
       - Done when:
-        - a saved connection resolves secrets through its declared backend and old saved connections remain compatible
-    - [ ] `B-004` Add focused tests
+        - new mutations are constrained by machine storage mode instead of arbitrary per-connection backend input
+    - [ ] `B-003` Preserve encrypted-local vault and system-secure abstractions
+      - Dependencies: `B-001`
+      - Work:
+        - Files to modify:
+          - backend credential store
+          - encrypted-local vault/session types
+        - Scope notes:
+          - keep encrypted-local stable as the portable/exportable foundation
+          - keep OS store pluggable for Windows/Linux follow-up
+      - Done when:
+        - core still supports both storage implementations, but selection is machine-scoped
+    - [ ] `B-004` Add focused compatibility tests
       - Dependencies: `B-002`, `B-003`
       - Work:
         - Files to create/modify:
-          - `packages/core/src/...*.test.ts`
+          - core/local-state tests
+          - access persistence tests
         - Scope notes:
-          - include tamper, wrong-passphrase, and no-secret-in-SQLite assertions
+          - cover first-save mode lock-in
+          - cover reset clearing mode
+          - cover mixed-state detection if needed
       - Done when:
-        - automated tests cover backend metadata persistence and encrypted-local failure modes
+        - automated tests prove machine-level mode enforcement and compatibility boundaries
   - [ ] Verification
-    - [ ] `V-001` Prove backend contract correctness
+    - [ ] `V-001` Prove core machine-mode enforcement
       - Dependencies: `B-004`
       - Steps:
         - `npm run typecheck`
-        - run focused credential backend tests
-        - inspect created SQLite rows in a temp workspace to confirm only metadata/references are stored
+        - run focused core credential/storage tests
+        - inspect temp persistence state to confirm secrets still stay out of SQLite/preferences
       - Expected outcome:
-        - backend metadata persists, secrets do not enter SQLite/preferences, and encrypted-local failures are explicit
+        - machine-level storage mode is enforced, secrets stay out of forbidden stores, and compatibility failures are recoverable
 - Execution logs:
   - Build log: [./features/core/credential-storage-backends/build.md](./features/core/credential-storage-backends/build.md)
   - Verify log: [./features/core/credential-storage-backends/verify.md](./features/core/credential-storage-backends/verify.md)
@@ -123,66 +136,71 @@ Done means a user can create one new connection with each backend, restart the a
   - Current state: `unstarted`
 - Tree todo:
   - [ ] Prerequisite checks
-    - [ ] `PC-101` Confirm which desktop connection creation flows currently save credential-bearing connections and where backend selection can be inserted without broad onboarding rewrites.
-    - [ ] `PC-102` Confirm current desktop preference storage shape and restart-read path for renderer, tray, and main-process consumers.
+    - [ ] `PC-101` Audit all desktop save/import/update entry points that still choose or forward storage backend independently.
+    - [ ] `PC-102` Confirm how reset currently clears local renderer preferences, vault state, and saved connections so storage-mode lock can rely on one consistent reset contract.
   - [ ] Build
-    - [ ] `B-101` Add desktop-local global default backend preference
-      - Dependencies: `PC-102`
+    - [ ] `B-101` Replace “default backend” with machine storage mode preference/state
+      - Dependencies: `PC-102`, `core/credential-storage-backends:B-001`
       - Work:
         - Files to modify:
-          - desktop preferences store and tests
+          - desktop preferences/state readers
+          - settings page storage section
+          - quick setup storage step
         - Scope notes:
-          - preference affects only new connection creation defaults
-          - no retroactive mutation of existing connections
+          - storage mode is chosen once on first save
+          - after first saved connection exists, UI becomes read-only
       - Done when:
-        - desktop can persist and reload a nullable global default backend
-    - [ ] `B-102` Add backend selection to credential-bearing connection create flows
-      - Dependencies: `PC-101`, `B-101`, `core/credential-storage-backends:B-003`
+        - renderer/main share one machine storage mode concept instead of a default-plus-overrides model
+    - [ ] `B-102` Unify all desktop save/import flows on machine-mode semantics
+      - Dependencies: `PC-101`, `B-101`, `core/credential-storage-backends:B-002`
       - Work:
         - Files to modify:
-          - renderer add/create connection flow
-          - any main-process draft/save contracts needed to pass backend choice
+          - add connection
+          - quick setup
+          - agent-page `Save to Nile`
+          - connection edit/import/update affordances
         - Scope notes:
-          - ask only when a credential save is actually about to happen
-          - preselect global default when present
+          - remove per-connection backend selectors where they no longer make sense
+          - the first credential-bearing save can still present a mode choice screen
       - Done when:
-        - desktop can create a new connection with an explicit selected backend
-    - [ ] `B-103` Add encrypted-local passphrase establish/unlock flow
-      - Dependencies: `B-102`, `core/credential-storage-backends:B-002`
+        - all desktop flows either establish the machine mode once or reuse the locked mode consistently
+    - [ ] `B-103` Keep encrypted-local unlock on-demand and action-scoped
+      - Dependencies: `B-102`, `core/credential-storage-backends:B-003`
       - Work:
         - Files to modify:
-          - renderer credential dialogs/forms
-          - main/electron draft save path if passphrase material must stay off renderer persistence paths
+          - unlock dialog orchestration
+          - action-level refresh/save/import gates
+          - header warning affordance copy
         - Scope notes:
-          - global passphrase only for this slice
-          - no passphrase recovery flow beyond explicit failure messaging
+          - no startup auto-unlock
+          - only actions that actually need encrypted-local secrets should prompt
       - Done when:
-        - selecting encrypted-local storage either establishes or unlocks the vault before save
-    - [ ] `B-104` Add system-secure denial fallback and restart-read coverage
-      - Dependencies: `B-102`, `B-103`
+        - locked encrypted-local mode blocks the right actions with a clear unlock dialog, while system-secure mode remains unaffected
+    - [ ] `B-104` Lock mode changes behind reset and explain recovery path
+      - Dependencies: `B-101`, `B-102`
       - Work:
         - Files to modify:
-          - desktop error/fallback flow
-          - tray/menubar/main-process preference readers if needed
-          - surface tests
+          - settings explanatory copy
+          - reset flow
+          - any machine-state banners/tooltips
         - Scope notes:
-          - fallback must stay explicit
-          - no silent backend conversion
+          - reset must explicitly clear storage mode, vault state, and related local markers
+          - no silent “convert existing connections” path
       - Done when:
-        - system-secure denial offers encrypted-local fallback and restart still remembers the chosen backend/default
+        - users can see that changing mode requires reset, and reset actually restores first-run choice behavior
   - [ ] Verification
-    - [ ] `V-101` Prove desktop choice flow correctness
+    - [ ] `V-101` Prove desktop machine-mode behavior
       - Dependencies: `B-104`
       - Steps:
         - `npm run typecheck`
-        - run focused desktop tests for preferences and connection creation
+        - run focused desktop tests for settings/preferences/connection flows
         - manual check:
-          - first credential-bearing connection with no default prompts for choice
-          - selecting “remember as default” affects the next new connection
-          - existing connections remain unchanged
-          - restart preserves the global default
+          - first saved connection asks for storage mode
+          - subsequent saves/imports do not offer conflicting per-connection storage choices
+          - encrypted-local locked actions prompt unlock on demand
+          - reset reopens first-run storage selection
       - Expected outcome:
-        - desktop choice flow behaves deterministically across first-run, override, fallback, and restart cases
+        - desktop behaves like a single-mode machine, not a mixed-backend connection bag
 - Execution logs:
   - Build log: [./features/surfaces/desktop-credential-storage-choice/build.md](./features/surfaces/desktop-credential-storage-choice/build.md)
   - Verify log: [./features/surfaces/desktop-credential-storage-choice/verify.md](./features/surfaces/desktop-credential-storage-choice/verify.md)
@@ -190,23 +208,26 @@ Done means a user can create one new connection with each backend, restart the a
 ## 5) Checkpoints
 
 - Checkpoint 1:
-  - shared backend metadata exists and encrypted-local vault tests pass in isolation
+  - core no longer depends on mutable connection-level backend selection for new writes
 - Checkpoint 2:
-  - desktop can create one new connection using `System secure storage`
+  - desktop first-save flow establishes machine storage mode exactly once
 - Checkpoint 3:
-  - desktop can create one new connection using `Encrypted local storage` with passphrase establish/unlock
+  - all desktop save/import/update paths reuse the same locked machine mode
 - Checkpoint 4:
-  - after restart, the global default remains selected for new connections and existing connections keep their original backend
+  - reset fully reopens the initial storage-mode decision
 
 ## 6) Risks / Spikes
 
 - Spike 1:
-  - choose the encrypted-local cryptography/KDF format before `B-002`
+  - decide how to interpret already-saved mixed backend metadata from pre-release local builds
   - output:
-    - exact primitive choice
-    - file metadata shape
-    - tamper/failure behavior
+    - accepted compatibility behavior
+    - whether to tolerate read-only mixed state or force reset
 - Risk 2:
-  - some existing desktop connection flows may save drafts through renderer/main IPC contracts that currently assume one credential backend
+  - several legacy desktop entry points still bypass the newer quick-setup flow
   - mitigation:
-    - finish `PC-101` before modifying UI copy or persistence payloads
+    - finish `PC-101` before assuming machine-mode enforcement is complete
+- Risk 3:
+  - future export/import may need additional vault metadata guarantees
+  - mitigation:
+    - keep encrypted-local format versioned and avoid OS-store-specific assumptions in the portable path

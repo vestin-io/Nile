@@ -49,26 +49,26 @@ describe("DesktopPreferencesStore", () => {
     });
   });
 
-  it("keeps a valid default credential storage backend", () => {
+  it("keeps a valid credential storage mode", () => {
     const storage = createStorage({
       "nile.desktop.preferences": JSON.stringify({
-        defaultCredentialStorageBackend: "encrypted_local_storage",
+        credentialStorageMode: "encrypted_local_storage",
       }),
     });
 
     const store = new DesktopPreferencesStore(storage, createRootElement());
-    expect(store.load().defaultCredentialStorageBackend).toBe("encrypted_local_storage");
+    expect(store.load().credentialStorageMode).toBe("encrypted_local_storage");
   });
 
-  it("drops an invalid default credential storage backend", () => {
+  it("drops an invalid credential storage mode", () => {
     const storage = createStorage({
       "nile.desktop.preferences": JSON.stringify({
-        defaultCredentialStorageBackend: "plaintext_file",
+        credentialStorageMode: "plaintext_file",
       }),
     });
 
     const store = new DesktopPreferencesStore(storage, createRootElement());
-    expect(store.load().defaultCredentialStorageBackend).toBeNull();
+    expect(store.load().credentialStorageMode).toBeNull();
   });
 });
 

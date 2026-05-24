@@ -10,7 +10,7 @@ export type CreateLocalConnectionInput = {
   endpointUrl?: string;
   enabledAgents?: AgentId[];
   allowUndetectedGateway?: boolean;
-  credentialStorageBackend?: CredentialStorageBackend;
+  credentialStorageBackend: CredentialStorageBackend;
   credentialRequest: LocalCredentialRequest;
 };
 

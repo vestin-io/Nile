@@ -84,7 +84,8 @@ export class DesktopIpcInputValidator {
     return {
       preset: this.readPreset(record.preset),
       authMode: this.readAuthMode(record.authMode),
-      ...this.readOptionalConnectionFields(record),
+      ...this.readOptionalCredentialFields(record),
+      ...this.readOptionalCredentialStorageModeFields(record),
       allowUndetectedGateway: this.readOptionalBoolean(record.allowUndetectedGateway, "allowUndetectedGateway"),
     };
   }
@@ -93,7 +94,7 @@ export class DesktopIpcInputValidator {
     const record = this.readRecord(input, "update connection input");
     return {
       connectionId: this.readRequiredString(record.connectionId, "connectionId"),
-      ...this.readOptionalConnectionFields(record),
+      ...this.readOptionalCredentialFields(record),
       syncSelectedAgents: this.readOptionalBoolean(record.syncSelectedAgents, "syncSelectedAgents"),
     };
   }
@@ -146,8 +147,7 @@ export class DesktopIpcInputValidator {
     const record = this.readRecord(input, "import current connection input");
     return {
       agentId: this.readAgentId(record.agentId, "agentId"),
-      credentialStorageBackend: this.readOptionalCredentialStorageBackend(record.credentialStorageBackend),
-      encryptedLocalPassphrase: this.readOptionalString(record.encryptedLocalPassphrase, "encryptedLocalPassphrase"),
+      ...this.readOptionalCredentialStorageModeFields(record),
     };
   }
 
@@ -261,10 +261,16 @@ export class DesktopIpcInputValidator {
     return preset as ConnectionPresetFamily;
   }
 
-  private readOptionalConnectionFields(record: Record<string, unknown>): Omit<
-    DesktopAddConnectionInput,
-    "preset" | "authMode" | "allowUndetectedGateway"
-  > {
+  private readOptionalCredentialFields(record: Record<string, unknown>): {
+    label?: string;
+    endpointUrl?: string;
+    enabledAgents?: AgentId[];
+    apiKeySource?: "direct" | "env_key";
+    apiKey?: string;
+    envKey?: string;
+    sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
+    sessionAuthJsonPath?: string;
+  } {
     return {
       label: this.readOptionalString(record.label, "label"),
       endpointUrl: this.readOptionalString(record.endpointUrl, "endpointUrl"),
@@ -274,6 +280,14 @@ export class DesktopIpcInputValidator {
       envKey: this.readOptionalString(record.envKey, "envKey"),
       sessionSource: this.readOptionalSessionSource(record.sessionSource),
       sessionAuthJsonPath: this.readOptionalString(record.sessionAuthJsonPath, "sessionAuthJsonPath"),
+    };
+  }
+
+  private readOptionalCredentialStorageModeFields(record: Record<string, unknown>): {
+    credentialStorageBackend?: CredentialStorageBackend;
+    encryptedLocalPassphrase?: string;
+  } {
+    return {
       credentialStorageBackend: this.readOptionalCredentialStorageBackend(record.credentialStorageBackend),
       encryptedLocalPassphrase: this.readOptionalString(record.encryptedLocalPassphrase, "encryptedLocalPassphrase"),
     };

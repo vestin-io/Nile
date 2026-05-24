@@ -257,6 +257,145 @@
 - Startup unlock is now user-visible by construction because it forces the settings surface open before the unlock dialog is requested.
 - Quick setup save failures now land in the shared destructive alert banner instead of disappearing into a closed passphrase dialog.
 
+## Follow-up Build: Locked Connection Detail Indicator
+
+## Follow-up Build: Machine-Level Storage Mode Convergence
+
+### Tasks Completed
+
+- Replaced the renderer preference concept of `defaultCredentialStorageBackend` with machine-level `credentialStorageMode`, while still loading the legacy preference key for compatibility.
+- Added shared renderer derivation for the effective machine storage mode from saved connections plus local preference state.
+- Updated quick setup to treat storage selection as first-save setup only; once a machine mode exists, quick setup reuses it and no longer offers a conflicting change action.
+- Updated add connection and settings to present storage mode as read-only once saved connections exist, instead of continuing to behave like a mutable per-connection/default backend selector.
+- Updated the agents-page inline import entry to stop silently falling back to an implicit backend when no machine mode exists; it now routes the user back into quick setup instead of creating a mixed semantic path.
+
+### Files Changed
+
+- `apps/desktop/src/renderer/shared/CredentialStorageMode.ts`
+- `apps/desktop/src/renderer/settings/Preferences.ts`
+- `apps/desktop/src/renderer/settings/Preferences.test.ts`
+- `apps/desktop/src/renderer/app/settings/usePreferences.ts`
+- `apps/desktop/src/renderer/app/settings/App.tsx`
+- `apps/desktop/src/renderer/app/settings/PageContent.tsx`
+- `apps/desktop/src/renderer/settings/general/Page.tsx`
+- `apps/desktop/src/renderer/settings/general/CredentialStorageSection.tsx`
+- `apps/desktop/src/renderer/quick-setup/Page.tsx`
+- `apps/desktop/src/renderer/connections/add/Page.tsx`
+- `apps/desktop/src/renderer/connections/add/usePageState.ts`
+- `apps/desktop/src/renderer/connections/add/useForm.ts`
+
+### Decisions
+
+- Saved connections now win over renderer preference state when deriving the effective machine mode, so an existing workspace cannot be reinterpreted just by stale local preference data.
+- The first-save machine mode is only persisted after a successful credential-bearing save; merely continuing past the quick-setup storage screen no longer locks the mode early.
+- Agents-page inline import still remains a legacy affordance, but it no longer invents a backend choice on its own; if no machine mode has been established yet, the user is pushed back to the dedicated first-save flow.
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/settings/Preferences.test.ts`
+
+### Key Findings
+
+- Renderer save/import flows now consistently behave like consumers of one machine storage mode once any saved connection exists.
+- Main-process import/create flows now resolve the effective storage mode from saved connections before writing, so a missed renderer prop no longer creates a second backend silently.
+- The renderer preference no longer loads the old `defaultCredentialStorageBackend` key; the surface now only recognizes `credentialStorageMode`.
+- Settings no longer acts as a pre-first-save mode picker. Machine mode is established by the first successful credential-bearing save, not by changing a setting ahead of time.
+
+### Tasks Completed
+
+- Surfaced saved connection credential-storage backend metadata through the desktop connection projection so renderer pages can tell when a saved connection is backed by encrypted-local storage.
+- Added a locked badge plus tooltip on the connection detail header when an encrypted-local connection is still locked for the current app session.
+- Moved the locked affordance to the global settings header near the notification bell, made it clickable to reopen the unlock dialog, and reworked its warning styling for light-theme contrast without the earlier pulse animation.
+- Improved the dark-theme locked button contrast and sanitized encrypted-local unlock failures into user-facing messages, including a separate corrupted-vault path for structurally unreadable vault files.
+- Replaced renderer-side unlock error string guessing with a structured `desktop:unlock-encrypted-local-storage` result code, so expected unlock failures no longer surface as Electron handler exceptions or raw IPC messages.
+- Added explicit encrypted-local unlock gates to add-connection, quick setup, and connection edit flows so save/update actions are blocked while an existing encrypted-local vault is still locked, with a direct `Unlock now` action rendered in-page.
+
+### Files Changed
+
+- `packages/core/src/models/connection/SavedConnections.ts`
+- `apps/desktop/src/state/Types.ts`
+- `apps/desktop/src/state/connection/List.ts`
+- `apps/desktop/src/state/connection/Status.ts`
+- `apps/desktop/src/renderer/app/settings/Chrome.tsx`
+- `apps/desktop/src/renderer/app/settings/useCredentialStorageSession.ts`
+- `apps/desktop/src/renderer/shared/EncryptedLocalUnlock.ts`
+- `apps/desktop/src/renderer/shared/EncryptedLocalUnlock.test.ts`
+- `apps/desktop/src/renderer/shared/EncryptedLocalUnlockGate.tsx`
+- `apps/desktop/src/renderer/app/settings/PageContent.tsx`
+- `apps/desktop/src/renderer/connections/list/Page.tsx`
+- `apps/desktop/src/renderer/connections/detail/Page.tsx`
+- `apps/desktop/src/renderer/connections/add/Page.tsx`
+- `apps/desktop/src/renderer/connections/edit/Page.tsx`
+- `apps/desktop/src/renderer/quick-setup/Page.tsx`
+- `apps/desktop/src/renderer/quick-setup/StorageStep.tsx`
+- `apps/desktop/src/renderer/quick-setup/DetectedSetup.tsx`
+- `apps/desktop/src/renderer/quick-setup/DetectedSetupAction.tsx`
+- `apps/desktop/src/renderer/quick-setup/AgentCard.tsx`
+- `apps/desktop/src/renderer/settings/general/CredentialStorageSection.tsx`
+- `apps/desktop/src/renderer/shared/i18n/en.ts`
+- `apps/desktop/src/renderer/shared/i18n/zh.ts`
+- `packages/core/src/services/credential/Store.ts`
+- `packages/core/src/services/credential/index.ts`
+- `packages/core/src/services/credential/EncryptedLocalCredentialStore.ts`
+- `packages/core/src/services/credential/EncryptedLocalCredentialStore.test.ts`
+- `apps/desktop/src/electron/connections/contracts.ts`
+- `apps/desktop/src/electron/ipc/DesktopIpcConnectionRoutes.ts`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Key Findings
+
+- `system_secure_storage` / keychain-backed connections are unaffected by the session unlock state; the new lock affordance is only shown for encrypted-local connections while the vault remains locked.
+- The saved connection summary keeps the backend field optional at the type boundary for fixture compatibility, but runtime summaries now always populate `system_secure_storage` or `encrypted_local_storage`.
+- The locked indicator now lives in the global settings header near the notification bell rather than inside connection detail content, because the lock state is session-wide storage state, not a property of one specific detail section.
+- The first warning-style version relied too much on subtle amber opacity and a breathing effect; the final button uses stable high-contrast warning colors so it remains visible in light theme and feels less noisy.
+- Dark theme needed a separate contrast pass as well; the current warning button uses a brighter amber fill and border there instead of just a faint tint over the dark header.
+- The unlock dialog no longer shows raw Electron IPC error strings. It now maps failures into user-facing messages and distinguishes clearly corrupted vault files from generic passphrase-or-authentication failures, but cryptographic authentication failures still cannot perfectly separate “wrong passphrase” from “tampered ciphertext.”
+- Unlock failure handling is now keyed off a stable IPC result code rather than renderer substring matching on `error.message`, which removes a brittle dependency on exception text staying unchanged across core and Electron layers.
+- Existing encrypted-local vaults are now treated as a hard gate for add/save/update flows until the user unlocks them for the current app session; only the “first-time vault setup” path remains allowed without a prior unlock because it creates the vault rather than reopening it.
+
+## Follow-up Build: On-demand Unlock Prompts
+
+### Tasks Completed
+
+- Removed the startup auto-unlock flow so Nile no longer opens an unlock dialog just because an encrypted-local vault exists.
+- Replaced the in-page `Unlock now` gates with on-demand unlock prompts that appear only when the user tries to continue quick setup, save a detected local setup, save a new connection, or update an encrypted-local connection.
+- Added contextual hint copy inside the unlock dialog so each interaction explains what action is blocked until the user unlocks encrypted local storage.
+- Removed the temporary `EncryptedLocalUnlockGate` component and kept the header badge as the persistent manual unlock affordance.
+
+### Files Changed
+
+- `apps/desktop/src/renderer/app/settings/useCredentialStorageSession.ts`
+- `apps/desktop/src/renderer/app/settings/Dialogs.tsx`
+- `apps/desktop/src/renderer/connections/dialogs/UnlockEncryptedLocalStorage.tsx`
+- `apps/desktop/src/renderer/shared/EncryptedLocalAccess.tsx`
+- `apps/desktop/src/renderer/quick-setup/Page.tsx`
+- `apps/desktop/src/renderer/quick-setup/StorageStep.tsx`
+- `apps/desktop/src/renderer/quick-setup/DetectedSetup.tsx`
+- `apps/desktop/src/renderer/quick-setup/DetectedSetupAction.tsx`
+- `apps/desktop/src/renderer/quick-setup/AgentCard.tsx`
+- `apps/desktop/src/renderer/connections/add/Page.tsx`
+- `apps/desktop/src/renderer/connections/edit/Page.tsx`
+- `apps/desktop/src/renderer/shared/i18n/en.ts`
+- `apps/desktop/src/renderer/shared/i18n/zh.ts`
+- `apps/desktop/src/renderer/shared/EncryptedLocalUnlockGate.tsx`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Key Findings
+
+- The better interaction model here is session-level unlock on demand, not proactive gating at page load. Users can still browse and inspect the app while the vault remains locked, and Nile only interrupts when a concrete action actually needs decrypted credentials.
+- `system_secure_storage` / keychain-backed connections remain unaffected by this session lock state; only encrypted-local flows request the unlock dialog.
+- The same unlock dialog now serves both the header shortcut and blocked action flows, but only action-triggered requests carry a contextual hint about what will continue after unlock.
+
 ## Follow-up Build: Surface Test Realignment
 
 ### Tasks Completed
@@ -275,3 +414,160 @@
 ### Key Findings
 
 - The desktop surface behavior itself did not regress in this round; the failing assertion was an outdated test expectation after the newer connection projection started carrying model/selection metadata on the current connection.
+
+## Follow-up Build: Connections List Refresh Unlock
+
+### Tasks Completed
+
+- Wrapped the connections list toolbar refresh action in the same encrypted-local unlock recovery used by the detail-page refresh path.
+- Added a dedicated unlock hint for refreshing saved connections so the dialog text matches the list-level action instead of reusing the single-connection wording.
+- Localized the new refresh hint across all supported desktop languages.
+
+### Files Changed
+
+- `apps/desktop/src/renderer/connections/list/Page.tsx`
+- `apps/desktop/src/renderer/shared/i18n/en.ts`
+- `apps/desktop/src/renderer/shared/i18n/zh.ts`
+- `apps/desktop/src/renderer/shared/i18n/de.ts`
+- `apps/desktop/src/renderer/shared/i18n/es.ts`
+- `apps/desktop/src/renderer/shared/i18n/fr.ts`
+- `apps/desktop/src/renderer/shared/i18n/it.ts`
+- `apps/desktop/src/renderer/shared/i18n/ja.ts`
+- `apps/desktop/src/renderer/shared/i18n/ko.ts`
+- `apps/desktop/src/renderer/shared/i18n/th.ts`
+- `apps/desktop/src/renderer/shared/i18n/vi.ts`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Key Findings
+
+- The earlier unlock coverage only wrapped the connection detail refresh button, so the list-level toolbar refresh still bypassed the dialog and looked inconsistent.
+- The list-level refresh now prompts only when there is at least one saved encrypted-local connection and the current session is still locked; keychain/system-secure connections remain unaffected.
+
+## Follow-up Build: Agent Import Uses Default Backend
+
+### Tasks Completed
+
+- Wrapped the legacy `Agents` page import action so it now forwards the current default credential storage backend instead of silently falling back to the session default.
+- Added the same encrypted-local unlock prompt to that agent import path when the current default backend is encrypted local storage and the vault exists but is still locked.
+
+### Files Changed
+
+- `apps/desktop/src/renderer/app/settings/App.tsx`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Key Findings
+
+- The `Quick setup` flow already passed an explicit backend, but the older inline `Save to Nile` action on the `Agents` page still called `importCurrentConnection(agentId)` with no backend input, which caused main-process logs to show `credentialStorageBackend:"default"`.
+- After this fix, the `Agents` page import path now follows the same default-backend intent as the rest of the desktop flows; encrypted-local defaults will no longer silently save through the session fallback without an unlock prompt.
+
+## Follow-up Build: Machine-Level Storage Mode Finalization
+
+### Tasks Completed
+
+- Stopped exposing per-connection credential backend metadata to renderer connection state and moved machine-level storage-mode derivation into `SettingsState.advanced`.
+- Updated desktop settings, quick setup, add-connection, and agent-import flows to treat storage mode as a machine-level choice rather than a per-connection default.
+- Added explicit mixed-state handling: if older local state contains saved connections across multiple backends, desktop now treats that as reset-required instead of allowing more saves.
+- Tightened desktop IPC contracts so storage-mode inputs only appear on create/import-first-save paths, not on connection update flows.
+
+### Files Changed
+
+- `apps/desktop/src/state/Types.ts`
+- `apps/desktop/src/state/SettingsQuery.ts`
+- `apps/desktop/src/state/connection/List.ts`
+- `apps/desktop/src/state/connection/Status.ts`
+- `apps/desktop/src/renderer/shared/CredentialStorageMode.ts`
+- `apps/desktop/src/renderer/app/settings/App.tsx`
+- `apps/desktop/src/renderer/app/settings/PageContent.tsx`
+- `apps/desktop/src/renderer/settings/general/CredentialStorageSection.tsx`
+- `apps/desktop/src/renderer/settings/general/Page.tsx`
+- `apps/desktop/src/renderer/quick-setup/Page.tsx`
+- `apps/desktop/src/renderer/connections/add/Page.tsx`
+- `apps/desktop/src/electron/connections/contracts.ts`
+- `apps/desktop/src/electron/ipc/DesktopIpcInputValidator.ts`
+- `apps/desktop/src/renderer/shared/i18n/en.ts`
+- `apps/desktop/src/renderer/shared/i18n/zh.ts`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/settings/Preferences.test.ts packages/core/src/services/credential/EncryptedLocalCredentialStore.test.ts`
+
+### Key Findings
+
+- Renderer no longer needs to infer machine-level mode by reading `credentialStorageBackend` off every projected connection; that backend remains internal storage metadata only.
+- A stored machine mode without saved connections is still treated as locked/established, which preserves current behavior when users delete all connections without resetting local state.
+- Mixed backend state remains detectable from older saved access records, but desktop now surfaces it as a reset-required condition instead of allowing additional creates/imports to silently extend the split state.
+
+## Follow-up Build: Mixed-State Connections Become Read-Only
+
+### Tasks Completed
+
+- Added reset-required blocking to connections list/detail/edit flows when saved connections on this Mac still span multiple storage backends.
+- Disabled detail-page edit/refresh actions in mixed state and surfaced the same destructive reset guidance already used by quick setup and add-connection.
+
+### Files Changed
+
+- `apps/desktop/src/renderer/app/settings/PageContent.tsx`
+- `apps/desktop/src/renderer/connections/list/Page.tsx`
+- `apps/desktop/src/renderer/connections/detail/Page.tsx`
+- `apps/desktop/src/renderer/connections/detail/ActionGroup.tsx`
+- `apps/desktop/src/renderer/connections/edit/Page.tsx`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Key Findings
+
+- Once per-connection backend stopped being a renderer-facing concept, the safe recovery path for legacy mixed installs is to make existing connection management read-only until reset, not to keep trying to infer unlock behavior per row.
+- This keeps the single-mode product rule honest without silently hiding existing saved connections from users who still need to inspect them before resetting.
+
+## Follow-up Build: Settings App Structure Split
+
+### Tasks Completed
+
+- Extracted `SettingsPageContent` prop assembly from `App.tsx` into `usePageContentProps.ts` so the top-level settings renderer stays under the repository 500-line file limit.
+
+### Files Changed
+
+- `apps/desktop/src/renderer/app/settings/App.tsx`
+- `apps/desktop/src/renderer/app/settings/PageContent.tsx`
+- `apps/desktop/src/renderer/app/settings/usePageContentProps.ts`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Key Findings
+
+- This split is structural only. The extracted hook preserves the existing settings-page callback wiring and lets pre-push structure checks pass without changing credential-storage behavior.
+
+## Follow-up Build: Desktop Machine-Mode Tests Aligned
+
+### Tasks Completed
+
+- Updated `DesktopConnectionManager` tests so first-save add/draft/import paths explicitly pass the machine-level storage mode that the product now requires.
+- Added `listSavedConnections()` stubs for session doubles that now need an established storage mode during import and batch-import flows.
+
+### Files Changed
+
+- `apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts`
+
+### Key Findings
+
+- The new machine-level mode invariant is exercised directly in desktop tests now; fixtures can no longer rely on implicit `system_secure_storage` fallback.

@@ -9,6 +9,8 @@ import {
   type SettingsState,
 } from "../shared/DesktopData";
 import type { Translator } from "../shared/I18n";
+import { readEncryptedLocalUnlockErrorMessage } from "../shared/EncryptedLocalUnlock";
+import { useEncryptedLocalAccessRecovery } from "../shared/EncryptedLocalAccess";
 import { nileMarkSvg } from "../shared/NileMark";
 import { QuickSetupAgentCard } from "./AgentCard";
 import { QuickSetupConnectionDialog } from "./ConnectionDialog";
@@ -21,13 +23,15 @@ import { Card, CardContent } from "../ui/card";
 
 type QuickSetupPageProps = {
   canConfigureAgent(agentId: AgentId): boolean;
+  credentialStorageMode: CredentialStorageBackend | null;
   credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
-  defaultCredentialStorageBackend: CredentialStorageBackend | null;
+  isCredentialStorageModeLocked: boolean;
+  isCredentialStorageModeMixed: boolean;
   state: SettingsState;
   t: Translator;
   onConfigureAgent(agentId: AgentId): void;
   onRefreshCredentialStorageState(): Promise<Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>>;
-  onRememberDefaultCredentialStorageBackend(backend: CredentialStorageBackend): void;
+  onRememberCredentialStorageMode(backend: CredentialStorageBackend): void;
   onSaveAgent(
     agentId: AgentId,
     input: {
@@ -45,13 +49,15 @@ type Step = "storage" | "agents";
 
 export function QuickSetupPage({
   canConfigureAgent,
+  credentialStorageMode,
   credentialStorageState,
-  defaultCredentialStorageBackend,
+  isCredentialStorageModeLocked,
+  isCredentialStorageModeMixed,
   state,
   t,
   onConfigureAgent,
   onRefreshCredentialStorageState,
-  onRememberDefaultCredentialStorageBackend,
+  onRememberCredentialStorageMode,
   onSaveAgent,
   onDone,
   onOpenModelSetup,
@@ -60,7 +66,7 @@ export function QuickSetupPage({
 }: QuickSetupPageProps) {
   const [configureAgentId, setConfigureAgentId] = useState<AgentId | null>(null);
   const [credentialStorageBackend, setCredentialStorageBackend] = useState<CredentialStorageBackend>(
-    defaultCredentialStorageBackend ?? "system_secure_storage",
+    credentialStorageMode ?? "system_secure_storage",
   );
   const [encryptedLocalPassphrase, setEncryptedLocalPassphrase] = useState("");
   const [encryptedLocalPassphraseConfirmation, setEncryptedLocalPassphraseConfirmation] = useState("");
@@ -68,7 +74,9 @@ export function QuickSetupPage({
   const [isCredentialStorageDialogOpen, setIsCredentialStorageDialogOpen] = useState(false);
   const [pendingSaveAgentId, setPendingSaveAgentId] = useState<AgentId | null>(null);
   const [optimisticallySavedAgentIds, setOptimisticallySavedAgentIds] = useState<AgentId[]>([]);
-  const [step, setStep] = useState<Step>(defaultCredentialStorageBackend === null ? "storage" : "agents");
+  const [step, setStep] = useState<Step>(credentialStorageMode === null ? "storage" : "agents");
+  const { requestUnlock } = useEncryptedLocalAccessRecovery();
+  const activeCredentialStorageMode = credentialStorageMode ?? credentialStorageBackend;
   const detectedSetupsByAgent = new Map(
     state.detectedSetups.items.map((item) => [item.agentId, item]),
   );
@@ -83,16 +91,34 @@ export function QuickSetupPage({
   );
 
   useEffect(() => {
-    if (defaultCredentialStorageBackend === null) {
+    if (isCredentialStorageModeMixed) {
+      setStep("agents");
+      return;
+    }
+    if (credentialStorageMode === null) {
       setCredentialStorageBackend("system_secure_storage");
       setStep("storage");
       return;
     }
-    setCredentialStorageBackend(defaultCredentialStorageBackend);
-  }, [defaultCredentialStorageBackend]);
+    setCredentialStorageBackend(credentialStorageMode);
+    setStep("agents");
+  }, [credentialStorageMode, isCredentialStorageModeMixed]);
 
-  const persistSelectedDefault = () => {
-    onRememberDefaultCredentialStorageBackend(credentialStorageBackend);
+  if (isCredentialStorageModeMixed) {
+    return (
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-14">
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>{t("settings.credentialStorage.mixedTitle")}</EmptyTitle>
+            <EmptyDescription>{t("settings.credentialStorage.mixedDescription")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </div>
+    );
+  }
+
+  const persistSelectedMode = () => {
+    onRememberCredentialStorageMode(credentialStorageBackend);
   };
 
   const markAgentSaved = (agentId: AgentId) => {
@@ -101,22 +127,34 @@ export function QuickSetupPage({
     ));
   };
 
+  const requiresEncryptedLocalUnlock = activeCredentialStorageMode === "encrypted_local_storage"
+    && credentialStorageState.encryptedLocalVaultExists
+    && !credentialStorageState.encryptedLocalUnlocked;
+
   const continueFromStorageStep = async () => {
+    if (requiresEncryptedLocalUnlock) {
+      await requestUnlock(t("dialog.encryptedLocalUnlock.reasonContinueQuickSetup"));
+      setStep("agents");
+      return;
+    }
     if (
-      credentialStorageBackend === "encrypted_local_storage"
+      activeCredentialStorageMode === "encrypted_local_storage"
       && !credentialStorageState.encryptedLocalVaultExists
     ) {
       setCredentialStorageError(null);
       setIsCredentialStorageDialogOpen(true);
       return;
     }
-    persistSelectedDefault();
     setStep("agents");
   };
 
   const saveAgent = async (agentId: AgentId): Promise<"requirements" | "saved"> => {
+    if (requiresEncryptedLocalUnlock) {
+      await requestUnlock(t("dialog.encryptedLocalUnlock.reasonSaveLocalSetup"));
+    }
     if (
-      credentialStorageBackend === "encrypted_local_storage"
+      activeCredentialStorageMode === "encrypted_local_storage"
+      && !credentialStorageState.encryptedLocalVaultExists
       && !credentialStorageState.encryptedLocalUnlocked
     ) {
       setPendingSaveAgentId(agentId);
@@ -125,11 +163,14 @@ export function QuickSetupPage({
       return "requirements";
     }
     await onSaveAgent(agentId, {
-      credentialStorageBackend,
-      encryptedLocalPassphrase: credentialStorageBackend === "encrypted_local_storage"
+      credentialStorageBackend: activeCredentialStorageMode,
+      encryptedLocalPassphrase: activeCredentialStorageMode === "encrypted_local_storage"
         ? encryptedLocalPassphrase.trim() || undefined
         : undefined,
     });
+    if (!isCredentialStorageModeLocked && credentialStorageMode === null) {
+      persistSelectedMode();
+    }
     markAgentSaved(agentId);
     return "saved";
   };
@@ -162,41 +203,47 @@ export function QuickSetupPage({
           backend={credentialStorageBackend}
           errorMessage={credentialStorageError}
           encryptedLocalPassphrase={encryptedLocalPassphrase}
-        encryptedLocalPassphraseConfirmation={encryptedLocalPassphraseConfirmation}
-        encryptedLocalUnlocked={credentialStorageState.encryptedLocalUnlocked}
-        encryptedLocalVaultExists={credentialStorageState.encryptedLocalVaultExists}
-        open={isCredentialStorageDialogOpen}
-        t={t}
-        onConfirm={() => {
-          void (async () => {
-            try {
-              await window.nileDesktop.connections.unlockEncryptedLocalStorage(encryptedLocalPassphrase);
-            } catch (error) {
-              setCredentialStorageError(error instanceof Error ? error.message : String(error));
-              return;
-            }
-
-            setCredentialStorageError(null);
-            setIsCredentialStorageDialogOpen(false);
-            await onRefreshCredentialStorageState();
-            const nextPendingSaveAgentId = pendingSaveAgentId;
-            setPendingSaveAgentId(null);
-            if (nextPendingSaveAgentId) {
+          encryptedLocalPassphraseConfirmation={encryptedLocalPassphraseConfirmation}
+          encryptedLocalUnlocked={credentialStorageState.encryptedLocalUnlocked}
+          encryptedLocalVaultExists={credentialStorageState.encryptedLocalVaultExists}
+          open={isCredentialStorageDialogOpen}
+          t={t}
+          onConfirm={() => {
+            void (async () => {
               try {
-                await onSaveAgent(nextPendingSaveAgentId, {
-                  credentialStorageBackend,
-                  encryptedLocalPassphrase: encryptedLocalPassphrase.trim() || undefined,
-                });
-                markAgentSaved(nextPendingSaveAgentId);
+                const result = await window.nileDesktop.connections.unlockEncryptedLocalStorage(encryptedLocalPassphrase);
+                if (!result.ok) {
+                  setCredentialStorageError(readEncryptedLocalUnlockErrorMessage(result, t));
+                  return;
+                }
               } catch {
+                setCredentialStorageError(t("dialog.encryptedLocalUnlock.errorUnknown"));
                 return;
               }
-              return;
-            }
-            persistSelectedDefault();
-            setStep("agents");
-          })();
-        }}
+
+              setCredentialStorageError(null);
+              setIsCredentialStorageDialogOpen(false);
+              await onRefreshCredentialStorageState();
+              const nextPendingSaveAgentId = pendingSaveAgentId;
+              setPendingSaveAgentId(null);
+              if (nextPendingSaveAgentId) {
+                try {
+                  await onSaveAgent(nextPendingSaveAgentId, {
+                    credentialStorageBackend: activeCredentialStorageMode,
+                    encryptedLocalPassphrase: encryptedLocalPassphrase.trim() || undefined,
+                  });
+                  if (!isCredentialStorageModeLocked && credentialStorageMode === null) {
+                    persistSelectedMode();
+                  }
+                  markAgentSaved(nextPendingSaveAgentId);
+                } catch {
+                  return;
+                }
+                return;
+              }
+              setStep("agents");
+            })();
+          }}
           onEncryptedLocalPassphraseChange={(value) => {
             setCredentialStorageError(null);
             setEncryptedLocalPassphrase(value);
@@ -239,20 +286,22 @@ export function QuickSetupPage({
                 {t("quickSetup.storageSummary.eyebrow")}
               </div>
               <div className="text-lg font-medium text-foreground">
-                {credentialStorageBackend === "system_secure_storage"
+                {activeCredentialStorageMode === "system_secure_storage"
                   ? t("addConnection.storage.system.title")
                   : t("addConnection.storage.encrypted.title")}
               </div>
               <div className="text-sm text-muted-foreground">
-                {credentialStorageBackend === "system_secure_storage"
+                {activeCredentialStorageMode === "system_secure_storage"
                   ? t("addConnection.storage.system.description")
                   : t("addConnection.storage.encrypted.description")}
               </div>
             </div>
-            <Button variant="outline" className="rounded-xl" onClick={() => setStep("storage")}>
-              <ArrowLeft className="h-4 w-4" />
-              {t("quickSetup.storageSummary.change")}
-            </Button>
+            {!isCredentialStorageModeLocked ? (
+              <Button variant="outline" className="rounded-xl" onClick={() => setStep("storage")}>
+                <ArrowLeft className="h-4 w-4" />
+                {t("quickSetup.storageSummary.change")}
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
 

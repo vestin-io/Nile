@@ -4,6 +4,7 @@ import { NileSession } from "@nile/builtins/runtime";
 import type { MatchedImportStateSnapshot } from "@nile/core/runtime-local/import-state";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import { NileLogger } from "@nile/core/services/NileLogger";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import type { DesktopImportCurrentConnectionInput } from "./contracts";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 
@@ -20,7 +21,7 @@ export class DesktopManagedConnectionImports {
     const startedAt = Date.now();
     this.logger.info("desktop.import_current_connection.imports.start", {
       agentId: input.agentId,
-      credentialStorageBackend: input.credentialStorageBackend ?? "default",
+      credentialStorageBackend: input.credentialStorageBackend,
     });
     const snapshot = this.captureMatchedImportState(session, input.agentId);
     const imported = await session.importCurrentConnection(input.agentId, {
@@ -56,8 +57,10 @@ export class DesktopManagedConnectionImports {
   async importDetectedSetups(
     session: NileSession,
     scanIds: AgentId[],
+    credentialStorageBackend: CredentialStorageBackend,
   ): Promise<ImportDetectedSetupsResult> {
     const result = await session.importDetectedSetups({
+      credentialStorageBackend,
       selections: scanIds.map((scanId) => ({ scanId })),
     });
     await this.ensureManagedDetectedSetups(session, result, scanIds);

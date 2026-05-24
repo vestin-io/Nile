@@ -222,7 +222,7 @@ export class DesktopStateStore {
     const startedAt = Date.now();
     this.logger.info("desktop.import_current_connection.state_store.start", {
       agentId: input.agentId,
-      credentialStorageBackend: input.credentialStorageBackend ?? "default",
+      credentialStorageBackend: input.credentialStorageBackend ?? "unset",
     });
     try {
       return await this.runAsyncMutation(

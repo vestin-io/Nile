@@ -1,4 +1,5 @@
 import type { DesktopConnection } from "../../../state/Types";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import type { LanguagePreference } from "../../settings/Preferences";
 import {
   ConnectionCapabilityField,
@@ -29,11 +30,15 @@ import { Checkbox } from "../../ui/checkbox";
 import { Input } from "../../ui/input";
 import { Alert, AlertDescription, AlertTitle } from "../../ui/alert";
 import { Card, CardContent } from "../../ui/card";
+import { useEncryptedLocalAccessRecovery } from "../../shared/EncryptedLocalAccess";
 
 type ConnectionEditPageProps = {
   connection: DesktopConnection;
+  credentialStorageMode: CredentialStorageBackend | null;
+  credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
   defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
+  isCredentialStorageModeMixed?: boolean;
   language: LanguagePreference;
   t: Translator;
   onBack(): void;
@@ -42,13 +47,17 @@ type ConnectionEditPageProps = {
 
 export function ConnectionEditPage({
   connection,
+  credentialStorageMode,
+  credentialStorageState,
   defaultOpenAiAuthJsonPath,
   definitions,
+  isCredentialStorageModeMixed = false,
   language,
   t,
   onBack,
   onSubmit,
 }: ConnectionEditPageProps) {
+  const { requestUnlock } = useEncryptedLocalAccessRecovery();
   const {
     apiKey,
     apiKeySource,
@@ -97,10 +106,44 @@ export function ConnectionEditPage({
     t,
   });
   const gatewayTrustTarget = describeGatewayTrustTarget(endpointUrl);
+  const requiresEncryptedLocalUnlock = credentialStorageMode === "encrypted_local_storage"
+    && credentialStorageState.encryptedLocalVaultExists
+    && !credentialStorageState.encryptedLocalUnlocked;
   const shouldShowProviderSummary =
     definition !== null &&
     definition !== undefined &&
     hasProviderSummary(definition.preset, language);
+
+  if (isCredentialStorageModeMixed) {
+    return (
+      <div className="space-y-5">
+        <div className="space-y-4">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink
+                  href="#"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onBack();
+                  }}
+                >
+                  {t("page.connections")}
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{connection.label}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        <Alert variant="destructive">
+          <AlertDescription>{t("settings.credentialStorage.mixedDescription")}</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -150,6 +193,14 @@ export function ConnectionEditPage({
         className="space-y-5"
         onSubmit={(event) => {
           event.preventDefault();
+          if (requiresEncryptedLocalUnlock) {
+            void requestUnlock(t("dialog.encryptedLocalUnlock.reasonUpdateConnection"))
+              .then(async () => {
+                await submit();
+              })
+              .catch(() => undefined);
+            return;
+          }
           void submit();
         }}
       >
@@ -310,7 +361,10 @@ export function ConnectionEditPage({
           <Button variant="ghost" type="button" onClick={onBack}>
             {t("common.cancel")}
           </Button>
-          <Button disabled={!trimmedLabel || isSaving || (requiresGatewayTrustForSave && !gatewayTrustConfirmed)} type="submit">
+          <Button
+            disabled={!trimmedLabel || isSaving || (requiresGatewayTrustForSave && !gatewayTrustConfirmed)}
+            type="submit"
+          >
             {isSaving ? t("connections.saving") : t("common.save")}
           </Button>
         </div>

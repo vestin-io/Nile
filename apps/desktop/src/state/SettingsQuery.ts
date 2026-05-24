@@ -4,6 +4,7 @@ import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/defin
 import type { AgentStatusView } from "@nile/core/actions/local-setup";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import type { NileSession } from "@nile/builtins/runtime";
 
 import type { DesktopStateReadContext } from "./ReadContext";
@@ -221,6 +222,24 @@ export class DesktopSettingsStateQuery {
       })),
       savedConnectionCount: savedConnections.length,
       importableSetupCount: scan.importableCount,
+      ...this.readCredentialStorageMode(savedConnections),
+    };
+  }
+
+  private readCredentialStorageMode(
+    savedConnections: SavedConnectionSummary[],
+  ): { credentialStorageMode: CredentialStorageBackend | null; credentialStorageModeMixed: boolean } {
+    const modes = [...new Set(savedConnections.map((connection) =>
+      connection.credentialStorageBackend ?? "system_secure_storage"))];
+    if (modes.length !== 1) {
+      return {
+        credentialStorageMode: null,
+        credentialStorageModeMixed: modes.length > 1,
+      };
+    }
+    return {
+      credentialStorageMode: modes[0] ?? null,
+      credentialStorageModeMixed: false,
     };
   }
 

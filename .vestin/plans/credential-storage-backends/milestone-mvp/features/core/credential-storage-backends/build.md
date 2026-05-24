@@ -129,3 +129,57 @@
 
 - `system_secure_storage` remains intentionally backward-compatible with string credential ids; only encrypted-local needs the structured target object.
 - The failing reset behavior was a stale test fixture schema, not a runtime migration bug in `StateReset`.
+
+## Follow-up Build: Explicit Create-Time Storage Metadata
+
+### Tasks Completed
+
+- Tightened core create-time contracts so new local/create connection flows must provide explicit credential storage backend metadata instead of relying on omitted-value defaults.
+- Updated desktop and CLI create/onboarding call sites to pass `system_secure_storage` explicitly outside the desktop machine-mode path.
+- Kept persisted access-level backend metadata as an internal storage concern so the credential store can still resolve where each saved secret lives.
+
+### Files Changed
+
+- `packages/core/src/application/local/ConnectionInputs.ts`
+- `packages/core/src/models/connection/Runtime.ts`
+- `packages/core/src/models/connection/Upsert.ts`
+- `packages/core/src/actions/live-setup/Import.ts`
+- `packages/connections/src/mutations/Creator.test.ts`
+- `packages/builtins/src/runtime/NileSession.test.ts`
+- `apps/cli/src/commands/ConnectionCommands.ts`
+- `apps/desktop/src/electron/connections/DesktopConnectionManager.ts`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+- `./node_modules/.bin/vitest run packages/connections/src/mutations/Creator.test.ts packages/builtins/src/runtime/NileSession.test.ts`
+
+### Key Findings
+
+- Connection-level backend is no longer a user-facing selection model, but persisted access records still need internal backend metadata so stored secrets can be read from the correct store.
+- `system_secure_storage` is now passed explicitly in non-desktop create paths, which removes the last hidden create-time fallback for new connections without changing the runtime credential-store compatibility layer.
+
+## Follow-up Build: Cross-Surface Single-Mode Enforcement
+
+### Tasks Completed
+
+- Blocked CLI connection save/import flows when this machine is already established on `encrypted_local_storage` or when older state is mixed across multiple backends.
+- Added explicit `credentialStorageBackend` propagation to detected-setup imports so desktop and CLI batch-import paths no longer depend on hidden system-secure fallbacks.
+
+### Files Changed
+
+- `apps/cli/src/commands/ConnectionCommands.ts`
+- `packages/core/src/actions/local-setup/Result.ts`
+- `packages/core/src/actions/local-setup/ImportDetectedSetups.ts`
+- `apps/desktop/src/electron/connections/Imports.ts`
+- `apps/desktop/src/electron/connections/DesktopConnectionGateway.ts`
+
+### Verification Commands Run
+
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+- `./node_modules/.bin/vitest run apps/cli/src/NileCli.test.ts`
+
+### Key Findings
+
+- The machine-level single-mode rule has to be enforced across every writable surface, not just desktop renderer flows; otherwise CLI can silently recreate the same mixed-backend state that desktop now blocks.
+- `importDetectedSetups` previously had no backend input at all, so even after tightening create flows it could still create system-secure connections implicitly. Passing the backend through that batch-import path closes the last active cross-surface fallback.

@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  EncryptedLocalCredentialStoreCorruptedError,
   EncryptedLocalCredentialStore,
   EncryptedLocalCredentialStoreLockedError,
   EncryptedLocalCredentialStorePassphraseError,
@@ -53,6 +54,15 @@ describe("EncryptedLocalCredentialStore", () => {
     writeFileSync(vaultPath, JSON.stringify(vault), "utf8");
 
     expect(() => store.get({ reference: "access:gateway-team" })).toThrow(EncryptedLocalCredentialStorePassphraseError);
+  });
+
+  it("reports corrupted vault structure separately from passphrase failures", () => {
+    const { store, vaultPath } = createStoreWithPath();
+    store.unlock("passphrase-123");
+    writeFileSync(vaultPath, "{not-json", "utf8");
+    store.clearUnlockedKey();
+
+    expect(() => store.unlock("passphrase-123")).toThrow(EncryptedLocalCredentialStoreCorruptedError);
   });
 });
 

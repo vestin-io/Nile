@@ -13,6 +13,7 @@ type SettingsDialogsProps = {
   isResetDialogOpen: boolean;
   isUnlockingEncryptedLocalStorage: boolean;
   isUnlockEncryptedLocalStorageDialogOpen: boolean;
+  unlockEncryptedLocalStorageHint: string | null;
   repairUsageConnection: DesktopConnection | null;
   reusedConnectionDialog: ReusedConnectionDialogState;
   t: Translator;
@@ -36,6 +37,7 @@ export function SettingsDialogs({
   isResetDialogOpen,
   isUnlockingEncryptedLocalStorage,
   isUnlockEncryptedLocalStorageDialogOpen,
+  unlockEncryptedLocalStorageHint,
   repairUsageConnection,
   reusedConnectionDialog,
   t,
@@ -85,6 +87,7 @@ export function SettingsDialogs({
 
       <UnlockEncryptedLocalStorageDialog
         errorMessage={unlockEncryptedLocalStorageError}
+        hintMessage={unlockEncryptedLocalStorageHint}
         isSubmitting={isUnlockingEncryptedLocalStorage}
         open={isUnlockEncryptedLocalStorageDialogOpen}
         t={t}

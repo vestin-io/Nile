@@ -9,6 +9,7 @@ import {
   CredentialAlreadyExistsError,
   CredentialNotFoundError,
   CredentialStoreValidationError,
+  EncryptedLocalCredentialStoreCorruptedError,
   EncryptedLocalCredentialStoreLockedError,
   EncryptedLocalCredentialStorePassphraseError,
   normalizeCredentialStoreTarget,
@@ -214,9 +215,16 @@ export class EncryptedLocalCredentialStore implements CredentialStore {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new CredentialStoreValidationError("Encrypted local storage vault is not valid JSON.");
+      throw new EncryptedLocalCredentialStoreCorruptedError("Encrypted local storage vault is not valid JSON.");
     }
-    return this.validateVaultFile(parsed);
+    try {
+      return this.validateVaultFile(parsed);
+    } catch (error) {
+      if (error instanceof CredentialStoreValidationError) {
+        throw new EncryptedLocalCredentialStoreCorruptedError(error.message);
+      }
+      throw error;
+    }
   }
 
   private writeVault(vault: VaultFile): void {

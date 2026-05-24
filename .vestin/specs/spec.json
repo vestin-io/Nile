@@ -2,10 +2,10 @@
   "schema_version": "1",
   "initiative": "nile",
   "glossary": {
-    "system-secure-storage": "The platform-native credential store used by Nile when the user accepts OS-managed secret storage, such as macOS Keychain.",
+    "system-secure-storage": "The platform-native credential store used by Nile when the user accepts OS-managed secret storage, such as macOS Keychain, Windows Credential Manager/DPAPI, or Linux Secret Service.",
     "encrypted-local-storage": "A Nile-managed local credential vault encrypted with a user-provided passphrase and stored in local files instead of the platform credential store.",
-    "credential-backend": "The concrete storage backend selected for a saved connection's secret material.",
-    "global-default-credential-backend": "The desktop-local default backend preference used to preselect storage mode for newly created connections only."
+    "credential-storage-mode": "The single machine-level credential storage strategy active for one local Nile workspace instance; once any saved connection exists, the mode is locked until explicit reset.",
+    "legacy-credential-backend": "Older per-connection backend metadata that may still exist for upgrade compatibility but is no longer the desired source of truth for new saves."
   },
   "invariants": [
     {
@@ -15,13 +15,18 @@
     },
     {
       "id": "INV-002",
-      "statement": "A saved connection's credential backend selection is connection-scoped metadata and may persist across restarts, but changing the desktop global default must not rewrite existing saved connections.",
-      "verification": "Unit test connection create/update persistence plus desktop preference reads so existing connection backend metadata stays unchanged after changing the global default; manually create two connections before and after changing the default and verify only the later connection inherits the new default."
+      "statement": "A local Nile workspace instance must use exactly one active credential storage mode for new saved credentials, and that mode becomes immutable until explicit reset once any saved connection exists.",
+      "verification": "Unit test first-save mode selection, later-save reuse of the same mode, and reset-driven mode clearing; manually save one connection, attempt another save through a different surface, and verify the same mode is enforced."
     },
     {
       "id": "INV-003",
       "statement": "Encrypted local storage must require a user-provided passphrase and must never silently downgrade to plaintext local files or SQLite secret storage.",
       "verification": "Unit test encrypted-local credential writes to fail without a passphrase and to reject fallback-to-plaintext paths; manually deny system-secure storage and verify desktop only offers encrypted-local storage as the fallback."
+    },
+    {
+      "id": "INV-004",
+      "statement": "Portable credential export/import must build on encrypted local storage semantics and must not require product-level renaming or behavioral forks for OS-specific secure stores.",
+      "verification": "Review core and surface specs to confirm `system_secure_storage` remains platform-abstract and `encrypted_local_storage` remains the portable vault foundation for future export/import work."
     }
   ],
   "modules": [

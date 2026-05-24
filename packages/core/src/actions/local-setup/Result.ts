@@ -1,4 +1,5 @@
 import type { AgentId } from "../../models/agent/Definitions";
+import type { CredentialStorageBackend } from "../../services/credential/Store";
 
 export type ScanItemState =
   | "new"
@@ -25,6 +26,7 @@ export type ScanLocalSetupsResult = {
 
 export type ImportDetectedSetupsInput = {
   selections: Array<{ scanId: AgentId }>;
+  credentialStorageBackend?: CredentialStorageBackend;
 };
 
 export type ImportDetectedSetupResult = {

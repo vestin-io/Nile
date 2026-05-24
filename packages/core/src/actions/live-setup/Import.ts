@@ -82,7 +82,7 @@ export class LiveSetupImportSupport {
           authMode: candidate.access.authMode,
           credential: candidate.credential,
           identityKey: candidate.access.identityKey ?? null,
-          credentialStorageBackend: input?.credentialStorageBackend,
+          credentialStorageBackend: input?.credentialStorageBackend ?? "system_secure_storage",
           enabledAgents: this.readImportedEnabledAgents(candidate.endpoint, candidate.access.authMode),
           enabledAgentsMode: "merge",
           apiKeyEnvKeyFallback: candidate.endpoint.protocols.openai?.envKeyOverride,

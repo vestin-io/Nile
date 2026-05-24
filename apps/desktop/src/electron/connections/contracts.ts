@@ -16,11 +16,14 @@ export type DesktopConnectionCredentialInput = {
   envKey?: string;
   sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
   sessionAuthJsonPath?: string;
+};
+
+export type DesktopCredentialStorageModeInput = {
   credentialStorageBackend?: CredentialStorageBackend;
   encryptedLocalPassphrase?: string;
 };
 
-export type DesktopAddConnectionInput = DesktopConnectionCredentialInput & {
+export type DesktopAddConnectionInput = DesktopConnectionCredentialInput & DesktopCredentialStorageModeInput & {
   preset: ConnectionPresetFamily;
   authMode: AuthMode;
   label?: string;
@@ -55,6 +58,23 @@ export type DesktopCredentialStorageState = {
   encryptedLocalUnlocked: boolean;
 };
 
+export type DesktopUnlockEncryptedLocalStorageResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code:
+        | "passphrase_or_corrupted"
+        | "corrupted"
+        | "locked"
+        | "unavailable"
+        | "unknown";
+    };
+
+export type DesktopUnlockEncryptedLocalStorageFailure = Extract<
+  DesktopUnlockEncryptedLocalStorageResult,
+  { ok: false }
+>;
+
 export type DesktopConnectionModelCatalog = ConnectionModelCatalogResult;
 
 export type DesktopGetConnectionModelCatalogInput = {
@@ -68,7 +88,7 @@ export type DesktopSavePreparedConnectionInput = {
   enabledAgents?: AgentId[];
 };
 
-export type DesktopImportCurrentConnectionInput = DesktopConnectionCredentialInput & {
+export type DesktopImportCurrentConnectionInput = DesktopCredentialStorageModeInput & {
   agentId: AgentId;
 };
 
@@ -98,7 +118,7 @@ export type DesktopUpdateAgentConnectionModelInput = {
 export type DesktopConnectionBridge = {
   listConnectionDefinitions(): Promise<import("@nile/core/models/connection").ConnectionDefinition[]>;
   getCredentialStorageState(): Promise<DesktopCredentialStorageState>;
-  unlockEncryptedLocalStorage(passphrase: string): Promise<void>;
+  unlockEncryptedLocalStorage(passphrase: string): Promise<DesktopUnlockEncryptedLocalStorageResult>;
   chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null>;
   describeConnectionOnboarding(input: DesktopAddConnectionInput): Promise<ConnectionOnboardingSuggestion>;
   describeSavedConnectionOnboarding(input: DesktopDescribeSavedConnectionOnboardingInput): Promise<ConnectionOnboardingSuggestion>;

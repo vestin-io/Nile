@@ -55,6 +55,7 @@ describe("DesktopConnectionManager", () => {
       authMode: "api_key",
       endpointUrl: "https://router.example/v1",
       apiKey: "router-secret",
+      credentialStorageBackend: "system_secure_storage",
     });
     const second = await manager.addConnection({
       preset: "gateway",
@@ -100,6 +101,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "current_codex",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -129,6 +131,7 @@ describe("DesktopConnectionManager", () => {
       authMode: "openai_session",
       sessionSource: "current_codex",
       sessionAuthJsonPath: authPath,
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -157,6 +160,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(loginRunner.signInCalls).toEqual([setup.codexHome]);
@@ -191,6 +195,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(draft.authMode).toBe("openai_session");
@@ -217,6 +222,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(loginRunner.commandOverrides).toEqual(["/tmp/codex-override/codex"]);
@@ -237,6 +243,7 @@ describe("DesktopConnectionManager", () => {
       preset: "anthropic",
       authMode: "claude_session",
       sessionSource: "current_claude",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -263,6 +270,7 @@ describe("DesktopConnectionManager", () => {
       preset: "gemini",
       authMode: "gemini_cli_session",
       sessionSource: "current_gemini",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -291,6 +299,7 @@ describe("DesktopConnectionManager", () => {
       preset: "gemini",
       authMode: "gemini_cli_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(loginRunner.signInCalls).toEqual([setup.geminiHome]);
@@ -322,6 +331,7 @@ describe("DesktopConnectionManager", () => {
       apiKey: "fallback-router-secret",
       enabledAgents: ["codex"],
       allowUndetectedGateway: true,
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(result).toEqual(
@@ -396,6 +406,7 @@ describe("DesktopConnectionManager", () => {
       preset: "anthropic",
       authMode: "claude_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     expect(loginRunner.signInCalls).toEqual([setup.claudeHome]);
@@ -420,6 +431,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     manager.discardPreparedConnectionDraft({ draftId: draft.id });
@@ -448,6 +460,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     await vi.advanceTimersByTimeAsync(1_000);
@@ -475,11 +488,13 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
     const second = await manager.prepareConnectionDraft({
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     await expect(manager.savePreparedConnection({ draftId: first.id })).rejects.toThrow(
@@ -510,6 +525,7 @@ describe("DesktopConnectionManager", () => {
       preset: "openai",
       authMode: "openai_session",
       sessionSource: "login",
+      credentialStorageBackend: "system_secure_storage",
     });
 
     manager.clearPreparedConnectionDrafts();
@@ -583,7 +599,10 @@ describe("DesktopConnectionManager", () => {
       credentialStore: setup.credentialStore,
     });
 
-    const imported = await gateway.importCurrentConnection("cursor");
+    const imported = await gateway.importCurrentConnection({
+      agentId: "cursor",
+      credentialStorageBackend: "system_secure_storage",
+    });
     const bindingRegistry = CursorUsageBindingRegistry.open(setup.dbPath, setup.credentialStore);
     try {
       expect(imported).toEqual(
@@ -693,6 +712,10 @@ describe("DesktopConnectionManager", () => {
   it("ensures managed env keys for batch detected-setup imports", async () => {
     const ensureCalls: string[] = [];
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         reconciliation: { state: "unavailable", issues: [] },
       }),
@@ -761,6 +784,10 @@ describe("DesktopConnectionManager", () => {
     const removeConnection = vi.fn();
     const restoreMatchedImportState = vi.fn();
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         reconciliation: { state: "unavailable", issues: [] },
       }),
@@ -824,6 +851,10 @@ describe("DesktopConnectionManager", () => {
       modelSetting: null,
     };
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         agentId: "claude",
         liveConnection: {
@@ -880,6 +911,10 @@ describe("DesktopConnectionManager", () => {
     const removeConnection = vi.fn();
     const removeForConnection = vi.fn();
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         reconciliation: { state: "unavailable", issues: [] },
       }),
@@ -953,6 +988,10 @@ describe("DesktopConnectionManager", () => {
       modelSetting: null,
     };
     const sessionStub = {
+      listSavedConnections: () => [{
+        id: "existing-system-secure",
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
       getAgentStatus: () => ({
         agentId: "claude",
         liveConnection: {

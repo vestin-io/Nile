@@ -23,6 +23,7 @@ import type { DesktopConnection } from "../../state/Types";
 import { DesktopManagedConnectionImports } from "./Imports";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 import { SessionRunner } from "./SessionRunner";
+import { resolveDesktopCredentialStorageMode } from "./CredentialStorageMode";
 import type {
   DesktopConnectionSummary,
   DesktopImportCurrentConnectionInput,
@@ -67,21 +68,28 @@ export class DesktopConnectionGateway {
     const startedAt = Date.now();
     this.logger.info("desktop.import_current_connection.gateway.start", {
       agentId: normalizedInput.agentId,
-      credentialStorageBackend: normalizedInput.credentialStorageBackend ?? "default",
+      credentialStorageBackend: normalizedInput.credentialStorageBackend ?? "unset",
     });
     try {
       return await this.sessions.runAsync(async (session) => {
+        const credentialStorageBackend = resolveDesktopCredentialStorageMode(
+          session,
+          normalizedInput.credentialStorageBackend,
+        );
         this.logger.info("desktop.import_current_connection.gateway.prepare_storage.start", {
           agentId: normalizedInput.agentId,
-          credentialStorageBackend: normalizedInput.credentialStorageBackend ?? "default",
+          credentialStorageBackend,
         });
-        this.prepareCredentialStorage(normalizedInput.credentialStorageBackend, normalizedInput.encryptedLocalPassphrase);
+        this.prepareCredentialStorage(credentialStorageBackend, normalizedInput.encryptedLocalPassphrase);
         this.logger.info("desktop.import_current_connection.gateway.prepare_storage.succeeded", {
           agentId: normalizedInput.agentId,
-          credentialStorageBackend: normalizedInput.credentialStorageBackend ?? "default",
+          credentialStorageBackend,
           durationMs: Date.now() - startedAt,
         });
-        const imported = await this.imports.importCurrentConnection(session, normalizedInput);
+        const imported = await this.imports.importCurrentConnection(session, {
+          ...normalizedInput,
+          credentialStorageBackend,
+        });
         this.logger.info("desktop.import_current_connection.gateway.cursor_usage_followup.start", {
           agentId: normalizedInput.agentId,
           connectionId: imported.id,
@@ -153,7 +161,8 @@ export class DesktopConnectionGateway {
 
   async importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult> {
     return await this.sessions.runAsync(async (session) => {
-      return await this.imports.importDetectedSetups(session, scanIds);
+      const credentialStorageBackend = resolveDesktopCredentialStorageMode(session, undefined);
+      return await this.imports.importDetectedSetups(session, scanIds, credentialStorageBackend);
     });
   }
 

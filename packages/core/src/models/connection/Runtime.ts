@@ -30,7 +30,7 @@ export type CreateConnectionInput = {
   label?: string;
   enabledAgents?: AgentId[];
   allowUndetectedGateway?: boolean;
-  credentialStorageBackend?: CredentialStorageBackend;
+  credentialStorageBackend: CredentialStorageBackend;
 };
 
 export type CreateConnectionResult = {
@@ -50,7 +50,6 @@ export type UpdateConnectionInput = {
   endpointUrl?: string;
   credential?: StoredCredential;
   probeCredential?: StoredCredential;
-  credentialStorageBackend?: CredentialStorageBackend;
 };
 
 export type ConnectionModelCatalogResult = {

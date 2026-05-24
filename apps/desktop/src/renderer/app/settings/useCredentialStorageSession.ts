@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { readEncryptedLocalUnlockErrorMessage } from "../../shared/EncryptedLocalUnlock";
+
 type CredentialStorageState = Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
 
 type PendingUnlock = {
@@ -10,14 +12,16 @@ type PendingUnlock = {
 
 type UseCredentialStorageSessionOptions = {
   onActionError(message: string | null): void;
+  t: (key: string) => string;
 };
 
 type CredentialStorageSessionState = {
   credentialStorageState: CredentialStorageState;
+  unlockEncryptedLocalStorageHint: string | null;
   isUnlockEncryptedLocalStorageDialogOpen: boolean;
   isUnlockingEncryptedLocalStorage: boolean;
   refreshCredentialStorageState(): Promise<CredentialStorageState>;
-  requestEncryptedLocalUnlock(): Promise<void>;
+  requestEncryptedLocalUnlock(hint?: string): Promise<void>;
   setUnlockEncryptedLocalStorageDialogOpen(open: boolean): void;
   unlockEncryptedLocalStorage(passphrase: string): Promise<void>;
   unlockEncryptedLocalStorageError: string | null;
@@ -25,21 +29,22 @@ type CredentialStorageSessionState = {
 
 export function useCredentialStorageSession({
   onActionError,
+  t,
 }: UseCredentialStorageSessionOptions): CredentialStorageSessionState {
   const pendingEncryptedLocalUnlockRef = useRef<PendingUnlock | null>(null);
-  const startupEncryptedLocalUnlockCheckedRef = useRef(false);
-  const [credentialStorageStateLoaded, setCredentialStorageStateLoaded] = useState(false);
   const [credentialStorageState, setCredentialStorageState] = useState<CredentialStorageState>({
     encryptedLocalVaultExists: false,
     encryptedLocalUnlocked: false,
   });
+  const [unlockEncryptedLocalStorageHint, setUnlockEncryptedLocalStorageHint] = useState<string | null>(null);
   const [isUnlockEncryptedLocalStorageDialogOpen, setUnlockEncryptedLocalStorageDialogOpen] = useState(false);
   const [unlockEncryptedLocalStorageError, setUnlockEncryptedLocalStorageError] = useState<string | null>(null);
   const [isUnlockingEncryptedLocalStorage, setIsUnlockingEncryptedLocalStorage] = useState(false);
 
-  const requestEncryptedLocalUnlock = useCallback(async (): Promise<void> => {
+  const requestEncryptedLocalUnlock = useCallback(async (hint?: string): Promise<void> => {
     onActionError(null);
     const existing = pendingEncryptedLocalUnlockRef.current;
+    setUnlockEncryptedLocalStorageHint(hint ?? null);
     if (existing) {
       return await existing.promise;
     }
@@ -62,7 +67,6 @@ export function useCredentialStorageSession({
   const refreshCredentialStorageState = useCallback(async (): Promise<CredentialStorageState> => {
     const nextState = await window.nileDesktop.connections.getCredentialStorageState();
     setCredentialStorageState(nextState);
-    setCredentialStorageStateLoaded(true);
     return nextState;
   }, []);
 
@@ -71,6 +75,7 @@ export function useCredentialStorageSession({
     pendingEncryptedLocalUnlockRef.current = null;
     setUnlockEncryptedLocalStorageDialogOpen(false);
     setUnlockEncryptedLocalStorageError(null);
+    setUnlockEncryptedLocalStorageHint(null);
     setIsUnlockingEncryptedLocalStorage(false);
     if (!pending) {
       return;
@@ -94,14 +99,19 @@ export function useCredentialStorageSession({
     setIsUnlockingEncryptedLocalStorage(true);
     setUnlockEncryptedLocalStorageError(null);
     try {
-      await window.nileDesktop.connections.unlockEncryptedLocalStorage(passphrase);
+      const result = await window.nileDesktop.connections.unlockEncryptedLocalStorage(passphrase);
+      if (!result.ok) {
+        setUnlockEncryptedLocalStorageError(readEncryptedLocalUnlockErrorMessage(result, t));
+        setIsUnlockingEncryptedLocalStorage(false);
+        return;
+      }
       await refreshCredentialStorageState();
       closeEncryptedLocalUnlockDialog();
-    } catch (error) {
-      setUnlockEncryptedLocalStorageError(error instanceof Error ? error.message : String(error));
+    } catch {
+      setUnlockEncryptedLocalStorageError(t("dialog.encryptedLocalUnlock.errorUnknown"));
       setIsUnlockingEncryptedLocalStorage(false);
     }
-  }, [closeEncryptedLocalUnlockDialog, refreshCredentialStorageState]);
+  }, [closeEncryptedLocalUnlockDialog, refreshCredentialStorageState, t]);
 
   useEffect(() => {
     void refreshCredentialStorageState().catch(() => undefined);
@@ -112,23 +122,12 @@ export function useCredentialStorageSession({
       encryptedLocalVaultExists: false,
       encryptedLocalUnlocked: false,
     });
-    setCredentialStorageStateLoaded(true);
+    setUnlockEncryptedLocalStorageHint(null);
   }), []);
-
-  useEffect(() => {
-    if (!credentialStorageStateLoaded || startupEncryptedLocalUnlockCheckedRef.current) {
-      return;
-    }
-    startupEncryptedLocalUnlockCheckedRef.current = true;
-    if (credentialStorageState.encryptedLocalVaultExists && !credentialStorageState.encryptedLocalUnlocked) {
-      void window.nileDesktop.app.openSettings().catch(() => undefined).then(() => (
-        requestEncryptedLocalUnlock().catch(() => undefined)
-      ));
-    }
-  }, [credentialStorageState, credentialStorageStateLoaded, requestEncryptedLocalUnlock]);
 
   return {
     credentialStorageState,
+    unlockEncryptedLocalStorageHint,
     isUnlockEncryptedLocalStorageDialogOpen,
     isUnlockingEncryptedLocalStorage,
     refreshCredentialStorageState,

@@ -38,14 +38,14 @@ export type SetEnabledAgentsOptions = {
 
 function createInitialFormState(
   defaultOpenAiAuthJsonPath: string,
-  defaultCredentialStorageBackend: CredentialStorageBackend | null,
+  credentialStorageMode: CredentialStorageBackend | null,
 ): AddConnectionFormState {
   return {
     apiKey: "",
     apiKeySource: "direct",
     authMode: "",
     authJsonPath: defaultOpenAiAuthJsonPath,
-    credentialStorageBackend: defaultCredentialStorageBackend ?? "system_secure_storage",
+    credentialStorageBackend: credentialStorageMode ?? "system_secure_storage",
     encryptedLocalPassphrase: "",
     encryptedLocalPassphraseConfirmation: "",
     envKey: "",
@@ -59,14 +59,14 @@ function createInitialFormState(
 export function useAddConnectionForm(
   definitions: Definition[],
   defaultOpenAiAuthJsonPath: string,
-  defaultCredentialStorageBackend: CredentialStorageBackend | null,
+  credentialStorageMode: CredentialStorageBackend | null,
 ) {
   const enabledAgentsPolicy = useMemo(() => new EnabledAgentsPolicy(), []);
   const previousDefaultOpenAiAuthJsonPath = useRef(defaultOpenAiAuthJsonPath);
-  const previousDefaultCredentialStorageBackend = useRef(defaultCredentialStorageBackend);
+  const previousCredentialStorageMode = useRef(credentialStorageMode);
   const [enabledAgentsManuallyEdited, setEnabledAgentsManuallyEdited] = useState(false);
   const [formState, setFormState] = useState<AddConnectionFormState>(() =>
-    createInitialFormState(defaultOpenAiAuthJsonPath, defaultCredentialStorageBackend),
+    createInitialFormState(defaultOpenAiAuthJsonPath, credentialStorageMode),
   );
 
   useEffect(() => {
@@ -113,16 +113,16 @@ export function useAddConnectionForm(
   }, [defaultOpenAiAuthJsonPath]);
 
   useEffect(() => {
-    const previousDefault = previousDefaultCredentialStorageBackend.current;
-    previousDefaultCredentialStorageBackend.current = defaultCredentialStorageBackend;
-    if (previousDefault === defaultCredentialStorageBackend) {
+    const previousMode = previousCredentialStorageMode.current;
+    previousCredentialStorageMode.current = credentialStorageMode;
+    if (previousMode === credentialStorageMode) {
       return;
     }
     setFormState((current) => {
-      if (current.credentialStorageBackend !== (previousDefault ?? "system_secure_storage")) {
+      if (current.credentialStorageBackend !== (previousMode ?? "system_secure_storage")) {
         return current;
       }
-      const nextCredentialStorageBackend = defaultCredentialStorageBackend ?? "system_secure_storage";
+      const nextCredentialStorageBackend = credentialStorageMode ?? "system_secure_storage";
       return {
         ...current,
         credentialStorageBackend: nextCredentialStorageBackend,
@@ -134,7 +134,7 @@ export function useAddConnectionForm(
           : "",
       };
     });
-  }, [defaultCredentialStorageBackend]);
+  }, [credentialStorageMode]);
 
   useEffect(() => {
     if (!selectedDefinition) {
