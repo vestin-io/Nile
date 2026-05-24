@@ -11,6 +11,7 @@ import {
 import type { Translator } from "../shared/I18n";
 import { readEncryptedLocalUnlockErrorMessage } from "../shared/EncryptedLocalUnlock";
 import { useEncryptedLocalAccessRecovery } from "../shared/EncryptedLocalAccess";
+import { readSystemSecureStorageName } from "../shared/Platform";
 import { nileMarkSvg } from "../shared/NileMark";
 import { QuickSetupAgentCard } from "./AgentCard";
 import { QuickSetupConnectionDialog } from "./ConnectionDialog";
@@ -64,6 +65,7 @@ export function QuickSetupPage({
   onUpdateAgentConnectionModel,
   onUseExistingConnection,
 }: QuickSetupPageProps) {
+  const systemSecureStorageName = readSystemSecureStorageName(t);
   const [configureAgentId, setConfigureAgentId] = useState<AgentId | null>(null);
   const [credentialStorageBackend, setCredentialStorageBackend] = useState<CredentialStorageBackend>(
     credentialStorageMode ?? "system_secure_storage",
@@ -292,7 +294,7 @@ export function QuickSetupPage({
               </div>
               <div className="text-sm text-muted-foreground">
                 {activeCredentialStorageMode === "system_secure_storage"
-                  ? t("addConnection.storage.system.description")
+                  ? t("addConnection.storage.system.description", { systemSecureStorageName })
                   : t("addConnection.storage.encrypted.description")}
               </div>
             </div>

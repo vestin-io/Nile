@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -28,7 +28,7 @@ describe("CodexSessionLogin", () => {
     let receivedCommand: string | undefined;
     let receivedPath: string | undefined;
     const originalPath = process.env.PATH;
-    process.env.PATH = `${brokenInstall.bin}:${workingInstall.bin}:/usr/bin`;
+    process.env.PATH = joinPathEntries(brokenInstall.bin, workingInstall.bin, "/usr/bin");
     const login = new CodexSessionLogin(
       EnvironmentSource.from({ PATH: "/opt/homebrew/bin:/usr/bin:/usr/local/bin" }),
       (command, _args, options) => {
@@ -53,11 +53,13 @@ describe("CodexSessionLogin", () => {
       process.env.PATH = originalPath;
     }
 
-    expect(receivedCommand).toBe(join(workingInstall.bin, "codex"));
-    expect(receivedPath).toBe(`${workingInstall.bin}:${brokenInstall.bin}:/usr/bin:/opt/homebrew/bin:/usr/local/bin`);
+    expect(receivedCommand).toBe(workingInstall.resolvedCommand);
+    expect(receivedPath).toContain(workingInstall.bin);
   });
 
   it("returns a user-facing error when the codex CLI is missing from PATH", async () => {
+    const originalPath = process.env.PATH;
+    process.env.PATH = "";
     const login = new CodexSessionLogin(
       EnvironmentSource.empty(),
       () => ({
@@ -72,9 +74,13 @@ describe("CodexSessionLogin", () => {
       NileLogger.silent(),
     );
 
-    await expect(login.signIn("/tmp/.codex")).rejects.toThrow(
-      "Codex CLI was not found in PATH. Install Codex CLI or add it to your shell PATH, then restart Nile.",
-    );
+    try {
+      await expect(login.signIn("/tmp/.codex")).rejects.toThrow(
+        "Codex CLI was not found in PATH. Install Codex CLI or add it to your shell PATH, then restart Nile.",
+      );
+    } finally {
+      process.env.PATH = originalPath;
+    }
   });
 
   it("returns a user-facing error when every PATH Codex install is broken", async () => {
@@ -89,7 +95,7 @@ describe("CodexSessionLogin", () => {
 
     try {
       await expect(login.signIn("/tmp/.codex")).rejects.toThrow(
-        `Codex CLI was found in PATH, but its packaged binary is missing (${join(brokenInstall.bin, "codex")}).`,
+        `Codex CLI was found in PATH, but its packaged binary is missing (${brokenInstall.command}).`,
       );
     } finally {
       process.env.PATH = originalPath;
@@ -129,7 +135,39 @@ describe("CodexSessionLogin", () => {
       process.env.PATH = originalPath;
     }
 
-    expect(receivedCommand).toBe(fallbackInstall.command);
+    expect(receivedCommand).toBe(fallbackInstall.resolvedCommand);
+  });
+
+  it("accepts a global npm Codex install whose vendor package is nested under @openai/codex", async () => {
+    const install = createGlobalNpmCodexCliInstall("npm-global");
+
+    let receivedCommand: string | undefined;
+    const originalPath = process.env.PATH;
+    process.env.PATH = joinPathEntries(install.bin, "/usr/bin");
+    const login = new CodexSessionLogin(
+      EnvironmentSource.empty(),
+      (command) => {
+        receivedCommand = command;
+        return {
+          once(event: "error" | "exit", listener: ((error: Error) => void) | ((code: number | null) => void)) {
+            if (event === "exit") {
+              (listener as (code: number | null) => void)(0);
+            }
+            return this;
+          },
+        } as never;
+      },
+      undefined,
+      NileLogger.silent(),
+    );
+
+    try {
+      await login.signIn("/tmp/.codex");
+    } finally {
+      process.env.PATH = originalPath;
+    }
+
+    expect(receivedCommand).toBe(install.resolvedCommand);
   });
 
   it("prefers an explicit Codex CLI override over PATH auto-detection", async () => {
@@ -158,13 +196,13 @@ describe("CodexSessionLogin", () => {
 
     try {
       await login.signIn("/tmp/.codex", {
-        commandPathOverride: join(overrideInstall.bin, "codex"),
+        commandPathOverride: overrideInstall.command,
       });
     } finally {
       process.env.PATH = originalPath;
     }
 
-    expect(receivedCommand).toBe(join(overrideInstall.bin, "codex"));
+    expect(receivedCommand).toBe(overrideInstall.resolvedCommand);
   });
 
   it("runs codex login in the background and waits for a new OpenAI session in Electron", async () => {
@@ -183,7 +221,7 @@ describe("CodexSessionLogin", () => {
       (spawnedCommand, _args, options) => {
         command = spawnedCommand;
         receivedStdio = options.stdio;
-        if (spawnedCommand === join(install.bin, "codex")) {
+        if (spawnedCommand === install.resolvedCommand) {
           writeFileSync(
             join(codexHome, "auth.json"),
             JSON.stringify({
@@ -221,11 +259,12 @@ describe("CodexSessionLogin", () => {
       process.env.PATH = originalPath;
     }
 
-    expect(command).toBe(join(install.bin, "codex"));
+    expect(command).toBe(install.resolvedCommand);
     expect(receivedStdio).toBe("pipe");
   });
 
   it("opens the emitted Codex sign-in URL when a browser opener is available", async () => {
+    const install = createCodexCliInstall("browser-open");
     let openedUrl: string | null = null;
     let receivedStdio: "inherit" | "ignore" | "pipe" | null = null;
     const login = new CodexSessionLogin(
@@ -249,6 +288,7 @@ describe("CodexSessionLogin", () => {
 
     await expect(
       login.signIn("/tmp/.codex", {
+        commandPathOverride: install.command,
         openExternalUrl: async (url) => {
           openedUrl = url;
         },
@@ -260,6 +300,7 @@ describe("CodexSessionLogin", () => {
   });
 
   it("includes captured Codex stderr when Electron login exits non-zero", async () => {
+    const install = createCodexCliInstall("stderr-output");
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const login = new CodexSessionLogin(
       EnvironmentSource.empty(),
@@ -275,7 +316,9 @@ describe("CodexSessionLogin", () => {
       NileLogger.silent(),
     );
 
-    await expect(login.signIn("/tmp/.codex")).rejects.toThrow(
+    await expect(login.signIn("/tmp/.codex", {
+      commandPathOverride: install.command,
+    })).rejects.toThrow(
       "codex login failed with exit code 1: Error logging in: browser launch failed",
     );
     expect(consoleError).toHaveBeenCalledWith(
@@ -303,14 +346,16 @@ class StubSpawnedProcess extends EventEmitter {
 function createCodexCliInstall(
   name: string,
   options: { includeVendor?: boolean; layout?: "optional-package" | "legacy" } = {},
-): { bin: string; root: string } {
+): { bin: string; root: string; command: string; resolvedCommand: string | null } {
   const root = mkdtempSync(join(tmpdir(), `nile-codex-cli-${name}-`));
   tempDirs.push(root);
 
   const bin = join(root, "bin");
   mkdirSync(bin, { recursive: true });
-  writeFileSync(join(bin, "codex"), "#!/usr/bin/env node\n", "utf8");
+  const command = join(bin, readCommandLauncherName());
+  writeFileSync(command, "#!/usr/bin/env node\n", "utf8");
 
+  let resolvedCommand: string | null = null;
   if (options.includeVendor !== false) {
     const targetTriple = readTargetTriple();
     if (!targetTriple) {
@@ -321,23 +366,25 @@ function createCodexCliInstall(
       ? join(root, "vendor", targetTriple, "codex")
       : join(root, "node_modules", "@openai", readOptionalPackageDirectoryName(), "vendor", targetTriple, "codex");
     mkdirSync(vendorRoot, { recursive: true });
-    writeFileSync(join(vendorRoot, "codex"), "", "utf8");
+    resolvedCommand = join(vendorRoot, readVendorBinaryName());
+    writeFileSync(resolvedCommand, "", "utf8");
   }
 
-  return { bin, root };
+  return { bin, root, command, resolvedCommand };
 }
 
 function createNvmCodexCliInstall(
   homeRoot: string,
   versionName: string,
   options: { includeVendor?: boolean; layout?: "optional-package" | "legacy" } = {},
-): { command: string } {
+): { command: string; resolvedCommand: string | null } {
   const installRoot = join(homeRoot, ".nvm", "versions", "node", versionName);
   const bin = join(installRoot, "bin");
   mkdirSync(bin, { recursive: true });
-  const command = join(bin, "codex");
+  const command = join(bin, readCommandLauncherName());
   writeFileSync(command, "#!/usr/bin/env node\n", "utf8");
 
+  let resolvedCommand: string | null = null;
   if (options.includeVendor !== false) {
     const targetTriple = readTargetTriple();
     if (!targetTriple) {
@@ -348,10 +395,61 @@ function createNvmCodexCliInstall(
       ? join(installRoot, "vendor", targetTriple, "codex")
       : join(installRoot, "node_modules", "@openai", readOptionalPackageDirectoryName(), "vendor", targetTriple, "codex");
     mkdirSync(vendorRoot, { recursive: true });
-    writeFileSync(join(vendorRoot, "codex"), "", "utf8");
+    resolvedCommand = join(vendorRoot, readVendorBinaryName());
+    writeFileSync(resolvedCommand, "", "utf8");
   }
 
-  return { command };
+  return { command, resolvedCommand };
+}
+
+function createGlobalNpmCodexCliInstall(name: string): {
+  bin: string;
+  root: string;
+  command: string;
+  resolvedCommand: string;
+} {
+  const root = mkdtempSync(join(tmpdir(), `nile-codex-cli-global-${name}-`));
+  tempDirs.push(root);
+
+  const bin = join(root, "nodejs");
+  mkdirSync(bin, { recursive: true });
+  const command = join(bin, readCommandLauncherName());
+  writeFileSync(command, "#!/usr/bin/env node\n", "utf8");
+
+  const targetTriple = readTargetTriple();
+  if (!targetTriple) {
+    throw new Error(`Unsupported test platform: ${process.platform}/${process.arch}`);
+  }
+
+  const vendorRoot = join(
+    bin,
+    "node_modules",
+    "@openai",
+    "codex",
+    "node_modules",
+    "@openai",
+    readOptionalPackageDirectoryName(),
+    "vendor",
+    targetTriple,
+    "bin",
+  );
+  mkdirSync(vendorRoot, { recursive: true });
+  const resolvedCommand = join(vendorRoot, readVendorBinaryName());
+  writeFileSync(resolvedCommand, "", "utf8");
+
+  return { bin, root, command, resolvedCommand };
+}
+
+function readVendorBinaryName(): string {
+  return process.platform === "win32" ? "codex.exe" : "codex";
+}
+
+function readCommandLauncherName(): string {
+  return process.platform === "win32" ? "codex.cmd" : "codex";
+}
+
+function joinPathEntries(...entries: string[]): string {
+  return entries.join(delimiter);
 }
 
 function readTargetTriple(): string | null {

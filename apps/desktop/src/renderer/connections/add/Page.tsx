@@ -15,6 +15,7 @@ import type { Translator } from "../../shared/I18n";
 import { type Definition } from "../../shared/DesktopData";
 import { readEncryptedLocalUnlockErrorMessage } from "../../shared/EncryptedLocalUnlock";
 import { useEncryptedLocalAccessRecovery } from "../../shared/EncryptedLocalAccess";
+import { readSystemSecureStorageName } from "../../shared/Platform";
 import type { LanguagePreference } from "../../settings/Preferences";
 import { useAddConnectionPageState } from "./usePageState";
 import type {
@@ -67,6 +68,7 @@ export function AddConnectionPage({
   onSavePrepared,
   onSubmit,
 }: AddConnectionPageProps) {
+  const systemSecureStorageName = readSystemSecureStorageName(t);
   const { requestUnlock } = useEncryptedLocalAccessRecovery();
   const {
     actionError,
@@ -292,7 +294,7 @@ export function AddConnectionPage({
                 )}
                 <div className="text-sm text-muted-foreground">
                   {activeCredentialStorageMode === "system_secure_storage"
-                    ? t("addConnection.storage.system.description")
+                    ? t("addConnection.storage.system.description", { systemSecureStorageName })
                     : t("addConnection.storage.encrypted.description")}
                 </div>
               </div>

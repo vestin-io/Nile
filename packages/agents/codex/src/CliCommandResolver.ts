@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import { listCommandsInNvm, listCommandsInPath } from "@nile/core/services/RuntimeCommandDiscovery";
 
@@ -26,9 +26,10 @@ export class CliCommandResolver {
     const invalidCommandPaths: string[] = [];
 
     for (const command of this.listPathCommands(pathValue)) {
-      if (this.pathExists(command) && this.readVendorBinaryPath(command)) {
+      const vendorBinaryPath = this.readVendorBinaryPath(command);
+      if (this.pathExists(command) && vendorBinaryPath) {
         return {
-          command,
+          command: vendorBinaryPath,
           invalidCommandPaths,
         };
       }
@@ -41,9 +42,10 @@ export class CliCommandResolver {
       if (invalidCommandPaths.includes(command)) {
         continue;
       }
-      if (this.pathExists(command) && this.readVendorBinaryPath(command)) {
+      const vendorBinaryPath = this.readVendorBinaryPath(command);
+      if (this.pathExists(command) && vendorBinaryPath) {
         return {
-          command,
+          command: vendorBinaryPath,
           invalidCommandPaths,
         };
       }
@@ -67,9 +69,10 @@ export class CliCommandResolver {
       };
     }
 
-    if (this.pathExists(normalized) && this.readVendorBinaryPath(normalized)) {
+    const vendorBinaryPath = this.readVendorBinaryPath(normalized);
+    if (this.pathExists(normalized) && vendorBinaryPath) {
       return {
-        command: normalized,
+        command: vendorBinaryPath,
         invalidCommandPaths: [],
       };
     }
@@ -88,8 +91,12 @@ export class CliCommandResolver {
       return null;
     }
 
-    const packageRoot = dirname(dirname(resolvedCommandPath));
-    for (const candidate of this.listVendorBinaryCandidates(packageRoot)) {
+    const binaryName = readVendorBinaryName();
+    if (basename(resolvedCommandPath).toLowerCase() === binaryName.toLowerCase()) {
+      return resolvedCommandPath;
+    }
+
+    for (const candidate of this.listVendorBinaryCandidates(resolvedCommandPath)) {
       if (this.pathExists(candidate)) {
         return candidate;
       }
@@ -106,24 +113,61 @@ export class CliCommandResolver {
     return listCommandsInNvm("codex", homeDirectory, this.readDirectoryNames);
   }
 
-  private listVendorBinaryCandidates(packageRoot: string): string[] {
+  private listVendorBinaryCandidates(commandPath: string): string[] {
     const targetTriple = readTargetTriple();
     if (!targetTriple) {
       return [];
     }
 
-    const binaryName = process.platform === "win32" ? "codex.exe" : "codex";
-    const candidates = [
-      join(packageRoot, "vendor", targetTriple, "codex", binaryName),
-    ];
+    const binaryName = readVendorBinaryName();
+    const commandDirectory = dirname(commandPath);
+    const commandParentDirectory = dirname(commandDirectory);
+    const installRoots = new Set<string>([
+      commandDirectory,
+      commandParentDirectory,
+      join(commandParentDirectory, "lib"),
+    ]);
+    const codexPackageRoots = new Set<string>([
+      join(commandDirectory, "node_modules", "@openai", "codex"),
+      join(commandParentDirectory, "node_modules", "@openai", "codex"),
+      join(commandParentDirectory, "lib", "node_modules", "@openai", "codex"),
+    ]);
+
+    const candidates: string[] = [];
+    for (const installRoot of installRoots) {
+      candidates.push(join(installRoot, "vendor", targetTriple, "codex", binaryName));
+      candidates.push(join(installRoot, "vendor", targetTriple, "bin", binaryName));
+    }
     const optionalPackageName = readOptionalVendorPackageName();
     if (optionalPackageName) {
-      candidates.unshift(
-        join(packageRoot, "node_modules", optionalPackageName, "vendor", targetTriple, "codex", binaryName),
-      );
+      for (const installRoot of installRoots) {
+        candidates.push(
+          join(installRoot, "node_modules", optionalPackageName, "vendor", targetTriple, "codex", binaryName),
+        );
+        candidates.push(
+          join(installRoot, "node_modules", optionalPackageName, "vendor", targetTriple, "bin", binaryName),
+        );
+      }
+      for (const packageRoot of codexPackageRoots) {
+        candidates.push(
+          join(packageRoot, "node_modules", optionalPackageName, "vendor", targetTriple, "codex", binaryName),
+        );
+        candidates.push(
+          join(packageRoot, "node_modules", optionalPackageName, "vendor", targetTriple, "bin", binaryName),
+        );
+      }
     }
-    return candidates;
+    for (const packageRoot of codexPackageRoots) {
+      candidates.push(join(packageRoot, "vendor", targetTriple, "codex", binaryName));
+      candidates.push(join(packageRoot, "vendor", targetTriple, "bin", binaryName));
+    }
+
+    return Array.from(new Set(candidates));
   }
+}
+
+function readVendorBinaryName(): string {
+  return process.platform === "win32" ? "codex.exe" : "codex";
 }
 
 function readTargetTriple(): string | null {

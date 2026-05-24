@@ -4,7 +4,7 @@ import type { AgentId } from "../models/agent/Definitions";
 import type { AgentConnectionSettings } from "../models/agent-settings";
 import type { AgentSelection } from "../models/selection/Selection";
 import type { CredentialStore } from "../services/credential/Store";
-import { FileSnapshotStore, MutationHistory, SecureSnapshotStore } from "../services/history";
+import { FileSnapshotStore, MutationHistory, createPlatformSecureSnapshotStore, SecureSnapshotStore } from "../services/history";
 import type { NileLogger } from "../services/NileLogger";
 import type { AgentProjection, ProjectionInput } from "../projection/Types";
 import { AgentApplySupport } from "../actions/apply";
@@ -37,7 +37,7 @@ export class AgentWorkspaceBinding {
     return new MutationHistory(
       this.context.database,
       new FileSnapshotStore(join(dirname(this.context.databasePath), "history")),
-      secureSnapshotStore ?? new SecureSnapshotStore(),
+      secureSnapshotStore ?? createPlatformSecureSnapshotStore(),
       logger,
     );
   }

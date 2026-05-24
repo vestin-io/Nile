@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
 import type { Translator } from "../../shared/I18n";
+import { readSystemSecureStorageName } from "../../shared/Platform";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
@@ -38,6 +39,7 @@ export function CredentialStorageDialog({
   onEncryptedLocalPassphraseConfirmationChange,
   onOpenChange,
 }: CredentialStorageDialogProps) {
+  const systemSecureStorageName = readSystemSecureStorageName(t);
   const [passphraseTouched, setPassphraseTouched] = useState(false);
   const [confirmationTouched, setConfirmationTouched] = useState(false);
   const requiresEncryptedLocalPassphrase = backend === "encrypted_local_storage" && !encryptedLocalUnlocked;
@@ -84,7 +86,7 @@ export function CredentialStorageDialog({
             </div>
             <div className="text-sm text-muted-foreground">
               {backend === "system_secure_storage"
-                ? t("addConnection.storage.system.description")
+                ? t("addConnection.storage.system.description", { systemSecureStorageName })
                 : t("addConnection.storage.encrypted.description")}
             </div>
           </div>

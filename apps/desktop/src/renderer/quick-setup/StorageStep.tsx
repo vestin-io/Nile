@@ -5,6 +5,7 @@ import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { cn } from "../ui/cn";
 import { Button } from "../ui/button";
 import type { Translator } from "../shared/I18n";
+import { readSystemSecureStorageName } from "../shared/Platform";
 
 type StorageStepProps = {
   backend: CredentialStorageBackend;
@@ -33,6 +34,8 @@ export function QuickSetupStorageStep({
   onBackendChange,
   onContinue,
 }: StorageStepProps) {
+  const systemSecureStorageName = readSystemSecureStorageName(t);
+
   return (
     <div className="space-y-6">
       <div className="mx-auto max-w-3xl space-y-3 text-center">
@@ -55,7 +58,7 @@ export function QuickSetupStorageStep({
             ? t("addConnection.storage.system.title")
             : t("addConnection.storage.encrypted.title");
           const description = option.backend === "system_secure_storage"
-            ? t("addConnection.storage.system.description")
+            ? t("addConnection.storage.system.description", { systemSecureStorageName })
             : t("addConnection.storage.encrypted.description");
 
           return (

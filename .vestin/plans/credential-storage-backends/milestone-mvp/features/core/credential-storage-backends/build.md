@@ -183,3 +183,55 @@
 
 - The machine-level single-mode rule has to be enforced across every writable surface, not just desktop renderer flows; otherwise CLI can silently recreate the same mixed-backend state that desktop now blocks.
 - `importDetectedSetups` previously had no backend input at all, so even after tightening create flows it could still create system-secure connections implicitly. Passing the backend through that batch-import path closes the last active cross-surface fallback.
+
+## Follow-up Build: Windows Credential Manager Backend
+
+### Tasks Completed
+
+- Added a dedicated Windows system-secure credential store implementation backed by the native Windows Credential Manager API.
+- Extracted shared credential payload serialization/validation so macOS Keychain and Windows Credential Manager stores enforce the same stored-secret shape rules.
+- Kept the encrypted-local vault path unchanged while letting desktop Windows route `system_secure_storage` to the native OS store instead of the earlier desktop-local file fallback.
+
+### Files Changed
+
+- `packages/core/src/services/credential/StoredCredentialCodec.ts`
+- `packages/core/src/services/credential/WindowsCredentialWriter.ts`
+- `packages/core/src/services/credential/WindowsCredentialManagerStore.ts`
+- `packages/core/src/services/credential/WindowsCredentialManagerStore.test.ts`
+- `packages/core/src/services/credential/KeychainCredentialStore.ts`
+- `packages/core/src/services/credential/index.ts`
+
+### Verification Commands Run
+
+- `npx vitest run packages/core/src/services/credential/KeychainCredentialStore.test.ts packages/core/src/services/credential/WindowsCredentialManagerStore.test.ts`
+- `npm run typecheck`
+
+### Key Findings
+
+- Windows `system_secure_storage` now maps to the real Windows Credential Manager instead of a Nile-managed file, which aligns the product meaning of "system secure storage" across macOS and Windows.
+- The Windows implementation uses PowerShell-hosted P/Invoke into the native Credential Manager API, so no new npm/native dependency was introduced in this slice.
+- Existing encrypted-local behavior and reset semantics remain unchanged; this round only changed the Windows system-store backend.
+
+## Follow-up Build: Windows Credential Payload Chunking
+
+### Tasks Completed
+
+- Split oversized Windows system-secure credential payloads across multiple Credential Manager entries instead of failing on the native blob-size cap.
+- Kept the base credential entry as a small manifest so Windows reads, updates, and deletes can reconstruct or clean up chunked payloads deterministically.
+- Added focused store tests for chunked create/read/update/remove behavior without reintroducing the earlier desktop-local Windows fallback.
+
+### Files Changed
+
+- `packages/core/src/services/credential/WindowsCredentialWriter.ts`
+- `packages/core/src/services/credential/WindowsCredentialManagerStore.ts`
+- `packages/core/src/services/credential/WindowsCredentialManagerStore.test.ts`
+
+### Verification Commands Run
+
+- `npx vitest run packages/core/src/services/credential/WindowsCredentialManagerStore.test.ts`
+- `npm run typecheck`
+
+### Key Findings
+
+- Native Windows Credential Manager generic credentials still enforce a small per-entry payload limit, so chunking has to happen in Nile rather than in the OS API.
+- This round intentionally does not preserve or migrate the earlier unreleased desktop-local Windows credential-file format; only the current Credential Manager layout matters now.

@@ -47,5 +47,6 @@ export type {
 export { KeychainCredentialStore } from "./KeychainCredentialStore";
 export { EncryptedLocalCredentialStore } from "./EncryptedLocalCredentialStore";
 export { BackendCredentialStore, buildCredentialStoreTarget } from "./BackendCredentialStore";
+export { WindowsCredentialManagerStore } from "./WindowsCredentialManagerStore";
 export { GenericPasswordWriter } from "./GenericPasswordWriter";
 export { SecurityCli, type SecurityCliResult } from "./SecurityCli";

@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import type { CredentialStore } from "@nile/core/services/credential";
 import { FileSnapshotStore } from "@nile/core/services/history";
 import { MutationHistory, MutationHistoryError } from "@nile/core/services/history";
-import { SecureSnapshotStore } from "@nile/core/services/history";
+import { createPlatformSecureSnapshotStore, SecureSnapshotStore } from "@nile/core/services/history";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import {
   AgentWorkspaceBinding,
@@ -40,7 +40,7 @@ export class RollbackLatestMutation {
         logger.child({ scope: "mutation-history" }),
       ),
       new FileSnapshotStore(join(dirname(binding.context.databasePath), "history")),
-      options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+      options?.secureSnapshotStore ?? createPlatformSecureSnapshotStore(),
       binding.context.agentSelection,
       LiveSetupDetector.fromContext(binding.context, {
         cursorHome,
@@ -72,7 +72,7 @@ export class RollbackLatestMutation {
         logger.child({ scope: "mutation-history" }),
       ),
       new FileSnapshotStore(join(dirname(binding.context.databasePath), "history")),
-      options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+      options?.secureSnapshotStore ?? createPlatformSecureSnapshotStore(),
       binding.context.agentSelection,
       LiveSetupDetector.fromContext(binding.context, {
         cursorHome,

@@ -468,6 +468,47 @@
 - The `Quick setup` flow already passed an explicit backend, but the older inline `Save to Nile` action on the `Agents` page still called `importCurrentConnection(agentId)` with no backend input, which caused main-process logs to show `credentialStorageBackend:"default"`.
 - After this fix, the `Agents` page import path now follows the same default-backend intent as the rest of the desktop flows; encrypted-local defaults will no longer silently save through the session fallback without an unlock prompt.
 
+## Follow-up Build: Platform-Specific System Storage Copy
+
+### Tasks Completed
+
+- Updated desktop renderer credential-storage copy so the system-secure option can name the platform-specific password manager instead of always describing a generic or Mac-specific store.
+- Removed several English `This Mac` references from quick setup and credential-storage flows in favor of device-neutral copy.
+- Switched desktop Windows main-process wiring to the new core Windows Credential Manager backend and removed the now-unused desktop file-backed credential store path.
+
+### Files Changed
+
+- `apps/desktop/src/electron/shell/DesktopMain.ts`
+- `apps/desktop/src/electron/credentials/DesktopCredentialStore.ts`
+- `apps/desktop/src/renderer/shared/Platform.ts`
+- `apps/desktop/src/renderer/shared/Platform.test.ts`
+- `apps/desktop/src/renderer/app/settings/usePreferences.ts`
+- `apps/desktop/src/renderer/quick-setup/StorageStep.tsx`
+- `apps/desktop/src/renderer/quick-setup/Page.tsx`
+- `apps/desktop/src/renderer/connections/add/Page.tsx`
+- `apps/desktop/src/renderer/connections/dialogs/CredentialStorage.tsx`
+- `apps/desktop/src/renderer/shared/i18n/en.ts`
+- `apps/desktop/src/renderer/shared/i18n/zh.ts`
+- `apps/desktop/src/renderer/shared/i18n/de.ts`
+- `apps/desktop/src/renderer/shared/i18n/es.ts`
+- `apps/desktop/src/renderer/shared/i18n/fr.ts`
+- `apps/desktop/src/renderer/shared/i18n/it.ts`
+- `apps/desktop/src/renderer/shared/i18n/ja.ts`
+- `apps/desktop/src/renderer/shared/i18n/ko.ts`
+- `apps/desktop/src/renderer/shared/i18n/th.ts`
+- `apps/desktop/src/renderer/shared/i18n/vi.ts`
+
+### Verification Commands Run
+
+- `npx vitest run apps/desktop/src/renderer/shared/Platform.test.ts`
+- `npm run typecheck`
+
+### Key Findings
+
+- The credential-storage option now names `Apple Keychain` on macOS and `Windows Credential Manager` on Windows while keeping a generic fallback for unsupported/unknown desktop platforms.
+- The renderer still carries some non-English legacy "this Mac" wording outside the credential-storage path; this round limited the cleanup to the flows directly touched by storage-mode selection and unlock messaging.
+- Windows environment-secret persistence still uses the desktop-local encrypted JSON file path for managed environment variables; this round only changed saved connection credential storage.
+
 ## Follow-up Build: Machine-Level Storage Mode Finalization
 
 ### Tasks Completed
@@ -571,3 +612,30 @@
 ### Key Findings
 
 - The new machine-level mode invariant is exercised directly in desktop tests now; fixtures can no longer rely on implicit `system_secure_storage` fallback.
+
+## Follow-up Build: System-Secure Copy Cleanup
+
+### Tasks Completed
+
+- Removed the remaining non-English desktop reset strings that still described system-secure credentials as `keychain`-managed after the Windows Credential Manager rollout.
+- Kept the platform-specific storage-option naming work intact while making the destructive reset warning platform-neutral across every supported desktop locale touched by that flow.
+
+### Files Changed
+
+- `apps/desktop/src/renderer/shared/i18n/de.ts`
+- `apps/desktop/src/renderer/shared/i18n/es.ts`
+- `apps/desktop/src/renderer/shared/i18n/fr.ts`
+- `apps/desktop/src/renderer/shared/i18n/it.ts`
+- `apps/desktop/src/renderer/shared/i18n/ja.ts`
+- `apps/desktop/src/renderer/shared/i18n/ko.ts`
+- `apps/desktop/src/renderer/shared/i18n/th.ts`
+- `apps/desktop/src/renderer/shared/i18n/vi.ts`
+
+### Verification Commands Run
+
+- `npm run typecheck`
+
+### Key Findings
+
+- The reset confirmation no longer names a macOS-only credential store on Windows or other platforms, even in non-English locales.
+- Several non-English storage-option strings still rely on English fallback keys for the newer platform-specific system-store description; this follow-up only corrected the stale reset wording.

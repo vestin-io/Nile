@@ -9,11 +9,11 @@ import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import {
   BackendCredentialStore,
   type CredentialStore,
+  WindowsCredentialManagerStore,
 } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { ShellEnvironment } from "@nile/host-local";
 
-import { DesktopCredentialStore, readCredentialStorePath } from "../credentials/DesktopCredentialStore";
 import { DesktopSurface } from "../../state/Surface";
 import { DesktopApplicationMenu } from "./DesktopApplicationMenu";
 import { AgentHomesStore } from "../state/AgentHomesStore";
@@ -155,7 +155,6 @@ export class DesktopMain {
       stateReset: new DesktopStateReset({
         localStatePaths: [
           join(dirname(options.databasePath), "credentials"),
-          readCredentialStorePath(options.databasePath),
           readDesktopEnvironmentStorePath(options.databasePath),
         ],
         onBeforeResetLocalState: () => this.clearManagedApiKeyEnvironment(),
@@ -508,5 +507,9 @@ function createDesktopCredentialStore(databasePath: string): CredentialStore {
     return new BackendCredentialStore(databasePath);
   }
 
-  return new BackendCredentialStore(databasePath, new DesktopCredentialStore(databasePath));
+  if (process.platform === "win32") {
+    return new BackendCredentialStore(databasePath, new WindowsCredentialManagerStore());
+  }
+
+  return new BackendCredentialStore(databasePath);
 }

@@ -21,6 +21,29 @@
 
 - `npm run typecheck`
 
+### Windows secure snapshot fallback
+
+- Fixed a Windows-only connection switch/apply regression where mutation-history secure snapshots still defaulted to the macOS keychain helper and failed with `Nile keychain helper was not found`.
+- Added a platform secure-snapshot factory in core so default history/reset paths pick the right backend automatically instead of constructing `new SecureSnapshotStore()` everywhere.
+- Added a Windows secure snapshot implementation backed by Windows Credential Manager and reused chunked secret storage so large sensitive snapshots still fit within WinCred blob limits.
+- Updated the remaining default construction sites to use the platform-aware factory:
+  - mutation history
+  - workspace binding
+  - local state reset
+  - Cursor/Gemini rollback flows
+
+#### Key findings
+
+- The regression was not in `desktop:switch-connection` itself. Desktop already used the correct Windows credential backend for saved connections, but the separate secure-snapshot default still assumed keychain.
+- Fixing only the desktop composition root would have left the same regression in other paths that rely on core defaults, so the platform choice was centralized in core instead.
+- Linux still follows the pre-existing non-Windows secure snapshot path. This change closes the Windows regression only and does not introduce a new Linux secure-storage backend.
+
+### Verification
+
+- `npx vitest run packages/core/src/services/credential/WindowsCredentialManagerStore.test.ts packages/core/src/services/history/WindowsSecureSnapshotStore.test.ts`
+- `npm run typecheck`
+- `npm run build -w @nile/desktop`
+
 ## 2026-05-21
 
 ### Desktop startup status batching
@@ -120,6 +143,39 @@
 
 - `./node_modules/.bin/vitest run packages/agents/codex/src/CodexSessionLogin.test.ts apps/desktop/src/state/Surface.test.ts`
 - `npm run typecheck`
+
+### Codex CLI global npm layout fix
+
+- Fixed Codex CLI discovery for Windows/global npm-style installs where the `codex` launcher lives directly under the Node prefix and the platform vendor package is nested under `node_modules/@openai/codex/node_modules/@openai/codex-win32-*`.
+- Kept the existing "skip obviously broken installs" behavior, but expanded the resolver's acceptable vendor-package layouts instead of treating every non-legacy wrapper as broken.
+- Added targeted Codex login coverage for the nested global package layout and updated the existing tests so they no longer depend on the host machine's real `PATH` contents.
+
+#### Key findings
+
+- The earlier resolver was too strict about install shape, not about command existence: `C:\nvm4w\nodejs\codex` was a valid launcher on this machine, but Nile only knew how to validate the older `bin/` and direct optional-package layouts.
+- Test isolation had to be tightened as part of this fix because Windows developer machines can already have a real global Codex install in `PATH`, which was leaking into "missing CLI" and browser-flow unit cases.
+
+### Verification
+
+- `npx vitest run packages/agents/codex/src/CodexSessionLogin.test.ts`
+- `npm run typecheck`
+
+### Windows Codex launcher follow-up
+
+- Fixed shared runtime command discovery so Windows PATH and NVM lookups prefer spawnable launchers such as `codex.cmd` instead of returning bare extensionless wrapper paths.
+- Fixed `ShellPath.merge()` to use the platform PATH delimiter instead of hardcoding `:`, which was corrupting Windows drive-letter paths during desktop login env construction.
+- Added focused `ShellPath` coverage for Windows-style PATH values and updated Codex login fixtures to model platform-specific launchers explicitly.
+
+#### Key findings
+
+- The earlier global npm-layout fix exposed a second Windows-only failure: once Nile recognized `C:\\nvm4w\\nodejs\\codex`, it still tried to spawn an extensionless wrapper and then built an invalid merged `PATH`, producing `ENOENT` and then `EINVAL` in sequence.
+- This follow-up fixes the shared command/path layer rather than adding more Codex-only exceptions, so other Windows agent login/runtime flows now inherit the same safer behavior.
+
+### Verification
+
+- `npx vitest run packages/core/src/services/ShellPath.test.ts packages/agents/codex/src/CodexSessionLogin.test.ts`
+- `npm run typecheck`
+- `npm run build -w @nile/desktop`
 
 ### Desktop-local CLI command override
 

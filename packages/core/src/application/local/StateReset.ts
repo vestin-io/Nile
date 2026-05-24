@@ -9,7 +9,7 @@ import {
   KeychainCredentialStore,
 } from "../../services/credential";
 import { SqliteDatabase } from "../../services/database";
-import { SecureSnapshotStore } from "../../services/history";
+import { createPlatformSecureSnapshotStore, SecureSnapshotStore } from "../../services/history";
 import { AGENT_MODULE_REGISTRY } from "../../models/agent/module/Registry";
 
 export type ResetStateResult = {
@@ -32,7 +32,7 @@ type ResetAccessCredentialRow = {
 export class StateReset {
   constructor(
     private readonly credentialStore: CredentialStore = new KeychainCredentialStore(),
-    private readonly secureSnapshotStore: SecureSnapshotStore = new SecureSnapshotStore(),
+    private readonly secureSnapshotStore: SecureSnapshotStore = createPlatformSecureSnapshotStore(),
   ) {}
 
   reset(databasePath: string): ResetStateResult {

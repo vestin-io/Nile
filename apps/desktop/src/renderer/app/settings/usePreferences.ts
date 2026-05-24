@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 
 import { createTranslator, type Translator } from "../../shared/I18n";
+import { readDocumentPlatform } from "../../shared/Platform";
 import { DesktopPreferencesStore, type DesktopPreferences } from "../../settings/Preferences";
 
 type DesktopPreferencesState = {
@@ -17,7 +18,7 @@ export function useDesktopPreferences(): DesktopPreferencesState {
   const [preferences, setPreferences] = useState<DesktopPreferences>(() => preferencesStore.load());
 
   useEffect(() => {
-    document.documentElement.dataset.platform = navigator.userAgent.includes("Mac") ? "mac" : "other";
+    document.documentElement.dataset.platform = readDocumentPlatform();
   }, []);
 
   useEffect(() => {
