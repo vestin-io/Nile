@@ -7,6 +7,8 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { DesktopSecretFileStore } from "../storage/DesktopSecretFileStore";
+
 type GenericPasswordReadResult = {
   exitCode: number;
   stdout: string;
@@ -16,19 +18,30 @@ type GenericPasswordReadResult = {
 
 export class DesktopEnvironmentStore {
   private readonly cache = new Map<string, string | null>();
+  private readonly fileStore: DesktopSecretFileStore | null;
 
   constructor(
+    databasePath?: string,
     private readonly serviceName: string = "nile.switcher.environment",
     private readonly writer: Pick<GenericPasswordWriter, "write" | "read" | "remove"> = new GenericPasswordWriter(
       undefined,
       () => readDesktopKeychainHelperPath(),
     ),
-  ) {}
+  ) {
+    this.fileStore = process.platform === "darwin" || !databasePath
+      ? null
+      : new DesktopSecretFileStore(readDesktopEnvironmentStorePath(databasePath));
+  }
 
   read(envKey: string): string | null {
     const normalizedEnvKey = this.normalizeEnvKey(envKey);
     if (this.cache.has(normalizedEnvKey)) {
       return this.cache.get(normalizedEnvKey) ?? null;
+    }
+    if (this.fileStore) {
+      const value = this.fileStore.read(normalizedEnvKey);
+      this.cache.set(normalizedEnvKey, value);
+      return value;
     }
 
     const result = this.writer.read({
@@ -54,6 +67,11 @@ export class DesktopEnvironmentStore {
     if (!normalizedValue) {
       throw new CredentialStoreValidationError("Environment value is required");
     }
+    if (this.fileStore) {
+      this.fileStore.write(normalizedEnvKey, normalizedValue);
+      this.cache.set(normalizedEnvKey, normalizedValue);
+      return;
+    }
 
     const result = this.writer.write({
       account: normalizedEnvKey,
@@ -69,6 +87,11 @@ export class DesktopEnvironmentStore {
 
   remove(envKey: string): void {
     const normalizedEnvKey = this.normalizeEnvKey(envKey);
+    if (this.fileStore) {
+      this.fileStore.remove(normalizedEnvKey);
+      this.cache.delete(normalizedEnvKey);
+      return;
+    }
     const result = this.writer.remove({
       account: normalizedEnvKey,
       service: this.serviceName,
@@ -152,4 +175,9 @@ export function readDesktopHelperPathCandidates(currentDir: string): string[] {
 
 function readUnpackedAsarPath(path: string): string {
   return path.includes("app.asar") ? path.replaceAll("app.asar", "app.asar.unpacked") : path;
+}
+
+function readDesktopEnvironmentStorePath(databasePath: string): string {
+  const databaseDir = dirname(databasePath);
+  return join(databaseDir, "desktop-environment.json");
 }

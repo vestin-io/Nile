@@ -13,6 +13,7 @@ import {
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { ShellEnvironment } from "@nile/host-local";
 
+import { DesktopCredentialStore } from "../credentials/DesktopCredentialStore";
 import { DesktopSurface } from "../../state/Surface";
 import { DesktopApplicationMenu } from "./DesktopApplicationMenu";
 import { AgentHomesStore } from "../state/AgentHomesStore";
@@ -96,8 +97,8 @@ export class DesktopMain {
 
   constructor(private readonly options: DesktopMainOptions) {
     this.logger = NileLogger.createDefault({ module: "desktop-main" });
-    this.credentialStore = options.credentialStore ?? new KeychainCredentialStore();
-    this.environmentStore = new DesktopEnvironmentStore();
+    this.credentialStore = options.credentialStore ?? createDesktopCredentialStore(options.databasePath);
+    this.environmentStore = new DesktopEnvironmentStore(options.databasePath);
     this.shellEnvironment = new DesktopShellEnvironment();
     this.environment = new DesktopEnvironmentSource(
       new ShellEnvironment().readLoginShellEnvironment(),
@@ -259,6 +260,9 @@ export class DesktopMain {
     const initialLanguagePreference = await this.shell.attach();
     if (initialLanguagePreference) {
       this.languageStore.write(initialLanguagePreference);
+    }
+    if (process.platform !== "darwin") {
+      this.shell.showSettings();
     }
     this.syncTrayTitle();
     await this.syncManagedApiKeyEnvironment();
@@ -477,4 +481,12 @@ export class DesktopMain {
       ),
     );
   }
+}
+
+function createDesktopCredentialStore(databasePath: string): CredentialStore {
+  if (process.platform === "darwin") {
+    return new KeychainCredentialStore();
+  }
+
+  return new DesktopCredentialStore(databasePath);
 }

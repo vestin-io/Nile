@@ -8,7 +8,7 @@
     "baseUrl": ".",
     "paths": {
       "@nile/builtins": [
-        "packages/builtins/src/index.ts"
+        "packages\\builtins\\src\\index.ts"
       ],
       "@nile/core": [
         "packages/core/src/index.ts"
@@ -53,235 +53,235 @@
         "packages/core/src/*"
       ],
       "@nile/agent-claude": [
-        "packages/agents/claude/src/index.ts"
+        "packages\\agents\\claude\\src\\index.ts"
       ],
       "@nile/agent-claude/module": [
-        "packages/agents/claude/src/Module.ts"
+        "packages\\agents\\claude\\src\\Module.ts"
       ],
       "@nile/agent-claude/manifest": [
-        "packages/agents/claude/src/Manifest.ts"
+        "packages\\agents\\claude\\src\\Manifest.ts"
       ],
       "@nile/agent-claude/declaration": [
-        "packages/agents/claude/src/Declaration.ts"
+        "packages\\agents\\claude\\src\\Declaration.ts"
       ],
       "@nile/agent-claude/runtime-factory": [
-        "packages/agents/claude/src/RuntimeFactory.ts"
+        "packages\\agents\\claude\\src\\RuntimeFactory.ts"
       ],
       "@nile/agent-claude/current-session-source": [
-        "packages/agents/claude/src/CurrentSessionSource.ts"
+        "packages\\agents\\claude\\src\\CurrentSessionSource.ts"
       ],
       "@nile/agent-claude/login-source": [
-        "packages/agents/claude/src/LoginSource.ts"
+        "packages\\agents\\claude\\src\\LoginSource.ts"
       ],
       "@nile/agent-claude/login-declaration": [
-        "packages/agents/claude/src/LoginDeclaration.ts"
+        "packages\\agents\\claude\\src\\LoginDeclaration.ts"
       ],
       "@nile/agent-claude/model-catalog-source": [
-        "packages/agents/claude/src/ModelCatalogSource.ts"
+        "packages\\agents\\claude\\src\\ModelCatalogSource.ts"
       ],
       "@nile/agent-claude/projection": [
-        "packages/agents/claude/src/Projection.ts"
+        "packages\\agents\\claude\\src\\Projection.ts"
       ],
       "@nile/agent-codex": [
-        "packages/agents/codex/src/index.ts"
+        "packages\\agents\\codex\\src\\index.ts"
       ],
       "@nile/agent-codex/module": [
-        "packages/agents/codex/src/Module.ts"
+        "packages\\agents\\codex\\src\\Module.ts"
       ],
       "@nile/agent-codex/manifest": [
-        "packages/agents/codex/src/Manifest.ts"
+        "packages\\agents\\codex\\src\\Manifest.ts"
       ],
       "@nile/agent-codex/declaration": [
-        "packages/agents/codex/src/Declaration.ts"
+        "packages\\agents\\codex\\src\\Declaration.ts"
       ],
       "@nile/agent-codex/runtime-factory": [
-        "packages/agents/codex/src/RuntimeFactory.ts"
+        "packages\\agents\\codex\\src\\RuntimeFactory.ts"
       ],
       "@nile/agent-codex/current-session-source": [
-        "packages/agents/codex/src/CurrentSessionSource.ts"
+        "packages\\agents\\codex\\src\\CurrentSessionSource.ts"
       ],
       "@nile/agent-codex/login-source": [
-        "packages/agents/codex/src/LoginSource.ts"
+        "packages\\agents\\codex\\src\\LoginSource.ts"
       ],
       "@nile/agent-codex/login-declaration": [
-        "packages/agents/codex/src/LoginDeclaration.ts"
+        "packages\\agents\\codex\\src\\LoginDeclaration.ts"
       ],
       "@nile/agent-codex/projection": [
-        "packages/agents/codex/src/Projection.ts"
+        "packages\\agents\\codex\\src\\Projection.ts"
       ],
       "@nile/agent-cursor": [
-        "packages/agents/cursor/src/index.ts"
+        "packages\\agents\\cursor\\src\\index.ts"
       ],
       "@nile/agent-cursor/module": [
-        "packages/agents/cursor/src/Module.ts"
+        "packages\\agents\\cursor\\src\\Module.ts"
       ],
       "@nile/agent-cursor/manifest": [
-        "packages/agents/cursor/src/Manifest.ts"
+        "packages\\agents\\cursor\\src\\Manifest.ts"
       ],
       "@nile/agent-cursor/declaration": [
-        "packages/agents/cursor/src/Declaration.ts"
+        "packages\\agents\\cursor\\src\\Declaration.ts"
       ],
       "@nile/agent-cursor/runtime-factory": [
-        "packages/agents/cursor/src/RuntimeFactory.ts"
+        "packages\\agents\\cursor\\src\\RuntimeFactory.ts"
       ],
       "@nile/agent-cursor/current-session-source": [
-        "packages/agents/cursor/src/CurrentSessionSource.ts"
+        "packages\\agents\\cursor\\src\\CurrentSessionSource.ts"
       ],
       "@nile/agent-cursor/projection": [
-        "packages/agents/cursor/src/Projection.ts"
+        "packages\\agents\\cursor\\src\\Projection.ts"
       ],
       "@nile/agent-cursor/usage": [
-        "packages/agents/cursor/src/usage/index.ts"
+        "packages\\agents\\cursor\\src\\usage\\index.ts"
       ],
       "@nile/agent-gemini": [
-        "packages/agents/gemini/src/index.ts"
+        "packages\\agents\\gemini\\src\\index.ts"
       ],
       "@nile/agent-gemini/module": [
-        "packages/agents/gemini/src/Module.ts"
+        "packages\\agents\\gemini\\src\\Module.ts"
       ],
       "@nile/agent-gemini/manifest": [
-        "packages/agents/gemini/src/Manifest.ts"
+        "packages\\agents\\gemini\\src\\Manifest.ts"
       ],
       "@nile/agent-gemini/declaration": [
-        "packages/agents/gemini/src/Declaration.ts"
+        "packages\\agents\\gemini\\src\\Declaration.ts"
       ],
       "@nile/agent-gemini/runtime-factory": [
-        "packages/agents/gemini/src/RuntimeFactory.ts"
+        "packages\\agents\\gemini\\src\\RuntimeFactory.ts"
       ],
       "@nile/agent-gemini/current-session-source": [
-        "packages/agents/gemini/src/CurrentSessionSource.ts"
+        "packages\\agents\\gemini\\src\\CurrentSessionSource.ts"
       ],
       "@nile/agent-gemini/login-source": [
-        "packages/agents/gemini/src/LoginSource.ts"
+        "packages\\agents\\gemini\\src\\LoginSource.ts"
       ],
       "@nile/agent-gemini/login-declaration": [
-        "packages/agents/gemini/src/LoginDeclaration.ts"
+        "packages\\agents\\gemini\\src\\LoginDeclaration.ts"
       ],
       "@nile/agent-gemini/projection": [
-        "packages/agents/gemini/src/Projection.ts"
+        "packages\\agents\\gemini\\src\\Projection.ts"
       ],
       "@nile/agent-openclaw": [
-        "packages/agents/openclaw/src/index.ts"
+        "packages\\agents\\openclaw\\src\\index.ts"
       ],
       "@nile/agent-openclaw/module": [
-        "packages/agents/openclaw/src/Module.ts"
+        "packages\\agents\\openclaw\\src\\Module.ts"
       ],
       "@nile/agent-openclaw/manifest": [
-        "packages/agents/openclaw/src/Manifest.ts"
+        "packages\\agents\\openclaw\\src\\Manifest.ts"
       ],
       "@nile/agent-openclaw/declaration": [
-        "packages/agents/openclaw/src/Declaration.ts"
+        "packages\\agents\\openclaw\\src\\Declaration.ts"
       ],
       "@nile/agent-openclaw/runtime-factory": [
-        "packages/agents/openclaw/src/RuntimeFactory.ts"
+        "packages\\agents\\openclaw\\src\\RuntimeFactory.ts"
       ],
       "@nile/agent-openclaw/projection": [
-        "packages/agents/openclaw/src/Projection.ts"
+        "packages\\agents\\openclaw\\src\\Projection.ts"
       ],
       "@nile/connections/labeling": [
-        "packages/connections/src/labeling/index.ts"
+        "packages\\connections\\src\\labeling\\index.ts"
       ],
       "@nile/connections/support": [
-        "packages/connections/src/support/index.ts"
+        "packages\\connections\\src\\support\\index.ts"
       ],
       "@nile/connections/mutations": [
-        "packages/connections/src/mutations/index.ts"
+        "packages\\connections\\src\\mutations\\index.ts"
       ],
       "@nile/connections/setup": [
-        "packages/connections/src/setup/index.ts"
+        "packages\\connections\\src\\setup\\index.ts"
       ],
       "@nile/connections/catalog": [
-        "packages/connections/src/catalog/index.ts"
+        "packages\\connections\\src\\catalog\\index.ts"
       ],
       "@nile/connections/anthropic-api-key": [
-        "packages/connections/src/families/anthropic-api-key/index.ts"
+        "packages\\connections\\src\\families\\anthropic-api-key\\index.ts"
       ],
       "@nile/connections/anthropic-api-key/module": [
-        "packages/connections/src/families/anthropic-api-key/Module.ts"
+        "packages\\connections\\src\\families\\anthropic-api-key\\Module.ts"
       ],
       "@nile/connections/anthropic-api-key/manifest": [
-        "packages/connections/src/families/anthropic-api-key/Manifest.ts"
+        "packages\\connections\\src\\families\\anthropic-api-key\\Manifest.ts"
       ],
       "@nile/connections/claude-session": [
-        "packages/connections/src/families/claude-session/index.ts"
+        "packages\\connections\\src\\families\\claude-session\\index.ts"
       ],
       "@nile/connections/claude-session/module": [
-        "packages/connections/src/families/claude-session/Module.ts"
+        "packages\\connections\\src\\families\\claude-session\\Module.ts"
       ],
       "@nile/connections/claude-session/manifest": [
-        "packages/connections/src/families/claude-session/Manifest.ts"
+        "packages\\connections\\src\\families\\claude-session\\Manifest.ts"
       ],
       "@nile/connections/cursor-api-key": [
-        "packages/connections/src/families/cursor-api-key/index.ts"
+        "packages\\connections\\src\\families\\cursor-api-key\\index.ts"
       ],
       "@nile/connections/cursor-api-key/module": [
-        "packages/connections/src/families/cursor-api-key/Module.ts"
+        "packages\\connections\\src\\families\\cursor-api-key\\Module.ts"
       ],
       "@nile/connections/cursor-api-key/manifest": [
-        "packages/connections/src/families/cursor-api-key/Manifest.ts"
+        "packages\\connections\\src\\families\\cursor-api-key\\Manifest.ts"
       ],
       "@nile/connections/cursor-session": [
-        "packages/connections/src/families/cursor-session/index.ts"
+        "packages\\connections\\src\\families\\cursor-session\\index.ts"
       ],
       "@nile/connections/cursor-session/module": [
-        "packages/connections/src/families/cursor-session/Module.ts"
+        "packages\\connections\\src\\families\\cursor-session\\Module.ts"
       ],
       "@nile/connections/cursor-session/manifest": [
-        "packages/connections/src/families/cursor-session/Manifest.ts"
+        "packages\\connections\\src\\families\\cursor-session\\Manifest.ts"
       ],
       "@nile/connections/gemini-cli-session": [
-        "packages/connections/src/families/gemini-cli-session/index.ts"
+        "packages\\connections\\src\\families\\gemini-cli-session\\index.ts"
       ],
       "@nile/connections/gemini-cli-session/module": [
-        "packages/connections/src/families/gemini-cli-session/Module.ts"
+        "packages\\connections\\src\\families\\gemini-cli-session\\Module.ts"
       ],
       "@nile/connections/gemini-cli-session/manifest": [
-        "packages/connections/src/families/gemini-cli-session/Manifest.ts"
+        "packages\\connections\\src\\families\\gemini-cli-session\\Manifest.ts"
       ],
       "@nile/connections/openai-api-key": [
-        "packages/connections/src/families/openai-api-key/index.ts"
+        "packages\\connections\\src\\families\\openai-api-key\\index.ts"
       ],
       "@nile/connections/openai-api-key/module": [
-        "packages/connections/src/families/openai-api-key/Module.ts"
+        "packages\\connections\\src\\families\\openai-api-key\\Module.ts"
       ],
       "@nile/connections/openai-api-key/manifest": [
-        "packages/connections/src/families/openai-api-key/Manifest.ts"
+        "packages\\connections\\src\\families\\openai-api-key\\Manifest.ts"
       ],
       "@nile/connections/openai-session": [
-        "packages/connections/src/families/openai-session/index.ts"
+        "packages\\connections\\src\\families\\openai-session\\index.ts"
       ],
       "@nile/connections/openai-session/module": [
-        "packages/connections/src/families/openai-session/Module.ts"
+        "packages\\connections\\src\\families\\openai-session\\Module.ts"
       ],
       "@nile/connections/openai-session/manifest": [
-        "packages/connections/src/families/openai-session/Manifest.ts"
+        "packages\\connections\\src\\families\\openai-session\\Manifest.ts"
       ],
       "@nile/connections/openclaw-openai-session": [
-        "packages/connections/src/families/openclaw-openai-session/index.ts"
+        "packages\\connections\\src\\families\\openclaw-openai-session\\index.ts"
       ],
       "@nile/connections/openclaw-openai-session/module": [
-        "packages/connections/src/families/openclaw-openai-session/Module.ts"
+        "packages\\connections\\src\\families\\openclaw-openai-session\\Module.ts"
       ],
       "@nile/connections/openclaw-openai-session/manifest": [
-        "packages/connections/src/families/openclaw-openai-session/Manifest.ts"
+        "packages\\connections\\src\\families\\openclaw-openai-session\\Manifest.ts"
       ],
       "@nile/builtins/agents": [
-        "packages/builtins/src/agents/index.ts"
+        "packages\\builtins\\src\\agents\\index.ts"
       ],
       "@nile/builtins/connections": [
-        "packages/builtins/src/connections/index.ts"
+        "packages\\builtins\\src\\connections\\index.ts"
       ],
       "@nile/builtins/cursor-usage": [
-        "packages/builtins/src/cursor-usage/index.ts"
+        "packages\\builtins\\src\\cursor-usage\\index.ts"
       ],
       "@nile/builtins/local": [
-        "packages/builtins/src/local/index.ts"
+        "packages\\builtins\\src\\local\\index.ts"
       ],
       "@nile/builtins/runtime": [
-        "packages/builtins/src/runtime/index.ts"
+        "packages\\builtins\\src\\runtime\\index.ts"
       ],
       "@nile/builtins/session": [
-        "packages/builtins/src/session/index.ts"
+        "packages\\builtins\\src\\session\\index.ts"
       ]
     }
   }
