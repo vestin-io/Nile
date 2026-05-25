@@ -1,6 +1,6 @@
 import {
   type CredentialStore,
-  KeychainCredentialStore,
+  createPlatformWorkspaceCredentialStore,
 } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { INTERACTIVE_SESSION_LOGIN_REGISTRY } from "@nile/builtins/session";
@@ -32,7 +32,7 @@ export class NileCli {
 
   constructor(
     options: CliOptions,
-    credentialStore: CredentialStore = options.credentialStore ?? new KeychainCredentialStore(),
+    credentialStore: CredentialStore = options.credentialStore ?? createPlatformWorkspaceCredentialStore(options.databasePath),
   ) {
     this.logger = options.logger ?? NileLogger.createDefault({ module: "cli" });
     const prompt = options.prompt ?? new InteractivePrompt();
@@ -48,7 +48,7 @@ export class NileCli {
       interactiveSessionLoginRegistry,
       this.logger,
     );
-    const resetCommands = new ResetCommands(prompt, this.logger);
+    const resetCommands = new ResetCommands(prompt, this.logger, credentialStore);
     const usageCommands = new UsageCommands(credentialStore, this.logger);
     const connectionPresenter = new ConnectionPresenter();
     const resetPresenter = new ResetPresenter();

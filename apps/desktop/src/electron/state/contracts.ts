@@ -1,29 +1,45 @@
 import type { LanguagePreference } from "../../state/UiPreferences";
 import type { DesktopNotificationHistoryFilterInput } from "../notifications/contracts";
-import type { DesktopStatusEntryDisplayMode, DesktopStatusEntryDisplayState } from "./StatusEntryDisplayStore";
+import type { DesktopPreferences } from "../../state/DesktopPreferences";
+import type { DesktopStatusEntryDisplayMode, DesktopStatusEntryDisplayState } from "../../state/StatusEntryDisplay";
 
-export type DesktopStateBridge = {
+export type DesktopPreferencesBridge = {
+  getDesktopPreferences(): Promise<DesktopPreferences>;
+  migrateDesktopPreferences(raw: string | null): Promise<DesktopPreferences>;
+  setDesktopPreferences(preferences: DesktopPreferences): Promise<DesktopPreferences>;
+  setLanguagePreference(language: LanguagePreference): Promise<LanguagePreference>;
+};
+
+export type DesktopStatusEntryBridge = {
   getStatusEntryState(): Promise<import("../../state/Types").DesktopStatusEntryState>;
   getStatusEntryDisplay(): Promise<DesktopStatusEntryDisplayState>;
+  setStatusEntryDisplayMode(mode: DesktopStatusEntryDisplayMode): Promise<DesktopStatusEntryDisplayState>;
+  toggleStatusEntrySelectedAgent(agentId: import("@nile/core/models/agent").AgentId): Promise<DesktopStatusEntryDisplayState>;
+  refreshStatusEntry(): Promise<void>;
+};
+
+export type DesktopSettingsDataBridge = {
   getSettingsState(): Promise<import("../../state/Types").SettingsState>;
   getSettingsStateSnapshot(): Promise<import("../../state/Types").SettingsState>;
   getHistoryState(): Promise<import("../../state/Types").HistoryState>;
+  refreshSettings(): Promise<void>;
+};
+
+export type DesktopNotificationBridge = {
+  getNotificationsMuted(): Promise<boolean>;
+  hasUnreadNotifications(): Promise<boolean>;
   getNotificationHistory(
     filter?: DesktopNotificationHistoryFilterInput,
   ): Promise<import("../../state/Types").DesktopNotificationHistoryEntry[]>;
   getNotificationHistoryConnections(
     filter?: DesktopNotificationHistoryFilterInput,
   ): Promise<import("../../state/Types").DesktopNotificationHistoryConnection[]>;
-  hasUnreadNotifications(): Promise<boolean>;
   markNotificationHistoryRead(entryIds: string[]): Promise<void>;
   markNotificationHistoryReadByFilter(filter?: DesktopNotificationHistoryFilterInput): Promise<void>;
-  setLanguagePreference(language: LanguagePreference): Promise<LanguagePreference>;
-  setStatusEntryDisplayMode(mode: DesktopStatusEntryDisplayMode): Promise<DesktopStatusEntryDisplayState>;
-  getNotificationsMuted(): Promise<boolean>;
-  getProfileFeatureEnabled(): Promise<boolean>;
   setNotificationsMuted(muted: boolean): Promise<boolean>;
-  toggleStatusEntrySelectedAgent(agentId: import("@nile/core/models/agent").AgentId): Promise<DesktopStatusEntryDisplayState>;
+};
+
+export type DesktopProfileFeatureBridge = {
+  getProfileFeatureEnabled(): Promise<boolean>;
   setProfileFeatureEnabled(enabled: boolean): Promise<boolean>;
-  refreshSettings(): Promise<void>;
-  refreshStatusEntry(): Promise<void>;
 };

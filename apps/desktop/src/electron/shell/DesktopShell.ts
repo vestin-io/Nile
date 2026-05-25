@@ -1,48 +1,45 @@
-import { app, BrowserWindow, dialog, Menu, nativeImage, screen, shell, Tray, type MenuItemConstructorOptions, type OpenDialogOptions } from "electron";
+import { app, Menu, nativeImage, shell, Tray, type MenuItemConstructorOptions } from "electron";
 import { readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { join } from "node:path";
 
-import {
-  parseLanguagePreferenceFromDesktopPreferences,
-  type LanguagePreference,
-} from "../../state/UiPreferences";
-import {
-  parseConnectionQuotaMetricPreferencesFromDesktopPreferences,
-  type ConnectionQuotaMetricPreferences,
-} from "../../state/ConnectionQuotaMetricPreferences";
 import type { DesktopNotificationTarget } from "../notifications/contracts";
 import { readDesktopPlatformCapabilities } from "./PlatformCapabilities";
-import { TrayPopupPlacement } from "./TrayPopupPlacement";
+import { DesktopSettingsWindow } from "./SettingsWindow";
+import { DesktopTrayPopupWindow } from "./TrayPopupWindow";
 
 type DesktopShellOptions = {
   currentDir: string;
   onSettingsClose(): void;
-  onTraySummaryMenuRequested(): Promise<MenuItemConstructorOptions[]>;
   onTrayMenuRequested(): Promise<MenuItemConstructorOptions[]>;
   shouldHideOnClose(): boolean;
 };
 
 export class DesktopShell {
   private static readonly trayIconName = "nileTemplate@2x.png";
-  private static readonly preferencesStorageKey = "nile.desktop.preferences";
-  private static readonly settingsLoadTimeoutMs = 2_000;
-  private static readonly trayPopupWidth = 420;
-  private static readonly trayPopupHeight = 560;
   private tray: Tray | null = null;
-  private settingsWindow: BrowserWindow | null = null;
-  private trayPopupWindow: BrowserWindow | null = null;
-  private pendingNotificationTarget: DesktopNotificationTarget | null = null;
+  private readonly settingsWindow: DesktopSettingsWindow;
+  private readonly trayPopupWindow: DesktopTrayPopupWindow | null;
 
-  constructor(private readonly options: DesktopShellOptions) {}
+  constructor(private readonly options: DesktopShellOptions) {
+    this.settingsWindow = new DesktopSettingsWindow({
+      currentDir: options.currentDir,
+      onSettingsClose: options.onSettingsClose,
+      shouldHideOnClose: options.shouldHideOnClose,
+    });
+    this.trayPopupWindow = readDesktopPlatformCapabilities(process.platform).supportsTrayPopup
+      ? new DesktopTrayPopupWindow({
+          currentDir: options.currentDir,
+          shouldHideOnClose: options.shouldHideOnClose,
+        })
+      : null;
+  }
 
-  async attach(): Promise<LanguagePreference | null> {
-    this.createSettingsWindow();
-    const initialLanguagePreference = await this.readInitialLanguagePreference();
+  async attach(): Promise<void> {
+    const iconPath = this.readRuntimeAppIconPath();
+    this.settingsWindow.attach(iconPath);
+    this.trayPopupWindow?.attach(iconPath);
     this.createTray();
     this.setAppIcon();
-    return initialLanguagePreference;
   }
 
   notifyStateChanged(): void {
@@ -55,6 +52,10 @@ export class DesktopShell {
 
   notifyNotificationHistoryChanged(): void {
     this.sendToRendererWindows("desktop:notification-history-changed");
+  }
+
+  notifyPreferencesChanged(): void {
+    this.sendToRendererWindows("desktop:preferences-changed");
   }
 
   setTrayTitle(title: string): void {
@@ -77,8 +78,7 @@ export class DesktopShell {
 
   showSettings(): void {
     this.hideTrayPopup();
-    this.settingsWindow?.show();
-    this.settingsWindow?.focus();
+    this.settingsWindow.show();
   }
 
   prepareForUpdateInstall(): void {
@@ -87,35 +87,17 @@ export class DesktopShell {
       this.tray = null;
     }
 
-    if (this.settingsWindow && !this.settingsWindow.isDestroyed()) {
-      this.settingsWindow.close();
-    }
-    if (this.trayPopupWindow && !this.trayPopupWindow.isDestroyed()) {
-      this.trayPopupWindow.destroy();
-      this.trayPopupWindow = null;
-    }
+    this.settingsWindow.prepareForUpdateInstall();
+    this.trayPopupWindow?.prepareForUpdateInstall();
   }
 
   showSettingsTarget(target: DesktopNotificationTarget): void {
-    this.showSettings();
-    this.sendNotificationTarget(target);
+    this.hideTrayPopup();
+    this.settingsWindow.showTarget(target);
   }
 
   async chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null> {
-    const options: OpenDialogOptions = {
-      title: "Choose auth.json",
-      buttonLabel: "Use this file",
-      defaultPath: this.resolveDialogPath(defaultPath),
-      filters: [{ name: "JSON files", extensions: ["json"] }],
-      properties: ["openFile"],
-    };
-    const result = this.settingsWindow
-      ? await dialog.showOpenDialog(this.settingsWindow, options)
-      : await dialog.showOpenDialog(options);
-    if (result.canceled) {
-      return null;
-    }
-    return result.filePaths[0] ?? null;
+    return await this.settingsWindow.chooseOpenAiAuthJsonPath(defaultPath);
   }
 
   async openExternalUrl(url: string): Promise<void> {
@@ -134,15 +116,6 @@ export class DesktopShell {
     await shell.openExternal("mailto:info@vestin.io");
   }
 
-  async readConnectionQuotaMetricPreferences(): Promise<ConnectionQuotaMetricPreferences> {
-    try {
-      const raw = await this.readDesktopPreferencesRaw();
-      return parseConnectionQuotaMetricPreferencesFromDesktopPreferences(raw);
-    } catch {
-      return {};
-    }
-  }
-
   readDesktopPackageVersion(): string {
     const packageJsonPath = join(this.options.currentDir, "..", "..", "package.json");
     const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: unknown };
@@ -159,151 +132,25 @@ export class DesktopShell {
     const icon = this.createTrayImage();
     this.tray = new Tray(icon);
     this.tray.setToolTip("Nile");
+    const platformCapabilities = readDesktopPlatformCapabilities(process.platform);
+    if (platformCapabilities.supportsTrayPopup) {
+      const togglePopup = () => {
+        void this.toggleTrayPopup();
+      };
+      this.tray.on("click", togglePopup);
+      this.tray.on("right-click", () => {
+        this.hideTrayPopup();
+        void this.popTrayMenu();
+      });
+      return;
+    }
     this.tray.on("click", () => {
-      if (readDesktopPlatformCapabilities(process.platform).supportsTraySummary) {
-        void this.popTraySummaryMenu();
-        return;
-      }
       void this.popTrayMenu();
     });
     this.tray.on("right-click", () => {
       this.hideTrayPopup();
       void this.popTrayMenu();
     });
-  }
-
-  private createTrayPopupWindow(): void {
-    if (!readDesktopPlatformCapabilities(process.platform).supportsTrayPopup) {
-      return;
-    }
-
-    this.trayPopupWindow = new BrowserWindow({
-      width: DesktopShell.trayPopupWidth,
-      height: DesktopShell.trayPopupHeight,
-      show: false,
-      frame: false,
-      resizable: false,
-      minimizable: false,
-      maximizable: false,
-      fullscreenable: false,
-      skipTaskbar: true,
-      alwaysOnTop: true,
-      backgroundColor: "#ffffff",
-      icon: this.readRuntimeAppIconPath(),
-      webPreferences: {
-        preload: join(this.options.currentDir, "preload.cjs"),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-    const popupUrl = pathToFileURL(join(this.options.currentDir, "..", "renderer", "menubar.html"));
-    this.trayPopupWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    this.trayPopupWindow.on("blur", () => {
-      this.trayPopupWindow?.hide();
-    });
-    this.trayPopupWindow.on("close", (event) => {
-      if (this.options.shouldHideOnClose()) {
-        event.preventDefault();
-        this.trayPopupWindow?.hide();
-      }
-    });
-    this.trayPopupWindow.on("closed", () => {
-      this.trayPopupWindow = null;
-    });
-    void this.trayPopupWindow.loadFile(fileURLToPath(popupUrl));
-  }
-
-  private createSettingsWindow(): void {
-    this.settingsWindow = new BrowserWindow({
-      width: 980,
-      height: 760,
-      show: false,
-      title: "Nile",
-      backgroundColor: "#ffffff",
-      titleBarStyle: process.platform === "darwin" ? "hiddenInset" : undefined,
-      icon: this.readRuntimeAppIconPath(),
-      trafficLightPosition: { x: 18, y: 18 },
-      webPreferences: {
-        preload: join(this.options.currentDir, "preload.cjs"),
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-    const settingsUrl = pathToFileURL(join(this.options.currentDir, "..", "renderer", "settings.html"));
-    this.settingsWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    this.settingsWindow.webContents.on("did-finish-load", () => {
-      if (!this.pendingNotificationTarget) {
-        return;
-      }
-      const pendingTarget = this.pendingNotificationTarget;
-      this.pendingNotificationTarget = null;
-      this.settingsWindow?.webContents.send("desktop:notification-target", pendingTarget);
-    });
-    this.settingsWindow.webContents.on("will-navigate", (event, url) => {
-      const target = new URL(url);
-      if (target.protocol !== settingsUrl.protocol || target.pathname !== settingsUrl.pathname) {
-        event.preventDefault();
-      }
-    });
-    this.settingsWindow.on("close", (event) => {
-      if (!this.options.shouldHideOnClose()) {
-        return;
-      }
-      event.preventDefault();
-      this.options.onSettingsClose();
-      this.settingsWindow?.hide();
-    });
-    this.settingsWindow.on("closed", () => {
-      this.settingsWindow = null;
-    });
-    void this.settingsWindow.loadFile(fileURLToPath(settingsUrl));
-  }
-
-  private async readInitialLanguagePreference(): Promise<LanguagePreference | null> {
-    try {
-      const raw = await this.readDesktopPreferencesRaw();
-      return parseLanguagePreferenceFromDesktopPreferences(typeof raw === "string" ? raw : null);
-    } catch {
-      return null;
-    }
-  }
-
-  private async waitForSettingsWindowLoad(settingsWindow: BrowserWindow): Promise<void> {
-    if (!settingsWindow.webContents.isLoadingMainFrame()) {
-      return;
-    }
-    await new Promise<void>((resolve) => {
-      let settled = false;
-      const settle = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        clearTimeout(timeoutId);
-        settingsWindow.webContents.removeListener("did-finish-load", settle);
-        settingsWindow.webContents.removeListener("did-fail-load", settle);
-        resolve();
-      };
-      const timeoutId = setTimeout(settle, DesktopShell.settingsLoadTimeoutMs);
-      settingsWindow.webContents.once("did-finish-load", settle);
-      settingsWindow.webContents.once("did-fail-load", settle);
-    });
-  }
-
-  private async readDesktopPreferencesRaw(): Promise<string | null> {
-    const settingsWindow = this.readSettingsWindowForSend();
-    if (!settingsWindow) {
-      return null;
-    }
-
-    await this.waitForSettingsWindowLoad(settingsWindow);
-    const raw = await settingsWindow.webContents.executeJavaScript(
-      `window.localStorage.getItem(${JSON.stringify(DesktopShell.preferencesStorageKey)})`,
-      true,
-    );
-    return typeof raw === "string" ? raw : null;
   }
 
   private async popTrayMenu(): Promise<void> {
@@ -314,124 +161,20 @@ export class DesktopShell {
     this.tray.popUpContextMenu(menu);
   }
 
-  private async popTraySummaryMenu(): Promise<void> {
-    if (!this.tray) {
-      return;
-    }
-    const menu = Menu.buildFromTemplate(await this.options.onTraySummaryMenuRequested());
-    this.tray.popUpContextMenu(menu);
-  }
-
   private async toggleTrayPopup(): Promise<void> {
-    const trayPopupWindow = this.readTrayPopupWindowForSend();
-    if (!trayPopupWindow || !this.tray) {
+    if (!this.trayPopupWindow || !this.tray) {
       return;
     }
-    if (trayPopupWindow.isVisible()) {
-      trayPopupWindow.hide();
-      return;
-    }
-    await this.waitForWindowLoad(trayPopupWindow);
-    const trayBounds = this.tray.getBounds();
-    const workArea = screen.getDisplayMatching(trayBounds).workArea;
-    const position = TrayPopupPlacement.readPosition({
-      popupHeight: DesktopShell.trayPopupHeight,
-      popupWidth: DesktopShell.trayPopupWidth,
-      trayBounds,
-      workArea,
-    });
-    trayPopupWindow.setPosition(position.x, position.y, false);
-    trayPopupWindow.show();
-    trayPopupWindow.focus();
-  }
-
-  private sendNotificationTarget(target: DesktopNotificationTarget): void {
-    const settingsWindow = this.readSettingsWindowForSend();
-    if (!settingsWindow) {
-      return;
-    }
-    if (settingsWindow.webContents.isLoadingMainFrame()) {
-      this.pendingNotificationTarget = target;
-      return;
-    }
-    settingsWindow.webContents.send("desktop:notification-target", target);
+    await this.trayPopupWindow.toggle(this.tray);
   }
 
   private sendToRendererWindows(channel: string, payload?: unknown): void {
-    for (const window of [this.readSettingsWindowForSend(), this.readTrayPopupWindowForSend()]) {
-      if (!window) {
-        continue;
-      }
-      if (payload === undefined) {
-        window.webContents.send(channel);
-        continue;
-      }
-      window.webContents.send(channel, payload);
-    }
-  }
-
-  private readSettingsWindowForSend(): BrowserWindow | null {
-    if (!this.settingsWindow) {
-      return null;
-    }
-    if (this.settingsWindow.isDestroyed() || this.settingsWindow.webContents.isDestroyed()) {
-      return null;
-    }
-    return this.settingsWindow;
-  }
-
-  private readTrayPopupWindowForSend(): BrowserWindow | null {
-    if (!this.trayPopupWindow) {
-      return null;
-    }
-    if (this.trayPopupWindow.isDestroyed() || this.trayPopupWindow.webContents.isDestroyed()) {
-      return null;
-    }
-    return this.trayPopupWindow;
+    this.settingsWindow.send(channel, payload);
+    this.trayPopupWindow?.send(channel, payload);
   }
 
   private hideTrayPopup(): void {
-    const trayPopupWindow = this.readTrayPopupWindowForSend();
-    if (!trayPopupWindow || !trayPopupWindow.isVisible()) {
-      return;
-    }
-    trayPopupWindow.hide();
-  }
-
-  private async waitForWindowLoad(window: BrowserWindow): Promise<void> {
-    if (!window.webContents.isLoadingMainFrame()) {
-      return;
-    }
-    await new Promise<void>((resolve) => {
-      let settled = false;
-      const settle = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        clearTimeout(timeoutId);
-        window.webContents.removeListener("did-finish-load", settle);
-        window.webContents.removeListener("did-fail-load", settle);
-        resolve();
-      };
-      const timeoutId = setTimeout(settle, DesktopShell.settingsLoadTimeoutMs);
-      window.webContents.once("did-finish-load", settle);
-      window.webContents.once("did-fail-load", settle);
-    });
-  }
-
-  private resolveDialogPath(path: string | undefined): string | undefined {
-    const trimmed = path?.trim();
-    if (!trimmed) {
-      return undefined;
-    }
-    if (trimmed === "~") {
-      return homedir();
-    }
-    if (trimmed.startsWith("~/")) {
-      return resolve(homedir(), trimmed.slice(2));
-    }
-    return trimmed;
+    this.trayPopupWindow?.hide();
   }
 
   private createTrayImage() {

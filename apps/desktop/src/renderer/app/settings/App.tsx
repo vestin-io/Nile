@@ -200,7 +200,7 @@ export function SettingsApp() {
   }, [updatePromptKey]);
 
   useEffect(() => {
-    void window.nileDesktop.state.refreshStatusEntry().catch(() => undefined);
+    void window.nileDesktop.statusEntry.refreshStatusEntry().catch(() => undefined);
   }, [preferences.language, preferences.theme]);
 
   if (isLoading && (!settingsState || !historyState)) {

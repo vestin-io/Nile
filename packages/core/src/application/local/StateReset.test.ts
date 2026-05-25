@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { EncryptedLocalCredentialStore } from "../../services/credential";
 import type { StoredCredential } from "../../services/credential";
 import type { CredentialStore } from "../../services/credential";
 import { CredentialStoreCommandError } from "../../services/credential";
@@ -124,6 +125,56 @@ describe("StateReset", () => {
       "access:openai-work",
       "usage:cursor:cursor-work",
     ]);
+  });
+
+  it("uses the workspace backend store by default so encrypted local credentials are removed", () => {
+    const root = mkdtempSync(join(tmpdir(), "nile-state-reset-encrypted-local-"));
+    tempDirs.push(root);
+    const databasePath = join(root, "switcher.sqlite");
+    const historyPath = join(root, "history");
+    const encryptedLocalStore = new EncryptedLocalCredentialStore(
+      join(root, "credentials", "encrypted-local.v1.json"),
+    );
+
+    encryptedLocalStore.unlock("passphrase-123");
+    encryptedLocalStore.create(
+      { reference: "access:gateway-team", backend: "encrypted_local_storage" },
+      { kind: "api_key", apiKey: "gateway-secret" },
+    );
+    encryptedLocalStore.clearUnlockedKey();
+
+    mkdirSync(dirname(databasePath), { recursive: true });
+    mkdirSync(join(historyPath, "mutation-1"), { recursive: true });
+    writeFileSync(join(historyPath, "mutation-1", "before.json"), "{}");
+
+    const database = SqliteDatabase.open(databasePath);
+    try {
+      database.exec(
+        "CREATE TABLE accesses (credential_source_ref TEXT NOT NULL, credential_storage_backend TEXT);",
+      );
+      database.exec("CREATE TABLE cursor_usage_bindings (credential_source_ref TEXT NOT NULL);");
+      database.exec(
+        "CREATE TABLE mutation_history_files (before_snapshot_kind TEXT NOT NULL, before_snapshot_ref TEXT NOT NULL);",
+      );
+      database.run(
+        "INSERT INTO accesses (credential_source_ref, credential_storage_backend) VALUES (?, ?)",
+        "access:gateway-team",
+        "encrypted_local_storage",
+      );
+    } finally {
+      database.close();
+    }
+
+    const result = new StateReset().reset(databasePath);
+
+    expect(result).toEqual({
+      databasePath,
+      historyPath,
+      credentialsRemoved: true,
+      databaseRemoved: true,
+      historyRemoved: true,
+    });
+    expect(existsSync(join(root, "credentials", "encrypted-local.v1.json"))).toBe(false);
   });
 });
 

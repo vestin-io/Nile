@@ -50,9 +50,13 @@ describe("WindowsCredentialManagerStore", () => {
 
     store.create("openai-work", credential);
 
-    expect(writer.readStoredSecret("nile.test", "openai-work")).toContain("__nile_windows_chunks_v1__:");
-    expect(writer.readStoredSecret("nile.test", "openai-work::chunk:0")).toBeDefined();
-    expect(writer.readStoredSecret("nile.test", "openai-work::chunk:1")).toBeDefined();
+    const manifestRaw = writer.readStoredSecret("nile.test", "openai-work");
+    expect(manifestRaw).toContain("__nile_windows_chunks_v1__:");
+    const manifest = JSON.parse(manifestRaw!.replace("__nile_windows_chunks_v1__:", "")) as {
+      chunkAccounts: string[];
+    };
+    expect(manifest.chunkAccounts).toHaveLength(2);
+    expect(manifest.chunkAccounts.every((account) => writer.readStoredSecret("nile.test", account) !== undefined)).toBe(true);
 
     const reloaded = new WindowsCredentialManagerStore("nile.test", undefined, undefined, writer);
     expect(reloaded.get("openai-work")).toEqual(credential);
@@ -70,6 +74,28 @@ describe("WindowsCredentialManagerStore", () => {
     );
     expect(writer.readStoredSecret("nile.test", "openai-work::chunk:0")).toBeUndefined();
     expect(writer.readStoredSecret("nile.test", "openai-work::chunk:1")).toBeUndefined();
+  });
+
+  it("preserves the previous oversized credential when a later chunked update fails", () => {
+    const writer = new StubWindowsCredentialWriter();
+    const store = new WindowsCredentialManagerStore("nile.test", undefined, undefined, writer);
+
+    store.create("openai-work", { kind: "api_key", apiKey: "x".repeat(2_000) });
+    const originalManifest = writer.readStoredSecret("nile.test", "openai-work");
+    const originalChunkKeys = writer.listStoredSecretAccounts("nile.test")
+      .filter((account) => account.startsWith("openai-work::chunk:"));
+
+    writer.queueWriteResult({ exitCode: 0, stdout: "", stderr: "" });
+    writer.queueWriteResult({ exitCode: 1, stdout: "", stderr: "Win32 1783: Credential payload exceeds the Windows Credential Manager size limit." });
+
+    expect(() => store.update("openai-work", { kind: "api_key", apiKey: "y".repeat(2_000) })).toThrow(
+      CredentialStoreCommandError,
+    );
+
+    expect(writer.readStoredSecret("nile.test", "openai-work")).toBe(originalManifest);
+    expect(writer.listStoredSecretAccounts("nile.test").filter((account) => account.startsWith("openai-work::chunk:")))
+      .toEqual(originalChunkKeys);
+    expect(store.get("openai-work")).toEqual({ kind: "api_key", apiKey: "x".repeat(2_000) });
   });
 
   it("removes chunk entries together with the base credential", () => {
@@ -124,6 +150,14 @@ describe("WindowsCredentialManagerStore", () => {
     const store = new WindowsCredentialManagerStore("nile.test", undefined, undefined, writer);
 
     expect(() => store.get("missing")).toThrow(CredentialNotFoundError);
+  });
+
+  it("maps corrupted chunk manifests as validation failures", () => {
+    const writer = new StubWindowsCredentialWriter();
+    writer.seedCredential("nile.test", "openai-work", "__nile_windows_chunks_v1__:{invalid-json");
+    const store = new WindowsCredentialManagerStore("nile.test", undefined, undefined, writer);
+
+    expect(() => store.get("openai-work")).toThrow(CredentialStoreValidationError);
   });
 
   it("rejects empty credential ids and secrets before calling the writer", () => {
@@ -200,6 +234,9 @@ class StubWindowsCredentialWriter {
     this.calls.push({ type: "write", ...input });
     const scripted = this.writeResults.shift();
     if (scripted) {
+      if (scripted.exitCode === 0) {
+        this.storedSecrets.set(readStoredSecretKey(input.service, input.account), input.secret);
+      }
       return scripted;
     }
 
@@ -248,6 +285,14 @@ class StubWindowsCredentialWriter {
 
   readStoredSecret(service: string, account: string): string | undefined {
     return this.storedSecrets.get(readStoredSecretKey(service, account));
+  }
+
+  listStoredSecretAccounts(service: string): string[] {
+    const prefix = `${service}/`;
+    return [...this.storedSecrets.keys()]
+      .filter((key) => key.startsWith(prefix))
+      .map((key) => key.slice(prefix.length))
+      .sort();
   }
 
   queueReadResult(result: SecurityCliResult): void {

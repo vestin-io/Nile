@@ -27,18 +27,18 @@ describe("DesktopStatusEntryDisplayStore", () => {
     });
   });
 
-  it("stores ticker mode and selected agents", () => {
+  it("stores summary mode and selected agents", () => {
     const { databasePath } = createStorePaths();
     const store = new DesktopStatusEntryDisplayStore(databasePath);
 
-    expect(store.writeMode("ticker")).toEqual({
+    expect(store.writeMode("summary")).toEqual({
       hasConfiguredSelectedAgents: false,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: [],
     });
     expect(store.writeSelectedAgentIds(["cursor", "codex", "cursor"])).toEqual({
       hasConfiguredSelectedAgents: true,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: ["codex", "cursor"],
     });
 
@@ -58,20 +58,20 @@ describe("DesktopStatusEntryDisplayStore", () => {
     const { databasePath } = createStorePaths();
     const store = new DesktopStatusEntryDisplayStore(databasePath);
 
-    store.writeMode("ticker");
+    store.writeMode("summary");
     expect(store.writeSelectedAgentIds(["codex"])).toEqual({
       hasConfiguredSelectedAgents: true,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: ["codex"],
     });
     expect(store.writeSelectedAgentIds(["cursor", "codex"])).toEqual({
       hasConfiguredSelectedAgents: true,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: ["codex", "cursor"],
     });
     expect(store.writeSelectedAgentIds(["cursor"])).toEqual({
       hasConfiguredSelectedAgents: true,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: ["cursor"],
     });
   });
@@ -79,7 +79,7 @@ describe("DesktopStatusEntryDisplayStore", () => {
   it("keeps configured selected agents when restoring the default app entry mode", () => {
     const { databasePath } = createStorePaths();
     const store = new DesktopStatusEntryDisplayStore(databasePath);
-    store.writeMode("ticker");
+    store.writeMode("summary");
     store.writeSelectedAgentIds(["codex"]);
 
     expect(store.writeMode("app_entry")).toEqual({

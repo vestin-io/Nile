@@ -29,8 +29,8 @@ export function useDesktopData() {
 
     try {
       const settingsStatePromise = options?.usage === "snapshot"
-        ? window.nileDesktop.state.getSettingsStateSnapshot()
-        : window.nileDesktop.state.getSettingsState();
+        ? window.nileDesktop.settingsData.getSettingsStateSnapshot()
+        : window.nileDesktop.settingsData.getSettingsState();
       if (options?.usage === "snapshot") {
         const nextSettingsState = await settingsStatePromise;
         if (!isMountedRef.current || requestId !== requestIdRef.current) {
@@ -40,7 +40,7 @@ export function useDesktopData() {
         setError(null);
         setIsLoading(false);
         const [nextHistoryState, nextDefinitions] = await Promise.all([
-          window.nileDesktop.state.getHistoryState(),
+          window.nileDesktop.settingsData.getHistoryState(),
           window.nileDesktop.connections.listConnectionDefinitions(),
         ]);
         if (!isMountedRef.current || requestId !== requestIdRef.current) {
@@ -53,7 +53,7 @@ export function useDesktopData() {
 
       const [nextSettingsState, nextHistoryState, nextDefinitions] = await Promise.all([
         settingsStatePromise,
-        window.nileDesktop.state.getHistoryState(),
+        window.nileDesktop.settingsData.getHistoryState(),
         window.nileDesktop.connections.listConnectionDefinitions(),
       ]);
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
@@ -79,7 +79,7 @@ export function useDesktopData() {
 
   const refresh = useCallback(async () => {
     try {
-      await window.nileDesktop.state.refreshSettings();
+      await window.nileDesktop.settingsData.refreshSettings();
     } catch (error) {
       if (isMountedRef.current) {
         setError(describeDesktopDataError(error));

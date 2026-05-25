@@ -25,8 +25,8 @@ export function useNotificationHistory(enabled: boolean, filter?: DesktopNotific
 
     try {
       const [nextEntries, nextConnectionTargets] = await Promise.all([
-        window.nileDesktop.state.getNotificationHistory(filter),
-        window.nileDesktop.state.getNotificationHistoryConnections({
+        window.nileDesktop.notifications.getNotificationHistory(filter),
+        window.nileDesktop.notifications.getNotificationHistoryConnections({
           kind: filter?.kind,
         }),
       ]);
@@ -68,7 +68,7 @@ export function useNotificationHistory(enabled: boolean, filter?: DesktopNotific
       }
       setIsMarkingRead(true);
       try {
-        await window.nileDesktop.state.markNotificationHistoryRead(entryIds);
+        await window.nileDesktop.notifications.markNotificationHistoryRead(entryIds);
       } finally {
         setIsMarkingRead(false);
       }
@@ -76,7 +76,7 @@ export function useNotificationHistory(enabled: boolean, filter?: DesktopNotific
     markReadByFilter: async (nextFilter?: DesktopNotificationHistoryFilterInput) => {
       setIsMarkingRead(true);
       try {
-        await window.nileDesktop.state.markNotificationHistoryReadByFilter(nextFilter);
+        await window.nileDesktop.notifications.markNotificationHistoryReadByFilter(nextFilter);
       } finally {
         setIsMarkingRead(false);
       }

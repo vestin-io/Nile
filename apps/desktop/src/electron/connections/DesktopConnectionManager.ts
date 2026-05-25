@@ -1,7 +1,4 @@
-import {
-  type LocalCredentialRequest,
-  LocalCredentialRequestBuilder,
-} from "@nile/builtins/local";
+import { type LocalCredentialRequest } from "@nile/builtins/local";
 import type { ConnectionPresetFamily } from "@nile/core/models/connection";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { ConnectionModelCatalogResult, CreateConnectionResult } from "@nile/core/models/connection";
@@ -16,9 +13,7 @@ import {
 } from "@nile/builtins/session";
 import {
   type CredentialStorageBackend,
-  isEnvKeyApiKeyCredential,
   SystemSecureCredentialStoreDeniedError,
-  type StoredCredential,
   type CredentialStore,
 } from "@nile/core/services/credential";
 import { isAgentId, type AgentHomes, type AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
@@ -39,6 +34,8 @@ import {
   type DesktopUpdateConnectionInput,
 } from "./contracts";
 import { CursorUsageSessionProbeFactory } from "./CursorUsageSessionProbeFactory";
+import { DesktopCredentialStorageSession } from "./CredentialStorageSession";
+import { DesktopConnectionInputBuilder } from "./InputBuilder";
 import { DesktopConnectionModelCatalog } from "./ModelCatalog";
 import { DesktopPreparedDraftStore } from "./DesktopPreparedDraftStore";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
@@ -53,11 +50,7 @@ type DesktopConnectionManagerOptions = {
   openExternalUrl?: (url: string) => Promise<void>;
   managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
   credentialStore: CredentialStore;
-  credentialStorageSession?: {
-    hasEncryptedLocalVault(): boolean;
-    isEncryptedLocalUnlocked(): boolean;
-    unlockEncryptedLocalStorage(passphrase: string): void;
-  };
+  credentialStorageSession?: DesktopCredentialStorageSession;
   maxPreparedDrafts?: number;
   preparedDraftTtlMs?: number;
 };
@@ -70,7 +63,7 @@ export class DesktopConnectionManager {
   private readonly cursorUsageSessionProbeFactory = new CursorUsageSessionProbeFactory();
   private readonly sessions: SessionRunner;
   private readonly labeler = new ConnectionLabeler();
-  private readonly requestBuilder = new LocalCredentialRequestBuilder();
+  private readonly inputs = new DesktopConnectionInputBuilder();
   private readonly preparedDrafts: DesktopPreparedDraftStore;
   private readonly modelCatalog = new DesktopConnectionModelCatalog();
   private readonly managedApiKeyEnvironment: ManagedApiKeyEnvironment | NoopManagedApiKeyEnvironment;
@@ -107,7 +100,7 @@ export class DesktopConnectionManager {
         });
         const created = this.applyCursorUsageFollowUp(
           await session.createLocalConnection(
-            this.buildLocalConnectionInput(input, credentialStorageBackend),
+            this.inputs.buildLocalConnectionInput(input, credentialStorageBackend),
             this.localCredentialResolver,
           ),
         );
@@ -120,12 +113,14 @@ export class DesktopConnectionManager {
   }
 
   async updateConnection(input: DesktopUpdateConnectionInput): Promise<DesktopConnectionSummary> {
+    let credentialStorageBackend: CredentialStorageBackend | undefined;
     try {
       return await this.sessions.runAsync(async (session) => {
         const existing = session.listSavedConnections().find((connection) => connection.id === input.connectionId);
         if (!existing) {
           throw new Error(`Connection not found: ${input.connectionId}`);
         }
+        credentialStorageBackend = existing.credentialStorageBackend;
         const updated = await session.updateConnection({
           connectionId: input.connectionId,
           label: input.label?.trim() || undefined,
@@ -145,14 +140,14 @@ export class DesktopConnectionManager {
         return this.buildConnectionSummary(ensured ?? updated);
       });
     } catch (error) {
-      throw this.mapCredentialStorageError(error, "system_secure_storage");
+      throw this.mapCredentialStorageError(error, credentialStorageBackend);
     }
   }
 
   async describeConnectionOnboarding(input: DesktopAddConnectionInput) {
       return await this.sessions.runAsync(async (session) =>
         await session.describeLocalConnectionOnboarding(
-          this.buildLocalConnectionInput(
+          this.inputs.buildLocalConnectionInput(
             input,
             resolveDesktopCredentialStorageMode(session, input.credentialStorageBackend),
         ),
@@ -188,7 +183,7 @@ export class DesktopConnectionManager {
         authMode: existing.authMode,
         credential,
         credentialStorageBackend: existing.credentialStorageBackend ?? "system_secure_storage",
-        probeCredential: this.resolveProbeCredential(credentialRequest, credential, this.localCredentialResolver),
+        probeCredential: this.inputs.resolveProbeCredential(credentialRequest, credential, this.localCredentialResolver),
         endpointUrl: input.endpointUrl?.trim() || existing.endpointUrl || undefined,
       });
     });
@@ -293,48 +288,18 @@ export class DesktopConnectionManager {
   }
 
   getCredentialStorageState() {
-    return {
-      encryptedLocalVaultExists: this.options.credentialStorageSession?.hasEncryptedLocalVault() ?? false,
-      encryptedLocalUnlocked: this.options.credentialStorageSession?.isEncryptedLocalUnlocked() ?? false,
+    return this.options.credentialStorageSession?.readState() ?? {
+      encryptedLocalVaultExists: false,
+      encryptedLocalUnlocked: false,
     };
   }
 
   unlockEncryptedLocalStorage(passphrase: string): void {
-    if (!this.options.credentialStorageSession) {
-      throw new Error("Encrypted local storage is not available in this desktop session.");
-    }
-    this.options.credentialStorageSession.unlockEncryptedLocalStorage(passphrase);
+    this.requireCredentialStorageSession().unlockEncryptedLocalStorage(passphrase);
   }
 
   private resolveCredentialRequest(input: DesktopAddConnectionInput): LocalCredentialRequest {
-    return this.requestBuilder.build({
-      authMode: input.authMode,
-      apiKeySource: input.apiKeySource,
-      apiKey: input.apiKey,
-      envKey: input.envKey,
-      sessionSource: input.sessionSource,
-      sessionAuthJsonPath: input.sessionAuthJsonPath,
-    });
-  }
-
-  private buildLocalConnectionInput(
-    input: DesktopAddConnectionInput,
-    credentialStorageBackend: CredentialStorageBackend,
-  ) {
-    if (input.authMode === "openclaw_openai_session") {
-      throw new Error("OpenClaw-only OpenAI sessions cannot be created from the add-connection form");
-    }
-
-    return {
-      preset: input.preset,
-      authMode: input.authMode,
-      credentialRequest: this.resolveCredentialRequest(input),
-      credentialStorageBackend,
-      endpointUrl: input.endpointUrl,
-      label: input.label,
-      enabledAgents: input.enabledAgents,
-      allowUndetectedGateway: input.allowUndetectedGateway,
-    };
+    return this.inputs.resolveCredentialRequest(input);
   }
 
   private resolvePresetForSavedConnection(connection: SavedConnectionSummary): ConnectionPresetFamily {
@@ -352,33 +317,7 @@ export class DesktopConnectionManager {
     input: DesktopUpdateConnectionInput,
     authMode: SavedConnectionSummary["authMode"],
   ): LocalCredentialRequest | undefined {
-    return this.requestBuilder.buildUpdate(authMode, {
-      apiKeySource: input.apiKeySource,
-      apiKey: input.apiKey,
-      envKey: input.envKey,
-      sessionSource: input.sessionSource,
-      sessionAuthJsonPath: input.sessionAuthJsonPath,
-    });
-  }
-
-  private resolveProbeCredential(
-    request: LocalCredentialRequest | undefined,
-    credential: StoredCredential,
-    localCredentialResolver: LocalCredentialResolver,
-  ): StoredCredential {
-    if (request?.authMode === "api_key" && request.source === "env_key") {
-      return localCredentialResolver.resolveProbeCredential(request);
-    }
-
-    if (isEnvKeyApiKeyCredential(credential)) {
-      return localCredentialResolver.resolveProbeCredential({
-        authMode: "api_key",
-        source: "env_key",
-        envKey: credential.envKey,
-      });
-    }
-
-    return credential;
+    return this.inputs.resolveUpdateCredentialRequest(input, authMode);
   }
 
   private buildConnectionSummary(
@@ -421,27 +360,7 @@ export class DesktopConnectionManager {
     passphrase: string | undefined,
     options: { allowCreate: boolean },
   ): void {
-    if (backend !== "encrypted_local_storage") {
-      return;
-    }
-    if (!this.options.credentialStorageSession) {
-      throw new Error("Encrypted local storage is not available in this desktop session.");
-    }
-    if (!this.options.credentialStorageSession.hasEncryptedLocalVault()) {
-      if (!passphrase?.trim()) {
-        throw new Error("Encrypted local storage passphrase is required.");
-      }
-      if (!options.allowCreate) {
-        return;
-      }
-    }
-    if (passphrase?.trim()) {
-      this.options.credentialStorageSession.unlockEncryptedLocalStorage(passphrase.trim());
-      return;
-    }
-    if (!this.options.credentialStorageSession.isEncryptedLocalUnlocked()) {
-      throw new Error("Encrypted local storage is locked. Enter your passphrase and try again.");
-    }
+    this.requireCredentialStorageSession().prepareStorage(backend, passphrase, options);
   }
 
   private mapCredentialStorageError(
@@ -456,9 +375,13 @@ export class DesktopConnectionManager {
       )
     ) {
       return new Error(
-        "System secure storage was denied by macOS. Choose Encrypted local storage to continue without Keychain.",
+        "System secure storage was denied by the operating system. Choose Encrypted local storage to continue without system secure storage.",
       );
     }
     return error instanceof Error ? error : new Error(String(error));
+  }
+
+  private requireCredentialStorageSession(): DesktopCredentialStorageSession {
+    return this.options.credentialStorageSession ?? new DesktopCredentialStorageSession(null);
   }
 }

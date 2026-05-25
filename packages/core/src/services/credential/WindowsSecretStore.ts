@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NileLogger } from "../../services/NileLogger";
 import { WINDOWS_CREDENTIAL_BLOB_LIMIT_BYTES, WindowsCredentialWriter } from "./WindowsCredentialWriter";
 
@@ -47,6 +48,11 @@ type StoredSecretDescriptor =
     kind: "chunked";
     chunkAccounts: string[];
   };
+
+type StoredSecretManifest = {
+  chunkCount?: unknown;
+  chunkAccounts?: unknown;
+};
 
 export class WindowsSecretStore {
   constructor(
@@ -135,21 +141,24 @@ export class WindowsSecretStore {
       };
     }
 
-    const manifest = JSON.parse(baseSecret.slice(WINDOWS_SECRET_CHUNK_PREFIX.length)) as {
-      chunkCount?: unknown;
-    };
-    const { chunkCount } = manifest;
-    const normalizedChunkCount = Number(chunkCount);
-    if (!Number.isInteger(normalizedChunkCount) || normalizedChunkCount < 1) {
+    const manifest = this.readStoredSecretManifest(baseSecret);
+    const chunkAccounts = this.readChunkAccounts(account, manifest);
+    if (chunkAccounts.length === 0) {
       throw new WindowsSecretValidationError("Stored Windows secret manifest is invalid");
     }
 
     return {
       kind: "chunked",
-      chunkAccounts: Array.from({ length: normalizedChunkCount }, (_, index) =>
-        this.readChunkAccountName(account, index),
-      ),
+      chunkAccounts,
     };
+  }
+
+  private readStoredSecretManifest(baseSecret: string): StoredSecretManifest {
+    try {
+      return JSON.parse(baseSecret.slice(WINDOWS_SECRET_CHUNK_PREFIX.length)) as StoredSecretManifest;
+    } catch {
+      throw new WindowsSecretValidationError("Stored Windows secret manifest is invalid JSON");
+    }
   }
 
   private writeSecret(account: string, secret: string): StoredSecretDescriptor {
@@ -162,8 +171,9 @@ export class WindowsSecretStore {
       };
     }
 
-    const chunkAccounts = chunks.map((_, index) => this.readChunkAccountName(account, index));
-    const manifest = `${WINDOWS_SECRET_CHUNK_PREFIX}${JSON.stringify({ chunkCount: chunkAccounts.length })}`;
+    const writeId = randomUUID();
+    const chunkAccounts = chunks.map((_, index) => this.readChunkAccountName(account, writeId, index));
+    const manifest = `${WINDOWS_SECRET_CHUNK_PREFIX}${JSON.stringify({ chunkAccounts })}`;
     const writtenChunkAccounts: string[] = [];
     try {
       for (let index = 0; index < chunks.length; index += 1) {
@@ -226,8 +236,26 @@ export class WindowsSecretStore {
     return chunks;
   }
 
-  private readChunkAccountName(account: string, index: number): string {
+  private readChunkAccounts(account: string, manifest: StoredSecretManifest): string[] {
+    if (Array.isArray(manifest.chunkAccounts)) {
+      const chunkAccounts = manifest.chunkAccounts
+        .filter((chunkAccount): chunkAccount is string => typeof chunkAccount === "string" && chunkAccount.trim().length > 0);
+      return chunkAccounts;
+    }
+
+    const normalizedChunkCount = Number(manifest.chunkCount);
+    if (!Number.isInteger(normalizedChunkCount) || normalizedChunkCount < 1) {
+      return [];
+    }
+    return Array.from({ length: normalizedChunkCount }, (_, index) => this.readLegacyChunkAccountName(account, index));
+  }
+
+  private readLegacyChunkAccountName(account: string, index: number): string {
     return `${account}::chunk:${index}`;
+  }
+
+  private readChunkAccountName(account: string, writeId: string, index: number): string {
+    return `${account}::chunk:${writeId}:${index}`;
   }
 
   private readEntry(account: string, includeSecret: boolean): string {

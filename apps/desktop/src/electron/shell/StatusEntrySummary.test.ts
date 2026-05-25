@@ -10,11 +10,11 @@ describe("DesktopStatusEntrySummary", () => {
       createState(),
       {
         hasConfiguredSelectedAgents: true,
-        mode: "ticker",
+        mode: "summary",
         selectedAgentIds: ["codex", "cursor", "claude"],
       },
       {},
-    )).toBe("Nile · Codex 72% · Cursor 6%");
+    )).toBe("Nile | Codex 72% | Cursor 6%");
   });
 
   it("falls back to the app name when no summary is available", () => {

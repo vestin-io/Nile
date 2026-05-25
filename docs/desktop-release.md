@@ -1,10 +1,10 @@
 # Desktop Release
 
-This project currently has a macOS desktop release pipeline.
+This project currently has a cross-platform desktop release pipeline for macOS and Windows.
 
 ## Release Files
 
-- `.github/workflows/desktop-release.yml`: GitHub Actions workflow that validates secrets, runs verification, builds the signed desktop app, and uploads artifacts to GitHub Releases.
+- `.github/workflows/desktop-release.yml`: GitHub Actions workflow that validates the release, creates or updates the GitHub Release, builds platform artifacts, and uploads them.
 - `apps/desktop/package.json`: `electron-builder` packaging config and desktop release scripts.
 - `apps/desktop/.env.release.example`: local template for signing and notarization environment variables.
 - `apps/desktop/build/entitlements.mac.plist`: hardened runtime entitlements for the main app.
@@ -20,24 +20,28 @@ Trigger tags:
 
 Flow:
 
-1. Check out the repository on `macos-latest`.
-2. Load signing and notarization secrets from GitHub Actions secrets.
-3. Validate that all required secrets are present.
-4. Derive the release version from the tag.
-5. Require a matching `release-notes/<tag>.md` file.
-6. Run `npm ci`.
-7. Run `npm run typecheck`.
-8. Run `npm test`.
-9. Validate that `apps/desktop/package.json` already matches the tag-derived version.
-10. Run `npm run build:app --prefix apps/desktop` to produce signed desktop artifacts.
-11. Find the generated `dmg` and `zip` files under `apps/desktop/release/`.
-12. Create or update the matching GitHub Release using `release-notes/<tag>.md` as the release body.
-13. Upload the artifacts to that GitHub Release with `gh release upload --clobber`.
+1. Check out the repository on `ubuntu-latest`.
+2. Derive the release version from the tag.
+3. Require a matching `release-notes/<tag>.md` file.
+4. Run `npm ci`.
+5. Run `npm run typecheck`.
+6. Run `npm test`.
+7. Validate that `apps/desktop/package.json` already matches the tag-derived version.
+8. Create or update the matching GitHub Release using `release-notes/<tag>.md` as the release body.
+9. Run the macOS packaging job on `macos-latest`:
+   - validate signing and notarization secrets
+   - run `npm ci`
+   - run `npm run build:app --prefix apps/desktop`
+   - upload the generated `.dmg` and macOS `.zip` assets
+10. Run the Windows packaging job on `windows-latest`:
+   - run `npm ci`
+   - run `npm run build:app:unsigned --prefix apps/desktop`
+   - upload the generated Windows `.exe` installer
 
 Pre-release tags are inferred from semver prerelease suffixes such as `v0.1.0-beta.1`.
 Those releases remain marked as GitHub prereleases, so Nile's in-app auto-update flow only follows stable releases.
 
-Release packaging currently emits separate `arm64` and `x64` macOS artifacts by default instead of one `universal` app. This keeps each downloadable artifact materially smaller and avoids shipping both architectures inside the same bundle.
+Release packaging currently emits separate `arm64` and `x64` macOS artifacts instead of one `universal` app, plus one `x64` Windows NSIS installer. This keeps the macOS downloads smaller and adds native Windows output without introducing a second Windows architecture matrix yet.
 
 ## Release Notes Source of Truth
 
@@ -83,13 +87,13 @@ The workflow will:
 
 1. Require `release-notes/v0.1.0.md`.
 2. Validate that `apps/desktop/package.json` is already `0.1.0`.
-3. Validate secrets.
-4. Run `npm run typecheck`.
-5. Run `npm test`.
-6. Build signed `arm64` and `x64` desktop artifacts.
-7. Submit both artifacts for notarization.
-8. Create or update the matching GitHub Release body from `release-notes/v0.1.0.md`.
-9. Upload the generated `dmg` and `zip` files.
+3. Run `npm run typecheck`.
+4. Run `npm test`.
+5. Create or update the matching GitHub Release body from `release-notes/v0.1.0.md`.
+6. Build signed `arm64` and `x64` macOS artifacts.
+7. Submit both macOS artifacts for notarization.
+8. Build the Windows `x64` installer.
+9. Upload the generated release assets.
 
 Expected uploaded artifacts:
 
@@ -97,6 +101,7 @@ Expected uploaded artifacts:
 - `Nile-<version>-arm64-mac.zip`
 - `Nile-<version>.dmg`
 - `Nile-<version>-mac.zip`
+- `Nile-<version>-win32-x64.exe`
 
 ## Manual Workflow Dispatch
 
@@ -115,6 +120,7 @@ Requirements for the in-app updater to work:
 1. Publish a stable GitHub Release from a `v<semver>` tag.
 2. Keep the repository public.
 3. Upload the signed macOS `.zip` assets alongside the `.dmg` files.
+4. Upload the Windows `.exe` installer for packaged Windows clients.
 
 The updater checks for new releases when the packaged app starts and continues polling in the background on Electron's default interval.
 
@@ -122,9 +128,9 @@ Manual update checks also query `https://update.electronjs.org/<owner>/<repo>/<p
 
 When the user chooses to install a downloaded update, Nile must quit for real before Squirrel can swap the app bundle. On macOS the settings window normally closes to the menu bar tray instead of exiting, so the install path sets an explicit quitting state, destroys the tray icon, and closes the window before calling `autoUpdater.quitAndInstall()`.
 
-## Local Signed Build
+## Local Signed macOS Build
 
-Local signed builds now use the checked-in desktop version from `apps/desktop/package.json`.
+Local signed macOS builds now use the checked-in desktop version from `apps/desktop/package.json`.
 Keep that file in sync with the latest intended desktop release version before packaging if you want the built app to report a real version instead of an older one.
 
 Copy the example env file and load it into the shell:
@@ -136,6 +142,20 @@ source apps/desktop/.env.release
 set +a
 npm run build:app --prefix apps/desktop
 ```
+
+## Local Windows Build
+
+Run the unsigned packaging command from a Windows machine:
+
+```bash
+npm run build:app:unsigned --prefix apps/desktop
+```
+
+Expected output under `apps/desktop/release/`:
+
+- `Nile-<version>-win32-x64.exe`
+
+Windows packaging currently uses the unsigned path and does not require the Apple signing and notarization environment variables from `apps/desktop/.env.release`.
 
 ## Local Unsigned Build
 

@@ -14,7 +14,7 @@ export function useNotificationUnread(enabled: boolean) {
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
     try {
-      const nextHasUnread = await window.nileDesktop.state.hasUnreadNotifications();
+      const nextHasUnread = await window.nileDesktop.notifications.hasUnreadNotifications();
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
         return;
       }

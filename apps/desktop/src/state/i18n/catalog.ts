@@ -1,4 +1,4 @@
-import type { LanguagePreference } from "../../../state/UiPreferences";
+import type { LanguagePreference } from "../UiPreferences";
 
 import { DE_MESSAGES } from "./de";
 import { EN_MESSAGES } from "./en";

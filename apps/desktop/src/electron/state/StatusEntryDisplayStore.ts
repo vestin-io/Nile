@@ -1,17 +1,16 @@
 import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
 import { SqliteDatabase } from "@nile/core/services/database";
 
-export const STATUS_ENTRY_DISPLAY_MODES = ["app_entry", "ticker"] as const;
-
-export type DesktopStatusEntryDisplayMode = (typeof STATUS_ENTRY_DISPLAY_MODES)[number];
-export type DesktopStatusEntryDisplayState = {
-  hasConfiguredSelectedAgents: boolean;
-  mode: DesktopStatusEntryDisplayMode;
-  selectedAgentIds: AgentId[];
-};
+import {
+  parseLegacyStatusEntryDisplayMode,
+  serializeLegacyStatusEntryDisplayMode,
+  type DesktopStatusEntryDisplayMode,
+  type DesktopStatusEntryDisplayState,
+  type LegacyDesktopStatusEntryDisplayMode,
+} from "../../state/StatusEntryDisplay";
 
 type LegacyMenubarDisplayRow = {
-  mode: DesktopStatusEntryDisplayMode;
+  mode: LegacyDesktopStatusEntryDisplayMode;
 };
 
 type LegacyMenubarTickerAgentRow = {
@@ -22,7 +21,6 @@ type LegacyMenubarTickerConfigRow = {
   configured: number;
 };
 
-const statusEntryDisplayModeSet = new Set<DesktopStatusEntryDisplayMode>(STATUS_ENTRY_DISPLAY_MODES);
 const supportedAgentIdSet = new Set<AgentId>(SUPPORTED_AGENT_IDS);
 
 export class DesktopStatusEntryDisplayStore {
@@ -49,9 +47,7 @@ export class DesktopStatusEntryDisplayStore {
 
       return {
         hasConfiguredSelectedAgents: tickerConfigRow?.configured === 1,
-        mode: statusEntryDisplayModeSet.has(modeRow?.mode ?? "app_entry")
-          ? (modeRow?.mode ?? "app_entry")
-          : "app_entry",
+        mode: parseLegacyStatusEntryDisplayMode(modeRow?.mode),
         selectedAgentIds: SUPPORTED_AGENT_IDS.filter((agentId) => selectedAgentIds.has(agentId)),
       };
     } finally {
@@ -74,7 +70,7 @@ export class DesktopStatusEntryDisplayStore {
             VALUES (1, ?)
             ON CONFLICT(id) DO UPDATE SET mode = excluded.mode
           `,
-          mode,
+          serializeLegacyStatusEntryDisplayMode(mode),
         );
       });
     } finally {

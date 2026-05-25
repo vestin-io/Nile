@@ -1,149 +1,251 @@
 import { registerBuiltinAgentDeclarations } from "@nile/builtins/agents";
 
-import { readConnectionQuotaMetricPreference } from "../../state/ConnectionQuotaMetricPreferences";
-import { resolveDesktopUsageSummary } from "../../state/UsageSummary";
-import { DesktopPreferencesStore } from "../settings/Preferences";
+import type { AgentId } from "@nile/core/models/agent";
+
+import { readDocumentPlatform } from "../../state/DesktopPlatform";
+import { readDefaultDesktopPreferences, type DesktopPreferences } from "../../state/DesktopPreferences";
+import {
+  DesktopStatusEntryPresenter,
+  type DesktopPresentedStatusEntryAgent,
+  type DesktopPresentedStatusEntryConnection,
+} from "../../state/StatusEntryPresenter";
+import { DesktopPreferencesClient } from "../settings/PreferencesClient";
+import { ThemeController } from "../settings/ThemeController";
 import { authModeLabel } from "../shared/DisplayText";
 import { createTranslator } from "../shared/I18n";
 
-type StatusEntryState = Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryState>>;
+type StatusEntryState = Awaited<ReturnType<typeof window.nileDesktop.statusEntry.getStatusEntryState>>;
 
-const preferencesStore = new DesktopPreferencesStore(window.localStorage, document.documentElement);
-const currentElement = document.getElementById("menubar-current");
-const driftElement = document.getElementById("menubar-drift");
-const connectionsElement = document.getElementById("menubar-connections");
-const settingsButton = document.getElementById("settings-button");
-const refreshButton = document.getElementById("refresh-button");
-const currentTitleElement = document.getElementById("menubar-current-title");
-const switchTitleElement = document.getElementById("menubar-switch-title");
+const preferencesClient = new DesktopPreferencesClient();
+const themeController = new ThemeController(document.documentElement);
+const contentElement = document.getElementById("menubar-content");
+const openAppButton = document.getElementById("open-app-button");
+const kickerElement = document.getElementById("menubar-kicker");
+const viewTitleElement = document.getElementById("menubar-view-title");
+const viewSubtitleElement = document.getElementById("menubar-view-subtitle");
+const backButton = document.getElementById("back-button");
+let selectedAgentId: AgentId | null = null;
+let currentPreferences: DesktopPreferences = readDefaultDesktopPreferences();
+let didMigrateLegacyPreferences = false;
 
 registerBuiltinAgentDeclarations();
 
-function applyFramePreferences() {
-  const preferences = preferencesStore.load();
-  const t = createTranslator(preferences.language);
-  preferencesStore.applyTheme(preferences.theme);
-  if (currentTitleElement) {
-    currentTitleElement.textContent = t("menubar.currentConnectionTitle");
-  }
-  if (driftElement) {
-    driftElement.textContent = t("menubar.currentConnectionDrift");
-  }
-  if (switchTitleElement) {
-    switchTitleElement.textContent = t("menubar.switchConnectionTitle");
-  }
-  if (refreshButton) {
-    refreshButton.textContent = t("common.refresh");
-  }
-  if (settingsButton) {
-    settingsButton.textContent = t("menubar.openSettings");
+function applyFramePreferences(): void {
+  const t = createTranslator(currentPreferences.language);
+  themeController.apply(currentPreferences.theme);
+  document.documentElement.dataset.platform = readDocumentPlatform();
+  if (openAppButton) {
+    openAppButton.textContent = t("tray.openApp");
   }
 }
 
 async function render(): Promise<void> {
-  const preferences = preferencesStore.load();
-  const t = createTranslator(preferences.language);
-  const state = await window.nileDesktop.state.getStatusEntryState();
-  const codex = state.agents.find((agent) => agent.agentId === "codex") ?? state.agents[0] ?? null;
-  renderCurrent(codex, t);
-  renderConnections(codex, t);
+  const state = await window.nileDesktop.statusEntry.getStatusEntryState();
+  const t = createTranslator(currentPreferences.language);
+  const presenter = new DesktopStatusEntryPresenter(
+    state,
+    currentPreferences.connectionQuotaMetricPreferences,
+  );
+  const agents = presenter.readConfiguredAgents();
+  const selectedAgent = selectedAgentId ? presenter.readConfiguredAgent(selectedAgentId) : null;
+
+  if (!selectedAgent) {
+    selectedAgentId = null;
+    renderAgentList(agents, t);
+    return;
+  }
+
+  renderAgentDetail(selectedAgent, t);
 }
 
-function renderCurrent(
-  agent: StatusEntryState["agents"][number] | null,
+function renderAgentList(
+  agents: DesktopPresentedStatusEntryAgent[],
   t: ReturnType<typeof createTranslator>,
 ): void {
-  if (!currentElement || !driftElement) {
+  if (!contentElement || !viewTitleElement || !viewSubtitleElement || !backButton || !kickerElement) {
     return;
   }
 
-  currentElement.textContent = agent?.currentConnection
-    ? `${agent.currentConnection.endpointLabel} / ${agent.currentConnection.label}${renderUsageSummary(agent)}`
-    : t("menubar.currentConnectionEmpty");
+  kickerElement.classList.remove("is-hidden");
+  viewTitleElement.textContent = "Agents";
+  viewSubtitleElement.textContent = "";
+  viewSubtitleElement.classList.add("is-hidden");
+  backButton.classList.add("is-hidden");
+  viewTitleElement.classList.remove("is-hidden");
 
-  driftElement.classList.add("is-hidden");
-}
+  if (agents.length === 0) {
+    const emptyRow = document.createElement("div");
+    emptyRow.className = "tray-empty-state";
 
-function renderUsageSummary(agent: NonNullable<StatusEntryState["agents"][number] | null>): string {
-  if (!agent.currentConnection || agent.currentUsage?.status !== "available") {
-    return "";
+    const title = document.createElement("div");
+    title.className = "tray-empty-title";
+    title.textContent = t("menubar.noSavedConnectionsTitle");
+
+    const description = document.createElement("div");
+    description.className = "tray-empty-description";
+    description.textContent = t("menubar.noSavedConnectionsDescription");
+
+    emptyRow.append(title, description);
+    contentElement.replaceChildren(emptyRow);
+    return;
   }
 
-  const preferences = preferencesStore.load();
-  const preferredMetricKey = readConnectionQuotaMetricPreference(
-    preferences.connectionQuotaMetricPreferences,
-    agent.currentConnection.id,
-  );
-  const summary = resolveDesktopUsageSummary(agent.currentUsage, preferredMetricKey);
-  return summary ? ` - ${summary.text}` : "";
+  contentElement.replaceChildren(...agents.map((agent) => createAgentListItem(agent, t)));
 }
 
-function renderConnections(
-  agent: StatusEntryState["agents"][number] | null,
+function createAgentListItem(
+  agent: DesktopPresentedStatusEntryAgent,
+  t: ReturnType<typeof createTranslator>,
+): HTMLElement {
+  const button = document.createElement("button");
+  button.className = "tray-agent-list-item";
+  button.type = "button";
+  button.addEventListener("click", () => {
+    selectedAgentId = agent.agentId;
+    void render();
+  });
+
+  const copy = document.createElement("div");
+  copy.className = "tray-agent-list-copy";
+
+  const name = document.createElement("div");
+  name.className = "tray-agent-list-name";
+  name.textContent = agent.agentLabel;
+
+  const meta = document.createElement("div");
+  meta.className = "tray-agent-list-meta";
+  meta.textContent = agent.currentConnectionSummary ?? t("menubar.currentConnectionEmpty");
+
+  const badge = document.createElement("div");
+  badge.className = "tray-agent-list-badge";
+  badge.textContent = agent.quotaBadgeText ?? t("common.unknown");
+
+  const chevron = document.createElement("div");
+  chevron.className = "tray-agent-list-chevron";
+  chevron.textContent = ">";
+
+  copy.append(name, meta);
+  button.append(copy, badge, chevron);
+  return button;
+}
+
+function renderAgentDetail(
+  agent: DesktopPresentedStatusEntryAgent,
   t: ReturnType<typeof createTranslator>,
 ): void {
-  if (!connectionsElement) {
+  if (!contentElement || !viewTitleElement || !viewSubtitleElement || !backButton || !kickerElement) {
     return;
   }
 
-  if (!agent || agent.connections.length === 0) {
-    connectionsElement.innerHTML = `<div class="connection-row"><div><div class="connection-name">${escapeHtml(t("menubar.noSavedConnectionsTitle"))}</div><div class="connection-meta">${escapeHtml(t("menubar.noSavedConnectionsDescription"))}</div></div></div>`;
-    return;
+  kickerElement.classList.add("is-hidden");
+  viewTitleElement.textContent = "";
+  viewSubtitleElement.textContent = "";
+  viewSubtitleElement.classList.add("is-hidden");
+  viewTitleElement.classList.add("is-hidden");
+  backButton.classList.remove("is-hidden");
+  backButton.textContent = `Agents > ${agent.agentLabel}`;
+
+  const connectionList = document.createElement("div");
+  connectionList.className = "tray-connection-list";
+
+  if (agent.connections.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "tray-empty-state";
+    const title = document.createElement("div");
+    title.className = "tray-empty-title";
+    title.textContent = t("menubar.noSavedConnectionsTitle");
+    const description = document.createElement("div");
+    description.className = "tray-empty-description";
+    description.textContent = t("menubar.noSavedConnectionsDescription");
+    empty.append(title, description);
+    connectionList.append(empty);
+  } else {
+    connectionList.append(...agent.connections.map((connection) => createConnectionRow(agent.agentId, connection, t)));
   }
 
-  connectionsElement.replaceChildren(
-    ...agent.connections.map((connection) => {
-      const row = document.createElement("div");
-      row.className = "connection-row";
-
-      const info = document.createElement("div");
-      info.innerHTML = `
-        <div class="connection-name">${escapeHtml(connection.label)}</div>
-        <div class="connection-meta">${escapeHtml(connection.endpointLabel)} - ${escapeHtml(authModeLabel(connection.authMode, t))}</div>
-      `;
-
-      const button = document.createElement("button");
-      button.className = connection.isCurrent ? "connection-button connection-button-current" : "connection-button";
-      button.textContent = connection.isCurrent ? t("common.current") : t("common.use");
-      button.disabled = connection.isCurrent;
-      button.addEventListener("click", async () => {
-        await window.nileDesktop.connections.switchConnection(agent.agentId, connection.id);
-        await render();
-      });
-
-      row.append(info, button);
-      return row;
-    }),
-  );
+  contentElement.replaceChildren(connectionList);
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
+function createConnectionRow(
+  agentId: AgentId,
+  connection: DesktopPresentedStatusEntryConnection,
+  t: ReturnType<typeof createTranslator>,
+): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "tray-connection-row";
+
+  const info = document.createElement("div");
+  info.className = "tray-connection-copy";
+
+  const name = document.createElement("div");
+  name.className = "tray-connection-name";
+  name.textContent = connection.label;
+
+  const meta = document.createElement("div");
+  meta.className = "tray-connection-meta";
+  meta.textContent = `${connection.endpointLabel} - ${authModeLabel(connection.authMode, t)}`;
+
+  const button = document.createElement("button");
+  button.className = connection.isCurrent ? "tray-connection-button is-current" : "tray-connection-button";
+  button.textContent = connection.isCurrent ? t("common.current") : t("common.use");
+  button.disabled = connection.isCurrent;
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      await window.nileDesktop.connections.switchConnection(agentId, connection.id);
+      await refreshAndRender();
+    } finally {
+      if (!connection.isCurrent) {
+        button.disabled = false;
+      }
+    }
+  });
+
+  info.append(name, meta);
+  row.append(info, button);
+  return row;
 }
 
-settingsButton?.addEventListener("click", async () => {
+openAppButton?.addEventListener("click", async () => {
   await window.nileDesktop.app.openSettings();
 });
 
-refreshButton?.addEventListener("click", async () => {
-  await window.nileDesktop.state.refreshStatusEntry();
-  await render();
+backButton?.addEventListener("click", () => {
+  selectedAgentId = null;
+  void render();
 });
 
 window.nileDesktopEvents.onStateChanged(() => {
-  applyFramePreferences();
-  void render();
+  void syncPreferencesAndRender();
 });
 
-preferencesStore.subscribe(() => {
-  applyFramePreferences();
-  void render();
+preferencesClient.subscribe(() => {
+  void syncPreferencesAndRender();
 });
 
-applyFramePreferences();
-void render();
+window.addEventListener("focus", () => {
+  void refreshAndRender();
+});
+
+async function refreshAndRender(): Promise<void> {
+  await syncPreferences();
+  await window.nileDesktop.statusEntry.refreshStatusEntry().catch(() => undefined);
+  await render();
+}
+
+async function syncPreferences(): Promise<void> {
+  currentPreferences = didMigrateLegacyPreferences
+    ? await preferencesClient.load().catch(() => currentPreferences)
+    : await preferencesClient.migrateLegacy(window.localStorage).catch(() => currentPreferences);
+  didMigrateLegacyPreferences = true;
+  applyFramePreferences();
+}
+
+async function syncPreferencesAndRender(): Promise<void> {
+  await syncPreferences();
+  await render();
+}
+
+void syncPreferencesAndRender();
 
 export {};

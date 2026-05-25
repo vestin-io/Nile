@@ -3,20 +3,19 @@ import type { MenuItemConstructorOptions } from "electron";
 import type { AgentId } from "@nile/core/models/agent";
 import { NileLogger } from "@nile/core/services/NileLogger";
 
-import { createTranslator, type Translator } from "../../renderer/shared/I18n";
-import { readStatusEntryToggleLabel } from "../../renderer/shared/Platform";
-import {
-  readConnectionQuotaMetricPreference,
-  type ConnectionQuotaMetricPreferences,
-} from "../../state/ConnectionQuotaMetricPreferences";
 import { readCurrentProfile } from "../../profiles/CurrentProfile";
+import { readStatusEntryToggleLabel } from "../../state/DesktopPlatform";
+import { createTranslator, type Translator } from "../../state/I18n";
+import type {
+  DesktopPresentedStatusEntryAgent,
+} from "../../state/StatusEntryPresenter";
+import { DesktopStatusEntryPresenter } from "../../state/StatusEntryPresenter";
+import type { DesktopStatusEntryDisplayState } from "../../state/StatusEntryDisplay";
+import type { ConnectionQuotaMetricPreferences } from "../../state/ConnectionQuotaMetricPreferences";
 import type { LanguagePreference } from "../../state/UiPreferences";
-import type { DesktopStatusEntryAgentState, DesktopStatusEntryState, SettingsState } from "../../state/Types";
-import { resolveDesktopUsageSummary } from "../../state/UsageSummary";
+import type { DesktopStatusEntryState, SettingsState } from "../../state/Types";
 import type { DesktopNotificationIntent } from "../notifications/Types";
 import type { WorkspaceProfile } from "../profiles/Store";
-import type { DesktopStatusEntryDisplayState } from "../state/StatusEntryDisplayStore";
-import { DesktopStatusEntrySummary } from "./StatusEntrySummary";
 import { DesktopStatusEntryTitle } from "./StatusEntryTitle";
 
 type DesktopTrayMenuOptions = {
@@ -39,7 +38,7 @@ type DesktopTrayMenuOptions = {
 };
 
 export class DesktopTrayMenu {
-  private static readonly PROFILE_EMOJI_PLACEHOLDER = "·";
+  private static readonly PROFILE_EMOJI_PLACEHOLDER = "-";
 
   constructor(private readonly options: DesktopTrayMenuOptions) {}
 
@@ -51,16 +50,6 @@ export class DesktopTrayMenu {
       state,
       settingsState,
       this.options.listProfiles(),
-      this.readTranslator(),
-      connectionQuotaMetricPreferences,
-    );
-  }
-
-  async readSummaryTemplate(): Promise<MenuItemConstructorOptions[]> {
-    const state = await this.readState();
-    const connectionQuotaMetricPreferences = await this.options.readConnectionQuotaMetricPreferences().catch(() => ({}));
-    return this.buildSummaryTemplate(
-      state,
       this.readTranslator(),
       connectionQuotaMetricPreferences,
     );
@@ -82,30 +71,6 @@ export class DesktopTrayMenu {
       });
       return this.options.peekSettingsState();
     });
-  }
-
-  private buildSummaryTemplate(
-    state: DesktopStatusEntryState | null,
-    t: Translator,
-    connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences,
-  ): MenuItemConstructorOptions[] {
-    if (!state) {
-      return [
-        { label: `Nile    ${t("tray.openApp")}`, click: () => this.options.showSettings() },
-        { type: "separator" },
-        { label: t("tray.loadingConnections"), enabled: false },
-      ];
-    }
-
-    const agentItems = state.agents
-      .filter((agent) => agent.currentConnection)
-      .map((agent) => this.buildAgentSummaryItem(agent, t, connectionQuotaMetricPreferences));
-
-    return [
-      { label: `Nile    ${t("tray.openApp")}`, click: () => this.options.showSettings() },
-      { type: "separator" },
-      ...(agentItems.length > 0 ? agentItems : [{ label: t("tray.noSavedConnections"), enabled: false }]),
-    ];
   }
 
   private buildFullTemplate(
@@ -136,31 +101,19 @@ export class DesktopTrayMenu {
       ];
     }
 
+    const presenter = new DesktopStatusEntryPresenter(state, connectionQuotaMetricPreferences);
     return [
       { label: t("tray.openMainWindow"), click: () => this.options.showSettings() },
       { type: "separator" },
       ...(profileMenu ? [profileMenu, { type: "separator" as const }] : []),
-      ...state.agents.map((agent) => this.buildAgentSubmenu(
+      ...presenter.readAgents().map((agent) => this.buildAgentSubmenu(
         agent,
         selectedAgentIds,
         t,
-        connectionQuotaMetricPreferences,
       )),
       { type: "separator" },
       { label: t("tray.quit"), click: () => this.options.quitApp() },
     ];
-  }
-
-  private buildAgentSummaryItem(
-    agent: DesktopStatusEntryAgentState,
-    t: Translator,
-    connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences,
-  ): MenuItemConstructorOptions {
-    const quotaText = this.readCompactQuotaText(agent, connectionQuotaMetricPreferences) ?? t("common.unknown");
-    return {
-      label: `${agent.agentLabel}    ${quotaText}`,
-      enabled: false,
-    };
   }
 
   private buildProfileSubmenu(
@@ -192,10 +145,9 @@ export class DesktopTrayMenu {
   }
 
   private buildAgentSubmenu(
-    agent: DesktopStatusEntryAgentState,
+    agent: DesktopPresentedStatusEntryAgent,
     selectedAgentIds: Set<AgentId>,
     t: Translator,
-    connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences,
   ): MenuItemConstructorOptions {
     if (agent.connections.length === 0) {
       return {
@@ -205,29 +157,26 @@ export class DesktopTrayMenu {
     }
 
     const submenu: MenuItemConstructorOptions[] = [];
-    if (agent.currentConnection && agent.currentUsage?.status === "available") {
-      const quotaText = DesktopStatusEntrySummary.readQuotaText(agent, connectionQuotaMetricPreferences);
-      if (quotaText) {
-        submenu.push({
-          label: t("tray.quota", { text: quotaText }),
-          submenu: [{
-            label: readStatusEntryToggleLabel(
-              t,
-              process.platform === "win32"
-                ? "win32"
-                : process.platform === "darwin"
-                  ? "darwin"
-                  : "linux",
-            ),
-            type: "checkbox",
-            checked: selectedAgentIds.has(agent.agentId),
-            click: () => {
-              this.options.toggleSelectedAgent(agent.agentId);
-            },
-          }],
-        });
-        submenu.push({ type: "separator" });
-      }
+    if (agent.quotaText) {
+      submenu.push({
+        label: t("tray.quota", { text: agent.quotaText }),
+        submenu: [{
+          label: readStatusEntryToggleLabel(
+            t,
+            process.platform === "win32"
+              ? "win32"
+              : process.platform === "darwin"
+                ? "darwin"
+                : "linux",
+          ),
+          type: "checkbox",
+          checked: selectedAgentIds.has(agent.agentId),
+          click: () => {
+            this.options.toggleSelectedAgent(agent.agentId);
+          },
+        }],
+      });
+      submenu.push({ type: "separator" });
     }
 
     submenu.push(...agent.connections.map<MenuItemConstructorOptions>((connection) => ({
@@ -246,22 +195,6 @@ export class DesktopTrayMenu {
       label: agent.agentLabel,
       submenu,
     };
-  }
-
-  private readCompactQuotaText(
-    agent: DesktopStatusEntryAgentState,
-    connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences,
-  ): string | null {
-    if (!agent.currentConnection || agent.currentUsage?.status !== "available") {
-      return null;
-    }
-
-    const preferredMetricKey = readConnectionQuotaMetricPreference(
-      connectionQuotaMetricPreferences,
-      agent.currentConnection.id,
-    );
-    const summary = resolveDesktopUsageSummary(agent.currentUsage, preferredMetricKey);
-    return summary ? `${summary.label} ${summary.remainingPercent}%` : null;
   }
 
   private async switchConnection(agentId: AgentId, connectionId: string, connectionLabel: string): Promise<void> {

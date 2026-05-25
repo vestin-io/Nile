@@ -22,11 +22,11 @@
     "predev": "npm --prefix ../.. run build -w @nile/builtins && npm --prefix ../.. run build:host-local",
     "prestart": "npm --prefix ../.. run build -w @nile/builtins && npm --prefix ../.. run build:host-local",
     "build": "node --import tsx ./build.ts",
-    "build:release": "NILE_BUILD_RELEASE=1 node --import tsx ./build.ts",
+    "build:release": "node --import tsx ./build.ts --release",
     "clean:release": "node --import tsx ./clean-release.ts",
-    "build:app": "npm run clean:release && npm run build:release && electron-builder --publish never",
-    "build:app:dir": "npm run clean:release && npm run build:release && electron-builder --dir --publish never",
-    "build:app:unsigned": "npm run clean:release && npm run build:release && env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never -c.mac.identity=null",
+    "build:app": "npm run clean:release && npm run build:release && node --import tsx ./package-app.ts",
+    "build:app:dir": "npm run clean:release && npm run build:release && node --import tsx ./package-app.ts --dir",
+    "build:app:unsigned": "npm run clean:release && npm run build:release && node --import tsx ./package-app.ts --unsigned",
     "dev": "node --import tsx ./dev.ts",
     "icons": "node --import tsx ./generate-icons.ts",
     "start": "npm run build && node --import tsx ./launch.ts"
@@ -97,6 +97,18 @@
           "target": "zip",
           "arch": [
             "arm64",
+            "x64"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "icon": "build/icons/icon.png",
+      "artifactName": "${productName}-${version}-win32-${arch}.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
             "x64"
           ]
         }

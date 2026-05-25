@@ -4,7 +4,7 @@ import type { DesktopStatusEntryState } from "../../state/Types";
 import { DesktopStatusEntryTitle } from "./StatusEntryTitle";
 
 describe("DesktopStatusEntryTitle", () => {
-  it("returns an empty title outside ticker mode", () => {
+  it("returns an empty title outside summary mode", () => {
     expect(DesktopStatusEntryTitle.format(createState(), {
       hasConfiguredSelectedAgents: true,
       mode: "app_entry",
@@ -15,15 +15,15 @@ describe("DesktopStatusEntryTitle", () => {
   it("formats selected agents with available current usage", () => {
     expect(DesktopStatusEntryTitle.format(createState(), {
       hasConfiguredSelectedAgents: true,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: ["codex", "cursor", "claude"],
-    }, {})).toBe("Codex 72% · Cursor 6%");
+    }, {})).toBe("Codex 72% | Cursor 6%");
   });
 
   it("omits selected agents that do not have available usage", () => {
     expect(DesktopStatusEntryTitle.format(createState(), {
       hasConfiguredSelectedAgents: true,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: ["claude"],
     }, {})).toBe("");
   });
@@ -31,7 +31,7 @@ describe("DesktopStatusEntryTitle", () => {
   it("defaults to the first available quota agent when selected agents were never configured", () => {
     expect(DesktopStatusEntryTitle.format(createState(), {
       hasConfiguredSelectedAgents: false,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: [],
     }, {})).toBe("Codex 72%");
   });
@@ -39,7 +39,7 @@ describe("DesktopStatusEntryTitle", () => {
   it("uses the pinned connection metric when one is configured", () => {
     expect(DesktopStatusEntryTitle.format(createState(), {
       hasConfiguredSelectedAgents: true,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: ["codex"],
     }, {
       "codex-work": "weekly",

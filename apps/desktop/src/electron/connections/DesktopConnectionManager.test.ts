@@ -23,6 +23,7 @@ import {
 import type { InteractiveSessionLoginRegistry } from "@nile/builtins/session";
 
 import { DesktopConnectionGateway } from "./DesktopConnectionGateway";
+import { DesktopCredentialStorageSession } from "./CredentialStorageSession";
 import { DesktopConnectionManager } from "./DesktopConnectionManager";
 
 const tempDirs: string[] = [];
@@ -361,7 +362,40 @@ describe("DesktopConnectionManager", () => {
       apiKey: "router-secret",
       credentialStorageBackend: "system_secure_storage",
     })).rejects.toThrow(
-      "System secure storage was denied by macOS. Choose Encrypted local storage to continue without Keychain.",
+      "System secure storage was denied by the operating system. Choose Encrypted local storage to continue without system secure storage.",
+    );
+  });
+
+  it("uses the saved connection backend when mapping update credential storage errors", async () => {
+    const sessionStub = {
+      listSavedConnections: () => [{
+        id: "shared-connection",
+        authMode: "api_key" as const,
+        credentialStorageBackend: "system_secure_storage" as const,
+      }],
+      updateConnection: async () => {
+        throw new SystemSecureCredentialStoreDeniedError();
+      },
+      close: () => {},
+    };
+
+    class SessionStubbedDesktopConnectionManager extends DesktopConnectionManager {
+      override openSession(): never {
+        return sessionStub as never;
+      }
+    }
+
+    const setup = createSetup();
+    const manager = new SessionStubbedDesktopConnectionManager({
+      databasePath: setup.dbPath,
+      environment: EnvironmentSource.empty(),
+      credentialStore: setup.credentialStore,
+    });
+
+    await expect(manager.updateConnection({
+      connectionId: "shared-connection",
+    })).rejects.toThrow(
+      "System secure storage was denied by the operating system. Choose Encrypted local storage to continue without system secure storage.",
     );
   });
 
@@ -374,7 +408,7 @@ describe("DesktopConnectionManager", () => {
       agentHomes: { codex: setup.codexHome },
       environment: EnvironmentSource.empty(),
       credentialStore,
-      credentialStorageSession: credentialStore,
+      credentialStorageSession: new DesktopCredentialStorageSession(credentialStore),
     });
 
     await manager.prepareConnectionDraft({

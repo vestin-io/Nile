@@ -4,6 +4,7 @@ export type DesktopAppBridge = {
   openGitHubIssues(): Promise<void>;
   openExternalUrl(url: string): Promise<void>;
   openSettings(): Promise<void>;
+  quit(): Promise<void>;
   openSupportEmail(): Promise<void>;
   updateAgentHome(agentId: AgentId, path: string | null): Promise<void>;
   updateAgentRuntimeCommand(agentId: AgentId, path: string | null): Promise<void>;

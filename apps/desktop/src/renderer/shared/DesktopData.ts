@@ -2,9 +2,9 @@ import type { AgentId } from "@nile/core/models/agent/definitions";
 import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
 import type { DesktopConnection } from "../../state/Types";
 
-export type SettingsState = Awaited<ReturnType<typeof window.nileDesktop.state.getSettingsState>>;
-export type HistoryState = Awaited<ReturnType<typeof window.nileDesktop.state.getHistoryState>>;
-export type NotificationHistoryState = Awaited<ReturnType<typeof window.nileDesktop.state.getNotificationHistory>>;
+export type SettingsState = Awaited<ReturnType<typeof window.nileDesktop.settingsData.getSettingsState>>;
+export type HistoryState = Awaited<ReturnType<typeof window.nileDesktop.settingsData.getHistoryState>>;
+export type NotificationHistoryState = Awaited<ReturnType<typeof window.nileDesktop.notifications.getNotificationHistory>>;
 export type Definition = Awaited<ReturnType<typeof window.nileDesktop.connections.listConnectionDefinitions>>[number];
 
 export function canConfigureAgent(definitions: Definition[], agentId: AgentId): boolean {

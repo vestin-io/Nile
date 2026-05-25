@@ -49,7 +49,7 @@ export type SettingsPageContentProps = {
   isResetting: boolean;
   isSavingProfileFeature: boolean;
   language: LanguagePreference;
-  statusEntryDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"];
+  statusEntryDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.statusEntry.getStatusEntryDisplay>>["mode"];
   notificationsMuted: boolean;
   notificationHistoryFilter: NotificationHistoryFilter;
   notificationHistoryConnections: DesktopNotificationHistoryConnection[];
@@ -97,7 +97,7 @@ export type SettingsPageContentProps = {
   onInstallUpdate(): Promise<void>;
   onLanguageChange(language: LanguagePreference): void;
   onStatusEntryDisplayModeChange(
-    mode: Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"],
+    mode: Awaited<ReturnType<typeof window.nileDesktop.statusEntry.getStatusEntryDisplay>>["mode"],
   ): Promise<void>;
   onNotificationsMutedChange(muted: boolean): Promise<void>;
   onNotificationHistoryFilterChange(filter: NotificationHistoryFilter): void;

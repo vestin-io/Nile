@@ -8,8 +8,35 @@ type PersistedSecrets = {
   entries: Record<string, string>;
 };
 
+type DesktopSafeStorage = Pick<typeof safeStorage, "decryptString" | "encryptString" | "isEncryptionAvailable">;
+type DesktopSecretFileStoreDependencies = {
+  existsSync: typeof existsSync;
+  mkdirSync: typeof mkdirSync;
+  readFileSync: typeof readFileSync;
+  renameSync: typeof renameSync;
+  unlinkSync: typeof unlinkSync;
+  writeFileSync: typeof writeFileSync;
+  safeStorage: DesktopSafeStorage;
+};
+
 export class DesktopSecretFileStore {
-  constructor(private readonly filePath: string) {}
+  private readonly dependencies: DesktopSecretFileStoreDependencies;
+
+  constructor(filePath: string, dependencies?: Partial<DesktopSecretFileStoreDependencies>) {
+    this.filePath = filePath;
+    this.dependencies = {
+      existsSync,
+      mkdirSync,
+      readFileSync,
+      renameSync,
+      unlinkSync,
+      writeFileSync,
+      safeStorage,
+      ...dependencies,
+    };
+  }
+
+  private readonly filePath: string;
 
   read(key: string): string | null {
     const store = this.readStore();
@@ -19,7 +46,7 @@ export class DesktopSecretFileStore {
     }
 
     return store.encrypted
-      ? safeStorage.decryptString(Buffer.from(value, "base64"))
+      ? this.dependencies.safeStorage.decryptString(Buffer.from(value, "base64"))
       : value;
   }
 
@@ -46,11 +73,11 @@ export class DesktopSecretFileStore {
   }
 
   private readStore(): PersistedSecrets {
-    if (!existsSync(this.filePath)) {
+    if (!this.dependencies.existsSync(this.filePath)) {
       return this.createEmptyStore();
     }
 
-    const raw = readFileSync(this.filePath, "utf8");
+    const raw = this.dependencies.readFileSync(this.filePath, "utf8");
     const parsed = JSON.parse(raw) as Partial<PersistedSecrets>;
     const encrypted = parsed.encrypted === true;
     const entries = this.normalizeEntries(parsed.entries);
@@ -62,26 +89,34 @@ export class DesktopSecretFileStore {
   }
 
   private writeStore(store: PersistedSecrets): void {
-    mkdirSync(dirname(this.filePath), { recursive: true });
+    this.dependencies.mkdirSync(dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.tmp`;
-    writeFileSync(tempPath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
+    const backupPath = `${this.filePath}.bak`;
+    this.dependencies.writeFileSync(tempPath, `${JSON.stringify(store, null, 2)}\n`, "utf8");
     try {
-      renameSync(tempPath, this.filePath);
-    } catch (error) {
-      try {
-        unlinkSync(this.filePath);
-      } catch {}
-      renameSync(tempPath, this.filePath);
-      if (error) {
+      if (!this.dependencies.existsSync(this.filePath)) {
+        this.dependencies.renameSync(tempPath, this.filePath);
         return;
       }
+
+      this.removeIfPresent(backupPath);
+      this.dependencies.renameSync(this.filePath, backupPath);
+      try {
+        this.dependencies.renameSync(tempPath, this.filePath);
+      } catch (error) {
+        this.restoreBackupFile(backupPath);
+        throw error;
+      }
+      this.removeIfPresent(backupPath);
+    } finally {
+      this.removeIfPresent(tempPath);
     }
   }
 
   private createEmptyStore(): PersistedSecrets {
     return {
       version: 1,
-      encrypted: safeStorage.isEncryptionAvailable(),
+      encrypted: this.dependencies.safeStorage.isEncryptionAvailable(),
       entries: {},
     };
   }
@@ -91,7 +126,7 @@ export class DesktopSecretFileStore {
       return value;
     }
 
-    return safeStorage.encryptString(value).toString("base64");
+    return this.dependencies.safeStorage.encryptString(value).toString("base64");
   }
 
   private normalizeEntries(entries: PersistedSecrets["entries"] | undefined): Record<string, string> {
@@ -102,5 +137,19 @@ export class DesktopSecretFileStore {
     return Object.fromEntries(
       Object.entries(entries).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     );
+  }
+
+  private removeIfPresent(path: string): void {
+    try {
+      this.dependencies.unlinkSync(path);
+    } catch {}
+  }
+
+  private restoreBackupFile(backupPath: string): void {
+    if (!this.dependencies.existsSync(backupPath)) {
+      return;
+    }
+    this.removeIfPresent(this.filePath);
+    this.dependencies.renameSync(backupPath, this.filePath);
   }
 }

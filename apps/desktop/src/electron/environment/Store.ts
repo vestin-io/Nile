@@ -28,7 +28,7 @@ export class DesktopEnvironmentStore {
       () => readDesktopKeychainHelperPath(),
     ),
   ) {
-    this.fileStore = process.platform === "darwin" || !databasePath
+    this.fileStore = !shouldUseDesktopEnvironmentFileStore() || !databasePath
       ? null
       : new DesktopSecretFileStore(readDesktopEnvironmentStorePath(databasePath));
   }
@@ -175,6 +175,12 @@ export function readDesktopHelperPathCandidates(currentDir: string): string[] {
 
 function readUnpackedAsarPath(path: string): string {
   return path.includes("app.asar") ? path.replaceAll("app.asar", "app.asar.unpacked") : path;
+}
+
+export function shouldUseDesktopEnvironmentFileStore(
+  platform: NodeJS.Platform = process.platform,
+): boolean {
+  return platform === "win32";
 }
 
 export function readDesktopEnvironmentStorePath(databasePath: string): string {

@@ -1,8 +1,8 @@
 import type { AgentId } from "@nile/core/models/agent/definitions";
 
+import type { DesktopStatusEntryDisplayState } from "../../state/StatusEntryDisplay";
 import type { DesktopStatusEntryState } from "../../state/Types";
 import type { ConnectionQuotaMetricPreferences } from "../../state/ConnectionQuotaMetricPreferences";
-import type { DesktopStatusEntryDisplayState } from "../state/StatusEntryDisplayStore";
 import { DesktopStatusEntrySummary } from "./StatusEntrySummary";
 
 export class DesktopStatusEntryTitle {
@@ -26,6 +26,6 @@ export class DesktopStatusEntryTitle {
     preferences: DesktopStatusEntryDisplayState,
     connectionQuotaMetricPreferences: ConnectionQuotaMetricPreferences = {},
   ): string {
-    return DesktopStatusEntrySummary.formatTickerTitle(state, preferences, connectionQuotaMetricPreferences);
+    return DesktopStatusEntrySummary.formatSelectedAgentSummary(state, preferences, connectionQuotaMetricPreferences);
   }
 }

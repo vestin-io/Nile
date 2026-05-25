@@ -97,91 +97,271 @@
 @layer components {
   .app-shell-menubar {
     background:
-      radial-gradient(circle at top, hsl(var(--accent) / 0.65), transparent 48%),
-      hsl(var(--background));
+      radial-gradient(circle at top left, rgba(255, 164, 101, 0.22), transparent 36%),
+      radial-gradient(circle at top right, rgba(95, 166, 255, 0.18), transparent 42%),
+      linear-gradient(180deg, #171c24 0%, #0f1218 100%);
+    color: #f3f5f8;
+    font-family: "Segoe UI Variable Display", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   }
 
-  .panel {
-    @apply flex min-h-screen flex-col gap-3 p-3;
+  .tray-panel {
+    display: flex;
+    min-height: 100vh;
+    flex-direction: column;
+    gap: 14px;
+    border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+      rgba(10, 13, 18, 0.92);
+    box-shadow:
+      0 28px 56px rgba(0, 0, 0, 0.42),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    padding: 16px;
   }
 
-  .hero-card {
-    @apply rounded-2xl border bg-card px-4 py-4 shadow-sm;
+  .tray-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 2px 2px 0;
   }
 
-  .hero-kicker {
-    @apply text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground;
+  .tray-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
   }
 
-  .hero-title {
-    @apply mt-2 text-sm font-semibold text-foreground;
+  .tray-header-copy {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
   }
 
-  .hero-value {
-    @apply mt-2 text-lg font-semibold leading-snug text-foreground;
+  .tray-kicker {
+    color: rgba(245, 247, 250, 0.72);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
   }
 
-  .hero-subtle {
-    @apply mt-2 text-sm text-muted-foreground;
+  .tray-open-button,
+  .tray-connection-button,
+  .tray-agent-list-item,
+  .tray-back-button {
+    border: 0;
+    cursor: pointer;
+    font: inherit;
   }
 
-  .section {
-    @apply rounded-2xl border bg-card px-3 py-3 shadow-sm;
-  }
-
-  .section-head {
-    @apply mb-3 flex items-center justify-between gap-3;
-  }
-
-  .section-head h2 {
-    @apply m-0 text-sm font-semibold text-foreground;
-  }
-
-  .text-button {
-    @apply rounded-lg px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground;
+  .tray-open-button {
+    flex: 0 0 auto;
     background: transparent;
-    border: 0;
-    cursor: pointer;
+    color: rgba(241, 245, 249, 0.82);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 0;
+    transition: color 120ms ease;
   }
 
-  .connection-list {
-    @apply flex max-h-[320px] flex-col gap-2 overflow-y-auto pr-1;
+  .tray-open-button:hover {
+    color: #ffffff;
   }
 
-  .connection-row {
-    @apply flex items-center justify-between gap-3 rounded-xl border bg-background px-3 py-3;
+  .tray-section-title {
+    margin: 0;
+    color: #f8fbff;
+    font-size: 14px;
+    font-weight: 650;
+    padding: 0 2px;
   }
 
-  .connection-name {
-    @apply text-sm font-medium text-foreground;
+  .tray-section-subtitle {
+    margin: -2px 0 0;
+    color: rgba(241, 245, 249, 0.62);
+    font-size: 12px;
+    line-height: 1.35;
+    padding: 0 2px;
+    word-break: break-word;
   }
 
-  .connection-meta {
-    @apply mt-1 text-xs text-muted-foreground;
+  .tray-back-button {
+    background: transparent;
+    color: #f8fbff;
+    font-size: 14px;
+    font-weight: 650;
+    padding: 0;
+    transition: color 120ms ease;
   }
 
-  .connection-button {
-    @apply inline-flex min-w-16 items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-100;
-    border: 0;
-    cursor: pointer;
+  .tray-back-button:hover {
+    color: rgba(255, 255, 255, 0.78);
   }
 
-  .connection-button-current {
-    @apply bg-secondary text-secondary-foreground;
+  .tray-content {
+    display: flex;
+    min-height: 0;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: 10px;
+    overflow-y: auto;
+    padding: 8px 2px 2px;
   }
 
-  .actions-grid {
-    @apply grid grid-cols-1 gap-2;
+  .tray-agent-list-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 10px;
+    border-radius: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(8, 11, 17, 0.72);
+    padding: 14px;
+    text-align: left;
+    transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
   }
 
-  .action-button {
-    @apply inline-flex w-full items-center justify-center rounded-xl px-3 py-2 text-sm font-medium transition-colors;
-    border: 0;
-    cursor: pointer;
+  .tray-agent-list-item:hover {
+    background: rgba(14, 18, 27, 0.9);
+    border-color: rgba(255, 255, 255, 0.14);
+    transform: translateY(-1px);
   }
 
-  .action-button-secondary {
-    @apply bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground;
+  .tray-agent-list-copy {
+    min-width: 0;
+  }
+
+  .tray-agent-list-name {
+    color: #fdfefe;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .tray-agent-list-meta {
+    margin-top: 4px;
+    color: rgba(241, 245, 249, 0.64);
+    font-size: 12px;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .tray-agent-list-badge {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 7px 10px;
+    white-space: nowrap;
+  }
+
+  .tray-agent-list-chevron {
+    color: rgba(241, 245, 249, 0.58);
+    font-size: 20px;
+    line-height: 1;
+  }
+
+  .tray-connection-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tray-connection-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 12px;
+  }
+
+  .tray-connection-copy {
+    min-width: 0;
+  }
+
+  .tray-connection-name {
+    color: #fefefe;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .tray-connection-meta {
+    margin-top: 4px;
+    color: rgba(241, 245, 249, 0.62);
+    font-size: 11px;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .tray-connection-button {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #f8fbff;
+    color: #0e1116;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 72px;
+    padding: 9px 12px;
+    transition: opacity 120ms ease, transform 120ms ease;
+  }
+
+  .tray-connection-button:hover {
+    transform: translateY(-1px);
+  }
+
+  .tray-connection-button:disabled {
+    cursor: default;
+    opacity: 1;
+    transform: none;
+  }
+
+  .tray-connection-button.is-current {
+    background: rgba(255, 255, 255, 0.13);
+    color: #ffffff;
+  }
+
+  .tray-connection-empty,
+  .tray-empty-state {
+    border-radius: 16px;
+    border: 1px dashed rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.025);
+    padding: 14px;
+  }
+
+  .tray-empty-title {
+    color: #fefefe;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .tray-empty-description,
+  .tray-connection-empty {
+    color: rgba(241, 245, 249, 0.62);
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 460px) {
+    .tray-panel {
+      min-height: 100vh;
+      border-radius: 20px;
+      padding: 12px;
+    }
+
+    .tray-agent-list-item {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .tray-agent-list-chevron {
+      display: none;
+    }
   }
 
   .is-hidden {

@@ -20,6 +20,7 @@ import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 
 import { DesktopConnectionStatusPresenter } from "../../state/connection/Status";
 import type { DesktopConnection } from "../../state/Types";
+import { DesktopCredentialStorageSession } from "./CredentialStorageSession";
 import { DesktopManagedConnectionImports } from "./Imports";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 import { SessionRunner } from "./SessionRunner";
@@ -35,11 +36,7 @@ type DesktopConnectionGatewayOptions = {
   environment: EnvironmentSource;
   managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
   credentialStore: CredentialStore;
-  credentialStorageSession?: {
-    hasEncryptedLocalVault(): boolean;
-    isEncryptedLocalUnlocked(): boolean;
-    unlockEncryptedLocalStorage(passphrase: string): void;
-  };
+  credentialStorageSession?: DesktopCredentialStorageSession;
   logger?: NileLogger;
 };
 
@@ -195,25 +192,7 @@ export class DesktopConnectionGateway {
     backend: CredentialStorageBackend | undefined,
     passphrase: string | undefined,
   ): void {
-    if (backend !== "encrypted_local_storage") {
-      return;
-    }
-    if (!this.options.credentialStorageSession) {
-      throw new Error("Encrypted local storage is not available in this desktop session.");
-    }
-    if (!this.options.credentialStorageSession.hasEncryptedLocalVault()) {
-      if (!passphrase?.trim()) {
-        throw new Error("Encrypted local storage passphrase is required.");
-      }
-      this.options.credentialStorageSession.unlockEncryptedLocalStorage(passphrase.trim());
-      return;
-    }
-    if (!this.options.credentialStorageSession.isEncryptedLocalUnlocked()) {
-      if (!passphrase?.trim()) {
-        throw new Error("Encrypted local storage is locked. Enter your passphrase and try again.");
-      }
-      this.options.credentialStorageSession.unlockEncryptedLocalStorage(passphrase.trim());
-    }
+    this.requireCredentialStorageSession().prepareStorage(backend, passphrase, { allowCreate: true });
   }
 
   private runCursorUsageWorkspace<TResult>(
@@ -238,5 +217,9 @@ export class DesktopConnectionGateway {
       authMode: result.authMode,
       ...("reused" in result && result.reused ? { reused: true } : {}),
     };
+  }
+
+  private requireCredentialStorageSession(): DesktopCredentialStorageSession {
+    return this.options.credentialStorageSession ?? new DesktopCredentialStorageSession(null);
   }
 }

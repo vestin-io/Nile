@@ -21,6 +21,29 @@
 
 - `npm run typecheck`
 
+### Windows tray popup unification
+
+- Reworked Windows tray interaction into a single styled popup instead of split left-click summary and right-click native menu:
+  - both left and right click now open the same tray popup on Windows
+  - the popup shows agent quota summaries on the first layer
+  - connection switching now lives inside expandable agent cards in the popup
+  - `Open app`, `Refresh`, and `Quit` are available directly from the popup
+- Refreshed the Windows tray popup presentation to a dedicated Windows-specific surface instead of the previous unstyled/plain menu-like view.
+- Hid the Windows `Tray` display-mode selector in Settings because `App entry / Usage summary` was a carryover from the macOS ticker model and no longer matches Windows behavior.
+- Removed the old Windows-only native summary-menu path so desktop tray behavior no longer splits between two menu systems.
+
+#### Key findings
+
+- I did not add a new `show tray / hide tray` preference in this pass. The old display-mode selector was misleading on Windows, but tray visibility itself is still not modeled as a separate persisted setting.
+- The underlying status-entry display store remains in place because macOS ticker behavior still depends on it, and Windows tooltip/title compatibility still reads from the same shared state.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/renderer/shared/Platform.test.ts`
+- `npx vitest run apps/desktop/src/electron/shell/PlatformCapabilities.test.ts apps/desktop/src/electron/shell/TrayPopupPlacement.test.ts`
+- `npm run build -w @nile/desktop`
+- `npm run typecheck`
+
 ### Settings usage cache pollution fix
 
 - Investigated the remaining `jiqiang90@gmail.com` quota gap with desktop logs and the persisted `desktop_state_snapshots` rows.
@@ -161,6 +184,219 @@
 ### Verification
 
 - `npm run build -w @nile/desktop`
+
+### Windows branch hardening follow-up
+
+- Restored the Windows status-entry configuration path:
+  - `state/DesktopPlatform.ts` now exposes the status-entry settings copy for `win32`
+  - the settings page can switch Windows between `app_entry` and `summary` again
+- Restored access to per-agent Windows summary selection from the tray:
+  - `electron/shell/DesktopShell.ts` now keeps left-click for the popup
+  - Windows right-click hides the popup and opens the full tray menu again, so the existing `Show in usage summary` toggles are reachable
+- Hardened Windows credential manifest parsing:
+  - `services/credential/WindowsSecretStore.ts` now converts invalid chunk manifest JSON into `WindowsSecretValidationError` instead of leaking a raw `SyntaxError`
+  - that keeps both `WindowsCredentialManagerStore` and `WindowsSecureSnapshotStore` on their intended validation/error-mapping paths
+- Fixed desktop connection update error mapping:
+  - `DesktopConnectionManager.updateConnection()` now maps storage errors using the saved connection's actual backend instead of a hardcoded `system_secure_storage`
+  - the denied-system-storage fallback message is now platform-neutral instead of incorrectly referencing macOS Keychain on Windows
+
+#### Key findings
+
+- I did not add a new `DesktopShell` interaction test for the Windows right-click tray wiring in this pass. The behavior change is small and local, but it is still covered only by code inspection plus the existing tray/menu tests around reachable actions.
+- The status-entry selector was implemented in the renderer already; the real break was that the shared platform helper returned `null` for Windows, which silently removed the settings section.
+- The Windows manifest bug affected both credential reads and secure history snapshot reads because both paths share `WindowsSecretStore`.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/shared/Platform.test.ts packages/core/src/services/credential/WindowsCredentialManagerStore.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts`
+- `npm run typecheck`
+
+### Windows desktop architecture cleanup
+
+- Reduced the main-process composition root back under the repository file-size limit:
+  - extracted tray/status-entry sync into `electron/shell/StatusEntryController.ts`
+  - extracted managed API-key environment startup/reset lifecycle into `electron/shell/ManagedEnvironmentLifecycle.ts`
+  - simplified desktop credential-store construction to the shared `createPlatformWorkspaceCredentialStore()` path
+- Promoted encrypted-local vault session behavior into a formal service instead of a duplicated side-channel:
+  - added the shared `CredentialStorageSession` capability in core credential services
+  - added `electron/connections/CredentialStorageSession.ts` to own encrypted-local prepare/unlock/state rules
+  - removed duplicated `prepareCredentialStorage()` logic from both `DesktopConnectionManager` and `DesktopConnectionGateway`
+- Narrowed the renderer bridge away from the old catch-all `state` bucket:
+  - preload and `DesktopBridge` now expose task-oriented groups: `preferences`, `statusEntry`, `settingsData`, `notifications`, and `profileFeatures`
+  - renderer consumers were moved to those narrower surfaces, including the tray popup, settings hooks, and preference client
+- Verified that reset keeps the workspace-backend behavior:
+  - current `StateReset` resolves a workspace credential store from `databasePath`
+  - that path removes both secure-store refs and the local `credentials/` directory, so encrypted-local vault state is cleared during reset
+
+#### Key findings
+
+- The previously reviewed CLI reset gap was already fixed in the current working tree before this pass. I verified it rather than layering a second CLI-specific fix on top.
+- I narrowed the preload surface by splitting the old `state` bridge, but I did not collapse `app / connections / profiles / updates` in the same batch. Those areas are smaller and were not the architecture hotspot that the Windows branch exposed first.
+- `DesktopMain.ts` is now back under 500 lines, but `DesktopShell.ts`, `DesktopConnectionManager.ts`, and `DesktopStateStore.ts` remain large files. They are within the hard limit now; they are the next obvious split candidates if this branch keeps growing.
+
+### Verification
+
+- `npx vitest run packages/core/src/application/local/StateReset.test.ts packages/core/src/services/credential/PlatformStore.test.ts apps/desktop/src/electron/connections/CredentialStorageSession.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/desktop/src/renderer/settings/PreferencesClient.test.ts`
+- `npx vitest run apps/desktop/src/electron/shell/StatusEntryController.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/renderer/settings/PreferencesClient.test.ts apps/desktop/src/electron/connections/CredentialStorageSession.test.ts`
+- `npm run typecheck`
+- `npm run build -w @nile/desktop`
+
+### Desktop shell and connection flow follow-up cleanup
+
+- Split `DesktopShell` window lifecycle into focused collaborators:
+  - `electron/shell/SettingsWindow.ts` now owns the settings BrowserWindow lifecycle, safe sending, notification-target handoff, and auth.json dialog path resolution
+  - `electron/shell/TrayPopupWindow.ts` now owns the Windows tray popup BrowserWindow lifecycle, placement, visibility toggling, and safe sending
+  - `DesktopShell.ts` now stays focused on tray icon wiring, app-level external actions, and orchestration between tray and windows
+- Split `DesktopConnectionManager` input/probe rules out of the session orchestrator:
+  - `electron/connections/InputBuilder.ts` now owns add/update credential request shaping, local-connection input shaping, and env-key probe fallback rules
+  - `DesktopConnectionManager.ts` now coordinates sessions and desktop-side flows instead of also owning low-level credential-request assembly
+
+#### Key findings
+
+- `DesktopShell.ts` is now down to 200 lines and `DesktopConnectionManager.ts` to 385 lines, both materially clearer than before this pass.
+- I reviewed `DesktopStateStore.ts` after these cuts and deliberately did not split it in the same batch. It is still below the repository file-size limit, and the remaining logic is tightly coupled to cache invalidation semantics; a forced extraction there would be mechanical rather than clarifying right now.
+- I did not add new unit tests around the two new window lifecycle helpers. The risk there was kept low by preserving behavior and re-verifying desktop build/typecheck plus the connection/status-entry tests that touch the affected wiring.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/desktop/src/electron/connections/CredentialStorageSession.test.ts`
+- `npx vitest run apps/desktop/src/electron/shell/StatusEntryController.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts`
+- `npm run typecheck`
+- `npm run build -w @nile/desktop`
+
+### Windows backend and reset hardening follow-up
+
+- Fixed CLI default credential wiring so non-overridden `NileCli` sessions now use a workspace-aware backend store instead of a raw platform system store:
+  - added `createPlatformWorkspaceCredentialStore(databasePath)`
+  - routed `apps/cli/src/NileCli.ts` through that helper
+- Fixed CLI reset wiring so the reset command now reuses the CLI credential store instead of silently constructing an unrelated default `StateReset`.
+- Hardened shared reset semantics for encrypted-local storage:
+  - `StateReset` still removes database-referenced system credentials and secure snapshots
+  - it now also removes the sibling Nile-managed `credentials/` directory so locked encrypted-local vaults do not survive `nile reset`
+- Scoped the desktop file-backed managed environment store back to Windows only:
+  - `DesktopEnvironmentStore` now enables `desktop-environment.json` only on `win32`
+  - Linux and macOS continue using the existing helper-backed secure-store path
+- Updated CLI reset copy so the user-facing output no longer incorrectly talks about “keychain entries” on Windows or encrypted-local setups.
+
+#### Key findings
+
+- Fixing only the platform system store choice was not enough for CLI: saved connection reads need the backend-aware workspace wrapper because access rows can point at `encrypted_local_storage`.
+- Encrypted-local reset cannot rely on per-entry deletion alone because the vault may still be locked when reset runs. Removing Nile-managed local credential files is the only reliable backend-agnostic reset path.
+- I left `.vestin/state/features.json` unchanged because these are hardening fixes to already-built desktop/CLI credential flows, not a new feature-state transition.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/services/credential/PlatformStore.test.ts packages/core/src/application/local/StateReset.test.ts apps/desktop/src/electron/environment/Store.test.ts apps/cli/src/ResetCli.test.ts`
+- `npm run typecheck`
+
+### Windows credential and local-secret hardening
+
+- Fixed the Windows secret chunking write path so a failed oversized credential update no longer corrupts the previous stored secret:
+  - chunked writes now use a fresh per-write chunk namespace
+  - the manifest now records explicit chunk account names
+  - legacy `chunkCount` manifests still continue to load for older rows
+- Unified default system credential-store selection behind a platform-aware factory:
+  - Windows now defaults to `WindowsCredentialManagerStore`
+  - non-Windows platforms keep the existing keychain-backed default
+  - the new default wiring now covers CLI, `StateReset`, and the core backend credential-store wrapper instead of only the desktop composition root
+- Hardened the desktop file-backed Windows secret store replacement flow:
+  - replacing `desktop-environment.json` now stages through a backup file
+  - a failed final rename restores the previous file instead of deleting it first
+- Added focused regression coverage for:
+  - failed Windows chunked credential updates preserving the previous secret
+  - platform-aware default credential-store selection
+  - desktop file secret-store replacement rollback
+
+#### Key findings
+
+- The Windows secret corruption risk was not in read/remove; it was specifically the update path reusing the same chunk account names before the manifest swap had succeeded.
+- The CLI Windows gap was broader than one constructor. `NileCli`, `StateReset`, and `BackendCredentialStore` all still had independent macOS-keychain defaults, so the platform choice needed to move into a shared factory.
+- This pass keeps backward compatibility for already-written legacy Windows chunk manifests by continuing to understand the old implicit `::chunk:<index>` format while writing the new explicit manifest shape going forward.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/services/credential/PlatformStore.test.ts packages/core/src/services/credential/WindowsCredentialManagerStore.test.ts apps/desktop/src/electron/storage/DesktopSecretFileStore.test.ts packages/core/src/application/local/StateReset.test.ts`
+- `npm run typecheck`
+
+### Desktop status entry architecture cleanup
+
+- Moved desktop platform/status-entry helpers out of `renderer/shared` into a shared state module:
+  - added `state/DesktopPlatform.ts`
+  - renderer `shared/Platform.ts` is now only a compatibility re-export
+  - main-process tray code no longer imports renderer-layer helpers
+- Split renderer desktop preferences responsibilities:
+  - added `renderer/settings/PreferencesClient.ts` for IPC-backed load/save/migration/subscription
+  - added `renderer/settings/ThemeController.ts` for DOM theme application
+  - `renderer/settings/Preferences.ts` is now only a thin type/constant barrel instead of another store class
+- Added a semantic status-entry display model above the legacy storage shape:
+  - added `state/StatusEntryDisplay.ts`
+  - public mode is now `app_entry | summary`
+  - `electron/state/StatusEntryDisplayStore.ts` maps that semantic model to the existing `desktop_menubar_*` tables and legacy `ticker` storage value
+- Updated tray/menu/title tests and renderer settings to use the semantic `summary` mode instead of leaking `ticker` through current code paths.
+
+#### Key findings
+
+- I deliberately kept the SQLite table names and on-disk `ticker` value as compatibility storage. The cleanup in this pass is an adapter layer, not a breaking migration.
+- `renderer/shared/Platform.ts` still exists as a compatibility import surface for renderer code, but it no longer owns the implementation and main-process code no longer depends on it.
+- The tray product still has two renderers (`native menu` and `Windows popup`). This pass cleaned the boundaries and state semantics, but it did not yet unify those two presenters into one shared view-model builder.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/state/StatusEntryDisplayStore.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/StatusEntryTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/renderer/shared/Platform.test.ts apps/desktop/src/state/DesktopPreferences.test.ts apps/desktop/src/electron/state/DesktopPreferencesStore.test.ts`
+- `npm run build -w @nile/desktop`
+- `npm run typecheck`
+
+### Status entry presenter unification
+
+- Added a shared status-entry presenter:
+  - [state/StatusEntryPresenter.ts](D:/jiqiang90/Nile/apps/desktop/src/state/StatusEntryPresenter.ts)
+  - it now owns agent visibility, current connection summary, quota badge text, quota text, and connection list shaping
+- Reused that presenter in both status-entry renderers:
+  - [electron/shell/TrayMenu.ts](D:/jiqiang90/Nile/apps/desktop/src/electron/shell/TrayMenu.ts)
+  - [renderer/app/menubar.ts](D:/jiqiang90/Nile/apps/desktop/src/renderer/app/menubar.ts)
+- This removes the previous drift where native tray menu and Windows popup each reimplemented:
+  - current-connection filtering
+  - quota summary selection
+  - connection list projection
+- Also normalized the summary separator and default profile placeholder to ASCII so the UI no longer carries the old mojibake `Â·` artifact.
+
+#### Key findings
+
+- The tray surface is still intentionally rendered twice: native menu on one path, HTML popup on the other. This pass unified the data shaping, not the rendering technology.
+- The connection detail row still formats `authMode` in the popup renderer only, because that text is not currently needed by the native menu. If we later need identical detailed rows on both sides, that label formatting should move into the shared presenter layer too.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/state/StatusEntryPresenter.test.ts apps/desktop/src/electron/state/StatusEntryDisplayStore.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/StatusEntryTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/renderer/shared/Platform.test.ts`
+- `npm run build -w @nile/desktop`
+- `npm run typecheck`
+
+### Status entry follow-up fixes
+
+- Removed the remaining main-to-renderer i18n dependency:
+  - moved shared translator implementation to [state/I18n.ts](D:/jiqiang90/Nile/apps/desktop/src/state/I18n.ts)
+  - moved translation catalog under [state/i18n](D:/jiqiang90/Nile/apps/desktop/src/state/i18n/catalog.ts)
+  - `renderer/shared/I18n.ts` is now only a compatibility re-export
+  - main tray code now imports translator helpers from state instead of renderer
+- Removed duplicate quota projection logic:
+  - added [state/StatusEntryQuota.ts](D:/jiqiang90/Nile/apps/desktop/src/state/StatusEntryQuota.ts)
+  - both [state/StatusEntryPresenter.ts](D:/jiqiang90/Nile/apps/desktop/src/state/StatusEntryPresenter.ts) and [electron/shell/StatusEntrySummary.ts](D:/jiqiang90/Nile/apps/desktop/src/electron/shell/StatusEntrySummary.ts) now use the same quota helper
+- Restored renderer-side coverage lost during the preferences split:
+  - added [renderer/settings/PreferencesClient.test.ts](D:/jiqiang90/Nile/apps/desktop/src/renderer/settings/PreferencesClient.test.ts)
+  - added [renderer/settings/ThemeController.test.ts](D:/jiqiang90/Nile/apps/desktop/src/renderer/settings/ThemeController.test.ts)
+  - updated [renderer/shared/I18n.test.ts](D:/jiqiang90/Nile/apps/desktop/src/renderer/shared/I18n.test.ts) for the new catalog location
+
+#### Key findings
+
+- The direct main-process dependency on renderer helper modules is now removed for both platform copy and i18n.
+- The status-entry title/tooltip path and the popup/menu presenter path now share one quota projection source, so future metric-label or freshness changes should not drift between them.
+- I left the dual-renderer product shape intact: native menu and Windows popup still render separately by design, but they no longer diverge on data shaping or summary logic.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/renderer/shared/I18n.test.ts apps/desktop/src/renderer/settings/PreferencesClient.test.ts apps/desktop/src/renderer/settings/ThemeController.test.ts apps/desktop/src/state/StatusEntryPresenter.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/renderer/shared/Platform.test.ts`
+- `npm run build -w @nile/desktop`
+- `npm run typecheck`
 
 ### Quota cache retry fix
 
@@ -4696,3 +4932,53 @@
 ### Verification
 
 - `npm run typecheck`
+
+### Desktop release Windows packaging
+
+- Extended desktop packaging so the checked-in scripts now run cross-platform instead of assuming POSIX shell env assignment:
+  - `build:release` now uses a CLI flag instead of inline env assignment
+  - app packaging now goes through `apps/desktop/package-app.ts`, which applies the macOS unsigned override only where it belongs
+- Added Windows packaging output to the desktop app config:
+  - `electron-builder` now emits an `x64` NSIS installer on Windows
+  - Windows artifacts use an explicit `-win32-x64` filename shape
+- Split the desktop release workflow into coordinated jobs:
+  - one Ubuntu validation job for tag/version/release-notes/typecheck/test gates
+  - one GitHub Release creation/update job
+  - one macOS packaging/upload job
+  - one Windows packaging/upload job that uses the unsigned packaging path
+- Updated desktop release docs and the local release env example so Windows local packaging is documented alongside the existing macOS flow.
+
+#### Key findings
+
+- This pass adds Windows release output, but it does not add a second Windows architecture yet. The workflow currently emits `x64` only.
+- Windows release packaging intentionally uses the unsigned packaging path in this batch. The pipeline now produces Windows installers without requiring Windows signing setup, but SmartScreen/signing hardening remains a separate follow-up if needed.
+- I left `.vestin/state/features.json` unchanged because `surfaces/desktop-release-pipeline` was already tracked as built; this is an expansion of the existing release feature, not a newly introduced feature state.
+
+### Verification
+
+- `npm run build:release --prefix apps/desktop`
+- `npm run build:app:unsigned --prefix apps/desktop`
+
+### Windows tray popup follow-up
+
+- Flattened the Windows tray popup header so it now uses a single top bar:
+  - list view shows `Nile` on the left and `Open app` on the right
+  - detail view shows the back affordance (`< Agent`) on the left and `Open app` on the right
+- Kept the body to the two-step structure only:
+  - first level lists configured agents with current connection and quota
+  - second level lists connections for the selected agent
+- Fixed a popup regression introduced during the header cleanup:
+  - `menubar.ts` still referenced `refreshButton` after the DOM button was removed
+  - that runtime error stopped the tray renderer before any agent rows were painted
+- Simplified the detail header again:
+  - removed the repeated current-connection subtitle
+  - switched the back affordance text to a breadcrumb-style `Agents > {Agent}`
+
+#### Key findings
+
+- The blank popup was not a data/state issue. It was a renderer initialization crash caused by a stale event binding after removing the refresh control.
+- This regression slipped through because the last visual cleanup was not rebuilt before manual verification. The build now catches that exact class of leftover reference again.
+
+### Verification
+
+- `npm run build -w @nile/desktop`

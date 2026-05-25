@@ -14,7 +14,7 @@ export function useNotificationMute(): NotificationMuteState {
 
   useEffect(() => {
     let cancelled = false;
-    void window.nileDesktop.state.getNotificationsMuted().then((muted) => {
+    void window.nileDesktop.notifications.getNotificationsMuted().then((muted) => {
       if (cancelled) {
         return;
       }
@@ -38,7 +38,7 @@ export function useNotificationMute(): NotificationMuteState {
     async setNotificationsMuted(muted: boolean) {
       setIsSaving(true);
       try {
-        const next = await window.nileDesktop.state.setNotificationsMuted(muted);
+        const next = await window.nileDesktop.notifications.setNotificationsMuted(muted);
         setNotificationsMutedState(next);
       } finally {
         setIsSaving(false);

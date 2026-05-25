@@ -6,7 +6,7 @@ import {
   type CredentialStore,
   CredentialNotFoundError,
   CredentialStoreCommandError,
-  KeychainCredentialStore,
+  createPlatformWorkspaceCredentialStore,
 } from "../../services/credential";
 import { SqliteDatabase } from "../../services/database";
 import { createPlatformSecureSnapshotStore, SecureSnapshotStore } from "../../services/history";
@@ -31,17 +31,21 @@ type ResetAccessCredentialRow = {
 
 export class StateReset {
   constructor(
-    private readonly credentialStore: CredentialStore = new KeychainCredentialStore(),
+    private readonly credentialStore: CredentialStore | null = null,
     private readonly secureSnapshotStore: SecureSnapshotStore = createPlatformSecureSnapshotStore(),
   ) {}
 
   reset(databasePath: string): ResetStateResult {
     const historyPath = join(dirname(databasePath), "history");
+    const credentialDirectoryPath = join(dirname(databasePath), "credentials");
+    const credentialsRemovedFromStore = this.removeWorkspaceCredentials(databasePath);
+    const credentialFilesRemoved = this.removePath(credentialDirectoryPath);
+    const credentialsRemoved = credentialsRemovedFromStore || credentialFilesRemoved;
 
     return {
       databasePath,
       historyPath,
-      credentialsRemoved: this.removeWorkspaceCredentials(databasePath),
+      credentialsRemoved,
       databaseRemoved: this.removePath(databasePath),
       historyRemoved: this.removePath(historyPath),
     };
@@ -90,7 +94,7 @@ export class StateReset {
       );
 
       for (const credentialRef of credentialRefs) {
-        this.removeCredential(credentialRef.reference, credentialRef.backend);
+        this.removeCredential(databasePath, credentialRef.reference, credentialRef.backend);
       }
       for (const snapshotRef of secureSnapshotRefs) {
         this.secureSnapshotStore.removeSnapshot(snapshotRef);
@@ -148,11 +152,12 @@ export class StateReset {
   }
 
   private removeCredential(
+    databasePath: string,
     reference: string,
     backend: "system_secure_storage" | "encrypted_local_storage" | undefined,
   ): void {
     try {
-      this.credentialStore.remove(buildCredentialStoreTarget(reference, backend));
+      this.readCredentialStore(databasePath).remove(buildCredentialStoreTarget(reference, backend));
     } catch (error) {
       if (
         error instanceof CredentialNotFoundError
@@ -162,5 +167,9 @@ export class StateReset {
       }
       throw error;
     }
+  }
+
+  private readCredentialStore(databasePath: string): CredentialStore {
+    return this.credentialStore ?? createPlatformWorkspaceCredentialStore(databasePath);
   }
 }

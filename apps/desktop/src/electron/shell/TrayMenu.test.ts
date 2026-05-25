@@ -9,19 +9,6 @@ import type { WorkspaceProfile } from "../profiles/Store";
 import { DesktopTrayMenu } from "./TrayMenu";
 
 describe("DesktopTrayMenu", () => {
-  it("shows a compact left-click summary menu", async () => {
-    const menu = createMenu();
-
-    const template = await menu.readSummaryTemplate();
-
-    expect(template.map((item) => item.label)).toEqual([
-      "Nile    Open app",
-      undefined,
-      "Codex    Weekly 88%",
-      "Claude    Unknown",
-    ]);
-  });
-
   it("keeps the right-click full menu with profiles and agent submenus", async () => {
     const menu = createMenu({
       profiles: [
@@ -36,7 +23,7 @@ describe("DesktopTrayMenu", () => {
     const template = await menu.readTemplate();
 
     expect(template[0]?.label).toBe("Open Main Window");
-    expect(template[2]?.label).toBe("· Work");
+    expect(template[2]?.label).toBe("- Work");
     expect(template.some((item) => item.label === "Codex")).toBe(true);
     expect(template.at(-1)?.label).toBe("Quit");
   });
@@ -45,24 +32,10 @@ describe("DesktopTrayMenu", () => {
     const showSettings = vi.fn();
     const menu = createMenu({ showSettings });
 
-    const template = await menu.readSummaryTemplate();
+    const template = await menu.readTemplate();
     template[0]?.click?.({} as never, {} as never, {} as never);
 
     expect(showSettings).toHaveBeenCalledTimes(1);
-  });
-
-  it("falls back to a loading row when the status-entry state is unavailable", async () => {
-    const menu = createMenu({
-      peekState: () => null,
-      refreshState: async () => {
-        throw new Error("refresh failed");
-      },
-    });
-
-    const template = await menu.readSummaryTemplate();
-
-    expect(template[0]?.label).toBe("Nile    Open app");
-    expect(template[2]?.label?.startsWith("Loading connections")).toBe(true);
   });
 });
 
@@ -85,7 +58,7 @@ function createMenu(options: {
     readLanguagePreference: () => options.language ?? "en",
     readStatusEntryDisplay: () => ({
       hasConfiguredSelectedAgents: true,
-      mode: "ticker",
+      mode: "summary",
       selectedAgentIds: ["codex"],
     }),
     readConnectionQuotaMetricPreferences: async () => ({ "codex-work": "weekly" }),

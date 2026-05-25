@@ -5,7 +5,7 @@ import {
   writeConnectionQuotaMetricPreference,
   type ConnectionQuotaMetricPreferences,
 } from "../../state/ConnectionQuotaMetricPreferences";
-import { DesktopPreferencesStore } from "../settings/Preferences";
+import { DesktopPreferencesClient } from "../settings/PreferencesClient";
 
 type ConnectionQuotaMetricPreferencesState = {
   preferences: ConnectionQuotaMetricPreferences;
@@ -14,34 +14,39 @@ type ConnectionQuotaMetricPreferencesState = {
 };
 
 export function useConnectionQuotaMetricPreferences(): ConnectionQuotaMetricPreferencesState {
-  const preferencesStore = useMemo(
-    () => new DesktopPreferencesStore(window.localStorage, document.documentElement),
+  const preferencesClient = useMemo(
+    () => new DesktopPreferencesClient(),
     [],
   );
-  const [preferences, setPreferences] = useState<ConnectionQuotaMetricPreferences>(
-    () => preferencesStore.load().connectionQuotaMetricPreferences,
-  );
+  const [preferences, setPreferences] = useState<ConnectionQuotaMetricPreferences>({});
 
   useEffect(() => {
-    return preferencesStore.subscribe(() => {
-      setPreferences(preferencesStore.load().connectionQuotaMetricPreferences);
+    void preferencesClient.load().then((next) => {
+      setPreferences(next.connectionQuotaMetricPreferences);
     });
-  }, [preferencesStore]);
+    return preferencesClient.subscribe(() => {
+      void preferencesClient.load().then((next) => {
+        setPreferences(next.connectionQuotaMetricPreferences);
+      });
+    });
+  }, [preferencesClient]);
 
   const setPreference = useCallback((connectionId: string, metricKey: string | null) => {
-    const current = preferencesStore.load();
-    const next = {
-      ...current,
-      connectionQuotaMetricPreferences: writeConnectionQuotaMetricPreference(
-        current.connectionQuotaMetricPreferences,
-        connectionId,
-        metricKey,
-      ),
-    };
-    preferencesStore.save(next);
-    setPreferences(next.connectionQuotaMetricPreferences);
-    void window.nileDesktop.state.refreshStatusEntry().catch(() => undefined);
-  }, [preferencesStore]);
+    void preferencesClient.load().then((current) => {
+      const next = {
+        ...current,
+        connectionQuotaMetricPreferences: writeConnectionQuotaMetricPreference(
+          current.connectionQuotaMetricPreferences,
+          connectionId,
+          metricKey,
+        ),
+      };
+      setPreferences(next.connectionQuotaMetricPreferences);
+      return preferencesClient.save(next);
+    }).then(() => {
+      return window.nileDesktop.statusEntry.refreshStatusEntry();
+    }).catch(() => undefined);
+  }, [preferencesClient]);
 
   const readPreference = useCallback((connectionId: string) => (
     readConnectionQuotaMetricPreference(preferences, connectionId)

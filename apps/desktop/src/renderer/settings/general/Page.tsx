@@ -16,11 +16,11 @@ import {
 } from "../../ui/select";
 import { Separator } from "../../ui/separator";
 import type { DesktopReleaseInfo } from "../../../state/Types";
+import { readStatusEntrySettings } from "../../../state/DesktopPlatform";
 import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { SettingsSection } from "./Section";
 import { CredentialStorageSection } from "./CredentialStorageSection";
 import { UpdateSection } from "./UpdateSection";
-import { readStatusEntrySettings } from "../../shared/Platform";
 
 type SettingsPageProps = {
   credentialStorageMode: CredentialStorageBackend | null;
@@ -32,7 +32,7 @@ type SettingsPageProps = {
   isSavingNotificationMute: boolean;
   isResetting: boolean;
   isSavingProfileFeature: boolean;
-  statusEntryDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"];
+  statusEntryDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.statusEntry.getStatusEntryDisplay>>["mode"];
   notificationsMuted: boolean;
   preferences: DesktopPreferences;
   profileFeatureEnabled: boolean;
@@ -40,7 +40,7 @@ type SettingsPageProps = {
   onCheckForUpdates(): Promise<void>;
   onInstallUpdate(): Promise<void>;
   onStatusEntryDisplayModeChange(
-    mode: Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"],
+    mode: Awaited<ReturnType<typeof window.nileDesktop.statusEntry.getStatusEntryDisplay>>["mode"],
   ): Promise<void>;
   onNotificationsMutedChange(muted: boolean): Promise<void>;
   onProfileFeatureEnabledChange(enabled: boolean): Promise<void>;
@@ -150,7 +150,7 @@ export function SettingsPage({
               value={statusEntryDisplayMode}
               onValueChange={(value) => {
                 void onStatusEntryDisplayModeChange(
-                  value as Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"],
+                  value as Awaited<ReturnType<typeof window.nileDesktop.statusEntry.getStatusEntryDisplay>>["mode"],
                 );
               }}
               disabled={!isLoadedStatusEntryDisplay || isSavingStatusEntryDisplay}
@@ -160,7 +160,7 @@ export function SettingsPage({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="app_entry">{statusEntrySettings.appEntryLabel}</SelectItem>
-                <SelectItem value="ticker">{statusEntrySettings.summaryLabel}</SelectItem>
+                <SelectItem value="summary">{statusEntrySettings.summaryLabel}</SelectItem>
               </SelectContent>
             </Select>
           </SettingsSection>

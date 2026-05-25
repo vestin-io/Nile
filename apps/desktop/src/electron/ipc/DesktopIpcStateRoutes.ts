@@ -2,24 +2,29 @@ import { ipcMain } from "electron";
 
 import type { AgentId } from "@nile/core/models/agent";
 
-import { SUPPORTED_LANGUAGES, type LanguagePreference } from "../../state/UiPreferences";
-import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
-import { DesktopStateStore } from "../state/DesktopStateStore";
 import {
   STATUS_ENTRY_DISPLAY_MODES,
   type DesktopStatusEntryDisplayMode,
   type DesktopStatusEntryDisplayState,
-} from "../state/StatusEntryDisplayStore";
+} from "../../state/StatusEntryDisplay";
+import { SUPPORTED_LANGUAGES, type LanguagePreference } from "../../state/UiPreferences";
+import { normalizeDesktopPreferences, type DesktopPreferences } from "../../state/DesktopPreferences";
+import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
+import { DesktopStateStore } from "../state/DesktopStateStore";
 
 type DesktopIpcStateRoutesOptions = {
+  getDesktopPreferences(): DesktopPreferences;
   getStatusEntryDisplay(): DesktopStatusEntryDisplayState;
   getNotificationsMuted(): boolean;
   getProfileFeatureEnabled(): boolean;
   inputs: DesktopIpcInputValidator;
   notifyLocalStateReset(): void;
   notifyNotificationHistoryChanged(): void;
+  notifyPreferencesChanged(): void;
   refreshAll(): void;
   refreshDesktopState(options: { invalidate: boolean; notifyRenderer: boolean }): Promise<void>;
+  migrateDesktopPreferences(raw: string | null): DesktopPreferences;
+  setDesktopPreferences(preferences: DesktopPreferences): DesktopPreferences;
   setLanguagePreference(language: LanguagePreference): LanguagePreference;
   setStatusEntryDisplayMode(mode: DesktopStatusEntryDisplayMode): DesktopStatusEntryDisplayState;
   setNotificationsMuted(muted: boolean): boolean;
@@ -37,6 +42,7 @@ export class DesktopIpcStateRoutes {
     const { inputs, stateStore } = this.options;
 
     ipcMain.handle("desktop:get-status-entry-state", () => stateStore.getStatusEntryState());
+    ipcMain.handle("desktop:get-desktop-preferences", () => this.options.getDesktopPreferences());
     ipcMain.handle("desktop:get-status-entry-display", () => this.options.getStatusEntryDisplay());
     ipcMain.handle("desktop:get-settings-state", () => stateStore.getSettingsState());
     ipcMain.handle("desktop:get-settings-state-snapshot", () => stateStore.getSettingsStateSnapshot());
@@ -54,8 +60,18 @@ export class DesktopIpcStateRoutes {
       stateStore.markNotificationHistoryReadByFilter(inputs.readNotificationHistoryFilter(filter));
       this.options.notifyNotificationHistoryChanged();
     });
+    ipcMain.handle("desktop:migrate-desktop-preferences", (_event, raw: unknown) => {
+      return this.options.migrateDesktopPreferences(inputs.readNullableString(raw, "raw"));
+    });
+    ipcMain.handle("desktop:set-desktop-preferences", (_event, preferences: unknown) => {
+      const next = this.options.setDesktopPreferences(normalizeDesktopPreferences(preferences));
+      this.options.notifyPreferencesChanged();
+      return next;
+    });
     ipcMain.handle("desktop:set-language-preference", (_event, language: unknown) => {
-      return this.options.setLanguagePreference(this.readLanguagePreference(language));
+      const next = this.options.setLanguagePreference(this.readLanguagePreference(language));
+      this.options.notifyPreferencesChanged();
+      return next;
     });
     ipcMain.handle("desktop:get-notifications-muted", () => this.options.getNotificationsMuted());
     ipcMain.handle("desktop:get-profile-feature-enabled", () => this.options.getProfileFeatureEnabled());

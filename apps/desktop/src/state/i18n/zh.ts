@@ -1,9 +1,6 @@
 import { EN_MESSAGES } from "./en";
 import type { Messages } from "./types";
-
-export const ZH_MESSAGES: Messages = {
-  ...EN_MESSAGES,
-  ...{
+export const ZH_MESSAGES: Messages = { ...EN_MESSAGES, ...{
     "nav.agents": "Agent",
     "nav.quickSetup": "快速设置",
     "nav.connections": "连接",
@@ -498,5 +495,4 @@ export const ZH_MESSAGES: Messages = {
     "menubar.noSavedConnectionsTitle": "还没有已保存连接",
     "menubar.noSavedConnectionsDescription": "先导入当前 Codex 配置，或者在设置里新增一个连接。",
     "menubar.openSettings": "打开设置",
-  },
-};
+  }};
