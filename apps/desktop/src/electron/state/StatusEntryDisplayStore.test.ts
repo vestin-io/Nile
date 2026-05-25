@@ -2,9 +2,10 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+
 import { SqliteDatabase } from "@nile/core/services/database";
 
-import { DesktopMenubarDisplayStore } from "./MenubarDisplayStore";
+import { DesktopStatusEntryDisplayStore } from "./StatusEntryDisplayStore";
 
 const tempDirs: string[] = [];
 
@@ -14,31 +15,31 @@ afterEach(() => {
   }
 });
 
-describe("DesktopMenubarDisplayStore", () => {
-  it("defaults to the app entry mode with no selected ticker agents", () => {
+describe("DesktopStatusEntryDisplayStore", () => {
+  it("defaults to the app entry mode with no selected agents", () => {
     const { databasePath } = createStorePaths();
-    const store = new DesktopMenubarDisplayStore(databasePath);
+    const store = new DesktopStatusEntryDisplayStore(databasePath);
 
     expect(store.read()).toEqual({
-      hasConfiguredTickerAgents: false,
+      hasConfiguredSelectedAgents: false,
       mode: "app_entry",
-      tickerAgentIds: [],
+      selectedAgentIds: [],
     });
   });
 
   it("stores ticker mode and selected agents", () => {
     const { databasePath } = createStorePaths();
-    const store = new DesktopMenubarDisplayStore(databasePath);
+    const store = new DesktopStatusEntryDisplayStore(databasePath);
 
     expect(store.writeMode("ticker")).toEqual({
-      hasConfiguredTickerAgents: false,
+      hasConfiguredSelectedAgents: false,
       mode: "ticker",
-      tickerAgentIds: [],
+      selectedAgentIds: [],
     });
-    expect(store.writeTickerAgentIds(["cursor", "codex", "cursor"])).toEqual({
-      hasConfiguredTickerAgents: true,
+    expect(store.writeSelectedAgentIds(["cursor", "codex", "cursor"])).toEqual({
+      hasConfiguredSelectedAgents: true,
       mode: "ticker",
-      tickerAgentIds: ["codex", "cursor"],
+      selectedAgentIds: ["codex", "cursor"],
     });
 
     const database = SqliteDatabase.open(databasePath);
@@ -53,44 +54,44 @@ describe("DesktopMenubarDisplayStore", () => {
     }
   });
 
-  it("rewrites ticker agents in supported-agent order", () => {
+  it("rewrites selected agents in supported-agent order", () => {
     const { databasePath } = createStorePaths();
-    const store = new DesktopMenubarDisplayStore(databasePath);
+    const store = new DesktopStatusEntryDisplayStore(databasePath);
 
     store.writeMode("ticker");
-    expect(store.writeTickerAgentIds(["codex"])).toEqual({
-      hasConfiguredTickerAgents: true,
+    expect(store.writeSelectedAgentIds(["codex"])).toEqual({
+      hasConfiguredSelectedAgents: true,
       mode: "ticker",
-      tickerAgentIds: ["codex"],
+      selectedAgentIds: ["codex"],
     });
-    expect(store.writeTickerAgentIds(["cursor", "codex"])).toEqual({
-      hasConfiguredTickerAgents: true,
+    expect(store.writeSelectedAgentIds(["cursor", "codex"])).toEqual({
+      hasConfiguredSelectedAgents: true,
       mode: "ticker",
-      tickerAgentIds: ["codex", "cursor"],
+      selectedAgentIds: ["codex", "cursor"],
     });
-    expect(store.writeTickerAgentIds(["cursor"])).toEqual({
-      hasConfiguredTickerAgents: true,
+    expect(store.writeSelectedAgentIds(["cursor"])).toEqual({
+      hasConfiguredSelectedAgents: true,
       mode: "ticker",
-      tickerAgentIds: ["cursor"],
+      selectedAgentIds: ["cursor"],
     });
   });
 
-  it("keeps configured ticker agents when restoring the default app entry mode", () => {
+  it("keeps configured selected agents when restoring the default app entry mode", () => {
     const { databasePath } = createStorePaths();
-    const store = new DesktopMenubarDisplayStore(databasePath);
+    const store = new DesktopStatusEntryDisplayStore(databasePath);
     store.writeMode("ticker");
-    store.writeTickerAgentIds(["codex"]);
+    store.writeSelectedAgentIds(["codex"]);
 
     expect(store.writeMode("app_entry")).toEqual({
-      hasConfiguredTickerAgents: true,
+      hasConfiguredSelectedAgents: true,
       mode: "app_entry",
-      tickerAgentIds: ["codex"],
+      selectedAgentIds: ["codex"],
     });
   });
 });
 
 function createStorePaths(): { databasePath: string } {
-  const dir = mkdtempSync(join(tmpdir(), "nile-desktop-menubar-display-"));
+  const dir = mkdtempSync(join(tmpdir(), "nile-desktop-status-entry-display-"));
   tempDirs.push(dir);
   return {
     databasePath: join(dir, "desktop.sqlite"),

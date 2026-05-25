@@ -1,6 +1,6 @@
 import { SqliteDatabase } from "@nile/core/services/database";
 
-import type { MenubarState, SettingsState } from "../../state/Types";
+import type { DesktopStatusEntryState, SettingsState } from "../../state/Types";
 
 type SnapshotRow = {
   payload: string;
@@ -8,7 +8,7 @@ type SnapshotRow = {
 };
 
 type DesktopStateSnapshot = {
-  menubarState: MenubarState | null;
+  statusEntryState: DesktopStatusEntryState | null;
   settingsState: SettingsState | null;
 };
 
@@ -24,7 +24,7 @@ export class DesktopStateSnapshotStore {
     try {
       this.initialize(database);
       return {
-        menubarState: this.readValue(database, MENUBAR_STATE_KEY, isMenubarState),
+        statusEntryState: this.readValue(database, MENUBAR_STATE_KEY, isStatusEntryState),
         settingsState: this.readValue(database, SETTINGS_STATE_KEY, isSettingsState),
       };
     } finally {
@@ -32,7 +32,7 @@ export class DesktopStateSnapshotStore {
     }
   }
 
-  writeMenubarState(state: MenubarState): void {
+  writeStatusEntryState(state: DesktopStatusEntryState): void {
     this.writeValue(MENUBAR_STATE_KEY, state);
   }
 
@@ -60,7 +60,7 @@ export class DesktopStateSnapshotStore {
     }
   }
 
-  private writeValue(key: string, value: MenubarState | SettingsState): void {
+  private writeValue(key: string, value: DesktopStatusEntryState | SettingsState): void {
     const database = SqliteDatabase.open(this.databasePath);
     try {
       this.initialize(database);
@@ -94,7 +94,7 @@ export class DesktopStateSnapshotStore {
   }
 }
 
-function isMenubarState(value: unknown): value is MenubarState {
+function isStatusEntryState(value: unknown): value is DesktopStatusEntryState {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }

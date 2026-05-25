@@ -20,16 +20,16 @@ type UseSettingsPageContentPropsOptions = {
   defaultOpenAiAuthJsonPath: string;
   definitions: SettingsPageContentProps["definitions"];
   historyState: SettingsPageContentProps["historyState"];
-  isLoadedMenubarDisplay: boolean;
+  isLoadedStatusEntryDisplay: boolean;
   isLoadedNotificationMute: boolean;
   isLoadingNotificationHistory: boolean;
   isMarkingNotificationHistoryRead: boolean;
   isResetting: boolean;
-  isSavingMenubarDisplay: boolean;
+  isSavingStatusEntryDisplay: boolean;
   isSavingNotificationMute: boolean;
   isSavingProfileFeature: boolean;
   language: SettingsPageContentProps["language"];
-  menubarDisplayMode: SettingsPageContentProps["menubarDisplayMode"];
+  statusEntryDisplayMode: SettingsPageContentProps["statusEntryDisplayMode"];
   markNotificationHistoryRead: SettingsPageContentProps["onMarkNotificationHistoryRead"];
   markNotificationHistoryReadByFilter: SettingsPageContentProps["onMarkNotificationHistoryReadByFilter"];
   notificationHistoryConnections: SettingsPageContentProps["notificationHistoryConnections"];
@@ -97,7 +97,7 @@ type UseSettingsPageContentPropsOptions = {
     profileSave(profileId: string, name: string, emoji: string, assignments: WorkspaceProfileAssignment[]): Promise<void>;
     saveAgentHome(agentId: AgentId, path: string | null): Promise<void>;
     saveAgentRuntimeCommand(agentId: AgentId, path: string | null): Promise<void>;
-    setMenubarDisplayMode(mode: SettingsPageContentProps["menubarDisplayMode"]): Promise<void>;
+    setStatusEntryDisplayMode(mode: SettingsPageContentProps["statusEntryDisplayMode"]): Promise<void>;
     setNotificationsMuted(muted: boolean): Promise<void>;
     themeChange(theme: SettingsPageContentProps["preferences"]["theme"]): void;
     updateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): Promise<void>;
@@ -119,16 +119,16 @@ export function useSettingsPageContentProps(
     historyState: input.historyState,
     isCredentialStorageModeLocked: input.credentialStorageModeState.isLocked,
     isCredentialStorageModeMixed: input.credentialStorageModeState.isMixed,
-    isLoadedMenubarDisplay: input.isLoadedMenubarDisplay,
+    isLoadedStatusEntryDisplay: input.isLoadedStatusEntryDisplay,
     isLoadedNotificationMute: input.isLoadedNotificationMute,
     isLoadingNotificationHistory: input.isLoadingNotificationHistory,
     isMarkingNotificationHistoryRead: input.isMarkingNotificationHistoryRead,
     isResetting: input.isResetting,
-    isSavingMenubarDisplay: input.isSavingMenubarDisplay,
+    isSavingStatusEntryDisplay: input.isSavingStatusEntryDisplay,
     isSavingNotificationMute: input.isSavingNotificationMute,
     isSavingProfileFeature: input.isSavingProfileFeature,
     language: input.language,
-    menubarDisplayMode: input.menubarDisplayMode,
+    statusEntryDisplayMode: input.statusEntryDisplayMode,
     notificationHistoryConnections: input.notificationHistoryConnections,
     notificationHistoryFilter: input.notificationHistoryFilter,
     notificationHistoryState: input.notificationHistoryState,
@@ -202,7 +202,7 @@ export function useSettingsPageContentProps(
     onLanguageChange: input.windowActions.languageChange,
     onMarkNotificationHistoryRead: input.markNotificationHistoryRead,
     onMarkNotificationHistoryReadByFilter: input.markNotificationHistoryReadByFilter,
-    onMenubarDisplayModeChange: input.windowActions.setMenubarDisplayMode,
+    onStatusEntryDisplayModeChange: input.windowActions.setStatusEntryDisplayMode,
     onNotificationHistoryFilterChange: (filter) => {
       input.setNotificationHistoryFilter(filter);
       input.setCurrentPage("notifications");

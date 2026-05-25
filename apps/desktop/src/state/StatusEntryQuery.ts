@@ -4,26 +4,26 @@ import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { NileSession } from "@nile/builtins/runtime";
 
 import type { DesktopStateReadContext } from "./ReadContext";
-import type { MenubarAgentState, MenubarState } from "./Types";
+import type { DesktopStatusEntryAgentState, DesktopStatusEntryState } from "./Types";
 import { DesktopConnectionListPresenter } from "./connection/List";
 import { DesktopConnectionStatusPresenter } from "./connection/Status";
 import { DesktopUsageCache } from "./UsageCache";
 
-export class DesktopMenubarStateQuery {
+export class DesktopStatusEntryStateQuery {
   constructor(
     private readonly lists: DesktopConnectionListPresenter,
     private readonly status: DesktopConnectionStatusPresenter,
     private readonly usage: DesktopUsageCache,
   ) {}
 
-  async read(session: NileSession): Promise<MenubarState> {
+  async read(session: NileSession): Promise<DesktopStatusEntryState> {
     return this.readFromContext({
       savedConnections: session.listSavedConnections(),
       statuses: this.listStatuses(session),
     });
   }
 
-  readFromContext(context: Pick<DesktopStateReadContext, "savedConnections" | "statuses">): MenubarState {
+  readFromContext(context: Pick<DesktopStateReadContext, "savedConnections" | "statuses">): DesktopStatusEntryState {
     return {
       agents: this.buildAgents(context.savedConnections, context.statuses),
     };
@@ -44,7 +44,7 @@ export class DesktopMenubarStateQuery {
   private buildAgents(
     savedConnections: SavedConnectionSummary[],
     statuses: AgentStatusView[],
-  ): MenubarAgentState[] {
+  ): DesktopStatusEntryAgentState[] {
     return statuses.map((status) => {
       const agentId = status.agent;
       const currentConnection = this.status.resolveEffectiveCurrentConnection(status, savedConnections);

@@ -7,10 +7,10 @@ import type { NileSession } from "@nile/builtins/runtime";
 
 import { DesktopConnectionListPresenter } from "./connection/List";
 import { DesktopConnectionStatusPresenter } from "./connection/Status";
-import { DesktopMenubarStateQuery } from "./MenubarQuery";
+import { DesktopStatusEntryStateQuery } from "./StatusEntryQuery";
 import { DesktopUsageCache } from "./UsageCache";
 
-describe("DesktopMenubarStateQuery", () => {
+describe("DesktopStatusEntryStateQuery", () => {
   it("reads agent status in one batched session call", async () => {
     let getAgentStatusCallCount = 0;
     let listAgentStatusesCallCount = 0;
@@ -20,11 +20,11 @@ describe("DesktopMenubarStateQuery", () => {
       },
       getAgentStatus() {
         getAgentStatusCallCount += 1;
-        throw new Error("Desktop menubar query should not call getAgentStatus per agent");
+        throw new Error("Desktop status-entry query should not call getAgentStatus per agent");
       },
       listAgentStatuses(agentIds?: AgentId[]) {
-      listAgentStatusesCallCount += 1;
-      return (agentIds ?? [...SUPPORTED_AGENT_IDS]).map((agentId) => createStatus(agentId));
+        listAgentStatusesCallCount += 1;
+        return (agentIds ?? [...SUPPORTED_AGENT_IDS]).map((agentId) => createStatus(agentId));
       },
     } as unknown as NileSession;
     const logger = {
@@ -32,7 +32,7 @@ describe("DesktopMenubarStateQuery", () => {
       warn() {},
     } as unknown as NileLogger;
 
-    const query = new DesktopMenubarStateQuery(
+    const query = new DesktopStatusEntryStateQuery(
       new DesktopConnectionListPresenter(),
       new DesktopConnectionStatusPresenter(),
       new DesktopUsageCache(logger),

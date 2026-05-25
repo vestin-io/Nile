@@ -10,17 +10,17 @@ import { type CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import type { SecureSnapshotStore } from "@nile/core/services/history";
 import {
+  type DesktopStatusEntryState,
   type HistoryState,
-  type MenubarState,
   type SettingsState,
 } from "./Types";
 import { DesktopConnectionListPresenter } from "./connection/List";
 import { DesktopConnectionStatusPresenter } from "./connection/Status";
 import { DesktopStateErrorNormalizer } from "./ErrorNormalizer";
 import { DesktopHistoryStateQuery } from "./HistoryQuery";
-import { DesktopMenubarStateQuery } from "./MenubarQuery";
 import type { DesktopStateReadContext } from "./ReadContext";
 import { DesktopSettingsStateQuery } from "./SettingsQuery";
+import { DesktopStatusEntryStateQuery } from "./StatusEntryQuery";
 import { DesktopUsageCache } from "./UsageCache";
 
 type DesktopSurfaceOptions = {
@@ -44,7 +44,7 @@ export class DesktopSurface {
   private readonly status = new DesktopConnectionStatusPresenter();
   private readonly errors = new DesktopStateErrorNormalizer();
   private readonly history = new DesktopHistoryStateQuery();
-  private readonly menubar: DesktopMenubarStateQuery;
+  private readonly statusEntry: DesktopStatusEntryStateQuery;
   private readonly settings: DesktopSettingsStateQuery;
   private menubarUsageRefresh: Promise<void> | null = null;
 
@@ -53,7 +53,7 @@ export class DesktopSurface {
   ) {
     this.logger = options.logger ?? NileLogger.createDefault({ module: "desktop" });
     this.usage = new DesktopUsageCache(this.logger);
-    this.menubar = new DesktopMenubarStateQuery(this.lists, this.status, this.usage);
+    this.statusEntry = new DesktopStatusEntryStateQuery(this.lists, this.status, this.usage);
     this.settings = new DesktopSettingsStateQuery({
       agentRuntimeCommandOverrides: options.agentRuntimeCommandOverrides,
       environment: options.environment ?? EnvironmentSource.empty(),
@@ -62,23 +62,23 @@ export class DesktopSurface {
     }, this.lists, this.status, this.usage);
   }
 
-  async getMenubarState(): Promise<MenubarState> {
-    const state = await this.withSession("menubar-state", async (session) => await this.menubar.read(session));
+  async getStatusEntryState(): Promise<DesktopStatusEntryState> {
+    const state = await this.withSession("menubar-state", async (session) => await this.statusEntry.read(session));
 
     if (state.agents.some((agent) => agent.currentConnection && agent.currentUsage === null)) {
-      void this.refreshMenubarUsage();
+      void this.refreshStatusEntryUsage();
     }
 
     return state;
   }
 
-  async refreshMenubarUsage(): Promise<void> {
+  async refreshStatusEntryUsage(): Promise<void> {
     if (this.menubarUsageRefresh) {
       return await this.menubarUsageRefresh;
     }
 
     this.menubarUsageRefresh = this.withSession("menubar-usage-refresh", async (session) => {
-      await this.menubar.refreshUsage(session);
+      await this.statusEntry.refreshUsage(session);
     }).finally(() => {
       this.menubarUsageRefresh = null;
     });
@@ -90,15 +90,15 @@ export class DesktopSurface {
     return await this.withSession("settings-state", async (session) => await this.settings.read(session, options));
   }
 
-  async primeStartupState(): Promise<{ menubarState: MenubarState; settingsState: SettingsState }> {
+  async primeStartupState(): Promise<{ statusEntryState: DesktopStatusEntryState; settingsState: SettingsState }> {
     return await this.withSession("startup-state", async (session) => {
       const context = this.createReadContext(session);
-      const [menubarState, settingsState] = await Promise.all([
-        this.menubar.readFromContext(context),
+      const [statusEntryState, settingsState] = await Promise.all([
+        this.statusEntry.readFromContext(context),
         this.settings.readFromContext(session, context, { refreshUsage: false }),
       ]);
       return {
-        menubarState,
+        statusEntryState,
         settingsState,
       };
     });

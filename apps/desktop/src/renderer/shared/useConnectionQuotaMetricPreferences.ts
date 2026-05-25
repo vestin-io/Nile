@@ -40,7 +40,7 @@ export function useConnectionQuotaMetricPreferences(): ConnectionQuotaMetricPref
     };
     preferencesStore.save(next);
     setPreferences(next.connectionQuotaMetricPreferences);
-    void window.nileDesktop.state.refreshMenubar().catch(() => undefined);
+    void window.nileDesktop.state.refreshStatusEntry().catch(() => undefined);
   }, [preferencesStore]);
 
   const readPreference = useCallback((connectionId: string) => (

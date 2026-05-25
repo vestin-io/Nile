@@ -8,7 +8,7 @@ type RefreshDesktopStateOptions = {
   notifyRenderer: boolean;
 };
 
-type RefreshMenubarUsageOptions = {
+type RefreshStatusEntryUsageOptions = {
   notifyRenderer?: boolean;
   tolerateFailures?: boolean;
 };
@@ -29,8 +29,8 @@ export class DesktopStateRefresher {
     }
 
     await Promise.all([
-      this.options.stateStore.refreshMenubarState(),
-      this.options.stateStore.refreshMenubarUsage(),
+      this.options.stateStore.refreshStatusEntryState(),
+      this.options.stateStore.refreshStatusEntryUsage(),
     ]);
     await this.evaluateAlerts();
 
@@ -39,12 +39,12 @@ export class DesktopStateRefresher {
     }
   }
 
-  async refreshMenubarUsage(options: RefreshMenubarUsageOptions = {}): Promise<void> {
+  async refreshStatusEntryUsage(options: RefreshStatusEntryUsageOptions = {}): Promise<void> {
     const notifyRenderer = options.notifyRenderer ?? true;
     const tolerateFailures = options.tolerateFailures ?? true;
 
     try {
-      await this.options.stateStore.refreshMenubarUsage();
+      await this.options.stateStore.refreshStatusEntryUsage();
       await this.evaluateAlerts();
       if (notifyRenderer) {
         this.options.notifyRenderer();
@@ -54,7 +54,7 @@ export class DesktopStateRefresher {
         throw error;
       }
 
-      this.options.logger.warn("desktop.menubar_usage_refresh_failed", {
+      this.options.logger.warn("desktop.status_entry_usage_refresh_failed", {
         error: error instanceof Error ? error.message : String(error),
       });
     }

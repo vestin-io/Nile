@@ -1,61 +1,61 @@
 import { describe, expect, it } from "vitest";
 
-import { DesktopTrayTickerTitle } from "./TickerTitle";
-import type { MenubarState } from "../../state/Types";
+import type { DesktopStatusEntryState } from "../../state/Types";
+import { DesktopStatusEntryTitle } from "./StatusEntryTitle";
 
-describe("DesktopTrayTickerTitle", () => {
+describe("DesktopStatusEntryTitle", () => {
   it("returns an empty title outside ticker mode", () => {
-    expect(DesktopTrayTickerTitle.format(createState(), {
-      hasConfiguredTickerAgents: true,
+    expect(DesktopStatusEntryTitle.format(createState(), {
+      hasConfiguredSelectedAgents: true,
       mode: "app_entry",
-      tickerAgentIds: ["codex"],
+      selectedAgentIds: ["codex"],
     }, {})).toBe("");
   });
 
   it("formats selected agents with available current usage", () => {
-    expect(DesktopTrayTickerTitle.format(createState(), {
-      hasConfiguredTickerAgents: true,
+    expect(DesktopStatusEntryTitle.format(createState(), {
+      hasConfiguredSelectedAgents: true,
       mode: "ticker",
-      tickerAgentIds: ["codex", "cursor", "claude"],
+      selectedAgentIds: ["codex", "cursor", "claude"],
     }, {})).toBe("Codex 72% · Cursor 6%");
   });
 
   it("omits selected agents that do not have available usage", () => {
-    expect(DesktopTrayTickerTitle.format(createState(), {
-      hasConfiguredTickerAgents: true,
+    expect(DesktopStatusEntryTitle.format(createState(), {
+      hasConfiguredSelectedAgents: true,
       mode: "ticker",
-      tickerAgentIds: ["claude"],
+      selectedAgentIds: ["claude"],
     }, {})).toBe("");
   });
 
-  it("defaults to the first available quota agent when ticker agents were never configured", () => {
-    expect(DesktopTrayTickerTitle.format(createState(), {
-      hasConfiguredTickerAgents: false,
+  it("defaults to the first available quota agent when selected agents were never configured", () => {
+    expect(DesktopStatusEntryTitle.format(createState(), {
+      hasConfiguredSelectedAgents: false,
       mode: "ticker",
-      tickerAgentIds: [],
+      selectedAgentIds: [],
     }, {})).toBe("Codex 72%");
   });
 
   it("uses the pinned connection metric when one is configured", () => {
-    expect(DesktopTrayTickerTitle.format(createState(), {
-      hasConfiguredTickerAgents: true,
+    expect(DesktopStatusEntryTitle.format(createState(), {
+      hasConfiguredSelectedAgents: true,
       mode: "ticker",
-      tickerAgentIds: ["codex"],
+      selectedAgentIds: ["codex"],
     }, {
       "codex-work": "weekly",
     })).toBe("Codex 88%");
   });
 
-  it("can remove the inferred default selection before any explicit ticker config exists", () => {
-    expect(DesktopTrayTickerTitle.toggleSelectedAgentIds(createState(), {
-      hasConfiguredTickerAgents: false,
+  it("can remove the inferred default selection before any explicit selection config exists", () => {
+    expect(DesktopStatusEntryTitle.toggleSelectedAgentIds(createState(), {
+      hasConfiguredSelectedAgents: false,
       mode: "app_entry",
-      tickerAgentIds: [],
+      selectedAgentIds: [],
     }, "codex")).toEqual([]);
   });
 });
 
-function createState(): MenubarState {
+function createState(): DesktopStatusEntryState {
   return {
     agents: [
       {
@@ -80,9 +80,7 @@ function createState(): MenubarState {
         currentConnection: { id: "cursor-work" } as never,
         currentUsage: {
           status: "available",
-          windows: [
-            { key: "monthly", label: "monthly", remainingPercent: 6, resetsAt: null },
-          ],
+          windows: [{ key: "monthly", label: "monthly", remainingPercent: 6, resetsAt: null }],
           windowLabel: "monthly",
           remainingPercent: 6,
           text: "monthly 6% left",

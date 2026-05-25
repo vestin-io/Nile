@@ -20,26 +20,27 @@ import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { SettingsSection } from "./Section";
 import { CredentialStorageSection } from "./CredentialStorageSection";
 import { UpdateSection } from "./UpdateSection";
+import { readStatusEntrySettings } from "../../shared/Platform";
 
 type SettingsPageProps = {
   credentialStorageMode: CredentialStorageBackend | null;
   isCredentialStorageModeLocked: boolean;
   isCredentialStorageModeMixed: boolean;
   isLoadedNotificationMute: boolean;
-  isLoadedMenubarDisplay: boolean;
-  isSavingMenubarDisplay: boolean;
+  isLoadedStatusEntryDisplay: boolean;
+  isSavingStatusEntryDisplay: boolean;
   isSavingNotificationMute: boolean;
   isResetting: boolean;
   isSavingProfileFeature: boolean;
-  menubarDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"];
+  statusEntryDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"];
   notificationsMuted: boolean;
   preferences: DesktopPreferences;
   profileFeatureEnabled: boolean;
   releaseInfo: DesktopReleaseInfo | null;
   onCheckForUpdates(): Promise<void>;
   onInstallUpdate(): Promise<void>;
-  onMenubarDisplayModeChange(
-    mode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"],
+  onStatusEntryDisplayModeChange(
+    mode: Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"],
   ): Promise<void>;
   onNotificationsMutedChange(muted: boolean): Promise<void>;
   onProfileFeatureEnabledChange(enabled: boolean): Promise<void>;
@@ -54,19 +55,19 @@ export function SettingsPage({
   isCredentialStorageModeLocked,
   isCredentialStorageModeMixed,
   isLoadedNotificationMute,
-  isLoadedMenubarDisplay,
-  isSavingMenubarDisplay,
+  isLoadedStatusEntryDisplay,
+  isSavingStatusEntryDisplay,
   isSavingNotificationMute,
   isResetting,
   isSavingProfileFeature,
-  menubarDisplayMode,
+  statusEntryDisplayMode,
   notificationsMuted,
   preferences,
   profileFeatureEnabled,
   releaseInfo,
   onCheckForUpdates,
   onInstallUpdate,
-  onMenubarDisplayModeChange,
+  onStatusEntryDisplayModeChange,
   onNotificationsMutedChange,
   onProfileFeatureEnabledChange,
   onReset,
@@ -74,6 +75,8 @@ export function SettingsPage({
   onThemeChange,
   t,
 }: SettingsPageProps) {
+  const statusEntrySettings = readStatusEntrySettings(t);
+
   return (
     <div className="overflow-hidden rounded-xl border bg-background">
       <SettingsSection
@@ -137,30 +140,34 @@ export function SettingsPage({
 
       <Separator />
 
-      <SettingsSection
-        title={t("settings.menubar.title")}
-        description={t("settings.menubar.description")}
-      >
-        <Select
-          value={menubarDisplayMode}
-          onValueChange={(value) => {
-            void onMenubarDisplayModeChange(
-              value as Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"],
-            );
-          }}
-          disabled={!isLoadedMenubarDisplay || isSavingMenubarDisplay}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={t("settings.menubar.label")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="app_entry">{t("settings.menubar.appEntry")}</SelectItem>
-            <SelectItem value="ticker">{t("settings.menubar.ticker")}</SelectItem>
-          </SelectContent>
-        </Select>
-      </SettingsSection>
+      {statusEntrySettings ? (
+        <>
+          <SettingsSection
+            title={statusEntrySettings.title}
+            description={statusEntrySettings.description}
+          >
+            <Select
+              value={statusEntryDisplayMode}
+              onValueChange={(value) => {
+                void onStatusEntryDisplayModeChange(
+                  value as Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"],
+                );
+              }}
+              disabled={!isLoadedStatusEntryDisplay || isSavingStatusEntryDisplay}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={statusEntrySettings.label} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="app_entry">{statusEntrySettings.appEntryLabel}</SelectItem>
+                <SelectItem value="ticker">{statusEntrySettings.summaryLabel}</SelectItem>
+              </SelectContent>
+            </Select>
+          </SettingsSection>
 
-      <Separator />
+          <Separator />
+        </>
+      ) : null}
 
       <SettingsSection
         title={t("settings.profiles.title")}

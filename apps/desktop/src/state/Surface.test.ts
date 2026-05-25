@@ -63,7 +63,7 @@ describe("DesktopSurface", () => {
     const surface = createSurface(setup);
     applySavedConnection(setup, "codex", "work");
 
-    expect(await surface.getMenubarState()).toEqual({
+    expect(await surface.getStatusEntryState()).toEqual({
       agents: [
         expect.objectContaining({
           agentId: "codex",
@@ -711,7 +711,7 @@ describe("DesktopSurface", () => {
 
     const surface = createSurface(setup);
 
-    expect(await surface.getMenubarState()).toEqual({
+    expect(await surface.getStatusEntryState()).toEqual({
       agents: [
         {
           agentId: "codex",
@@ -856,9 +856,9 @@ describe("DesktopSurface", () => {
 
     const surface = createSurface(setup);
     applySavedConnection(setup, "codex", "personal");
-    await surface.refreshMenubarUsage();
+    await surface.refreshStatusEntryUsage();
 
-    const state = await surface.getMenubarState();
+    const state = await surface.getStatusEntryState();
     expect(state.agents[0]?.currentUsage).toEqual({
       status: "available",
       planLabel: "Plus",

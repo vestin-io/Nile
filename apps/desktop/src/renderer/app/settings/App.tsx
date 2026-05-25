@@ -6,7 +6,7 @@ import { useNotificationHistory } from "./useNotificationHistory";
 import { useNotificationUnread } from "./useNotificationUnread";
 import { useNotificationMute } from "./useNotificationMute";
 import { useDesktopPreferences } from "./usePreferences";
-import { useMenubarDisplay } from "./useMenubarDisplay";
+import { useStatusEntryDisplay } from "./useStatusEntryDisplay";
 import { useProfileFeature } from "./useProfileFeature";
 import { useSettingsNavigation } from "./useNavigation";
 import { useDesktopData } from "./useData";
@@ -41,11 +41,11 @@ export function SettingsApp() {
   } = useDesktopData();
   const { preferences, setPreferences, t } = useDesktopPreferences();
   const {
-    isLoaded: isMenubarDisplayLoaded,
-    isSaving: isSavingMenubarDisplay,
-    mode: menubarDisplayMode,
-    setMode: setMenubarDisplayMode,
-  } = useMenubarDisplay();
+    isLoaded: isStatusEntryDisplayLoaded,
+    isSaving: isSavingStatusEntryDisplay,
+    mode: statusEntryDisplayMode,
+    setMode: setStatusEntryDisplayMode,
+  } = useStatusEntryDisplay();
   const {
     isLoaded: isNotificationMuteLoaded,
     isSaving: isSavingNotificationMute,
@@ -189,6 +189,7 @@ export function SettingsApp() {
     unlockEncryptedLocalStorageError,
   } = useCredentialStorageSession({
     onActionError: setActionError,
+    onUnlocked: refresh,
     t,
   });
 
@@ -199,7 +200,7 @@ export function SettingsApp() {
   }, [updatePromptKey]);
 
   useEffect(() => {
-    void window.nileDesktop.state.refreshMenubar().catch(() => undefined);
+    void window.nileDesktop.state.refreshStatusEntry().catch(() => undefined);
   }, [preferences.language, preferences.theme]);
 
   if (isLoading && (!settingsState || !historyState)) {
@@ -279,18 +280,18 @@ export function SettingsApp() {
     definitions,
     historyState,
     importCurrentConnection,
-    isLoadedMenubarDisplay: isMenubarDisplayLoaded,
+    isLoadedStatusEntryDisplay: isStatusEntryDisplayLoaded,
     isLoadedNotificationMute: isNotificationMuteLoaded,
     isLoadingNotificationHistory,
     isMarkingNotificationHistoryRead,
     isResetting,
-    isSavingMenubarDisplay,
+    isSavingStatusEntryDisplay,
     isSavingNotificationMute,
     isSavingProfileFeature,
     language: preferences.language,
     markNotificationHistoryRead,
     markNotificationHistoryReadByFilter,
-    menubarDisplayMode,
+    statusEntryDisplayMode,
     notificationHistoryConnections,
     notificationHistoryFilter,
     notificationHistoryState,
@@ -375,7 +376,7 @@ export function SettingsApp() {
       saveAgentRuntimeCommand: async (agentId, path) => {
         await window.nileDesktop.app.updateAgentRuntimeCommand(agentId, path);
       },
-      setMenubarDisplayMode,
+      setStatusEntryDisplayMode,
       setNotificationsMuted,
       themeChange: (theme) => setPreferences((current) => ({ ...current, theme })),
       updateAgentConnectionModel: async (agentId, connectionId, modelId) => {

@@ -41,15 +41,15 @@ export type SettingsPageContentProps = {
   definitions: Definition[];
   historyState: HistoryState;
   isLoadedNotificationMute: boolean;
-  isLoadedMenubarDisplay: boolean;
+  isLoadedStatusEntryDisplay: boolean;
   isLoadingNotificationHistory: boolean;
   isMarkingNotificationHistoryRead: boolean;
-  isSavingMenubarDisplay: boolean;
+  isSavingStatusEntryDisplay: boolean;
   isSavingNotificationMute: boolean;
   isResetting: boolean;
   isSavingProfileFeature: boolean;
   language: LanguagePreference;
-  menubarDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"];
+  statusEntryDisplayMode: Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"];
   notificationsMuted: boolean;
   notificationHistoryFilter: NotificationHistoryFilter;
   notificationHistoryConnections: DesktopNotificationHistoryConnection[];
@@ -96,8 +96,8 @@ export type SettingsPageContentProps = {
   onDeleteProfile(profileId: string): Promise<void>;
   onInstallUpdate(): Promise<void>;
   onLanguageChange(language: LanguagePreference): void;
-  onMenubarDisplayModeChange(
-    mode: Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarDisplay>>["mode"],
+  onStatusEntryDisplayModeChange(
+    mode: Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryDisplay>>["mode"],
   ): Promise<void>;
   onNotificationsMutedChange(muted: boolean): Promise<void>;
   onNotificationHistoryFilterChange(filter: NotificationHistoryFilter): void;
@@ -154,15 +154,15 @@ export function SettingsPageContent({
   definitions,
   historyState,
   isLoadedNotificationMute,
-  isLoadedMenubarDisplay,
+  isLoadedStatusEntryDisplay,
   isLoadingNotificationHistory,
   isMarkingNotificationHistoryRead,
-  isSavingMenubarDisplay,
+  isSavingStatusEntryDisplay,
   isSavingNotificationMute,
   isResetting,
   isSavingProfileFeature,
   language,
-  menubarDisplayMode,
+  statusEntryDisplayMode,
   notificationsMuted,
   notificationHistoryFilter,
   notificationHistoryConnections,
@@ -201,7 +201,7 @@ export function SettingsPageContent({
   onDeleteProfile,
   onInstallUpdate,
   onLanguageChange,
-  onMenubarDisplayModeChange,
+  onStatusEntryDisplayModeChange,
   onNotificationsMutedChange,
   onNotificationHistoryFilterChange,
   onMarkNotificationHistoryRead,
@@ -393,9 +393,9 @@ export function SettingsPageContent({
     return (
       <SettingsPage
         isLoadedNotificationMute={isLoadedNotificationMute}
-        isLoadedMenubarDisplay={isLoadedMenubarDisplay}
-        isSavingMenubarDisplay={isSavingMenubarDisplay}
-        menubarDisplayMode={menubarDisplayMode}
+        isLoadedStatusEntryDisplay={isLoadedStatusEntryDisplay}
+        isSavingStatusEntryDisplay={isSavingStatusEntryDisplay}
+        statusEntryDisplayMode={statusEntryDisplayMode}
         credentialStorageMode={credentialStorageMode}
         isCredentialStorageModeLocked={isCredentialStorageModeLocked}
         isCredentialStorageModeMixed={isCredentialStorageModeMixed}
@@ -410,7 +410,7 @@ export function SettingsPageContent({
         onCheckForUpdates={onCheckForUpdates}
         onInstallUpdate={onInstallUpdate}
         onLanguageChange={onLanguageChange}
-        onMenubarDisplayModeChange={onMenubarDisplayModeChange}
+        onStatusEntryDisplayModeChange={onStatusEntryDisplayModeChange}
         onNotificationsMutedChange={onNotificationsMutedChange}
         onProfileFeatureEnabledChange={onProfileFeatureEnabledChange}
         onReset={onReset}

@@ -72,9 +72,13 @@ export class DesktopUsageCache {
         if (!connectionId) {
           return;
         }
-        const summary = await this.readUsageSummary(session, connectionId);
-        this.usageByConnectionId.set(connectionId, summary);
-        this.usageReadAt.set(connectionId, Date.now());
+        const result = await this.readUsageSummary(session, connectionId);
+        this.usageByConnectionId.set(connectionId, result.summary);
+        if (result.cacheable) {
+          this.usageReadAt.set(connectionId, Date.now());
+        } else {
+          this.usageReadAt.delete(connectionId);
+        }
       }
     });
     await Promise.all(workers);
@@ -91,18 +95,24 @@ export class DesktopUsageCache {
   private async readUsageSummary(
     session: NileSession,
     connectionId: string,
-  ): Promise<DesktopUsageState | null> {
+  ): Promise<{ cacheable: boolean; summary: DesktopUsageState | null }> {
     try {
       const result = await session.getConnectionUsage(connectionId);
       const summary = UsageSummary.fromResult(result);
       this.logGeminiQuotaResult(result, summary);
-      return summary;
+      return {
+        cacheable: result.status !== "error",
+        summary,
+      };
     } catch (error) {
       this.logger.warn("desktop.usage.read_failed", {
         connectionId,
         error: error instanceof Error ? error.message : String(error),
       });
-      return null;
+      return {
+        cacheable: false,
+        summary: null,
+      };
     }
   }
 

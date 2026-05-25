@@ -88,7 +88,7 @@ export type DesktopAgentHomeState = {
   runtimeCommandOverridePath?: string | null;
 };
 
-export type MenubarAgentState = {
+export type DesktopStatusEntryAgentState = {
   agentId: AgentId;
   agentLabel: string;
   currentConnection: DesktopConnection | null;
@@ -96,8 +96,8 @@ export type MenubarAgentState = {
   connections: DesktopConnection[];
 };
 
-export type MenubarState = {
-  agents: MenubarAgentState[];
+export type DesktopStatusEntryState = {
+  agents: DesktopStatusEntryAgentState[];
 };
 
 export type DesktopOnboardingItem = {

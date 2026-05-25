@@ -5,10 +5,14 @@ import type { AgentId } from "@nile/core/models/agent";
 import { SUPPORTED_LANGUAGES, type LanguagePreference } from "../../state/UiPreferences";
 import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
 import { DesktopStateStore } from "../state/DesktopStateStore";
-import { MENUBAR_DISPLAY_MODES, type DesktopMenubarDisplayMode, type DesktopMenubarDisplayState } from "../state/MenubarDisplayStore";
+import {
+  STATUS_ENTRY_DISPLAY_MODES,
+  type DesktopStatusEntryDisplayMode,
+  type DesktopStatusEntryDisplayState,
+} from "../state/StatusEntryDisplayStore";
 
 type DesktopIpcStateRoutesOptions = {
-  getMenubarDisplay(): DesktopMenubarDisplayState;
+  getStatusEntryDisplay(): DesktopStatusEntryDisplayState;
   getNotificationsMuted(): boolean;
   getProfileFeatureEnabled(): boolean;
   inputs: DesktopIpcInputValidator;
@@ -17,11 +21,11 @@ type DesktopIpcStateRoutesOptions = {
   refreshAll(): void;
   refreshDesktopState(options: { invalidate: boolean; notifyRenderer: boolean }): Promise<void>;
   setLanguagePreference(language: LanguagePreference): LanguagePreference;
-  setMenubarDisplayMode(mode: DesktopMenubarDisplayMode): DesktopMenubarDisplayState;
+  setStatusEntryDisplayMode(mode: DesktopStatusEntryDisplayMode): DesktopStatusEntryDisplayState;
   setNotificationsMuted(muted: boolean): boolean;
   setProfileFeatureEnabled(enabled: boolean): boolean;
   stateStore: DesktopStateStore;
-  toggleMenubarTickerAgent(agentId: AgentId): DesktopMenubarDisplayState;
+  toggleStatusEntrySelectedAgent(agentId: AgentId): DesktopStatusEntryDisplayState;
   updateAgentHome(agentId: AgentId, path: string | null): void;
   updateAgentRuntimeCommand(agentId: AgentId, path: string | null): void;
 };
@@ -32,8 +36,8 @@ export class DesktopIpcStateRoutes {
   register(): void {
     const { inputs, stateStore } = this.options;
 
-    ipcMain.handle("desktop:get-menubar-state", () => stateStore.getMenubarState());
-    ipcMain.handle("desktop:get-menubar-display", () => this.options.getMenubarDisplay());
+    ipcMain.handle("desktop:get-status-entry-state", () => stateStore.getStatusEntryState());
+    ipcMain.handle("desktop:get-status-entry-display", () => this.options.getStatusEntryDisplay());
     ipcMain.handle("desktop:get-settings-state", () => stateStore.getSettingsState());
     ipcMain.handle("desktop:get-settings-state-snapshot", () => stateStore.getSettingsStateSnapshot());
     ipcMain.handle("desktop:get-history-state", () => stateStore.getHistoryState());
@@ -55,14 +59,14 @@ export class DesktopIpcStateRoutes {
     });
     ipcMain.handle("desktop:get-notifications-muted", () => this.options.getNotificationsMuted());
     ipcMain.handle("desktop:get-profile-feature-enabled", () => this.options.getProfileFeatureEnabled());
-    ipcMain.handle("desktop:set-menubar-display-mode", (_event, mode: unknown) => {
-      return this.options.setMenubarDisplayMode(this.readMenubarDisplayMode(mode));
+    ipcMain.handle("desktop:set-status-entry-display-mode", (_event, mode: unknown) => {
+      return this.options.setStatusEntryDisplayMode(this.readStatusEntryDisplayMode(mode));
     });
     ipcMain.handle("desktop:set-notifications-muted", (_event, muted: unknown) => {
       return this.options.setNotificationsMuted(inputs.readBoolean(muted, "muted"));
     });
-    ipcMain.handle("desktop:toggle-menubar-ticker-agent", (_event, agentId: unknown) => {
-      return this.options.toggleMenubarTickerAgent(inputs.readAgentId(agentId));
+    ipcMain.handle("desktop:toggle-status-entry-selected-agent", (_event, agentId: unknown) => {
+      return this.options.toggleStatusEntrySelectedAgent(inputs.readAgentId(agentId));
     });
     ipcMain.handle("desktop:set-profile-feature-enabled", (_event, enabled: unknown) => {
       return this.options.setProfileFeatureEnabled(inputs.readBoolean(enabled, "enabled"));
@@ -95,7 +99,7 @@ export class DesktopIpcStateRoutes {
     ipcMain.handle("desktop:refresh-settings", async () => {
       await this.options.refreshDesktopState({ invalidate: true, notifyRenderer: false });
     });
-    ipcMain.handle("desktop:refresh-menubar", () => {
+    ipcMain.handle("desktop:refresh-status-entry", () => {
       this.options.refreshAll();
     });
     ipcMain.handle("desktop:update-agent-home", async (_event, agentId: unknown, path: unknown) => {
@@ -114,12 +118,12 @@ export class DesktopIpcStateRoutes {
     });
   }
 
-  private readMenubarDisplayMode(value: unknown): DesktopMenubarDisplayMode {
+  private readStatusEntryDisplayMode(value: unknown): DesktopStatusEntryDisplayMode {
     const mode = this.options.inputs.readRequiredString(value, "mode");
-    if (MENUBAR_DISPLAY_MODES.includes(mode as DesktopMenubarDisplayMode)) {
-      return mode as DesktopMenubarDisplayMode;
+    if (STATUS_ENTRY_DISPLAY_MODES.includes(mode as DesktopStatusEntryDisplayMode)) {
+      return mode as DesktopStatusEntryDisplayMode;
     }
-    throw new Error(`Unsupported menubar display mode: ${mode}`);
+    throw new Error(`Unsupported status entry display mode: ${mode}`);
   }
 
   private readLanguagePreference(value: unknown): LanguagePreference {

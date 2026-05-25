@@ -21,6 +21,32 @@
 
 - `npm run typecheck`
 
+### Settings usage cache pollution fix
+
+- Investigated the remaining `jiqiang90@gmail.com` quota gap with desktop logs and the persisted `desktop_state_snapshots` rows.
+- Confirmed the OpenAI session itself still returns live quota when read directly after unlocking encrypted local storage:
+  - `jay.ji@spotto.ai`: available
+  - `jiqiang90@gmail.com`: available
+- Root cause was not the quota reader itself. It was the desktop state cache boundary:
+  - `refreshDesktopState()` refreshes status-entry usage first
+  - `evaluateAlerts()` then called `getSettingsState({ refreshUsage: false })`
+  - that partial settings read was being written into the main cached `settingsState`
+  - a later renderer `getSettingsState()` reused that cached/in-flight partial result, so only the current connection had quota while non-current connections stayed `Unknown`
+- Fixed `DesktopStateStore.getSettingsState({ refreshUsage: false })` to bypass the main settings cache instead of poisoning it.
+- Added a regression test that proves a partial `refreshUsage: false` read no longer satisfies a later live `getSettingsState()` call.
+
+### Key findings
+
+- The earlier `DesktopUsageCache` retry fix was necessary but not sufficient. The stale `Unknown` state here came from partial settings-state caching, not from the per-connection usage TTL alone.
+- The persisted `settings_state` snapshot on disk was showing the exact bad shape we saw in UI:
+  - current OpenAI connection had live usage
+  - secondary saved OpenAI connection remained `usage: null`
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts`
+- `npm run build -w @nile/desktop`
+
 ### Windows secure snapshot fallback
 
 - Fixed a Windows-only connection switch/apply regression where mutation-history secure snapshots still defaulted to the macOS keychain helper and failed with `Nile keychain helper was not found`.
@@ -42,6 +68,275 @@
 
 - `npx vitest run packages/core/src/services/credential/WindowsCredentialManagerStore.test.ts packages/core/src/services/history/WindowsSecureSnapshotStore.test.ts`
 - `npm run typecheck`
+- `npm run build -w @nile/desktop`
+
+### Status-entry presenter extraction
+
+- Started the cross-platform desktop status-entry refactor from the smallest reusable layer instead of renaming `MenubarState` first.
+- Extracted a shared status summary presenter for:
+  - selected ticker agent resolution
+  - ticker title formatting
+  - per-agent quota summary text
+  - Windows tray tooltip summary text
+- Added a minimal desktop platform capability helper in the Electron shell layer so native entry behavior can branch on declared capabilities instead of sprinkling ad hoc platform checks through menu/summary formatting.
+- Kept the current tray/menu structure intact for now:
+  - macOS still uses the existing title ticker path
+  - Windows now gets a tray tooltip summary using the shared presenter on top of the already cross-platform tray
+- Reused the presenter inside `TrayMenu` quota rows so ticker and tray summary formatting no longer duplicate usage-summary selection logic.
+- Platformized the desktop settings status-entry copy without changing the stored `menubarDisplay` shape:
+  - macOS keeps `Menu bar` / `Ticker`
+  - Windows now shows `Tray` / `Usage summary`
+  - unsupported platforms no longer show a dead status-entry display section in settings
+- Platformized the tray quota toggle copy through the same renderer platform helper so Windows no longer shows `Show in ticker` in the native tray menu.
+- Rewrote the focused tray-menu unit test file with clean UTF-8 literals while touching this area so future platform-copy assertions do not keep depending on mojibake text artifacts.
+
+#### Key findings
+
+- The existing Electron tray is already cross-platform; the main macOS-only behavior was the tray title ticker, not tray existence itself.
+- Doing the shared presenter extraction first gave a real Windows-visible MVP without forcing a noisy rename of the current `MenubarState` types.
+- This batch intentionally does not add a Windows popup yet. Tooltip summary is the first low-risk delivery on top of the current tray shell.
+- The cross-platform status-entry copy now covers both the settings surface and the tray quota toggle, while the persisted state shape still intentionally keeps the legacy `menubarDisplay` naming for now.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/shell/TickerTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/PlatformCapabilities.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Status-entry internal naming follow-up
+
+- Renamed the internal query/presenter layer from macOS-specific terms to neutral status-entry names:
+  - `DesktopMenubarStateQuery` -> `DesktopStatusEntryStateQuery`
+  - `DesktopTrayTickerTitle` -> `DesktopStatusEntryTitle`
+- Moved the corresponding files and tests onto the new names so new desktop work no longer has to extend `MenubarQuery` / `TickerTitle`.
+- Kept the public compatibility boundary unchanged for now:
+  - IPC still exposes `getMenubarState`
+  - desktop-local persistence still uses `desktop_menubar_*` tables
+  - shared state shapes still use `MenubarState` / `DesktopMenubarDisplayState`
+
+#### Key findings
+
+- This batch intentionally stops at the internal composition layer. Renaming persisted SQLite tables, preload contracts, and renderer/main IPC payloads would widen the upgrade surface and needs to be handled as a separate compatibility pass.
+- The query/title rename is still worthwhile even without touching the persistence boundary because it gives new platform work a neutral place to land instead of extending more `menubar` and `ticker` classes.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/state/StatusEntryQuery.test.ts apps/desktop/src/renderer/shared/Platform.test.ts apps/desktop/src/electron/shell/StatusEntryTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/PlatformCapabilities.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Status-entry display store naming follow-up
+
+- Renamed the Electron-side display preference store onto a neutral internal name:
+  - `DesktopMenubarDisplayStore` -> `DesktopStatusEntryDisplayStore`
+  - `MENUBAR_DISPLAY_MODES` -> `STATUS_ENTRY_DISPLAY_MODES`
+  - `DesktopMenubarDisplayMode` / `DesktopMenubarDisplayState` -> `DesktopStatusEntryDisplayMode` / `DesktopStatusEntryDisplayState`
+- Updated the internal shell/state consumers to read the new store/type names while keeping the user-facing and persistence compatibility edges unchanged:
+  - IPC method names still use `getMenubarDisplay`, `setMenubarDisplayMode`, and `toggleMenubarTickerAgent`
+  - SQLite tables still use `desktop_menubar_*`
+  - the stored payload still keeps `hasConfiguredTickerAgents` / `tickerAgentIds`
+
+#### Key findings
+
+- Renaming the store and its immediate types gives new desktop work a neutral state-layer entry point without forcing an upgrade-sensitive migration of tables or preload contracts in the same batch.
+- The remaining legacy field names inside the stored payload are now the next obvious cleanup seam. Changing them will need a more deliberate compatibility pass than this internal rename did.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/state/StatusEntryDisplayStore.test.ts apps/desktop/src/state/StatusEntryQuery.test.ts apps/desktop/src/renderer/shared/Platform.test.ts apps/desktop/src/electron/shell/StatusEntryTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/PlatformCapabilities.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Renderer status-entry naming follow-up
+
+- Renamed the renderer settings-state surface from `menubarDisplay*` props/handlers to `statusEntryDisplay*` across:
+  - the settings app container
+  - page-content prop plumbing
+  - the general settings page
+- Replaced the old `useMenubarDisplay` wrapper with the already-neutral `useStatusEntryDisplay` hook and removed the now-dead wrapper file.
+- Kept the concrete macOS-only detached entry window in `renderer/app/menubar.ts` untouched; this batch only neutralizes the shared settings/status-entry UI path.
+
+#### Key findings
+
+- The renderer tree now uses status-entry terminology for the shared display-mode flow, but the underlying preload compatibility methods still intentionally expose both `getMenubarDisplay` and `getStatusEntryDisplay`.
+- `renderer/app/menubar.ts` still uses the old naming because it is the specific macOS menubar surface, not the cross-platform status-entry settings path.
+
+### Verification
+
+- `npm run build -w @nile/desktop`
+
+### Quota cache retry fix
+
+- Traced the remaining `jiqiang90@gmail.com` `Unknown` quota state past the unlock-refresh change.
+- Found that the desktop usage cache treated quota read failures as fresh `null` values for 60 seconds:
+  - a transient OpenAI usage read error or locked-credential read stored `null`
+  - later manual refreshes reused that cached `null` instead of retrying the remote usage read
+- Updated `DesktopUsageCache` so usage reads with `status: "error"` or thrown read failures are not marked fresh in the TTL cache.
+- Added focused coverage proving an initial quota-read error is retried on the next refresh instead of staying stuck as cached `null`.
+
+#### Key findings
+
+- The visible `Unknown` state was a cache freshness bug, not a missing OpenAI quota record.
+- `DesktopStateRefresher.refreshDesktopState()` already invalidated desktop state, but it did not clear the independent `DesktopUsageCache`, so stale `null` usage could survive a manual refresh.
+- Keeping successful `unavailable` / `unsupported` reads cacheable is still useful, but plain `error` results must stay retryable.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/state/UsageCache.test.ts`
+- `npm run build -w @nile/desktop`
+- `rg -n "menubarDisplay|useMenubarDisplay|onMenubarDisplayModeChange|isLoadedMenubarDisplay|isSavingMenubarDisplay" apps/desktop/src/renderer`
+
+### Windows tray popup MVP
+
+- Added a minimal Windows tray popup path on top of the existing cross-platform tray shell:
+  - left click now toggles a compact popup window on Windows
+  - right click still opens the native tray menu
+- Reused the existing detached status-entry renderer (`menubar.html/js`) for the popup surface so the first Windows flyout can ship without introducing a second renderer implementation.
+- Added a focused popup placement helper and tests so tray-window positioning logic stays out of `DesktopShell`.
+- Extended platform capabilities with `supportsTrayPopup` and kept the rest of the tray summary/ticker branching on the shared capability helper.
+
+#### Key findings
+
+- This is intentionally an MVP. The Windows popup currently reuses the existing detached menubar renderer, so the internal file naming still reflects its historical macOS origin.
+- The popup does not add a new Windows-specific interaction model yet; it is a lightweight left-click flyout over the same content, not a fully redesigned tray dashboard.
+- Tray attention/icon-state work is still separate. This batch adds the missing popup surface only and does not yet change the tray icon based on alert or quota state.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/shell/PlatformCapabilities.test.ts apps/desktop/src/electron/shell/TrayPopupPlacement.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/StatusEntryTitle.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Code-level legacy removal
+
+- Removed the code-level status-entry compatibility aliases and switched the active desktop APIs to the neutral names:
+  - removed `MenubarState` / `MenubarAgentState` type aliases
+  - removed preload and IPC compatibility methods such as `getMenubarState`, `getMenubarDisplay`, `setMenubarDisplayMode`, `toggleMenubarTickerAgent`, and `refreshMenubar`
+  - renamed the remaining desktop state/surface/store methods onto `statusEntry*`
+- Updated the shared renderer consumers, shell code, and focused desktop tests to use the neutral names end-to-end.
+- Kept the concrete `renderer/app/menubar.*` asset names in place while switching that renderer to the new bridge methods. The file still represents the macOS menubar/tray popup surface, but it no longer depends on menubar-named APIs.
+
+#### Key findings
+
+- The remaining legacy naming is now intentionally limited to persistence/upgrade surfaces only:
+  - `desktop_menubar_*` SQLite tables
+  - the `menubar_state` snapshot key
+  These still need to load existing installs safely, so they were not renamed in this batch.
+- The verification here is targeted to the refactored desktop state/shell/status-entry suites. The broader `Surface.test.ts` file still contains unrelated Windows Codex CLI runtime cases that are environment-sensitive and were not part of this legacy-removal pass.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/state/StatusEntryQuery.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/StatusEntryTitle.test.ts apps/desktop/src/electron/shell/PlatformCapabilities.test.ts apps/desktop/src/electron/shell/TrayPopupPlacement.test.ts`
+- `npm run build -w @nile/desktop`
+
+## 2026-05-25
+
+### Windows tray interaction simplification
+
+- Kept the new left-click tray popup path, but finished the missing renderer styling for that surface so the popup no longer renders as raw text on Windows.
+- Simplified the right-click tray menu down to a compact read-only summary:
+  - `Open app`
+  - one row per agent that currently has a saved active connection
+  - each row shows the current quota summary when available, otherwise `Unknown`
+- Removed the old right-click submenu responsibilities from `TrayMenu`:
+  - profile switching
+  - per-agent connection switching
+  - status-entry ticker/usage-summary toggles
+  Those flows still exist in the left-click popup or the main settings window, but the right-click surface is now summary-only.
+
+#### Key findings
+
+- The unstyled popup was not a tray-window loading issue. `menubar.html` was loading `styles.css`, but the semantic popup classes (`panel`, `hero-card`, `connection-row`, etc.) had no component-layer definitions in the stylesheet.
+- The old right-click menu had become an overloaded second control surface. Keeping mutations in both left-click and right-click menus made the tray harder to scan and harder to maintain.
+- The per-connection missing quota issue for `jiqiang90@gmail.com` was not resolved in this batch. Investigation started, but the task direction shifted to tray UX before the local data probe was completed.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Encrypted-local quota refresh follow-up
+
+- Investigated the missing quota on the saved `jiqiang90@gmail.com` OpenAI session connection.
+- Verified directly against the live encrypted-local credential and OpenAI usage endpoint that the connection does have readable quota:
+  - plan: `Plus`
+  - `5h`: `0%`
+  - `7d` / weekly: `66%`
+- Confirmed the desktop issue was not the OpenAI reader or the stored session credential. The problem was the renderer refresh path after encrypted-local unlock:
+  - the settings page could load a snapshot with `usage: null`
+  - unlocking encrypted local storage only updated the unlock-state flag
+  - no automatic settings-state refresh ran after the unlock succeeded
+- Added a post-unlock settings refresh hook in the settings renderer so quota-backed connection rows reload immediately after a successful encrypted-local unlock.
+
+#### Key findings
+
+- The saved `jiqiang90@gmail.com` connection is an `openai_session`, not an API-key connection. It uses the same OpenAI quota reader path as `jay.ji@spotto.ai`.
+- The live quota API was healthy during investigation. Repeated direct reads returned `available` for both OpenAI session connections.
+- The stale `Unknown` state came from renderer state freshness, not from missing upstream quota data.
+
+### Verification
+
+- `npm run build -w @nile/desktop`
+
+### Windows tray click-role correction
+
+- Corrected the Windows tray interaction split after the previous batch inverted the intended behavior:
+  - left click now opens a compact native summary menu
+  - right click keeps the existing full native tray menu with profiles, per-agent connection switching, and status-entry toggles
+- Removed the left-click dependency on the tray popup path for Windows and routed it through a dedicated summary template instead.
+- Kept the earlier popup styling fix in the codebase, but it is no longer the active Windows left-click interaction.
+
+#### Key findings
+
+- The previous implementation changed the wrong surface: it simplified the right-click menu and left the rich popup on left click, which was the opposite of the requested UX.
+- The clean fix was to split tray menu generation into two templates instead of trying to mutate one menu definition for both click paths.
+- The `jiqiang90@gmail.com` quota investigation is still separate and remains unfinished in this batch.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/shell/TrayMenu.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Status-entry bridge alias follow-up
+
+- Added neutral status-entry type aliases at the shared desktop state boundary:
+  - `DesktopStatusEntryAgentState`
+  - `DesktopStatusEntryState`
+- Switched the newer internal query/presenter/state-store files to consume those neutral types while preserving the legacy `Menubar*` aliases for compatibility.
+- Added additive preload and IPC aliases so new renderer code can use status-entry naming without breaking older menubar-named calls:
+  - `getStatusEntryState`
+  - `getStatusEntryDisplay`
+  - `setStatusEntryDisplayMode`
+  - `toggleStatusEntrySelectedAgent`
+  - `refreshStatusEntry`
+- Added a new renderer settings hook, `useStatusEntryDisplay`, and moved the settings app plus quota-preference refresh path onto the new bridge names.
+
+#### Key findings
+
+- This batch intentionally keeps the legacy IPC channels, preload methods, snapshot keys, and `desktop_menubar_*` persistence names alive. The new status-entry calls are additive aliases only.
+- The detached `renderer/app/menubar.ts` entry was left on its existing naming because it is still the concrete macOS menubar window surface, not a shared cross-platform abstraction.
+- Settings/page prop names such as `menubarDisplayMode` are still present in the renderer tree. The bridge is now neutral enough to rename those later without needing another IPC pass first.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/state/StatusEntryDisplayStore.test.ts apps/desktop/src/state/StatusEntryQuery.test.ts apps/desktop/src/renderer/shared/Platform.test.ts apps/desktop/src/electron/shell/StatusEntryTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/PlatformCapabilities.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Status-entry display payload naming follow-up
+
+- Renamed the internal status-entry display payload fields to neutral names:
+  - `hasConfiguredTickerAgents` -> `hasConfiguredSelectedAgents`
+  - `tickerAgentIds` -> `selectedAgentIds`
+  - `writeTickerAgentIds(...)` -> `writeSelectedAgentIds(...)`
+- Updated the internal shell presenter/tests to consume the new field names while keeping the outer compatibility edges unchanged:
+  - IPC method names still use `getMenubarDisplay`, `setMenubarDisplayMode`, and `toggleMenubarTickerAgent`
+  - SQLite tables still use `desktop_menubar_*`
+  - persisted rows still store the same data, only the in-memory TypeScript shape was neutralized
+
+#### Key findings
+
+- This closes the most obvious remaining `ticker` wording leak inside the internal display-state payload without forcing a migration of persisted data.
+- The next remaining legacy seam is the exported `MenubarState` / `getMenubarState` naming. That one spans renderer/main/preload contracts and should be handled separately from this in-memory payload cleanup.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/state/StatusEntryDisplayStore.test.ts apps/desktop/src/state/StatusEntryQuery.test.ts apps/desktop/src/renderer/shared/Platform.test.ts apps/desktop/src/electron/shell/StatusEntryTitle.test.ts apps/desktop/src/electron/shell/TrayMenu.test.ts apps/desktop/src/electron/shell/StatusEntrySummary.test.ts apps/desktop/src/electron/shell/PlatformCapabilities.test.ts`
 - `npm run build -w @nile/desktop`
 
 ## 2026-05-21

@@ -1,44 +1,44 @@
 import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
 import { SqliteDatabase } from "@nile/core/services/database";
 
-export const MENUBAR_DISPLAY_MODES = ["app_entry", "ticker"] as const;
+export const STATUS_ENTRY_DISPLAY_MODES = ["app_entry", "ticker"] as const;
 
-export type DesktopMenubarDisplayMode = (typeof MENUBAR_DISPLAY_MODES)[number];
-export type DesktopMenubarDisplayState = {
-  hasConfiguredTickerAgents: boolean;
-  mode: DesktopMenubarDisplayMode;
-  tickerAgentIds: AgentId[];
+export type DesktopStatusEntryDisplayMode = (typeof STATUS_ENTRY_DISPLAY_MODES)[number];
+export type DesktopStatusEntryDisplayState = {
+  hasConfiguredSelectedAgents: boolean;
+  mode: DesktopStatusEntryDisplayMode;
+  selectedAgentIds: AgentId[];
 };
 
-type MenubarDisplayRow = {
-  mode: DesktopMenubarDisplayMode;
+type LegacyMenubarDisplayRow = {
+  mode: DesktopStatusEntryDisplayMode;
 };
 
-type MenubarTickerAgentRow = {
+type LegacyMenubarTickerAgentRow = {
   agent_id: AgentId;
 };
 
-type MenubarTickerConfigRow = {
+type LegacyMenubarTickerConfigRow = {
   configured: number;
 };
 
-const menubarDisplayModeSet = new Set<DesktopMenubarDisplayMode>(MENUBAR_DISPLAY_MODES);
+const statusEntryDisplayModeSet = new Set<DesktopStatusEntryDisplayMode>(STATUS_ENTRY_DISPLAY_MODES);
 const supportedAgentIdSet = new Set<AgentId>(SUPPORTED_AGENT_IDS);
 
-export class DesktopMenubarDisplayStore {
+export class DesktopStatusEntryDisplayStore {
   constructor(private readonly databasePath: string) {}
 
-  read(): DesktopMenubarDisplayState {
+  read(): DesktopStatusEntryDisplayState {
     const database = SqliteDatabase.open(this.databasePath);
     try {
       this.initialize(database);
-      const modeRow = database.query<MenubarDisplayRow>(
+      const modeRow = database.query<LegacyMenubarDisplayRow>(
         "SELECT mode FROM desktop_menubar_display WHERE id = 1",
       ).get();
-      const tickerAgentRows = database.query<MenubarTickerAgentRow>(
+      const tickerAgentRows = database.query<LegacyMenubarTickerAgentRow>(
         "SELECT agent_id FROM desktop_menubar_ticker_agents",
       ).all();
-      const tickerConfigRow = database.query<MenubarTickerConfigRow>(
+      const tickerConfigRow = database.query<LegacyMenubarTickerConfigRow>(
         "SELECT configured FROM desktop_menubar_ticker_config WHERE id = 1",
       ).get();
       const selectedAgentIds = new Set(
@@ -48,18 +48,18 @@ export class DesktopMenubarDisplayStore {
       );
 
       return {
-        hasConfiguredTickerAgents: tickerConfigRow?.configured === 1,
-        mode: menubarDisplayModeSet.has(modeRow?.mode ?? "app_entry")
+        hasConfiguredSelectedAgents: tickerConfigRow?.configured === 1,
+        mode: statusEntryDisplayModeSet.has(modeRow?.mode ?? "app_entry")
           ? (modeRow?.mode ?? "app_entry")
           : "app_entry",
-        tickerAgentIds: SUPPORTED_AGENT_IDS.filter((agentId) => selectedAgentIds.has(agentId)),
+        selectedAgentIds: SUPPORTED_AGENT_IDS.filter((agentId) => selectedAgentIds.has(agentId)),
       };
     } finally {
       database.close();
     }
   }
 
-  writeMode(mode: DesktopMenubarDisplayMode): DesktopMenubarDisplayState {
+  writeMode(mode: DesktopStatusEntryDisplayMode): DesktopStatusEntryDisplayState {
     const database = SqliteDatabase.open(this.databasePath);
     try {
       database.transaction(() => {
@@ -83,7 +83,7 @@ export class DesktopMenubarDisplayStore {
     return this.read();
   }
 
-  writeTickerAgentIds(agentIds: AgentId[]): DesktopMenubarDisplayState {
+  writeSelectedAgentIds(agentIds: AgentId[]): DesktopStatusEntryDisplayState {
     const normalizedAgentIds = SUPPORTED_AGENT_IDS.filter((agentId) => agentIds.includes(agentId));
     const database = SqliteDatabase.open(this.databasePath);
     try {

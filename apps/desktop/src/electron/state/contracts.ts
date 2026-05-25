@@ -1,10 +1,10 @@
 import type { LanguagePreference } from "../../state/UiPreferences";
 import type { DesktopNotificationHistoryFilterInput } from "../notifications/contracts";
-import type { DesktopMenubarDisplayMode, DesktopMenubarDisplayState } from "./MenubarDisplayStore";
+import type { DesktopStatusEntryDisplayMode, DesktopStatusEntryDisplayState } from "./StatusEntryDisplayStore";
 
 export type DesktopStateBridge = {
-  getMenubarState(): Promise<import("../../state/Types").MenubarState>;
-  getMenubarDisplay(): Promise<DesktopMenubarDisplayState>;
+  getStatusEntryState(): Promise<import("../../state/Types").DesktopStatusEntryState>;
+  getStatusEntryDisplay(): Promise<DesktopStatusEntryDisplayState>;
   getSettingsState(): Promise<import("../../state/Types").SettingsState>;
   getSettingsStateSnapshot(): Promise<import("../../state/Types").SettingsState>;
   getHistoryState(): Promise<import("../../state/Types").HistoryState>;
@@ -18,12 +18,12 @@ export type DesktopStateBridge = {
   markNotificationHistoryRead(entryIds: string[]): Promise<void>;
   markNotificationHistoryReadByFilter(filter?: DesktopNotificationHistoryFilterInput): Promise<void>;
   setLanguagePreference(language: LanguagePreference): Promise<LanguagePreference>;
-  setMenubarDisplayMode(mode: DesktopMenubarDisplayMode): Promise<DesktopMenubarDisplayState>;
+  setStatusEntryDisplayMode(mode: DesktopStatusEntryDisplayMode): Promise<DesktopStatusEntryDisplayState>;
   getNotificationsMuted(): Promise<boolean>;
   getProfileFeatureEnabled(): Promise<boolean>;
   setNotificationsMuted(muted: boolean): Promise<boolean>;
-  toggleMenubarTickerAgent(agentId: import("@nile/core/models/agent").AgentId): Promise<DesktopMenubarDisplayState>;
+  toggleStatusEntrySelectedAgent(agentId: import("@nile/core/models/agent").AgentId): Promise<DesktopStatusEntryDisplayState>;
   setProfileFeatureEnabled(enabled: boolean): Promise<boolean>;
   refreshSettings(): Promise<void>;
-  refreshMenubar(): Promise<void>;
+  refreshStatusEntry(): Promise<void>;
 };

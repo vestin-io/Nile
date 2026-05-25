@@ -1,11 +1,12 @@
 import { registerBuiltinAgentDeclarations } from "@nile/builtins/agents";
-import { createTranslator } from "../shared/I18n";
-import { DesktopPreferencesStore } from "../settings/Preferences";
-import { authModeLabel } from "../shared/DisplayText";
+
 import { readConnectionQuotaMetricPreference } from "../../state/ConnectionQuotaMetricPreferences";
 import { resolveDesktopUsageSummary } from "../../state/UsageSummary";
+import { DesktopPreferencesStore } from "../settings/Preferences";
+import { authModeLabel } from "../shared/DisplayText";
+import { createTranslator } from "../shared/I18n";
 
-type MenubarState = Awaited<ReturnType<typeof window.nileDesktop.state.getMenubarState>>;
+type StatusEntryState = Awaited<ReturnType<typeof window.nileDesktop.state.getStatusEntryState>>;
 
 const preferencesStore = new DesktopPreferencesStore(window.localStorage, document.documentElement);
 const currentElement = document.getElementById("menubar-current");
@@ -42,14 +43,14 @@ function applyFramePreferences() {
 async function render(): Promise<void> {
   const preferences = preferencesStore.load();
   const t = createTranslator(preferences.language);
-  const state = await window.nileDesktop.state.getMenubarState();
+  const state = await window.nileDesktop.state.getStatusEntryState();
   const codex = state.agents.find((agent) => agent.agentId === "codex") ?? state.agents[0] ?? null;
   renderCurrent(codex, t);
   renderConnections(codex, t);
 }
 
 function renderCurrent(
-  agent: MenubarState["agents"][number] | null,
+  agent: StatusEntryState["agents"][number] | null,
   t: ReturnType<typeof createTranslator>,
 ): void {
   if (!currentElement || !driftElement) {
@@ -63,7 +64,7 @@ function renderCurrent(
   driftElement.classList.add("is-hidden");
 }
 
-function renderUsageSummary(agent: NonNullable<MenubarState["agents"][number] | null>): string {
+function renderUsageSummary(agent: NonNullable<StatusEntryState["agents"][number] | null>): string {
   if (!agent.currentConnection || agent.currentUsage?.status !== "available") {
     return "";
   }
@@ -74,11 +75,11 @@ function renderUsageSummary(agent: NonNullable<MenubarState["agents"][number] | 
     agent.currentConnection.id,
   );
   const summary = resolveDesktopUsageSummary(agent.currentUsage, preferredMetricKey);
-  return summary ? ` · ${summary.text}` : "";
+  return summary ? ` - ${summary.text}` : "";
 }
 
 function renderConnections(
-  agent: MenubarState["agents"][number] | null,
+  agent: StatusEntryState["agents"][number] | null,
   t: ReturnType<typeof createTranslator>,
 ): void {
   if (!connectionsElement) {
@@ -98,7 +99,7 @@ function renderConnections(
       const info = document.createElement("div");
       info.innerHTML = `
         <div class="connection-name">${escapeHtml(connection.label)}</div>
-        <div class="connection-meta">${escapeHtml(connection.endpointLabel)} • ${escapeHtml(authModeLabel(connection.authMode, t))}</div>
+        <div class="connection-meta">${escapeHtml(connection.endpointLabel)} - ${escapeHtml(authModeLabel(connection.authMode, t))}</div>
       `;
 
       const button = document.createElement("button");
@@ -128,7 +129,7 @@ settingsButton?.addEventListener("click", async () => {
 });
 
 refreshButton?.addEventListener("click", async () => {
-  await window.nileDesktop.state.refreshMenubar();
+  await window.nileDesktop.state.refreshStatusEntry();
   await render();
 });
 

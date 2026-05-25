@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, Menu, nativeImage, shell, Tray, type MenuItemConstructorOptions, type OpenDialogOptions } from "electron";
+import { app, BrowserWindow, dialog, Menu, nativeImage, screen, shell, Tray, type MenuItemConstructorOptions, type OpenDialogOptions } from "electron";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -13,10 +13,13 @@ import {
   type ConnectionQuotaMetricPreferences,
 } from "../../state/ConnectionQuotaMetricPreferences";
 import type { DesktopNotificationTarget } from "../notifications/contracts";
+import { readDesktopPlatformCapabilities } from "./PlatformCapabilities";
+import { TrayPopupPlacement } from "./TrayPopupPlacement";
 
 type DesktopShellOptions = {
   currentDir: string;
   onSettingsClose(): void;
+  onTraySummaryMenuRequested(): Promise<MenuItemConstructorOptions[]>;
   onTrayMenuRequested(): Promise<MenuItemConstructorOptions[]>;
   shouldHideOnClose(): boolean;
 };
@@ -25,8 +28,11 @@ export class DesktopShell {
   private static readonly trayIconName = "nileTemplate@2x.png";
   private static readonly preferencesStorageKey = "nile.desktop.preferences";
   private static readonly settingsLoadTimeoutMs = 2_000;
+  private static readonly trayPopupWidth = 420;
+  private static readonly trayPopupHeight = 560;
   private tray: Tray | null = null;
   private settingsWindow: BrowserWindow | null = null;
+  private trayPopupWindow: BrowserWindow | null = null;
   private pendingNotificationTarget: DesktopNotificationTarget | null = null;
 
   constructor(private readonly options: DesktopShellOptions) {}
@@ -40,15 +46,15 @@ export class DesktopShell {
   }
 
   notifyStateChanged(): void {
-    this.sendToSettingsWindow("desktop:state-changed");
+    this.sendToRendererWindows("desktop:state-changed");
   }
 
   notifyLocalStateReset(): void {
-    this.sendToSettingsWindow("desktop:local-state-reset");
+    this.sendToRendererWindows("desktop:local-state-reset");
   }
 
   notifyNotificationHistoryChanged(): void {
-    this.sendToSettingsWindow("desktop:notification-history-changed");
+    this.sendToRendererWindows("desktop:notification-history-changed");
   }
 
   setTrayTitle(title: string): void {
@@ -60,7 +66,17 @@ export class DesktopShell {
     this.tray.setImage(normalizedTitle ? nativeImage.createEmpty() : this.createTrayImage());
   }
 
+  setTrayToolTip(text: string): void {
+    if (!this.tray) {
+      return;
+    }
+
+    const normalizedText = text.trim() || "Nile";
+    this.tray.setToolTip(normalizedText);
+  }
+
   showSettings(): void {
+    this.hideTrayPopup();
     this.settingsWindow?.show();
     this.settingsWindow?.focus();
   }
@@ -73,6 +89,10 @@ export class DesktopShell {
 
     if (this.settingsWindow && !this.settingsWindow.isDestroyed()) {
       this.settingsWindow.close();
+    }
+    if (this.trayPopupWindow && !this.trayPopupWindow.isDestroyed()) {
+      this.trayPopupWindow.destroy();
+      this.trayPopupWindow = null;
     }
   }
 
@@ -140,11 +160,58 @@ export class DesktopShell {
     this.tray = new Tray(icon);
     this.tray.setToolTip("Nile");
     this.tray.on("click", () => {
+      if (readDesktopPlatformCapabilities(process.platform).supportsTraySummary) {
+        void this.popTraySummaryMenu();
+        return;
+      }
       void this.popTrayMenu();
     });
     this.tray.on("right-click", () => {
+      this.hideTrayPopup();
       void this.popTrayMenu();
     });
+  }
+
+  private createTrayPopupWindow(): void {
+    if (!readDesktopPlatformCapabilities(process.platform).supportsTrayPopup) {
+      return;
+    }
+
+    this.trayPopupWindow = new BrowserWindow({
+      width: DesktopShell.trayPopupWidth,
+      height: DesktopShell.trayPopupHeight,
+      show: false,
+      frame: false,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      backgroundColor: "#ffffff",
+      icon: this.readRuntimeAppIconPath(),
+      webPreferences: {
+        preload: join(this.options.currentDir, "preload.cjs"),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    const popupUrl = pathToFileURL(join(this.options.currentDir, "..", "renderer", "menubar.html"));
+    this.trayPopupWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    this.trayPopupWindow.on("blur", () => {
+      this.trayPopupWindow?.hide();
+    });
+    this.trayPopupWindow.on("close", (event) => {
+      if (this.options.shouldHideOnClose()) {
+        event.preventDefault();
+        this.trayPopupWindow?.hide();
+      }
+    });
+    this.trayPopupWindow.on("closed", () => {
+      this.trayPopupWindow = null;
+    });
+    void this.trayPopupWindow.loadFile(fileURLToPath(popupUrl));
   }
 
   private createSettingsWindow(): void {
@@ -247,6 +314,37 @@ export class DesktopShell {
     this.tray.popUpContextMenu(menu);
   }
 
+  private async popTraySummaryMenu(): Promise<void> {
+    if (!this.tray) {
+      return;
+    }
+    const menu = Menu.buildFromTemplate(await this.options.onTraySummaryMenuRequested());
+    this.tray.popUpContextMenu(menu);
+  }
+
+  private async toggleTrayPopup(): Promise<void> {
+    const trayPopupWindow = this.readTrayPopupWindowForSend();
+    if (!trayPopupWindow || !this.tray) {
+      return;
+    }
+    if (trayPopupWindow.isVisible()) {
+      trayPopupWindow.hide();
+      return;
+    }
+    await this.waitForWindowLoad(trayPopupWindow);
+    const trayBounds = this.tray.getBounds();
+    const workArea = screen.getDisplayMatching(trayBounds).workArea;
+    const position = TrayPopupPlacement.readPosition({
+      popupHeight: DesktopShell.trayPopupHeight,
+      popupWidth: DesktopShell.trayPopupWidth,
+      trayBounds,
+      workArea,
+    });
+    trayPopupWindow.setPosition(position.x, position.y, false);
+    trayPopupWindow.show();
+    trayPopupWindow.focus();
+  }
+
   private sendNotificationTarget(target: DesktopNotificationTarget): void {
     const settingsWindow = this.readSettingsWindowForSend();
     if (!settingsWindow) {
@@ -256,19 +354,20 @@ export class DesktopShell {
       this.pendingNotificationTarget = target;
       return;
     }
-    this.sendToSettingsWindow("desktop:notification-target", target);
+    settingsWindow.webContents.send("desktop:notification-target", target);
   }
 
-  private sendToSettingsWindow(channel: string, payload?: unknown): void {
-    const settingsWindow = this.readSettingsWindowForSend();
-    if (!settingsWindow) {
-      return;
+  private sendToRendererWindows(channel: string, payload?: unknown): void {
+    for (const window of [this.readSettingsWindowForSend(), this.readTrayPopupWindowForSend()]) {
+      if (!window) {
+        continue;
+      }
+      if (payload === undefined) {
+        window.webContents.send(channel);
+        continue;
+      }
+      window.webContents.send(channel, payload);
     }
-    if (payload === undefined) {
-      settingsWindow.webContents.send(channel);
-      return;
-    }
-    settingsWindow.webContents.send(channel, payload);
   }
 
   private readSettingsWindowForSend(): BrowserWindow | null {
@@ -279,6 +378,46 @@ export class DesktopShell {
       return null;
     }
     return this.settingsWindow;
+  }
+
+  private readTrayPopupWindowForSend(): BrowserWindow | null {
+    if (!this.trayPopupWindow) {
+      return null;
+    }
+    if (this.trayPopupWindow.isDestroyed() || this.trayPopupWindow.webContents.isDestroyed()) {
+      return null;
+    }
+    return this.trayPopupWindow;
+  }
+
+  private hideTrayPopup(): void {
+    const trayPopupWindow = this.readTrayPopupWindowForSend();
+    if (!trayPopupWindow || !trayPopupWindow.isVisible()) {
+      return;
+    }
+    trayPopupWindow.hide();
+  }
+
+  private async waitForWindowLoad(window: BrowserWindow): Promise<void> {
+    if (!window.webContents.isLoadingMainFrame()) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      let settled = false;
+      const settle = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timeoutId);
+        window.webContents.removeListener("did-finish-load", settle);
+        window.webContents.removeListener("did-fail-load", settle);
+        resolve();
+      };
+      const timeoutId = setTimeout(settle, DesktopShell.settingsLoadTimeoutMs);
+      window.webContents.once("did-finish-load", settle);
+      window.webContents.once("did-fail-load", settle);
+    });
   }
 
   private resolveDialogPath(path: string | undefined): string | undefined {

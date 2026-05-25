@@ -12,6 +12,7 @@ type PendingUnlock = {
 
 type UseCredentialStorageSessionOptions = {
   onActionError(message: string | null): void;
+  onUnlocked?(): Promise<void>;
   t: (key: string) => string;
 };
 
@@ -29,6 +30,7 @@ type CredentialStorageSessionState = {
 
 export function useCredentialStorageSession({
   onActionError,
+  onUnlocked,
   t,
 }: UseCredentialStorageSessionOptions): CredentialStorageSessionState {
   const pendingEncryptedLocalUnlockRef = useRef<PendingUnlock | null>(null);
@@ -107,11 +109,12 @@ export function useCredentialStorageSession({
       }
       await refreshCredentialStorageState();
       closeEncryptedLocalUnlockDialog();
+      void onUnlocked?.().catch(() => undefined);
     } catch {
       setUnlockEncryptedLocalStorageError(t("dialog.encryptedLocalUnlock.errorUnknown"));
       setIsUnlockingEncryptedLocalStorage(false);
     }
-  }, [closeEncryptedLocalUnlockDialog, refreshCredentialStorageState, t]);
+  }, [closeEncryptedLocalUnlockDialog, onUnlocked, refreshCredentialStorageState, t]);
 
   useEffect(() => {
     void refreshCredentialStorageState().catch(() => undefined);

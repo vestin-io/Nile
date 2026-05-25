@@ -93,3 +93,98 @@
     font: inherit;
   }
 }
+
+@layer components {
+  .app-shell-menubar {
+    background:
+      radial-gradient(circle at top, hsl(var(--accent) / 0.65), transparent 48%),
+      hsl(var(--background));
+  }
+
+  .panel {
+    @apply flex min-h-screen flex-col gap-3 p-3;
+  }
+
+  .hero-card {
+    @apply rounded-2xl border bg-card px-4 py-4 shadow-sm;
+  }
+
+  .hero-kicker {
+    @apply text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground;
+  }
+
+  .hero-title {
+    @apply mt-2 text-sm font-semibold text-foreground;
+  }
+
+  .hero-value {
+    @apply mt-2 text-lg font-semibold leading-snug text-foreground;
+  }
+
+  .hero-subtle {
+    @apply mt-2 text-sm text-muted-foreground;
+  }
+
+  .section {
+    @apply rounded-2xl border bg-card px-3 py-3 shadow-sm;
+  }
+
+  .section-head {
+    @apply mb-3 flex items-center justify-between gap-3;
+  }
+
+  .section-head h2 {
+    @apply m-0 text-sm font-semibold text-foreground;
+  }
+
+  .text-button {
+    @apply rounded-lg px-2 py-1 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .connection-list {
+    @apply flex max-h-[320px] flex-col gap-2 overflow-y-auto pr-1;
+  }
+
+  .connection-row {
+    @apply flex items-center justify-between gap-3 rounded-xl border bg-background px-3 py-3;
+  }
+
+  .connection-name {
+    @apply text-sm font-medium text-foreground;
+  }
+
+  .connection-meta {
+    @apply mt-1 text-xs text-muted-foreground;
+  }
+
+  .connection-button {
+    @apply inline-flex min-w-16 items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-100;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .connection-button-current {
+    @apply bg-secondary text-secondary-foreground;
+  }
+
+  .actions-grid {
+    @apply grid grid-cols-1 gap-2;
+  }
+
+  .action-button {
+    @apply inline-flex w-full items-center justify-center rounded-xl px-3 py-2 text-sm font-medium transition-colors;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .action-button-secondary {
+    @apply bg-secondary text-secondary-foreground hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .is-hidden {
+    display: none;
+  }
+}

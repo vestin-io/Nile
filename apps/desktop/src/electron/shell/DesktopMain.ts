@@ -43,14 +43,16 @@ import { WorkspaceProfileStore } from "../profiles/Store";
 import { DesktopShell } from "./DesktopShell";
 import { DesktopTrayMenu } from "./TrayMenu";
 import { DesktopStateReset } from "../state/Reset";
-import { DesktopMenubarDisplayStore } from "../state/MenubarDisplayStore";
 import { DesktopLanguageStore } from "../state/LanguageStore";
 import { DesktopNotificationMuteStore } from "../state/NotificationMuteStore";
 import { DesktopProfileFeatureStore } from "../state/ProfileFeatureStore";
+import { DesktopStatusEntryDisplayStore } from "../state/StatusEntryDisplayStore";
 import { DesktopStateRefresher } from "../state/DesktopStateRefresher";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 import { DesktopWorkspaceWatcher } from "./DesktopWorkspaceWatcher";
-import { DesktopTrayTickerTitle } from "./TickerTitle";
+import { readDesktopPlatformCapabilities } from "./PlatformCapabilities";
+import { DesktopStatusEntrySummary } from "./StatusEntrySummary";
+import { DesktopStatusEntryTitle } from "./StatusEntryTitle";
 
 const currentDir = typeof __dirname === "string" ? __dirname : dirname(fileURLToPath(import.meta.url));
 
@@ -64,7 +66,7 @@ export class DesktopMain {
   private readonly shellEnvironment: DesktopShellEnvironment;
   private readonly agentHomesStore: AgentHomesStore;
   private readonly agentRuntimeCommandsStore: AgentRuntimeCommandsStore;
-  private readonly menubarDisplayStore: DesktopMenubarDisplayStore;
+  private readonly statusEntryDisplayStore: DesktopStatusEntryDisplayStore;
   private readonly languageStore: DesktopLanguageStore;
   private readonly notificationMuteStore: DesktopNotificationMuteStore;
   private readonly profileFeatureStore: DesktopProfileFeatureStore;
@@ -99,7 +101,7 @@ export class DesktopMain {
     );
     this.agentHomesStore = new AgentHomesStore(options.databasePath);
     this.agentRuntimeCommandsStore = new AgentRuntimeCommandsStore(options.databasePath);
-    this.menubarDisplayStore = new DesktopMenubarDisplayStore(options.databasePath);
+    this.statusEntryDisplayStore = new DesktopStatusEntryDisplayStore(options.databasePath);
     this.languageStore = new DesktopLanguageStore(options.databasePath);
     this.notificationMuteStore = new DesktopNotificationMuteStore(options.databasePath);
     this.profileFeatureStore = new DesktopProfileFeatureStore(options.databasePath);
@@ -176,6 +178,7 @@ export class DesktopMain {
       onSettingsClose: () => {
         this.connectionManager.clearPreparedConnectionDrafts();
       },
+      onTraySummaryMenuRequested: async () => await this.trayMenu.readSummaryTemplate(),
       onTrayMenuRequested: async () => await this.trayMenu.readTemplate(),
       shouldHideOnClose: () => !this.isQuitting,
     });
@@ -189,13 +192,13 @@ export class DesktopMain {
     });
     this.trayMenu = new DesktopTrayMenu({
       logger: this.logger,
-      peekState: () => this.stateStore.peekMenubarState(),
+      peekState: () => this.stateStore.peekStatusEntryState(),
       peekSettingsState: () => this.stateStore.peekSettingsState(),
       isProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       readLanguagePreference: () => this.languageStore.read(),
       readConnectionQuotaMetricPreferences: () => this.shell.readConnectionQuotaMetricPreferences(),
-      readMenubarDisplay: () => this.menubarDisplayStore.read(),
-      refreshState: async () => await this.stateStore.refreshMenubarState(),
+      readStatusEntryDisplay: () => this.statusEntryDisplayStore.read(),
+      refreshState: async () => await this.stateStore.refreshStatusEntryState(),
       refreshSettingsState: async () => await this.stateStore.getSettingsState({ refreshUsage: false }),
       listProfiles: () => this.profileManager.list(),
       notify: (intent) => {
@@ -211,8 +214,8 @@ export class DesktopMain {
         await this.stateStore.switchConnection(agentId, connectionId);
         this.reloadAll();
       },
-      toggleTickerAgent: (agentId) => {
-        this.toggleMenubarTickerAgent(agentId);
+      toggleSelectedAgent: (agentId) => {
+        this.toggleStatusEntrySelectedAgent(agentId);
         this.syncTrayTitle();
       },
     });
@@ -286,7 +289,7 @@ export class DesktopMain {
       if (this.isQuitting) {
         return;
       }
-      void this.refreshMenubarUsage().catch((error) => {
+      void this.refreshStatusEntryUsage().catch((error) => {
         this.logger.error("desktop.startup.refresh_usage_failed", error);
       });
     }, 1500);
@@ -307,7 +310,7 @@ export class DesktopMain {
 
   private registerIpcRoutes(): void {
     new DesktopIpcStateRoutes({
-      getMenubarDisplay: () => this.menubarDisplayStore.read(),
+      getStatusEntryDisplay: () => this.statusEntryDisplayStore.read(),
       getNotificationsMuted: () => this.notificationMuteStore.read(),
       getProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       inputs: this.inputs,
@@ -316,16 +319,16 @@ export class DesktopMain {
       refreshAll: () => this.reloadAll(),
       refreshDesktopState: (options) => this.refreshDesktopState(options),
       setLanguagePreference: (language) => this.languageStore.write(language),
-      setMenubarDisplayMode: (mode) => {
-        const next = this.menubarDisplayStore.writeMode(mode);
+      setStatusEntryDisplayMode: (mode) => {
+        const next = this.statusEntryDisplayStore.writeMode(mode);
         this.syncTrayTitle();
         return next;
       },
       setNotificationsMuted: (muted) => this.notificationMuteStore.write(muted),
       setProfileFeatureEnabled: (enabled) => this.profileFeatureStore.write(enabled),
       stateStore: this.stateStore,
-      toggleMenubarTickerAgent: (agentId) => {
-        const next = this.toggleMenubarTickerAgent(agentId);
+      toggleStatusEntrySelectedAgent: (agentId) => {
+        const next = this.toggleStatusEntrySelectedAgent(agentId);
         this.syncTrayTitle();
         return next;
       },
@@ -474,31 +477,47 @@ export class DesktopMain {
     }
   }
 
-  private refreshMenubarUsage(): Promise<void> {
-    return this.stateRefresher.refreshMenubarUsage();
+  private refreshStatusEntryUsage(): Promise<void> {
+    return this.stateRefresher.refreshStatusEntryUsage();
   }
 
-  private toggleMenubarTickerAgent(agentId: AgentId) {
-    const preferences = this.menubarDisplayStore.read();
-    const nextSelectedAgentIds = DesktopTrayTickerTitle.toggleSelectedAgentIds(
-      this.stateStore.peekMenubarState(),
+  private toggleStatusEntrySelectedAgent(agentId: AgentId) {
+    const preferences = this.statusEntryDisplayStore.read();
+    const nextSelectedAgentIds = DesktopStatusEntryTitle.toggleSelectedAgentIds(
+      this.stateStore.peekStatusEntryState(),
       preferences,
       agentId,
     );
-    return this.menubarDisplayStore.writeTickerAgentIds(nextSelectedAgentIds);
+    return this.statusEntryDisplayStore.writeSelectedAgentIds(nextSelectedAgentIds);
   }
 
   private syncTrayTitle(): void { void this.syncTrayTitleAsync(); }
 
   private async syncTrayTitleAsync(): Promise<void> {
     const connectionQuotaMetricPreferences = await this.shell.readConnectionQuotaMetricPreferences().catch(() => ({}));
-    this.shell.setTrayTitle(
-      DesktopTrayTickerTitle.format(
-        this.stateStore.peekMenubarState(),
-        this.menubarDisplayStore.read(),
-        connectionQuotaMetricPreferences,
-      ),
-    );
+    const state = this.stateStore.peekStatusEntryState();
+    const preferences = this.statusEntryDisplayStore.read();
+    const platformCapabilities = readDesktopPlatformCapabilities(process.platform);
+
+    if (platformCapabilities.supportsTitleTicker) {
+      this.shell.setTrayTitle(
+        DesktopStatusEntryTitle.format(
+          state,
+          preferences,
+          connectionQuotaMetricPreferences,
+        ),
+      );
+    }
+    if (platformCapabilities.supportsTraySummary) {
+      this.shell.setTrayToolTip(
+        DesktopStatusEntrySummary.formatTrayTooltip(
+          "Nile",
+          state,
+          preferences,
+          connectionQuotaMetricPreferences,
+        ),
+      );
+    }
   }
 }
 
