@@ -57,6 +57,7 @@ describe("SettingsDataLoader", () => {
       },
       refreshSettings: async () => {
         events.push("refresh");
+        return createSettingsState();
       },
     });
 
@@ -92,6 +93,7 @@ describe("SettingsDataLoader", () => {
       },
       refreshSettings: async () => {
         events.push("refresh");
+        return createSettingsState();
       },
     });
 
@@ -102,7 +104,7 @@ describe("SettingsDataLoader", () => {
   });
 
   it("forwards refresh requests to the bridge", async () => {
-    const refreshSettings = vi.fn(async () => {});
+    const refreshSettings = vi.fn(async () => createSettingsState());
     const loader = new SettingsDataLoader({
       getHistoryState: async () => createHistoryState(),
       getSettingsState: async () => createSettingsState(),
@@ -111,8 +113,9 @@ describe("SettingsDataLoader", () => {
       refreshSettings,
     });
 
-    await loader.refreshSettings();
+    const result = await loader.refreshSettings();
 
     expect(refreshSettings).toHaveBeenCalledTimes(1);
+    expect(result.settingsState).toEqual(createSettingsState());
   });
 });

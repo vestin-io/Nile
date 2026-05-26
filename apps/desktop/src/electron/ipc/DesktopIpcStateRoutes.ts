@@ -7,6 +7,7 @@ import {
   type DesktopStatusEntryDisplayMode,
   type DesktopStatusEntryDisplayState,
 } from "../../state/StatusEntryDisplay";
+import type { DesktopUsageRefreshMode } from "../../state/UsageCache";
 import { SUPPORTED_LANGUAGES, type LanguagePreference } from "../../state/UiPreferences";
 import { normalizeDesktopPreferences, type DesktopPreferences } from "../../state/DesktopPreferences";
 import { DesktopIpcInputValidator } from "./DesktopIpcInputValidator";
@@ -22,7 +23,11 @@ type DesktopIpcStateRoutesOptions = {
   notifyNotificationHistoryChanged(): void;
   notifyPreferencesChanged(): void;
   refreshAll(): void;
-  refreshDesktopState(options: { invalidate: boolean; notifyRenderer: boolean }): Promise<void>;
+  refreshDesktopState(options: {
+    invalidate: boolean;
+    notifyRenderer: boolean;
+    usageRefreshMode?: DesktopUsageRefreshMode;
+  }): Promise<void>;
   migrateDesktopPreferences(raw: string | null): DesktopPreferences;
   setDesktopPreferences(preferences: DesktopPreferences): DesktopPreferences;
   setLanguagePreference(language: LanguagePreference): LanguagePreference;
@@ -129,10 +134,19 @@ export class DesktopIpcStateRoutes {
       return result;
     });
     ipcMain.handle("desktop:refresh-settings", async () => {
-      await this.options.refreshDesktopState({ invalidate: true, notifyRenderer: false });
+      await this.options.refreshDesktopState({
+        invalidate: true,
+        notifyRenderer: false,
+        usageRefreshMode: "manual",
+      });
+      return await stateStore.getSettingsState({ usageRefreshMode: "manual" });
     });
-    ipcMain.handle("desktop:refresh-status-entry", () => {
-      this.options.refreshAll();
+    ipcMain.handle("desktop:refresh-status-entry", async () => {
+      await this.options.refreshDesktopState({
+        invalidate: true,
+        notifyRenderer: true,
+        usageRefreshMode: "manual",
+      });
     });
     ipcMain.handle("desktop:update-agent-home", async (_event, agentId: unknown, path: unknown) => {
       this.options.updateAgentHome(

@@ -90,7 +90,14 @@ export function useDesktopData() {
       if (!loader) {
         throw new Error("Desktop data loader is not ready.");
       }
-      await loader.refreshSettings();
+      const result = await loader.refreshSettings();
+      if (!isMountedRef.current) {
+        return;
+      }
+      setSettingsState(result.settingsState);
+      setHistoryState(result.historyState);
+      setDefinitions(result.definitions);
+      setError(null);
     } catch (error) {
       if (isMountedRef.current) {
         setError(describeDesktopDataError(error));
@@ -98,8 +105,7 @@ export function useDesktopData() {
       }
       return;
     }
-    await read();
-  }, [read]);
+  }, []);
   const reload = useCallback(async () => {
     await read({ usage: "snapshot" });
   }, [read]);

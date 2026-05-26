@@ -3,11 +3,13 @@ import {
   CredentialStoreCommandError,
   CredentialStoreValidationError,
 } from "@nile/core/services/credential";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { DesktopSecretFileStore } from "../storage/DesktopSecretFileStore";
+import { DesktopEnvironmentStorageModeReader } from "./StorageMode";
 
 type GenericPasswordReadResult = {
   exitCode: number;
@@ -16,9 +18,15 @@ type GenericPasswordReadResult = {
   errorMessage?: string;
 };
 
+type DesktopEnvironmentWriteOptions = {
+  mirrorToSystem?: boolean;
+};
+
 export class DesktopEnvironmentStore {
   private readonly cache = new Map<string, string | null>();
-  private readonly fileStore: DesktopSecretFileStore | null;
+  private readonly databasePath: string | null;
+  private readonly storageModeReader: DesktopEnvironmentStorageModeReader | null;
+  private cacheStoreKind: "file" | "system" | null = null;
 
   constructor(
     databasePath?: string,
@@ -27,19 +35,22 @@ export class DesktopEnvironmentStore {
       undefined,
       () => readDesktopKeychainHelperPath(),
     ),
+    private readonly platform: NodeJS.Platform = process.platform,
   ) {
-    this.fileStore = !shouldUseDesktopEnvironmentFileStore() || !databasePath
-      ? null
-      : new DesktopSecretFileStore(readDesktopEnvironmentStorePath(databasePath));
+    this.databasePath = databasePath ?? null;
+    this.storageModeReader = this.databasePath
+      ? new DesktopEnvironmentStorageModeReader(this.databasePath)
+      : null;
   }
 
   read(envKey: string): string | null {
     const normalizedEnvKey = this.normalizeEnvKey(envKey);
+    const storeAccess = this.readStoreAccess();
     if (this.cache.has(normalizedEnvKey)) {
       return this.cache.get(normalizedEnvKey) ?? null;
     }
-    if (this.fileStore) {
-      const value = this.fileStore.read(normalizedEnvKey);
+    if (storeAccess.kind === "file") {
+      const value = storeAccess.store.read(normalizedEnvKey);
       this.cache.set(normalizedEnvKey, value);
       return value;
     }
@@ -61,34 +72,31 @@ export class DesktopEnvironmentStore {
     throw new CredentialStoreCommandError(this.buildCommandError("read", normalizedEnvKey, result));
   }
 
-  write(envKey: string, value: string): void {
+  write(envKey: string, value: string, options: DesktopEnvironmentWriteOptions = {}): void {
     const normalizedEnvKey = this.normalizeEnvKey(envKey);
     const normalizedValue = value.trim();
     if (!normalizedValue) {
       throw new CredentialStoreValidationError("Environment value is required");
     }
-    if (this.fileStore) {
-      this.fileStore.write(normalizedEnvKey, normalizedValue);
+    const storeAccess = this.readStoreAccess();
+    if (storeAccess.kind === "file") {
+      storeAccess.store.write(normalizedEnvKey, normalizedValue);
+      if (options.mirrorToSystem) {
+        this.writeSystemValue(normalizedEnvKey, normalizedValue);
+      }
       this.cache.set(normalizedEnvKey, normalizedValue);
       return;
     }
 
-    const result = this.writer.write({
-      account: normalizedEnvKey,
-      service: this.serviceName,
-      secret: normalizedValue,
-      update: true,
-    });
-    if (result.exitCode !== 0) {
-      throw new CredentialStoreCommandError(this.buildCommandError("write", normalizedEnvKey, result));
-    }
+    this.writeSystemValue(normalizedEnvKey, normalizedValue);
     this.cache.set(normalizedEnvKey, normalizedValue);
   }
 
   remove(envKey: string): void {
     const normalizedEnvKey = this.normalizeEnvKey(envKey);
-    if (this.fileStore) {
-      this.fileStore.remove(normalizedEnvKey);
+    const storeAccess = this.readStoreAccess();
+    if (storeAccess.kind === "file") {
+      storeAccess.store.remove(normalizedEnvKey);
       this.cache.delete(normalizedEnvKey);
       return;
     }
@@ -100,6 +108,40 @@ export class DesktopEnvironmentStore {
       throw new CredentialStoreCommandError(this.buildCommandError("remove", normalizedEnvKey, result));
     }
     this.cache.delete(normalizedEnvKey);
+  }
+
+  removeSystemCopy(envKey: string): void {
+    if (this.readStoreAccess().kind !== "file") {
+      return;
+    }
+    const normalizedEnvKey = this.normalizeEnvKey(envKey);
+    const result = this.writer.remove({
+      account: normalizedEnvKey,
+      service: this.serviceName,
+    });
+    if (result.exitCode !== 0 && !this.isMissing(result)) {
+      throw new CredentialStoreCommandError(this.buildCommandError("remove", normalizedEnvKey, result));
+    }
+  }
+
+  private readStoreAccess():
+    | { kind: "file"; store: DesktopSecretFileStore }
+    | { kind: "system" } {
+    const storageMode = this.storageModeReader?.read() ?? null;
+    const kind = this.databasePath && shouldUseDesktopEnvironmentFileStore(this.platform, storageMode)
+      ? "file"
+      : "system";
+    if (this.cacheStoreKind !== kind) {
+      this.cache.clear();
+      this.cacheStoreKind = kind;
+    }
+    if (kind === "system" || !this.databasePath) {
+      return { kind: "system" };
+    }
+    return {
+      kind: "file",
+      store: new DesktopSecretFileStore(readDesktopEnvironmentStorePath(this.databasePath)),
+    };
   }
 
   private normalizeEnvKey(envKey: string): string {
@@ -117,6 +159,18 @@ export class DesktopEnvironmentStore {
   private buildCommandError(action: string, envKey: string, result: GenericPasswordReadResult): string {
     const detail = result.stderr.trim() || result.errorMessage?.trim() || `security exited with code ${result.exitCode}`;
     return `Failed to ${action} environment value ${envKey}: ${detail}`;
+  }
+
+  private writeSystemValue(envKey: string, value: string): void {
+    const result = this.writer.write({
+      account: envKey,
+      service: this.serviceName,
+      secret: value,
+      update: true,
+    });
+    if (result.exitCode !== 0) {
+      throw new CredentialStoreCommandError(this.buildCommandError("write", envKey, result));
+    }
   }
 }
 
@@ -179,8 +233,9 @@ function readUnpackedAsarPath(path: string): string {
 
 export function shouldUseDesktopEnvironmentFileStore(
   platform: NodeJS.Platform = process.platform,
+  storageMode: CredentialStorageBackend | null = null,
 ): boolean {
-  return platform === "win32";
+  return platform === "win32" || storageMode === "encrypted_local_storage";
 }
 
 export function readDesktopEnvironmentStorePath(databasePath: string): string {

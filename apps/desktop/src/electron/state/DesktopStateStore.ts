@@ -4,6 +4,7 @@ import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/bui
 import { NileLogger } from "@nile/core/services/NileLogger";
 
 import { DesktopSurface } from "../../state/Surface";
+import type { DesktopUsageRefreshMode } from "../../state/UsageCache";
 import type { DesktopConnection, DesktopStatusEntryState, HistoryState, SettingsState } from "../../state/Types";
 import type { DesktopNotificationHistoryFilterInput } from "../notifications/contracts";
 import { ConnectionAlertOverlay } from "../alerts/Overlay";
@@ -48,6 +49,7 @@ type DesktopStateStoreOptions = {
 
 type GetSettingsStateOptions = {
   refreshUsage?: boolean;
+  usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
 export class DesktopStateStore {
@@ -91,7 +93,10 @@ export class DesktopStateStore {
     }
 
     return await this.readState(this.settingsState, async () => {
-      const state = await this.options.surface.getSettingsState(options);
+      const state = await this.options.surface.getSettingsState({
+        ...options,
+        usageRefreshMode: options.usageRefreshMode ?? "auto",
+      });
       return this.connectionAlertOverlay ? this.connectionAlertOverlay.decorateSettingsState(state) : state;
     });
   }
@@ -150,8 +155,8 @@ export class DesktopStateStore {
     this.notificationHistory.markReadByFilter(filter);
   }
 
-  async refreshStatusEntryUsage(): Promise<void> {
-    await this.options.surface.refreshStatusEntryUsage();
+  async refreshStatusEntryUsage(options?: { mode?: DesktopUsageRefreshMode }): Promise<void> {
+    await this.options.surface.refreshStatusEntryUsage(options);
     this.markDirty(this.statusEntryState, this.settingsState);
   }
 

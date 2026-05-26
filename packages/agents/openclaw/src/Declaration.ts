@@ -6,6 +6,7 @@ export const OPENCLAW_DECLARATION = {
   iconKey: "openclaw",
   requiredApplyRequirements: ["selected-model", "env-backed-api-key"],
   supportsManagedEnvBackedApiKey: true,
+  requiresManagedApiKeyShellEnvironment: true,
   supportedConnectionFamilyIds: [
     "openai-api-key",
     "anthropic-api-key",

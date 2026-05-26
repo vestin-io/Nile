@@ -117,6 +117,28 @@ describe("DesktopStateRefresher", () => {
 
     expect(evaluate).toHaveBeenCalled();
   });
+
+  it("passes manual usage refresh mode through desktop refreshes", async () => {
+    const refreshStatusEntryUsage = vi.fn(async () => {});
+    const refresher = new DesktopStateRefresher({
+      logger: createLoggerStub(),
+      notifyRenderer: vi.fn(),
+      stateStore: {
+        invalidateAll: vi.fn(),
+        refreshStatusEntryState: async () => ({}) as never,
+        refreshStatusEntryUsage,
+        getSettingsState: async () => ({}) as never,
+      } as never,
+    });
+
+    await refresher.refreshDesktopState({
+      invalidate: false,
+      notifyRenderer: false,
+      usageRefreshMode: "manual",
+    });
+
+    expect(refreshStatusEntryUsage).toHaveBeenCalledWith({ mode: "manual" });
+  });
 });
 
 function createLoggerStub() {

@@ -6,6 +6,7 @@ export const GEMINI_DECLARATION = {
   iconKey: "gemini",
   requiredApplyRequirements: [],
   supportsManagedEnvBackedApiKey: false,
+  requiresManagedApiKeyShellEnvironment: false,
   supportedConnectionFamilyIds: ["gemini-cli-session"],
   autoSyncMatchedSelection: true,
   connectionEntryMode: "configure_or_import",

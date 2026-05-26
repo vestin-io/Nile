@@ -17,7 +17,7 @@ import type {
   DesktopOnboardingState,
   SettingsState,
 } from "./Types";
-import { DesktopUsageCache } from "./UsageCache";
+import { DesktopUsageCache, type DesktopUsageRefreshMode } from "./UsageCache";
 import type { DesktopUsageState } from "./UsageSummary";
 
 type DesktopSettingsStateQueryOptions = {
@@ -29,6 +29,7 @@ type DesktopSettingsStateQueryOptions = {
 
 type DesktopSettingsStateReadOptions = {
   refreshUsage?: boolean;
+  usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
 export class DesktopSettingsStateQuery {
@@ -54,7 +55,9 @@ export class DesktopSettingsStateQuery {
     const statuses = context.statuses;
     const usageByConnectionId = options.refreshUsage === false
       ? this.usage.snapshotByConnectionId(savedConnections)
-      : await this.usage.readByConnectionId(session, savedConnections);
+      : await this.usage.readByConnectionId(session, savedConnections, {
+        mode: options.usageRefreshMode,
+      });
     const agentStates = this.buildAgentStates(session, savedConnections, usageByConnectionId, statuses);
     const codexState = agentStates.find((state) => state.agentId === CODEX_AGENT_ID);
     if (!codexState) {

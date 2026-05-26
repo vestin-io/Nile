@@ -387,6 +387,20 @@ describe("DesktopStateStore", () => {
     expect(surface.getSettingsStateCalls).toBe(2);
   });
 
+  it("passes explicit settings usage refresh mode through to the surface read", async () => {
+    const surface = new StubSurface();
+    const store = new DesktopStateStore({
+      databasePath: createDatabasePath(),
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.getSettingsState({ usageRefreshMode: "manual" });
+
+    expect(surface.getSettingsStateOptions).toEqual([{ usageRefreshMode: "manual" }]);
+  });
+
   it("ignores invalid persisted settings snapshots", async () => {
     const databasePath = createDatabasePath();
     const database = SqliteDatabase.open(databasePath);
@@ -430,6 +444,7 @@ function createDatabasePath(): string {
 class StubSurface {
   getStatusEntryStateCalls = 0;
   getSettingsStateCalls = 0;
+  getSettingsStateOptions: Array<{ refreshUsage?: boolean; usageRefreshMode?: "auto" | "manual" }> = [];
   getHistoryStateCalls = 0;
   primeStartupStateCalls = 0;
 
@@ -440,8 +455,11 @@ class StubSurface {
     };
   }
 
-  async getSettingsState(): Promise<SettingsState> {
+  async getSettingsState(
+    options: { refreshUsage?: boolean; usageRefreshMode?: "auto" | "manual" } = {},
+  ): Promise<SettingsState> {
     this.getSettingsStateCalls += 1;
+    this.getSettingsStateOptions.push(options);
     return {
       onboarding: null,
       currentConnection: null,

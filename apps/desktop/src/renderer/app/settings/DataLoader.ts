@@ -19,7 +19,7 @@ type SettingsDataBridge = {
   getSettingsState(): Promise<SettingsState>;
   getSettingsStateSnapshot(): Promise<SettingsState>;
   listConnectionDefinitions(): Promise<Definition[]>;
-  refreshSettings(): Promise<void>;
+  refreshSettings(): Promise<SettingsState>;
 };
 
 export class SettingsDataLoader {
@@ -46,8 +46,14 @@ export class SettingsDataLoader {
     };
   }
 
-  async refreshSettings(): Promise<void> {
-    await this.bridge.refreshSettings();
+  async refreshSettings(): Promise<SettingsRefreshData> {
+    const settingsState = await this.bridge.refreshSettings();
+    const supplementaryData = await this.readSupplementaryData();
+
+    return {
+      settingsState,
+      ...supplementaryData,
+    };
   }
 
   private async readSupplementaryData(): Promise<SettingsSupplementaryData> {

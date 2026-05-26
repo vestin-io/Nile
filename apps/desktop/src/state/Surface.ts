@@ -21,7 +21,7 @@ import { DesktopHistoryStateQuery } from "./HistoryQuery";
 import type { DesktopStateReadContext } from "./ReadContext";
 import { DesktopSettingsStateQuery } from "./SettingsQuery";
 import { DesktopStatusEntryStateQuery } from "./StatusEntryQuery";
-import { DesktopUsageCache } from "./UsageCache";
+import { DesktopUsageCache, type DesktopUsageRefreshMode } from "./UsageCache";
 
 type DesktopSurfaceOptions = {
   databasePath: string;
@@ -35,6 +35,7 @@ type DesktopSurfaceOptions = {
 
 type DesktopSettingsStateOptions = {
   refreshUsage?: boolean;
+  usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
 export class DesktopSurface {
@@ -65,20 +66,23 @@ export class DesktopSurface {
   async getStatusEntryState(): Promise<DesktopStatusEntryState> {
     const state = await this.withSession("menubar-state", async (session) => await this.statusEntry.read(session));
 
-    if (state.agents.some((agent) => agent.currentConnection && agent.currentUsage === null)) {
+    if (state.agents.some((agent) =>
+      agent.currentConnection
+      && agent.currentUsage === null
+      && this.usage.canAutoRefresh(agent.currentConnection.id))) {
       void this.refreshStatusEntryUsage();
     }
 
     return state;
   }
 
-  async refreshStatusEntryUsage(): Promise<void> {
+  async refreshStatusEntryUsage(options?: { mode?: DesktopUsageRefreshMode }): Promise<void> {
     if (this.menubarUsageRefresh) {
       return await this.menubarUsageRefresh;
     }
 
     this.menubarUsageRefresh = this.withSession("menubar-usage-refresh", async (session) => {
-      await this.statusEntry.refreshUsage(session);
+      await this.statusEntry.refreshUsage(session, options);
     }).finally(() => {
       this.menubarUsageRefresh = null;
     });

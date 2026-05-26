@@ -5,12 +5,15 @@ import type { ConnectionUsageResult } from "@nile/core/actions/usage/Result";
 
 import { type DesktopUsageState, UsageSummary } from "./UsageSummary";
 
+export type DesktopUsageRefreshMode = "auto" | "manual";
+
 export class DesktopUsageCache {
   private static readonly CACHE_TTL_MS = 60_000;
   private static readonly REFRESH_CONCURRENCY = 4;
 
   private readonly usageByConnectionId = new Map<string, DesktopUsageState | null>();
   private readonly usageReadAt = new Map<string, number>();
+  private readonly autoRefreshPausedConnectionIds = new Set<string>();
 
   constructor(private readonly logger: NileLogger) {}
 
@@ -29,26 +32,36 @@ export class DesktopUsageCache {
   async readByConnectionId(
     session: NileSession,
     savedConnections: SavedConnectionSummary[],
+    options?: { mode?: DesktopUsageRefreshMode },
   ): Promise<Map<string, DesktopUsageState | null>> {
     return await this.refreshByConnectionId(
       session,
       savedConnections.map((connection) => connection.id),
+      {
+        mode: options?.mode,
+      },
     );
+  }
+
+  canAutoRefresh(connectionId: string): boolean {
+    return !this.autoRefreshPausedConnectionIds.has(connectionId);
   }
 
   async refreshByConnectionId(
     session: NileSession,
     connectionIds: Array<string | null>,
-    options?: { force: boolean },
+    options?: { force?: boolean; mode?: DesktopUsageRefreshMode },
   ): Promise<Map<string, DesktopUsageState | null>> {
     const uniqueConnectionIds = [...new Set(connectionIds.filter((connectionId): connectionId is string => Boolean(connectionId)))];
     const forceRefresh = options?.force ?? false;
+    const refreshMode = options?.mode ?? "auto";
     const shouldRefresh = uniqueConnectionIds.filter((connectionId) =>
-      forceRefresh || !this.hasFreshUsageCache(connectionId),
+      (refreshMode === "manual" || !this.autoRefreshPausedConnectionIds.has(connectionId))
+        && (forceRefresh || !this.hasFreshUsageCache(connectionId)),
     );
 
     if (shouldRefresh.length > 0) {
-      await this.refreshBatch(session, shouldRefresh);
+      await this.refreshBatch(session, shouldRefresh, refreshMode);
     }
 
     const now = Date.now();
@@ -63,7 +76,11 @@ export class DesktopUsageCache {
     return result;
   }
 
-  private async refreshBatch(session: NileSession, connectionIds: string[]): Promise<void> {
+  private async refreshBatch(
+    session: NileSession,
+    connectionIds: string[],
+    refreshMode: DesktopUsageRefreshMode,
+  ): Promise<void> {
     const queue = [...connectionIds];
     const workerCount = Math.min(DesktopUsageCache.REFRESH_CONCURRENCY, queue.length);
     const workers = Array.from({ length: workerCount }, async () => {
@@ -76,8 +93,10 @@ export class DesktopUsageCache {
         this.usageByConnectionId.set(connectionId, result.summary);
         if (result.cacheable) {
           this.usageReadAt.set(connectionId, Date.now());
+          this.autoRefreshPausedConnectionIds.delete(connectionId);
         } else {
           this.usageReadAt.delete(connectionId);
+          this.autoRefreshPausedConnectionIds.add(connectionId);
         }
       }
     });

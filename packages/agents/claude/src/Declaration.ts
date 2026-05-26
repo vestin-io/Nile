@@ -6,6 +6,7 @@ export const CLAUDE_DECLARATION = {
   iconKey: "claude",
   requiredApplyRequirements: [],
   supportsManagedEnvBackedApiKey: true,
+  requiresManagedApiKeyShellEnvironment: false,
   supportedConnectionFamilyIds: ["anthropic-api-key", "claude-session"],
   autoSyncMatchedSelection: true,
   connectionEntryMode: "configure_or_import",

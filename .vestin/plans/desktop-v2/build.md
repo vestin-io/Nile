@@ -1,5 +1,97 @@
 # Desktop V2 Build Log
 
+## 2026-05-27
+
+### Quick setup duplicate saved-connection display cleanup
+
+- Reused the shared local-setup visibility rule inside the quick-setup agent cards.
+- `QuickSetupAgentCard` now hides detected setups whose reconciliation state is already `already_saved`, so the same saved Gateway/API-key setup no longer appears both in Quick Setup and the Connections list.
+- Added a focused shared-presenter regression test covering:
+  - `already_saved` detected setups stay hidden from actionable surfaces
+  - `new` detected setups remain visible
+
+#### Key findings
+
+- The underlying data was not duplicated. Quick Setup and Connections were rendering the same saved setup through different state slices.
+- The inconsistency came from the quick-setup surface bypassing `LOCAL_SETUP_PRESENTATION.shouldShowDetectedSetup(...)` while the agent list already used it.
+- This change is intentionally narrow: it removes the duplicate saved-setup presentation without changing connection storage, reconciliation, or import behavior.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/shared/LocalSetup.test.ts apps/desktop/src/renderer/shared/DisplayText.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Desktop state review follow-up cleanup
+
+- Removed the backend-agnostic managed-environment cache bug from `DesktopEnvironmentStore`:
+  - reads/writes now re-resolve the active backend
+  - in-memory cache is cleared automatically when desktop storage mode flips between system store and encrypted-local file store
+- Removed the one-shot `nextSettingsUsageRefreshMode` side channel from desktop state refresh:
+  - `desktop:refresh-settings` now returns the manually refreshed `SettingsState` directly
+  - renderer refresh flow consumes that returned state instead of immediately issuing a second generic `getSettingsState()` read
+  - manual usage-refresh intent now stays attached to the same request path instead of leaking through ambient mutable state
+- Replaced the managed-shell-environment heuristic with an explicit agent capability:
+  - added `requiresManagedApiKeyShellEnvironment` to agent declarations/capabilities
+  - `ManagedApiKeyEnvironment` now reads that capability directly instead of inferring shell mirroring from `selected-model`
+
+#### Key findings
+
+- The previous manual-refresh mode plumbing was functionally correct in the happy path, but it depended on request timing. Returning refreshed state directly from the IPC mutation is a much clearer boundary.
+- `supportsManagedEnvBackedApiKey` and “needs shell env mirror” are separate concerns. Treating one as a proxy for the other was the kind of silent coupling that would break as soon as a new agent landed.
+- Automatic usage-refresh pause state is still process-local. This cleanup fixes the in-session behavior and removes the worst feedback loops, but it does not yet persist paused connections across app restarts.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/environment/Store.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts apps/desktop/src/state/UsageCache.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts apps/desktop/src/renderer/app/settings/DataLoader.test.ts packages/core/src/models/agent/registry/Capabilities.test.ts`
+- `npm run typecheck`
+- `npm run build -w @nile/desktop`
+
+### Usage auto-refresh circuit breaker
+
+- Changed desktop usage refresh behavior so failing connections no longer stay in the automatic background refresh queue forever.
+- `DesktopUsageCache` now pauses auto refresh for a connection after a failed quota read, including current-session failures that would otherwise keep retrying from menubar/settings refresh loops.
+- Manual refresh paths now carry an explicit `manual` usage refresh mode from IPC through the desktop state layer:
+  - `desktop:refresh-settings`
+  - `desktop:refresh-status-entry`
+- A manual refresh attempt can probe paused connections again, and only successful reads re-enable future automatic refresh for that connection.
+- Automatic menubar follow-up refreshes now also check whether the current connection is auto-refresh-eligible before scheduling another background usage refresh.
+
+#### Key findings
+
+- The important boundary here is not “cache vs no cache”; it is “automatic background work vs explicit user intent”. Once a connection starts failing in a way that is noisy or interactive, background refresh must stop assuming it is safe to keep retrying.
+- Re-enabling auto refresh on any manual attempt would still be too eager. The connection only returns to the auto queue after a successful manual read.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/state/UsageCache.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+- `npm run build -w @nile/desktop`
+
+### Packaged desktop state refresh loop fix
+
+- Investigated the macOS packaged-app lag regression using the local `~/.nile-switcher/logs/app.log` output instead of renderer errors, because the app was slow without crashing.
+- The hot path was repeated desktop state rebuild work:
+  - `menubar-state`
+  - `menubar-usage-refresh`
+  - `settings-state`
+- Root cause was a desktop self-trigger loop, not a single failing connection:
+  - `DesktopStateStore` persisted status/settings snapshots into `desktop_state_snapshots`
+  - those writes touched `switcher.sqlite`
+  - `DesktopWorkspaceWatcher` watches `switcher.sqlite`, `-wal`, and `-shm`
+  - the packaged app then invalidated and rebuilt desktop state again from its own snapshot write traffic
+- Fixed `DesktopStateSnapshotStore` so it now skips SQLite upserts when the snapshot payload and version are unchanged.
+- Added regression coverage proving identical snapshot writes no longer rewrite the row.
+
+#### Key findings
+
+- The visible lag was amplified by quota-read noise (`Unsupported quota auth mode: api_key` and expired Gemini session refresh attempts), but those log lines were secondary. The main responsiveness regression came from the watcher reacting to unchanged app-owned snapshot writes.
+- This fix intentionally does not change the existing Gemini/current-session retry behavior or the unsupported API-key quota warning. Those may still deserve follow-up cleanup, but they are no longer allowed to multiply through the snapshot write loop.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/SnapshotStore.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts`
+- `npm run build -w @nile/desktop`
+- `npm run typecheck`
+
 ## 2026-05-06
 
 ### Step 79: Expose live agent models in desktop settings state

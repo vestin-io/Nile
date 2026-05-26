@@ -129,6 +129,7 @@ export class ManagedApiKeyEnvironment {
         continue;
       }
       this.store.remove(envKey);
+      this.store.removeSystemCopy?.(envKey);
     }
     this.shellEnvironment.sync([...preservedKeys].sort());
   }
@@ -167,12 +168,14 @@ export class ManagedApiKeyEnvironment {
   }
 
   private writeManagedEnvironment(connection: SavedConnectionSummary, envKey: string, apiKey: string): void {
-    this.writeManagedStoreIfChanged(envKey, apiKey);
-    if (this.supportsManagedShellEnvironment(connection)) {
+    const requiresManagedShellEnvironment = this.supportsManagedShellEnvironment(connection);
+    this.writeManagedStoreIfChanged(envKey, apiKey, requiresManagedShellEnvironment);
+    if (requiresManagedShellEnvironment) {
       this.shellEnvironment.ensure(envKey);
       return;
     }
     this.shellEnvironment.remove(envKey);
+    this.store.removeSystemCopy?.(envKey);
   }
 
   private syncConnectionWithoutShell(session: NileSession, connectionId: string): string | null {
@@ -193,14 +196,21 @@ export class ManagedApiKeyEnvironment {
 
     const previousEnvKey = connection.envKey?.trim() || credential.envKey?.trim() || null;
     const envKey = this.readEnvKey(connection, credential);
+    const requiresManagedShellEnvironment = this.supportsManagedShellEnvironment(connection);
     if (previousEnvKey === envKey) {
-      this.writeManagedStoreIfChanged(envKey, apiKey);
+      this.writeManagedStoreIfChanged(envKey, apiKey, requiresManagedShellEnvironment);
+      if (!requiresManagedShellEnvironment) {
+        this.store.removeSystemCopy?.(envKey);
+      }
       return envKey;
     }
 
     session.setConnectionDirectApiKeyEnvKey(connectionId, envKey);
     try {
-      this.writeManagedStoreIfChanged(envKey, apiKey);
+      this.writeManagedStoreIfChanged(envKey, apiKey, requiresManagedShellEnvironment);
+      if (!requiresManagedShellEnvironment) {
+        this.store.removeSystemCopy?.(envKey);
+      }
     } catch (error) {
       session.setConnectionDirectApiKeyEnvKey(connectionId, previousEnvKey);
       throw error;
@@ -208,8 +218,17 @@ export class ManagedApiKeyEnvironment {
     return envKey;
   }
 
-  private writeManagedStoreIfChanged(envKey: string, apiKey: string): void {
-    if (this.store.read(envKey) === apiKey) {
+  private writeManagedStoreIfChanged(
+    envKey: string,
+    apiKey: string,
+    mirrorToSystem: boolean = false,
+  ): void {
+    const hasShellMirror = this.shellEnvironment.has?.(envKey) ?? false;
+    if (this.store.read(envKey) === apiKey && (!mirrorToSystem || hasShellMirror)) {
+      return;
+    }
+    if (mirrorToSystem) {
+      this.store.write(envKey, apiKey, { mirrorToSystem: true });
       return;
     }
     this.store.write(envKey, apiKey);
@@ -217,15 +236,12 @@ export class ManagedApiKeyEnvironment {
 
   private removeManagedEnvironment(envKey: string): void {
     this.store.remove(envKey);
+    this.store.removeSystemCopy?.(envKey);
     this.shellEnvironment.remove(envKey);
   }
 
   private supportsManagedShellEnvironment(connection: SavedConnectionSummary): boolean {
-    return connection.enabledAgents.some((agentId) => {
-      const capability = AGENT_CAPABILITIES.read(agentId);
-      return capability.supportsManagedEnvBackedApiKey
-        && capability.requiredApplyRequirements.includes("selected-model");
-    });
+    return connection.enabledAgents.some((agentId) => AGENT_CAPABILITIES.read(agentId).requiresManagedApiKeyShellEnvironment);
   }
 
   private cleanupManagedEnvironment(envKey: string): void {
