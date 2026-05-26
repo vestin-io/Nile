@@ -8,6 +8,7 @@ const bridge: DesktopBridge = {
     openGitHubIssues: () => ipcRenderer.invoke("desktop:open-github-issues"),
     openExternalUrl: (url) => ipcRenderer.invoke("desktop:open-external-url", url),
     openSettings: () => ipcRenderer.invoke("desktop:open-settings"),
+    quit: () => ipcRenderer.invoke("desktop:quit-app"),
     openSupportEmail: () => ipcRenderer.invoke("desktop:open-support-email"),
     updateAgentHome: (agentId, path) => ipcRenderer.invoke("desktop:update-agent-home", agentId, path),
     updateAgentRuntimeCommand: (agentId, path) => ipcRenderer.invoke("desktop:update-agent-runtime-command", agentId, path),
@@ -27,7 +28,6 @@ const bridge: DesktopBridge = {
     rollbackLatestMutation: (agentId) => ipcRenderer.invoke("desktop:rollback-latest-mutation", agentId),
     addConnection: (input) => ipcRenderer.invoke("desktop:add-connection", input),
     updateConnection: (input) => ipcRenderer.invoke("desktop:update-connection", input),
-    importDetectedSetups: (scanIds) => ipcRenderer.invoke("desktop:import-detected-setups", scanIds),
     importCurrentConnection: (input) => ipcRenderer.invoke("desktop:import-current-connection", input),
     removeConnection: (connectionId) => ipcRenderer.invoke("desktop:remove-connection", connectionId),
     updateAgentConnectionModel: (input) => ipcRenderer.invoke("desktop:update-agent-connection-model", input),
@@ -36,6 +36,21 @@ const bridge: DesktopBridge = {
     updateUsageAlert: (input) => ipcRenderer.invoke("desktop:update-connection-usage-alert", input),
     deleteUsageAlert: (connectionId, alertId) => ipcRenderer.invoke("desktop:delete-connection-usage-alert", connectionId, alertId),
     resetState: () => ipcRenderer.invoke("desktop:reset-state"),
+  },
+  notifications: {
+    getNotificationsMuted: () => ipcRenderer.invoke("desktop:get-notifications-muted"),
+    hasUnreadNotifications: () => ipcRenderer.invoke("desktop:has-unread-notifications"),
+    getNotificationHistory: (filter) => ipcRenderer.invoke("desktop:get-notification-history", filter),
+    getNotificationHistoryConnections: (filter) => ipcRenderer.invoke("desktop:get-notification-history-connections", filter),
+    markNotificationHistoryRead: (entryIds) => ipcRenderer.invoke("desktop:mark-notification-history-read", entryIds),
+    markNotificationHistoryReadByFilter: (filter) => ipcRenderer.invoke("desktop:mark-notification-history-read-by-filter", filter),
+    setNotificationsMuted: (muted) => ipcRenderer.invoke("desktop:set-notifications-muted", muted),
+  },
+  preferences: {
+    getDesktopPreferences: () => ipcRenderer.invoke("desktop:get-desktop-preferences"),
+    migrateDesktopPreferences: (raw) => ipcRenderer.invoke("desktop:migrate-desktop-preferences", raw),
+    setDesktopPreferences: (preferences) => ipcRenderer.invoke("desktop:set-desktop-preferences", preferences),
+    setLanguagePreference: (language) => ipcRenderer.invoke("desktop:set-language-preference", language),
   },
   profiles: {
     listProfiles: () => ipcRenderer.invoke("desktop:list-workspace-profiles"),
@@ -46,26 +61,22 @@ const bridge: DesktopBridge = {
     deleteProfile: (profileId) => ipcRenderer.invoke("desktop:delete-workspace-profile", profileId),
     applyProfile: (profileId) => ipcRenderer.invoke("desktop:apply-workspace-profile", profileId),
   },
-  state: {
-    getMenubarState: () => ipcRenderer.invoke("desktop:get-menubar-state"),
-    getMenubarDisplay: () => ipcRenderer.invoke("desktop:get-menubar-display"),
+  profileFeatures: {
+    getProfileFeatureEnabled: () => ipcRenderer.invoke("desktop:get-profile-feature-enabled"),
+    setProfileFeatureEnabled: (enabled) => ipcRenderer.invoke("desktop:set-profile-feature-enabled", enabled),
+  },
+  settingsData: {
     getSettingsState: () => ipcRenderer.invoke("desktop:get-settings-state"),
     getSettingsStateSnapshot: () => ipcRenderer.invoke("desktop:get-settings-state-snapshot"),
     getHistoryState: () => ipcRenderer.invoke("desktop:get-history-state"),
-    getNotificationHistory: (filter) => ipcRenderer.invoke("desktop:get-notification-history", filter),
-    getNotificationHistoryConnections: (filter) => ipcRenderer.invoke("desktop:get-notification-history-connections", filter),
-    hasUnreadNotifications: () => ipcRenderer.invoke("desktop:has-unread-notifications"),
-    markNotificationHistoryRead: (entryIds) => ipcRenderer.invoke("desktop:mark-notification-history-read", entryIds),
-    markNotificationHistoryReadByFilter: (filter) => ipcRenderer.invoke("desktop:mark-notification-history-read-by-filter", filter),
-    setLanguagePreference: (language) => ipcRenderer.invoke("desktop:set-language-preference", language),
-    getNotificationsMuted: () => ipcRenderer.invoke("desktop:get-notifications-muted"),
-    getProfileFeatureEnabled: () => ipcRenderer.invoke("desktop:get-profile-feature-enabled"),
-    setMenubarDisplayMode: (mode) => ipcRenderer.invoke("desktop:set-menubar-display-mode", mode),
-    setNotificationsMuted: (muted) => ipcRenderer.invoke("desktop:set-notifications-muted", muted),
-    toggleMenubarTickerAgent: (agentId) => ipcRenderer.invoke("desktop:toggle-menubar-ticker-agent", agentId),
-    setProfileFeatureEnabled: (enabled) => ipcRenderer.invoke("desktop:set-profile-feature-enabled", enabled),
     refreshSettings: () => ipcRenderer.invoke("desktop:refresh-settings"),
-    refreshMenubar: () => ipcRenderer.invoke("desktop:refresh-menubar"),
+  },
+  statusEntry: {
+    getStatusEntryState: () => ipcRenderer.invoke("desktop:get-status-entry-state"),
+    getStatusEntryDisplay: () => ipcRenderer.invoke("desktop:get-status-entry-display"),
+    setStatusEntryDisplayMode: (mode) => ipcRenderer.invoke("desktop:set-status-entry-display-mode", mode),
+    toggleStatusEntrySelectedAgent: (agentId) => ipcRenderer.invoke("desktop:toggle-status-entry-selected-agent", agentId),
+    refreshStatusEntry: () => ipcRenderer.invoke("desktop:refresh-status-entry"),
   },
   updates: {
     getReleaseInfo: () => ipcRenderer.invoke("desktop:get-release-info"),
@@ -88,6 +99,13 @@ contextBridge.exposeInMainWorld("nileDesktopEvents", {
     ipcRenderer.on("desktop:state-changed", listener);
     return () => {
       ipcRenderer.removeListener("desktop:state-changed", listener);
+    };
+  },
+  onPreferencesChanged(callback: () => void) {
+    const listener = () => callback();
+    ipcRenderer.on("desktop:preferences-changed", listener);
+    return () => {
+      ipcRenderer.removeListener("desktop:preferences-changed", listener);
     };
   },
   onLocalStateReset(callback: () => void) {

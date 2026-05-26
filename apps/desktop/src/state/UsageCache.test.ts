@@ -67,6 +67,83 @@ describe("DesktopUsageCache", () => {
       },
     ]);
   });
+
+  it("does not cache quota read errors as fresh null usage and requires a manual retry", async () => {
+    const logger = new StubLogger();
+    const cache = new DesktopUsageCache(logger as never);
+    const session = createFlakySession();
+
+    const first = await cache.refreshByConnectionId(session as never, ["openai-session"]);
+    const second = await cache.refreshByConnectionId(session as never, ["openai-session"]);
+    const third = await cache.refreshByConnectionId(session as never, ["openai-session"], { mode: "manual" });
+
+    expect(first.get("openai-session")).toBeNull();
+    expect(second.get("openai-session")).toBeNull();
+    expect(third.get("openai-session")).toEqual({
+      status: "available",
+      planLabel: "Plus",
+      windows: [
+        { key: "weekly", label: "weekly", remainingPercent: 66, resetsAt: null },
+      ],
+      windowLabel: "weekly",
+      remainingPercent: 66,
+      text: "weekly 66% left",
+    });
+  });
+
+  it("pauses automatic refresh after an error until a manual refresh succeeds", async () => {
+    const logger = new StubLogger();
+    const cache = new DesktopUsageCache(logger as never);
+    const session = createSequenceSession([
+      {
+        connectionId: "openai-session",
+        connectionLabel: "openai@example.com",
+        endpointFamily: "openai",
+        endpointLabel: "OpenAI",
+        status: "error",
+        source: "remote_api",
+        message: "Quota request timed out after 10000ms",
+        windows: [],
+      },
+      {
+        connectionId: "openai-session",
+        connectionLabel: "openai@example.com",
+        endpointFamily: "openai",
+        endpointLabel: "OpenAI",
+        status: "available",
+        source: "remote_api",
+        planLabel: "Plus",
+        windows: [
+          {
+            label: "weekly",
+            remainingPercent: 66,
+          },
+        ],
+      },
+      {
+        connectionId: "openai-session",
+        connectionLabel: "openai@example.com",
+        endpointFamily: "openai",
+        endpointLabel: "OpenAI",
+        status: "available",
+        source: "remote_api",
+        planLabel: "Plus",
+        windows: [
+          {
+            label: "weekly",
+            remainingPercent: 66,
+          },
+        ],
+      },
+    ]);
+
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "manual" });
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
+
+    expect(session.calls).toBe(3);
+  });
 });
 
 function createSession(result: {
@@ -88,6 +165,70 @@ function createSession(result: {
       return result;
     },
   } as never;
+}
+
+function createFlakySession() {
+  let calls = 0;
+  return {
+    async getConnectionUsage() {
+      calls += 1;
+      if (calls === 1) {
+        return {
+          connectionId: "openai-session",
+          connectionLabel: "openai@example.com",
+          endpointFamily: "openai",
+          endpointLabel: "OpenAI",
+          status: "error",
+          source: "remote_api",
+          message: "Quota request timed out after 10000ms",
+          windows: [],
+        };
+      }
+
+      return {
+        connectionId: "openai-session",
+        connectionLabel: "openai@example.com",
+        endpointFamily: "openai",
+        endpointLabel: "OpenAI",
+        status: "available",
+        source: "remote_api",
+        planLabel: "Plus",
+        windows: [
+          {
+            label: "weekly",
+            remainingPercent: 66,
+          },
+        ],
+      };
+    },
+  };
+}
+
+function createSequenceSession(results: Array<{
+  connectionId: string;
+  connectionLabel: string;
+  endpointFamily: string;
+  endpointLabel: string;
+  status: string;
+  source: string;
+  planLabel?: string;
+  message?: string;
+  windows: Array<{
+    label: string;
+    remainingPercent: number | null;
+  }>;
+}>) {
+  let calls = 0;
+  return {
+    get calls() {
+      return calls;
+    },
+    async getConnectionUsage() {
+      const result = results[Math.min(calls, results.length - 1)];
+      calls += 1;
+      return result;
+    },
+  };
 }
 
 class StubLogger {

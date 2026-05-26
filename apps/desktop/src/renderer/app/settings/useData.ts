@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AgentId } from "@nile/core/models/agent/definitions";
 
+import { SettingsDataLoader } from "./DataLoader";
 import {
   canConfigureAgent as readAgentConfigurability,
   readDefinitionsForAgent as readDefinitionsByAgent,
@@ -13,8 +14,19 @@ export function useDesktopData() {
   const [historyState, setHistoryState] = useState<HistoryState | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [settingsState, setSettingsState] = useState<SettingsState | null>(null);
+  const loaderRef = useRef<SettingsDataLoader | null>(null);
   const requestIdRef = useRef(0);
   const isMountedRef = useRef(true);
+
+  if (!loaderRef.current) {
+    loaderRef.current = new SettingsDataLoader({
+      getHistoryState: async () => await window.nileDesktop.settingsData.getHistoryState(),
+      getSettingsState: async () => await window.nileDesktop.settingsData.getSettingsState(),
+      getSettingsStateSnapshot: async () => await window.nileDesktop.settingsData.getSettingsStateSnapshot(),
+      listConnectionDefinitions: async () => await window.nileDesktop.connections.listConnectionDefinitions(),
+      refreshSettings: async () => await window.nileDesktop.settingsData.refreshSettings(),
+    });
+  }
 
   const read = useCallback(async (options?: {
     markLoading?: boolean;
@@ -28,21 +40,20 @@ export function useDesktopData() {
     }
 
     try {
-      const settingsStatePromise = options?.usage === "snapshot"
-        ? window.nileDesktop.state.getSettingsStateSnapshot()
-        : window.nileDesktop.state.getSettingsState();
+      const loader = loaderRef.current;
+      if (!loader) {
+        throw new Error("Desktop data loader is not ready.");
+      }
+
       if (options?.usage === "snapshot") {
-        const nextSettingsState = await settingsStatePromise;
+        const snapshot = await loader.readSnapshot();
         if (!isMountedRef.current || requestId !== requestIdRef.current) {
           return false;
         }
-        setSettingsState(nextSettingsState);
+        setSettingsState(snapshot.settingsState);
         setError(null);
         setIsLoading(false);
-        const [nextHistoryState, nextDefinitions] = await Promise.all([
-          window.nileDesktop.state.getHistoryState(),
-          window.nileDesktop.connections.listConnectionDefinitions(),
-        ]);
+        const { historyState: nextHistoryState, definitions: nextDefinitions } = await snapshot.followup;
         if (!isMountedRef.current || requestId !== requestIdRef.current) {
           return false;
         }
@@ -51,17 +62,13 @@ export function useDesktopData() {
         return true;
       }
 
-      const [nextSettingsState, nextHistoryState, nextDefinitions] = await Promise.all([
-        settingsStatePromise,
-        window.nileDesktop.state.getHistoryState(),
-        window.nileDesktop.connections.listConnectionDefinitions(),
-      ]);
+      const result = await loader.readRefresh();
       if (!isMountedRef.current || requestId !== requestIdRef.current) {
         return false;
       }
-      setSettingsState(nextSettingsState);
-      setHistoryState(nextHistoryState);
-      setDefinitions(nextDefinitions);
+      setSettingsState(result.settingsState);
+      setHistoryState(result.historyState);
+      setDefinitions(result.definitions);
       setError(null);
       return true;
     } catch (error) {
@@ -79,7 +86,18 @@ export function useDesktopData() {
 
   const refresh = useCallback(async () => {
     try {
-      await window.nileDesktop.state.refreshSettings();
+      const loader = loaderRef.current;
+      if (!loader) {
+        throw new Error("Desktop data loader is not ready.");
+      }
+      const result = await loader.refreshSettings();
+      if (!isMountedRef.current) {
+        return;
+      }
+      setSettingsState(result.settingsState);
+      setHistoryState(result.historyState);
+      setDefinitions(result.definitions);
+      setError(null);
     } catch (error) {
       if (isMountedRef.current) {
         setError(describeDesktopDataError(error));
@@ -87,8 +105,7 @@ export function useDesktopData() {
       }
       return;
     }
-    await read();
-  }, [read]);
+  }, []);
   const reload = useCallback(async () => {
     await read({ usage: "snapshot" });
   }, [read]);

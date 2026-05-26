@@ -1,5 +1,4 @@
 import type { AgentHomes, AgentId, ImportCurrentConnectionResult, RollbackLatestAgentResult } from "@nile/core/models/agent";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { RemoveConnectionResult } from "@nile/builtins/local";
 import type {
   BindCursorUsageResult,
@@ -20,9 +19,11 @@ import { CursorUsageSessionSourceProbe } from "@nile/host-local";
 
 import { DesktopConnectionStatusPresenter } from "../../state/connection/Status";
 import type { DesktopConnection } from "../../state/Types";
+import { DesktopCredentialStorageSession } from "./CredentialStorageSession";
 import { DesktopManagedConnectionImports } from "./Imports";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 import { SessionRunner } from "./SessionRunner";
+import { DesktopConnectionStorageSupport } from "./StorageSupport";
 import { resolveDesktopCredentialStorageMode } from "./CredentialStorageMode";
 import type {
   DesktopConnectionSummary,
@@ -35,11 +36,7 @@ type DesktopConnectionGatewayOptions = {
   environment: EnvironmentSource;
   managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
   credentialStore: CredentialStore;
-  credentialStorageSession?: {
-    hasEncryptedLocalVault(): boolean;
-    isEncryptedLocalUnlocked(): boolean;
-    unlockEncryptedLocalStorage(passphrase: string): void;
-  };
+  credentialStorageSession?: DesktopCredentialStorageSession;
   logger?: NileLogger;
 };
 
@@ -50,6 +47,7 @@ export class DesktopConnectionGateway {
   private readonly managedApiKeyEnvironment: ManagedApiKeyEnvironment | NoopManagedApiKeyEnvironment;
   private readonly imports: DesktopManagedConnectionImports;
   private readonly logger: NileLogger;
+  private readonly storage: DesktopConnectionStorageSupport;
 
   constructor(private readonly options: DesktopConnectionGatewayOptions) {
     this.logger = this.options.logger ?? NileLogger.silent().child({ scope: "connection-gateway" });
@@ -59,6 +57,7 @@ export class DesktopConnectionGateway {
       this.logger.child({ feature: "managed-imports" }),
     );
     this.sessions = new SessionRunner(this);
+    this.storage = new DesktopConnectionStorageSupport(this.options.credentialStorageSession ?? null);
   }
 
   async importCurrentConnection(
@@ -66,13 +65,14 @@ export class DesktopConnectionGateway {
   ): Promise<DesktopConnectionSummary> {
     const normalizedInput = typeof input === "string" ? { agentId: input } : input;
     const startedAt = Date.now();
+    let credentialStorageBackend: CredentialStorageBackend | undefined;
     this.logger.info("desktop.import_current_connection.gateway.start", {
       agentId: normalizedInput.agentId,
       credentialStorageBackend: normalizedInput.credentialStorageBackend ?? "unset",
     });
     try {
       return await this.sessions.runAsync(async (session) => {
-        const credentialStorageBackend = resolveDesktopCredentialStorageMode(
+        credentialStorageBackend = resolveDesktopCredentialStorageMode(
           session,
           normalizedInput.credentialStorageBackend,
         );
@@ -80,7 +80,9 @@ export class DesktopConnectionGateway {
           agentId: normalizedInput.agentId,
           credentialStorageBackend,
         });
-        this.prepareCredentialStorage(credentialStorageBackend, normalizedInput.encryptedLocalPassphrase);
+        this.storage.prepare(credentialStorageBackend, normalizedInput.encryptedLocalPassphrase, {
+          allowCreate: true,
+        });
         this.logger.info("desktop.import_current_connection.gateway.prepare_storage.succeeded", {
           agentId: normalizedInput.agentId,
           credentialStorageBackend,
@@ -109,7 +111,7 @@ export class DesktopConnectionGateway {
         agentId: normalizedInput.agentId,
         durationMs: Date.now() - startedAt,
       });
-      throw error;
+      throw this.storage.mapError(error, credentialStorageBackend);
     }
   }
 
@@ -159,13 +161,6 @@ export class DesktopConnectionGateway {
     });
   }
 
-  async importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult> {
-    return await this.sessions.runAsync(async (session) => {
-      const credentialStorageBackend = resolveDesktopCredentialStorageMode(session, undefined);
-      return await this.imports.importDetectedSetups(session, scanIds, credentialStorageBackend);
-    });
-  }
-
   rollbackLatestMutation(agentId: AgentId): RollbackLatestAgentResult {
     return this.sessions.run((session) => session.rollbackLatestMutation(agentId));
   }
@@ -189,31 +184,6 @@ export class DesktopConnectionGateway {
 
   private applyCursorUsageFollowUp<T extends ConnectionChangeResult>(result: T): T {
     return this.runCursorUsageWorkspace((workspace) => workspace.applyFollowUp(result));
-  }
-
-  private prepareCredentialStorage(
-    backend: CredentialStorageBackend | undefined,
-    passphrase: string | undefined,
-  ): void {
-    if (backend !== "encrypted_local_storage") {
-      return;
-    }
-    if (!this.options.credentialStorageSession) {
-      throw new Error("Encrypted local storage is not available in this desktop session.");
-    }
-    if (!this.options.credentialStorageSession.hasEncryptedLocalVault()) {
-      if (!passphrase?.trim()) {
-        throw new Error("Encrypted local storage passphrase is required.");
-      }
-      this.options.credentialStorageSession.unlockEncryptedLocalStorage(passphrase.trim());
-      return;
-    }
-    if (!this.options.credentialStorageSession.isEncryptedLocalUnlocked()) {
-      if (!passphrase?.trim()) {
-        throw new Error("Encrypted local storage is locked. Enter your passphrase and try again.");
-      }
-      this.options.credentialStorageSession.unlockEncryptedLocalStorage(passphrase.trim());
-    }
   }
 
   private runCursorUsageWorkspace<TResult>(

@@ -33,6 +33,7 @@ describe("ClaudeSessionLogin", () => {
         return exitedProcess(0);
       },
       () => false,
+      "darwin",
     );
 
     await login.signIn("/tmp/test-home/.claude");
@@ -59,6 +60,7 @@ describe("ClaudeSessionLogin", () => {
         return exitedProcess(0);
       },
       () => false,
+      "darwin",
     );
 
     await login.signIn("/tmp/test-home/.claude");
@@ -70,7 +72,7 @@ describe("ClaudeSessionLogin", () => {
     });
     expect(calls[0]?.args[1]).toContain('tell application "Terminal"');
     expect(calls[0]?.args[1]).toContain("HOME='/tmp/test-home'");
-    expect(calls[0]?.args[1]).toContain(install.command);
+    expect(calls[0]?.args[1]).toContain(install.command.replaceAll("\\", "\\\\"));
     expect(calls[0]?.args[1]).toContain("login");
   });
 
@@ -87,6 +89,7 @@ describe("ClaudeSessionLogin", () => {
         return exitedProcess(0);
       },
       () => true,
+      "darwin",
     );
 
     await login.signIn("/tmp/test-home/.claude");
@@ -97,6 +100,36 @@ describe("ClaudeSessionLogin", () => {
         stdio: "ignore",
       },
     ]);
+  });
+
+  it("opens a Windows terminal for Claude sign-in when no attached terminal is available", async () => {
+    setTty("stdin", false);
+    setTty("stdout", false);
+    const install = createClaudeCliInstall("windows");
+    process.env.PATH = install.bin;
+    const calls: Array<{ command: string; args: string[]; stdio: "inherit" | "ignore" }> = [];
+    const login = new ClaudeSessionLogin(
+      EnvironmentSource.empty(),
+      (command, args, options) => {
+        calls.push({ command, args, stdio: options.stdio });
+        return exitedProcess(0);
+      },
+      () => true,
+      "win32",
+    );
+
+    await login.signIn("C:\\Users\\tester\\.claude");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      command: "cmd.exe",
+      stdio: "ignore",
+    });
+    expect(calls[0]?.args).toEqual(expect.arrayContaining(["/d", "/c", "start", "", "cmd.exe", "/k"]));
+    const script = calls[0]?.args.at(-1) ?? "";
+    expect(script).toContain('set "HOME=C:\\Users\\tester"');
+    expect(script).toContain(install.command);
+    expect(script).toContain("login");
   });
 
   it("returns a user-facing error when the Claude CLI is missing from PATH", async () => {
@@ -111,6 +144,7 @@ describe("ClaudeSessionLogin", () => {
         },
       }) as never,
       () => false,
+      "darwin",
     );
 
     await expect(login.signIn("/tmp/test-home/.claude")).rejects.toThrow(
@@ -132,6 +166,7 @@ describe("ClaudeSessionLogin", () => {
         return exitedProcess(0);
       },
       () => false,
+      "darwin",
     );
 
     await login.signIn("/tmp/test-home/.claude", {

@@ -1,6 +1,11 @@
 import { GenericPasswordWriter } from "./GenericPasswordWriter";
 import { SecuritySecretCodec } from "./SecretCodec";
 import { type StoredCredential } from "./Types";
+import {
+  type CredentialValidator,
+  DEFAULT_CREDENTIAL_VALIDATORS,
+  StoredCredentialCodec,
+} from "./StoredCredentialCodec";
 import { NileLogger } from "../../services/NileLogger";
 import {
   type CredentialStore,
@@ -23,6 +28,7 @@ export {
 
 export class KeychainCredentialStore implements CredentialStore {
   private readonly cache = new Map<string, StoredCredential>();
+  private readonly codec: StoredCredentialCodec;
 
   constructor(
     private readonly serviceName: string = "nile.switcher.credential",
@@ -30,12 +36,18 @@ export class KeychainCredentialStore implements CredentialStore {
     private readonly validators: Record<string, CredentialValidator> = DEFAULT_CREDENTIAL_VALIDATORS,
     private readonly secretCodec: SecuritySecretCodec = new SecuritySecretCodec(),
     private readonly genericPasswordWriter: GenericPasswordWriter = new GenericPasswordWriter(),
-  ) {}
+  ) {
+    this.codec = new StoredCredentialCodec(
+      (value) => this.secretCodec.encode(value),
+      (value) => this.secretCodec.decode(value),
+      this.validators,
+    );
+  }
 
   create(target: CredentialStoreTarget, credential: StoredCredential): void {
     const credentialId = normalizeCredentialStoreTarget(target).reference;
     this.validateCredentialId(credentialId);
-    const serialized = this.serializeCredential(credential);
+    const serialized = this.codec.serialize(credential);
     this.logger.debug("credential.create.start", {
       credentialId,
       kind: credential.kind,
@@ -44,7 +56,7 @@ export class KeychainCredentialStore implements CredentialStore {
     const result = this.genericPasswordWriter.write({
       account: credentialId,
       service: this.serviceName,
-      secret: this.secretCodec.encode(serialized),
+      secret: serialized,
       update: false,
     });
 
@@ -81,7 +93,7 @@ export class KeychainCredentialStore implements CredentialStore {
   update(target: CredentialStoreTarget, credential: StoredCredential): void {
     const credentialId = normalizeCredentialStoreTarget(target).reference;
     this.validateCredentialId(credentialId);
-    const serialized = this.serializeCredential(credential);
+    const serialized = this.codec.serialize(credential);
     this.logger.debug("credential.update.start", {
       credentialId,
       kind: credential.kind,
@@ -94,7 +106,7 @@ export class KeychainCredentialStore implements CredentialStore {
     const result = this.genericPasswordWriter.write({
       account: credentialId,
       service: this.serviceName,
-      secret: this.secretCodec.encode(serialized),
+      secret: serialized,
       update: true,
     });
 
@@ -137,7 +149,7 @@ export class KeychainCredentialStore implements CredentialStore {
     });
 
     if (result.exitCode === 0) {
-      const credential = this.deserializeCredential(result.stdout);
+      const credential = this.codec.deserialize(result.stdout);
       this.cache.set(credentialId, credential);
       this.logger.debug("credential.get.success", { credentialId });
       return credential;
@@ -219,37 +231,6 @@ export class KeychainCredentialStore implements CredentialStore {
     }
   }
 
-  private serializeCredential(credential: StoredCredential): string {
-    this.validateCredential(credential);
-    return JSON.stringify(credential);
-  }
-
-  private deserializeCredential(raw: string): StoredCredential {
-    let parsed: unknown;
-
-    try {
-      parsed = JSON.parse(this.secretCodec.decode(raw));
-    } catch {
-      throw new CredentialStoreValidationError("Stored credential payload is not valid JSON");
-    }
-
-    this.validateCredential(parsed);
-    return parsed;
-  }
-
-  private validateCredential(credential: unknown): asserts credential is StoredCredential {
-    if (typeof credential !== "object" || credential === null || Array.isArray(credential)) {
-      throw new CredentialStoreValidationError("Credential payload must be an object");
-    }
-
-    const kind = requireStringField(credential, "kind");
-    const validator = this.validators[kind];
-    if (!validator) {
-      throw new CredentialStoreValidationError(`Unsupported credential kind: ${kind}`);
-    }
-    validator(credential);
-  }
-
   private isDuplicateError(result: SecurityCliResultLike): boolean {
     return /already exists/i.test(result.stderr);
   }
@@ -274,94 +255,3 @@ type SecurityCliResultLike = {
   stderr: string;
   errorMessage?: string;
 };
-
-type CredentialValidator = (credential: unknown) => void;
-
-const DEFAULT_CREDENTIAL_VALIDATORS: Record<string, CredentialValidator> = {
-  api_key: (credential) => {
-    const source = requireOptionalStringField(credential, "source");
-    if (!source || source === "direct") {
-      requireStringField(credential, "apiKey");
-      requireOptionalStringField(credential, "envKey");
-      return;
-    }
-    if (source === "env_key") {
-      requireStringField(credential, "envKey");
-      return;
-    }
-    throw new CredentialStoreValidationError(`Unsupported api_key credential source: ${source}`);
-  },
-  claude_session: (credential) => {
-    requireStringField(credential, "accessToken");
-    requireStringField(credential, "refreshToken");
-    requireOptionalNumberField(credential, "expiresAt");
-    requireOptionalStringField(credential, "accountUuid");
-    requireOptionalStringField(credential, "organizationUuid");
-    requireOptionalStringField(credential, "email");
-    requireOptionalStringField(credential, "displayName");
-  },
-  openai_session: (credential) => {
-    requireStringField(credential, "idToken");
-    requireStringField(credential, "accessToken");
-    requireStringField(credential, "refreshToken");
-    requireOptionalStringField(credential, "accountId");
-    requireOptionalStringField(credential, "lastRefresh");
-  },
-  openclaw_openai_session: (credential) => {
-    requireStringField(credential, "accessToken");
-    requireStringField(credential, "refreshToken");
-    requireOptionalNumberField(credential, "expiresAt");
-    requireOptionalStringField(credential, "accountId");
-    requireOptionalStringField(credential, "email");
-  },
-  cursor_session: (credential) => {
-    requireStringField(credential, "accessToken");
-    requireStringField(credential, "refreshToken");
-    requireOptionalStringField(credential, "authId");
-    requireOptionalStringField(credential, "authCacheKey");
-    requireOptionalStringField(credential, "email");
-    requireOptionalStringField(credential, "displayName");
-    requireOptionalNumberField(credential, "userId");
-  },
-  gemini_cli_session: (credential) => {
-    requireStringField(credential, "accessToken");
-    requireStringField(credential, "refreshToken");
-    requireStringField(credential, "idToken");
-    requireOptionalNumberField(credential, "expiryDate");
-    requireOptionalStringField(credential, "tokenType");
-    requireOptionalStringField(credential, "scope");
-  },
-  cursor_web_session: (credential) => {
-    requireStringField(credential, "sessionToken");
-  },
-};
-
-function requireStringField(value: unknown, field: string): string {
-  const record = value as Record<string, unknown>;
-  if (typeof record[field] !== "string" || !record[field]) {
-    throw new CredentialStoreValidationError(`Credential field ${field} is required`);
-  }
-  return record[field] as string;
-}
-
-function requireOptionalStringField(value: unknown, field: string): string | undefined {
-  const record = value as Record<string, unknown>;
-  if (record[field] === undefined) {
-    return undefined;
-  }
-  if (typeof record[field] !== "string" || !record[field]) {
-    throw new CredentialStoreValidationError(`Credential field ${field} must be a non-empty string`);
-  }
-  return record[field] as string;
-}
-
-function requireOptionalNumberField(value: unknown, field: string): number | undefined {
-  const record = value as Record<string, unknown>;
-  if (record[field] === undefined) {
-    return undefined;
-  }
-  if (typeof record[field] !== "number" || Number.isNaN(record[field])) {
-    throw new CredentialStoreValidationError(`Credential field ${field} must be a valid number`);
-  }
-  return record[field] as number;
-}

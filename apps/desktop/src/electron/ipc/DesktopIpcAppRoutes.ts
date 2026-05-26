@@ -7,6 +7,7 @@ type DesktopIpcAppRoutesOptions = {
   openExternalUrl(url: string): Promise<void>;
   openGitHubIssues(): Promise<void>;
   openSettings(): void;
+  quitApp(): void;
   openSupportEmail(): Promise<void>;
 };
 
@@ -20,6 +21,9 @@ export class DesktopIpcAppRoutes {
     });
     ipcMain.handle("desktop:open-settings", () => {
       this.options.openSettings();
+    });
+    ipcMain.handle("desktop:quit-app", () => {
+      this.options.quitApp();
     });
     ipcMain.handle("desktop:open-support-email", () => this.options.openSupportEmail());
   }

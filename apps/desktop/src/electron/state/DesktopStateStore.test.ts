@@ -5,11 +5,10 @@ import { tmpdir } from "node:os";
 
 import type { RollbackLatestAgentResult } from "@nile/core/models/agent";
 import type { RemoveConnectionResult, ResetStateResult } from "@nile/builtins/local";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/builtins/cursor-usage";
 import { SqliteDatabase } from "@nile/core/services/database";
 
-import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";
+import type { DesktopConnection, DesktopStatusEntryState, HistoryState, SettingsState } from "../../state/Types";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
 import type { DesktopAddConnectionInput, DesktopConnectionSummary } from "../connections/contracts";
 import { DesktopStateStore } from "./DesktopStateStore";
@@ -33,11 +32,11 @@ describe("DesktopStateStore", () => {
       connectionManager: manager as never,
     });
 
-    const first = await store.getMenubarState();
-    const second = await store.getMenubarState();
+    const first = await store.getStatusEntryState();
+    const second = await store.getStatusEntryState();
 
     expect(first).toBe(second);
-    expect(surface.getMenubarStateCalls).toBe(1);
+    expect(surface.getStatusEntryStateCalls).toBe(1);
   });
 
   it("deduplicates in-flight refreshes for the same state", async () => {
@@ -59,28 +58,28 @@ describe("DesktopStateStore", () => {
   });
 
   it("does not let stale in-flight refreshes clear later invalidations", async () => {
-    const surface = new DeferredMenubarSurface();
+    const surface = new DeferredStatusEntrySurface();
     const store = new DesktopStateStore({
       databasePath: createDatabasePath(),
       surface: surface as never,
       connectionGateway: new StubConnectionGateway() as never,
       connectionManager: new StubConnectionManager() as never,
     });
-    const firstState: MenubarState = { agents: [] };
-    const secondState: MenubarState = { agents: [] };
+    const firstState: DesktopStatusEntryState = { agents: [] };
+    const secondState: DesktopStatusEntryState = { agents: [] };
 
-    const firstRefresh = store.getMenubarState();
+    const firstRefresh = store.getStatusEntryState();
     store.invalidateAll();
-    const secondRefresh = store.getMenubarState();
+    const secondRefresh = store.getStatusEntryState();
 
-    expect(surface.getMenubarStateCalls).toBe(2);
+    expect(surface.getStatusEntryStateCalls).toBe(2);
     surface.resolve(0, firstState);
     await expect(firstRefresh).resolves.toBe(firstState);
-    expect(store.peekMenubarState()).toBeNull();
+    expect(store.peekStatusEntryState()).toBeNull();
 
     surface.resolve(1, secondState);
     await expect(secondRefresh).resolves.toBe(secondState);
-    expect(store.peekMenubarState()).toBe(secondState);
+    expect(store.peekStatusEntryState()).toBe(secondState);
   });
 
   it("invalidates cached state after a switch", async () => {
@@ -93,15 +92,15 @@ describe("DesktopStateStore", () => {
       connectionManager: new StubConnectionManager() as never,
     });
 
-    await store.getMenubarState();
+    await store.getStatusEntryState();
     await store.getSettingsState();
 
     await store.switchConnection("codex", "work");
-    await store.getMenubarState();
+    await store.getStatusEntryState();
     await store.getSettingsState();
 
     expect(gateway.switchConnectionCalls).toEqual([["codex", "work"]]);
-    expect(surface.getMenubarStateCalls).toBe(2);
+    expect(surface.getStatusEntryStateCalls).toBe(2);
     expect(surface.getSettingsStateCalls).toBe(2);
   });
 
@@ -114,12 +113,12 @@ describe("DesktopStateStore", () => {
       connectionManager: new StubConnectionManager() as never,
     });
 
-    expect(store.peekMenubarState()).toBeNull();
-    await store.getMenubarState();
+    expect(store.peekStatusEntryState()).toBeNull();
+    await store.getStatusEntryState();
 
-    const cached = store.peekMenubarState();
+    const cached = store.peekStatusEntryState();
     expect(cached).toEqual({ agents: [] });
-    expect(surface.getMenubarStateCalls).toBe(1);
+    expect(surface.getStatusEntryStateCalls).toBe(1);
   });
 
   it("forces a new menubar refresh when explicitly requested", async () => {
@@ -131,10 +130,10 @@ describe("DesktopStateStore", () => {
       connectionManager: new StubConnectionManager() as never,
     });
 
-    await store.getMenubarState();
-    await store.refreshMenubarState();
+    await store.getStatusEntryState();
+    await store.refreshStatusEntryState();
 
-    expect(surface.getMenubarStateCalls).toBe(2);
+    expect(surface.getStatusEntryStateCalls).toBe(2);
   });
 
   it("primes startup menubar and settings state into cache together", async () => {
@@ -150,9 +149,9 @@ describe("DesktopStateStore", () => {
     await store.primeStartupState();
 
     expect(surface.primeStartupStateCalls).toBe(1);
-    expect(store.peekMenubarState()).toEqual({ agents: [] });
+    expect(store.peekStatusEntryState()).toEqual({ agents: [] });
     expect(store.peekSettingsState()).toEqual(await surface.getSettingsState());
-    expect(surface.getMenubarStateCalls).toBe(0);
+    expect(surface.getStatusEntryStateCalls).toBe(0);
   });
 
   it("invalidates every cached desktop state when requested", async () => {
@@ -165,17 +164,17 @@ describe("DesktopStateStore", () => {
       connectionManager: manager as never,
     });
 
-    await store.getMenubarState();
+    await store.getStatusEntryState();
     await store.getSettingsState();
     await store.getHistoryState();
 
     store.invalidateAll();
 
-    await store.getMenubarState();
+    await store.getStatusEntryState();
     await store.getSettingsState();
     await store.getHistoryState();
 
-    expect(surface.getMenubarStateCalls).toBe(2);
+    expect(surface.getStatusEntryStateCalls).toBe(2);
     expect(surface.getSettingsStateCalls).toBe(2);
     expect(surface.getHistoryStateCalls).toBe(2);
   });
@@ -192,11 +191,11 @@ describe("DesktopStateStore", () => {
       stateReset: stateReset as never,
     });
 
-    await store.getMenubarState();
+    await store.getStatusEntryState();
     await store.getSettingsState();
 
     const result = store.resetState();
-    await store.getMenubarState();
+    await store.getStatusEntryState();
     await store.getSettingsState();
 
     expect(result).toEqual({
@@ -207,7 +206,7 @@ describe("DesktopStateStore", () => {
       historyRemoved: true,
     });
     expect(stateReset.databasePaths).toEqual([databasePath]);
-    expect(surface.getMenubarStateCalls).toBe(2);
+    expect(surface.getStatusEntryStateCalls).toBe(2);
     expect(surface.getSettingsStateCalls).toBe(2);
   });
 
@@ -221,11 +220,11 @@ describe("DesktopStateStore", () => {
       connectionManager: new StubConnectionManager() as never,
     });
 
-    await store.getMenubarState();
+    await store.getStatusEntryState();
     await store.getSettingsState();
 
     const result = store.bindCursorUsage("cursor-work", "session-token");
-    await store.getMenubarState();
+    await store.getStatusEntryState();
     await store.getSettingsState();
 
     expect(result).toEqual({
@@ -237,7 +236,7 @@ describe("DesktopStateStore", () => {
       boundAt: "2026-05-01T00:00:00.000Z",
     });
     expect(gateway.bindCursorUsageCalls).toEqual([["cursor-work", "session-token"]]);
-    expect(surface.getMenubarStateCalls).toBe(2);
+    expect(surface.getStatusEntryStateCalls).toBe(2);
     expect(surface.getSettingsStateCalls).toBe(2);
   });
 
@@ -259,7 +258,7 @@ describe("DesktopStateStore", () => {
     expect(result).toBe("gpt-5.3-codex");
     expect(gateway.updateAgentConnectionModelCalls).toEqual([["openclaw", "work", "gpt-5.3-codex"]]);
     expect(surface.getSettingsStateCalls).toBe(2);
-    expect(surface.getMenubarStateCalls).toBe(0);
+    expect(surface.getStatusEntryStateCalls).toBe(0);
   });
 
   it("hydrates cached menubar and settings state from the persisted desktop snapshot", async () => {
@@ -272,7 +271,7 @@ describe("DesktopStateStore", () => {
       connectionManager: new StubConnectionManager() as never,
     });
 
-    await writer.getMenubarState();
+    await writer.getStatusEntryState();
     await writer.getSettingsState();
 
     const readerSurface = new StubSurface();
@@ -283,11 +282,11 @@ describe("DesktopStateStore", () => {
       connectionManager: new StubConnectionManager() as never,
     });
 
-    expect(reader.peekMenubarState()).toEqual({ agents: [] });
+    expect(reader.peekStatusEntryState()).toEqual({ agents: [] });
     expect(reader.peekSettingsState()).toEqual(await writerSurface.getSettingsState());
     await expect(reader.getSettingsStateSnapshot()).resolves.toEqual(await writerSurface.getSettingsState());
     expect(readerSurface.getSettingsStateCalls).toBe(0);
-    await expect(reader.getMenubarState()).resolves.toEqual({ agents: [] });
+    await expect(reader.getStatusEntryState()).resolves.toEqual({ agents: [] });
     await expect(reader.getSettingsState()).resolves.toEqual({
       onboarding: null,
       currentConnection: null,
@@ -311,7 +310,7 @@ describe("DesktopStateStore", () => {
         credentialStorageModeMixed: false,
       },
     });
-    expect(readerSurface.getMenubarStateCalls).toBe(1);
+    expect(readerSurface.getStatusEntryStateCalls).toBe(1);
     expect(readerSurface.getSettingsStateCalls).toBe(1);
   });
 
@@ -328,6 +327,23 @@ describe("DesktopStateStore", () => {
     await store.getSettingsState();
 
     expect(surface.getSettingsStateCalls).toBe(2);
+  });
+
+  it("does not let refreshUsage:false settings reads satisfy later live reads", async () => {
+    const surface = new RefreshAwareSettingsSurface();
+    const store = new DesktopStateStore({
+      databasePath: createDatabasePath(),
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    const partial = await store.getSettingsState({ refreshUsage: false });
+    const live = await store.getSettingsState();
+
+    expect(partial.connections[0]?.usage?.text).toBe("partial");
+    expect(live.connections[0]?.usage?.text).toBe("live");
+    expect(surface.calls).toEqual([false, true]);
   });
 
   it("does not let startup prewarm overwrite an existing persisted settings snapshot", async () => {
@@ -371,6 +387,20 @@ describe("DesktopStateStore", () => {
     expect(surface.getSettingsStateCalls).toBe(2);
   });
 
+  it("passes explicit settings usage refresh mode through to the surface read", async () => {
+    const surface = new StubSurface();
+    const store = new DesktopStateStore({
+      databasePath: createDatabasePath(),
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.getSettingsState({ usageRefreshMode: "manual" });
+
+    expect(surface.getSettingsStateOptions).toEqual([{ usageRefreshMode: "manual" }]);
+  });
+
   it("ignores invalid persisted settings snapshots", async () => {
     const databasePath = createDatabasePath();
     const database = SqliteDatabase.open(databasePath);
@@ -412,20 +442,24 @@ function createDatabasePath(): string {
 }
 
 class StubSurface {
-  getMenubarStateCalls = 0;
+  getStatusEntryStateCalls = 0;
   getSettingsStateCalls = 0;
+  getSettingsStateOptions: Array<{ refreshUsage?: boolean; usageRefreshMode?: "auto" | "manual" }> = [];
   getHistoryStateCalls = 0;
   primeStartupStateCalls = 0;
 
-  async getMenubarState(): Promise<MenubarState> {
-    this.getMenubarStateCalls += 1;
+  async getStatusEntryState(): Promise<DesktopStatusEntryState> {
+    this.getStatusEntryStateCalls += 1;
     return {
       agents: [],
     };
   }
 
-  async getSettingsState(): Promise<SettingsState> {
+  async getSettingsState(
+    options: { refreshUsage?: boolean; usageRefreshMode?: "auto" | "manual" } = {},
+  ): Promise<SettingsState> {
     this.getSettingsStateCalls += 1;
+    this.getSettingsStateOptions.push(options);
     return {
       onboarding: null,
       currentConnection: null,
@@ -459,12 +493,12 @@ class StubSurface {
     };
   }
 
-  async refreshMenubarUsage(): Promise<void> {}
+  async refreshStatusEntryUsage(): Promise<void> {}
 
-  async primeStartupState(): Promise<{ menubarState: MenubarState; settingsState: SettingsState }> {
+  async primeStartupState(): Promise<{ statusEntryState: DesktopStatusEntryState; settingsState: SettingsState }> {
     this.primeStartupStateCalls += 1;
     return {
-      menubarState: {
+      statusEntryState: {
         agents: [],
       },
       settingsState: await this.getSettingsState(),
@@ -483,17 +517,28 @@ class UsageSurface extends StubSurface {
   }
 }
 
-class DeferredMenubarSurface extends StubSurface {
-  private readonly pending: Array<(value: MenubarState) => void> = [];
+class RefreshAwareSettingsSurface extends StubSurface {
+  readonly calls: boolean[] = [];
 
-  override async getMenubarState(): Promise<MenubarState> {
-    this.getMenubarStateCalls += 1;
+  override async getSettingsState(options?: { refreshUsage?: boolean }): Promise<SettingsState> {
+    this.getSettingsStateCalls += 1;
+    const isLive = options?.refreshUsage !== false;
+    this.calls.push(isLive);
+    return createSettingsState(isLive ? "live" : "partial");
+  }
+}
+
+class DeferredStatusEntrySurface extends StubSurface {
+  private readonly pending: Array<(value: DesktopStatusEntryState) => void> = [];
+
+  override async getStatusEntryState(): Promise<DesktopStatusEntryState> {
+    this.getStatusEntryStateCalls += 1;
     return await new Promise((resolve) => {
       this.pending.push(resolve);
     });
   }
 
-  resolve(index: number, value: MenubarState): void {
+  resolve(index: number, value: DesktopStatusEntryState): void {
     const resolve = this.pending[index];
     if (!resolve) {
       throw new Error(`No pending menubar refresh at index ${index}`);
@@ -576,10 +621,6 @@ class StubConnectionGateway {
       configurableAgents: [],
       selectedByAgents: [],
     };
-  }
-
-  importDetectedSetups(): ImportDetectedSetupsResult {
-    return { results: [] };
   }
 
   rollbackLatestMutation(agentId: string): RollbackLatestAgentResult {

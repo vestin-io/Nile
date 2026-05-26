@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { SqliteDatabase } from "../database/SqliteDatabase";
 import { NileLogger } from "../NileLogger";
 import { FileSnapshotStore } from "./FileSnapshotStore";
+import { createPlatformSecureSnapshotStore } from "./PlatformSecureSnapshotStore";
 import { SecureSnapshotStore } from "./SecureSnapshotStore";
 import { SqliteMutationHistoryStore } from "./SqliteMutationHistoryStore";
 import {
@@ -37,7 +38,7 @@ export class MutationHistory {
     return new MutationHistory(
       database,
       new FileSnapshotStore(historyRoot),
-      options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+      options?.secureSnapshotStore ?? createPlatformSecureSnapshotStore(),
       options?.logger ?? NileLogger.silent().child({ module: "mutation-history" }),
       database,
     );
@@ -56,7 +57,7 @@ export class MutationHistory {
     return new MutationHistory(
       database,
       new FileSnapshotStore(historyRoot),
-      options?.secureSnapshotStore ?? new SecureSnapshotStore(),
+      options?.secureSnapshotStore ?? createPlatformSecureSnapshotStore(),
       options?.logger ?? NileLogger.silent().child({ module: "mutation-history" }),
       null,
     );

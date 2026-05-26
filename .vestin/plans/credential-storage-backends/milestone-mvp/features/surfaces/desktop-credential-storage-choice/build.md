@@ -468,6 +468,47 @@
 - The `Quick setup` flow already passed an explicit backend, but the older inline `Save to Nile` action on the `Agents` page still called `importCurrentConnection(agentId)` with no backend input, which caused main-process logs to show `credentialStorageBackend:"default"`.
 - After this fix, the `Agents` page import path now follows the same default-backend intent as the rest of the desktop flows; encrypted-local defaults will no longer silently save through the session fallback without an unlock prompt.
 
+## Follow-up Build: Platform-Specific System Storage Copy
+
+### Tasks Completed
+
+- Updated desktop renderer credential-storage copy so the system-secure option can name the platform-specific password manager instead of always describing a generic or Mac-specific store.
+- Removed several English `This Mac` references from quick setup and credential-storage flows in favor of device-neutral copy.
+- Switched desktop Windows main-process wiring to the new core Windows Credential Manager backend and removed the now-unused desktop file-backed credential store path.
+
+### Files Changed
+
+- `apps/desktop/src/electron/shell/DesktopMain.ts`
+- `apps/desktop/src/electron/credentials/DesktopCredentialStore.ts`
+- `apps/desktop/src/renderer/shared/Platform.ts`
+- `apps/desktop/src/renderer/shared/Platform.test.ts`
+- `apps/desktop/src/renderer/app/settings/usePreferences.ts`
+- `apps/desktop/src/renderer/quick-setup/StorageStep.tsx`
+- `apps/desktop/src/renderer/quick-setup/Page.tsx`
+- `apps/desktop/src/renderer/connections/add/Page.tsx`
+- `apps/desktop/src/renderer/connections/dialogs/CredentialStorage.tsx`
+- `apps/desktop/src/renderer/shared/i18n/en.ts`
+- `apps/desktop/src/renderer/shared/i18n/zh.ts`
+- `apps/desktop/src/renderer/shared/i18n/de.ts`
+- `apps/desktop/src/renderer/shared/i18n/es.ts`
+- `apps/desktop/src/renderer/shared/i18n/fr.ts`
+- `apps/desktop/src/renderer/shared/i18n/it.ts`
+- `apps/desktop/src/renderer/shared/i18n/ja.ts`
+- `apps/desktop/src/renderer/shared/i18n/ko.ts`
+- `apps/desktop/src/renderer/shared/i18n/th.ts`
+- `apps/desktop/src/renderer/shared/i18n/vi.ts`
+
+### Verification Commands Run
+
+- `npx vitest run apps/desktop/src/renderer/shared/Platform.test.ts`
+- `npm run typecheck`
+
+### Key Findings
+
+- The credential-storage option now names `Apple Keychain` on macOS and `Windows Credential Manager` on Windows while keeping a generic fallback for unsupported/unknown desktop platforms.
+- The renderer still carries some non-English legacy "this Mac" wording outside the credential-storage path; this round limited the cleanup to the flows directly touched by storage-mode selection and unlock messaging.
+- Windows environment-secret persistence still uses the desktop-local encrypted JSON file path for managed environment variables; this round only changed saved connection credential storage.
+
 ## Follow-up Build: Machine-Level Storage Mode Finalization
 
 ### Tasks Completed
@@ -571,3 +612,68 @@
 ### Key Findings
 
 - The new machine-level mode invariant is exercised directly in desktop tests now; fixtures can no longer rely on implicit `system_secure_storage` fallback.
+
+## Follow-up Build: System-Secure Copy Cleanup
+
+### Tasks Completed
+
+- Removed the remaining non-English desktop reset strings that still described system-secure credentials as `keychain`-managed after the Windows Credential Manager rollout.
+- Kept the platform-specific storage-option naming work intact while making the destructive reset warning platform-neutral across every supported desktop locale touched by that flow.
+
+### Files Changed
+
+- `apps/desktop/src/renderer/shared/i18n/de.ts`
+- `apps/desktop/src/renderer/shared/i18n/es.ts`
+- `apps/desktop/src/renderer/shared/i18n/fr.ts`
+- `apps/desktop/src/renderer/shared/i18n/it.ts`
+- `apps/desktop/src/renderer/shared/i18n/ja.ts`
+- `apps/desktop/src/renderer/shared/i18n/ko.ts`
+- `apps/desktop/src/renderer/shared/i18n/th.ts`
+- `apps/desktop/src/renderer/shared/i18n/vi.ts`
+
+### Verification Commands Run
+
+- `npm run typecheck`
+
+### Key Findings
+
+- The reset confirmation no longer names a macOS-only credential store on Windows or other platforms, even in non-English locales.
+- Several non-English storage-option strings still rely on English fallback keys for the newer platform-specific system-store description; this follow-up only corrected the stale reset wording.
+
+## Follow-up Build: Managed Env Local-Store Support
+
+### Tasks Completed
+
+- Added a desktop environment storage-mode reader so managed `NILE_*` API-key values now follow the machine-level credential storage mode instead of hardcoding macOS to the keychain-backed environment store.
+- Updated `DesktopEnvironmentStore` to re-evaluate the current machine-level mode from local state on each access:
+  - Windows still keeps the existing desktop file-backed environment store path.
+  - macOS now uses the desktop file-backed environment store when the machine mode is `encrypted_local_storage`.
+  - The first-save flow no longer requires an app restart before managed env writes switch over to the local store.
+- Kept external shell-backed managed env flows working for the current OpenClaw-style path by mirroring to the system store only when shell export wiring is still required.
+- Added regression coverage for:
+  - machine-mode resolution from saved connections vs desktop preferences
+  - macOS file-backed managed env persistence in encrypted-local mode
+  - dynamic in-session mode switching for the environment store
+  - shell-backed mirror behavior and mirror cleanup in managed-env orchestration
+
+### Files Changed
+
+- `apps/desktop/src/electron/environment/StorageMode.ts`
+- `apps/desktop/src/electron/environment/StorageMode.test.ts`
+- `apps/desktop/src/electron/environment/Store.ts`
+- `apps/desktop/src/electron/environment/Store.test.ts`
+- `apps/desktop/src/electron/environment/Shell.ts`
+- `apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.ts`
+- `apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts`
+
+### Verification Commands Run
+
+- `npx vitest run apps/desktop/src/electron/environment/StorageMode.test.ts apps/desktop/src/electron/environment/Store.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts apps/desktop/src/electron/environment/Shell.test.ts`
+- `npm run build -w @nile/desktop`
+- `npm run typecheck`
+
+### Key Findings
+
+- The key startup prompt was not coming from saved-connection credentials anymore; it was coming from the separate managed-environment store still reading macOS keychain entries even after the machine mode had moved to encrypted local storage.
+- Re-evaluating the machine mode on each environment-store access is necessary. Caching the backend at app startup would still leave same-session first-save/import flows on the old keychain path until restart.
+- This pass does not remove legacy `nile.switcher.environment` keychain entries that older desktop builds may already have written. In encrypted-local mode Nile now stops reading them for normal desktop-managed API-key flows, but shell-backed flows that still need external env export keep using a controlled system-store mirror until a file-backed shell bridge exists.

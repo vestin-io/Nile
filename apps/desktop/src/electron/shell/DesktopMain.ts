@@ -7,8 +7,9 @@ import type { AgentHomes, AgentRuntimeCommandOverrides } from "@nile/core/models
 import { mergeAgentHomes, type AgentId } from "@nile/core/models/agent";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import {
-  BackendCredentialStore,
+  createPlatformWorkspaceCredentialStore,
   type CredentialStore,
+  isCredentialStorageSession,
 } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { ShellEnvironment } from "@nile/host-local";
@@ -23,11 +24,11 @@ import { ConnectionAlertOverlay } from "../alerts/Overlay";
 import { ConnectionAlertStore } from "../alerts/Store";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
+import { DesktopCredentialStorageSession } from "../connections/CredentialStorageSession";
 import { ManagedApiKeyEnvironment } from "../connections/ManagedApiKeyEnvironment";
-import { DesktopOpenClawEnvironmentReader } from "../environment/OpenClaw";
 import { DesktopEnvironmentSource } from "../environment/Source";
 import { DesktopShellEnvironment } from "../environment/Shell";
-import { DesktopEnvironmentStore } from "../environment/Store";
+import { DesktopEnvironmentStore, readDesktopEnvironmentStorePath } from "../environment/Store";
 import { DesktopIpcAppRoutes } from "../ipc/DesktopIpcAppRoutes";
 import { DesktopIpcConnectionRoutes } from "../ipc/DesktopIpcConnectionRoutes";
 import { DesktopIpcInputValidator } from "../ipc/DesktopIpcInputValidator";
@@ -42,14 +43,15 @@ import { WorkspaceProfileStore } from "../profiles/Store";
 import { DesktopShell } from "./DesktopShell";
 import { DesktopTrayMenu } from "./TrayMenu";
 import { DesktopStateReset } from "../state/Reset";
-import { DesktopMenubarDisplayStore } from "../state/MenubarDisplayStore";
-import { DesktopLanguageStore } from "../state/LanguageStore";
+import { DesktopPreferencesStore } from "../state/DesktopPreferencesStore";
 import { DesktopNotificationMuteStore } from "../state/NotificationMuteStore";
 import { DesktopProfileFeatureStore } from "../state/ProfileFeatureStore";
+import { DesktopStatusEntryDisplayStore } from "../state/StatusEntryDisplayStore";
 import { DesktopStateRefresher } from "../state/DesktopStateRefresher";
 import { DesktopStateStore } from "../state/DesktopStateStore";
 import { DesktopWorkspaceWatcher } from "./DesktopWorkspaceWatcher";
-import { DesktopTrayTickerTitle } from "./TickerTitle";
+import { DesktopManagedEnvironmentLifecycle } from "./ManagedEnvironmentLifecycle";
+import { DesktopStatusEntryController } from "./StatusEntryController";
 
 const currentDir = typeof __dirname === "string" ? __dirname : dirname(fileURLToPath(import.meta.url));
 
@@ -61,10 +63,11 @@ export class DesktopMain {
   private readonly environment: EnvironmentSource;
   private readonly environmentStore: DesktopEnvironmentStore;
   private readonly shellEnvironment: DesktopShellEnvironment;
+  private readonly credentialStorageSession: DesktopCredentialStorageSession;
   private readonly agentHomesStore: AgentHomesStore;
   private readonly agentRuntimeCommandsStore: AgentRuntimeCommandsStore;
-  private readonly menubarDisplayStore: DesktopMenubarDisplayStore;
-  private readonly languageStore: DesktopLanguageStore;
+  private readonly statusEntryDisplayStore: DesktopStatusEntryDisplayStore;
+  private readonly preferencesStore: DesktopPreferencesStore;
   private readonly notificationMuteStore: DesktopNotificationMuteStore;
   private readonly profileFeatureStore: DesktopProfileFeatureStore;
   private readonly profileStore: WorkspaceProfileStore;
@@ -84,22 +87,27 @@ export class DesktopMain {
   private readonly autoUpdateManager: AutoUpdateManager;
   private readonly applicationMenu: DesktopApplicationMenu;
   private readonly notifications: DesktopNotificationService;
+  private readonly managedEnvironmentLifecycle: DesktopManagedEnvironmentLifecycle;
+  private readonly statusEntryController: DesktopStatusEntryController;
   private readonly inputs = new DesktopIpcInputValidator();
   private isQuitting = false;
 
   constructor(private readonly options: DesktopMainOptions) {
     this.logger = NileLogger.createDefault({ module: "desktop-main" });
-    this.credentialStore = options.credentialStore ?? new BackendCredentialStore(options.databasePath);
-    this.environmentStore = new DesktopEnvironmentStore();
+    this.credentialStore = options.credentialStore ?? createDesktopCredentialStore(options.databasePath);
+    this.environmentStore = new DesktopEnvironmentStore(options.databasePath);
     this.shellEnvironment = new DesktopShellEnvironment();
+    this.credentialStorageSession = new DesktopCredentialStorageSession(
+      isCredentialStorageSession(this.credentialStore) ? this.credentialStore : null,
+    );
     this.environment = new DesktopEnvironmentSource(
       new ShellEnvironment().readLoginShellEnvironment(),
       this.environmentStore,
     );
     this.agentHomesStore = new AgentHomesStore(options.databasePath);
     this.agentRuntimeCommandsStore = new AgentRuntimeCommandsStore(options.databasePath);
-    this.menubarDisplayStore = new DesktopMenubarDisplayStore(options.databasePath);
-    this.languageStore = new DesktopLanguageStore(options.databasePath);
+    this.statusEntryDisplayStore = new DesktopStatusEntryDisplayStore(options.databasePath);
+    this.preferencesStore = new DesktopPreferencesStore(options.databasePath);
     this.notificationMuteStore = new DesktopNotificationMuteStore(options.databasePath);
     this.profileFeatureStore = new DesktopProfileFeatureStore(options.databasePath);
     this.profileStore = new WorkspaceProfileStore(options.databasePath);
@@ -127,9 +135,7 @@ export class DesktopMain {
         this.logger.child({ scope: "managed-api-key-environment", path: "connection-manager" }),
       ),
       credentialStore: this.credentialStore,
-      credentialStorageSession: this.credentialStore instanceof BackendCredentialStore
-        ? this.credentialStore
-        : undefined,
+      credentialStorageSession: this.credentialStorageSession,
     });
     this.connectionGateway = new DesktopConnectionGateway({
       databasePath: options.databasePath,
@@ -141,9 +147,7 @@ export class DesktopMain {
         this.logger.child({ scope: "managed-api-key-environment", path: "connection-gateway" }),
       ),
       credentialStore: this.credentialStore,
-      credentialStorageSession: this.credentialStore instanceof BackendCredentialStore
-        ? this.credentialStore
-        : undefined,
+      credentialStorageSession: this.credentialStorageSession,
       logger: this.logger.child({ scope: "connection-gateway" }),
     });
     this.stateStore = new DesktopStateStore({
@@ -152,7 +156,10 @@ export class DesktopMain {
       connectionGateway: this.connectionGateway,
       connectionManager: this.connectionManager,
       stateReset: new DesktopStateReset({
-        localStatePaths: [join(dirname(options.databasePath), "credentials")],
+        localStatePaths: [
+          join(dirname(options.databasePath), "credentials"),
+          readDesktopEnvironmentStorePath(options.databasePath),
+        ],
         onBeforeResetLocalState: () => this.clearManagedApiKeyEnvironment(),
         onResetLocalState: () => this.resetDesktopLocalState(),
         stateReset: new StateReset(this.credentialStore),
@@ -183,15 +190,21 @@ export class DesktopMain {
       notifyHistoryChanged: () => this.shell.notifyNotificationHistoryChanged(),
       openTarget: (target) => this.shell.showSettingsTarget(target),
     });
+    this.managedEnvironmentLifecycle = new DesktopManagedEnvironmentLifecycle({
+      agentHomes: this.agentHomes,
+      environment: new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment),
+      logger: this.logger,
+      openSession: () => this.connectionGateway.openSession(),
+    });
     this.trayMenu = new DesktopTrayMenu({
       logger: this.logger,
-      peekState: () => this.stateStore.peekMenubarState(),
+      peekState: () => this.stateStore.peekStatusEntryState(),
       peekSettingsState: () => this.stateStore.peekSettingsState(),
       isProfileFeatureEnabled: () => this.profileFeatureStore.read(),
-      readLanguagePreference: () => this.languageStore.read(),
-      readConnectionQuotaMetricPreferences: () => this.shell.readConnectionQuotaMetricPreferences(),
-      readMenubarDisplay: () => this.menubarDisplayStore.read(),
-      refreshState: async () => await this.stateStore.refreshMenubarState(),
+      readLanguagePreference: () => this.preferencesStore.read().language,
+      readConnectionQuotaMetricPreferences: async () => this.preferencesStore.read().connectionQuotaMetricPreferences,
+      readStatusEntryDisplay: () => this.statusEntryDisplayStore.read(),
+      refreshState: async () => await this.stateStore.refreshStatusEntryState(),
       refreshSettingsState: async () => await this.stateStore.getSettingsState({ refreshUsage: false }),
       listProfiles: () => this.profileManager.list(),
       notify: (intent) => {
@@ -207,9 +220,9 @@ export class DesktopMain {
         await this.stateStore.switchConnection(agentId, connectionId);
         this.reloadAll();
       },
-      toggleTickerAgent: (agentId) => {
-        this.toggleMenubarTickerAgent(agentId);
-        this.syncTrayTitle();
+      toggleSelectedAgent: (agentId) => {
+        this.statusEntryController.toggleSelectedAgent(agentId);
+        this.statusEntryController.sync();
       },
     });
     this.stateRefresher = new DesktopStateRefresher({
@@ -221,7 +234,7 @@ export class DesktopMain {
       logger: this.logger,
       notifyRenderer: () => {
         this.shell.notifyStateChanged();
-        this.syncTrayTitle();
+        this.statusEntryController.sync();
       },
       stateStore: this.stateStore,
     });
@@ -256,6 +269,15 @@ export class DesktopMain {
       platform: process.platform,
       version: this.shell.readDesktopPackageVersion(),
     });
+    this.statusEntryController = new DesktopStatusEntryController({
+      appName: "Nile",
+      platform: process.platform,
+      readConnectionQuotaMetricPreferences: () => this.preferencesStore.read().connectionQuotaMetricPreferences,
+      readDisplayState: () => this.statusEntryDisplayStore.read(),
+      readStatusEntryState: () => this.stateStore.peekStatusEntryState(),
+      shell: this.shell,
+      writeSelectedAgentIds: (agentIds) => this.statusEntryDisplayStore.writeSelectedAgentIds(agentIds),
+    });
   }
 
   async start(): Promise<void> {
@@ -265,12 +287,12 @@ export class DesktopMain {
     this.applicationMenu.configureAboutPanel();
     this.applicationMenu.install();
     this.registerIpcRoutes();
-    const initialLanguagePreference = await this.shell.attach();
-    if (initialLanguagePreference) {
-      this.languageStore.write(initialLanguagePreference);
+    await this.shell.attach();
+    if (process.platform !== "darwin") {
+      this.shell.showSettings();
     }
-    this.syncTrayTitle();
-    await this.syncManagedApiKeyEnvironment();
+    this.statusEntryController.sync();
+    await this.managedEnvironmentLifecycle.syncStartup();
     this.workspaceWatcher.start();
     void this.stateStore.primeStartupState().catch((error) => {
       this.logger.error("desktop.startup.prime_state_failed", error);
@@ -279,7 +301,7 @@ export class DesktopMain {
       if (this.isQuitting) {
         return;
       }
-      void this.refreshMenubarUsage().catch((error) => {
+      void this.refreshStatusEntryUsage().catch((error) => {
         this.logger.error("desktop.startup.refresh_usage_failed", error);
       });
     }, 1500);
@@ -288,9 +310,7 @@ export class DesktopMain {
     app.on("before-quit", () => {
       this.isQuitting = true;
       this.connectionManager.clearPreparedConnectionDrafts();
-      if (this.credentialStore instanceof BackendCredentialStore) {
-        this.credentialStore.clearUnlockedCredentials();
-      }
+      this.credentialStorageSession.clearUnlockedCredentials();
       this.workspaceWatcher.stop();
     });
     app.on("activate", () => {
@@ -300,26 +320,41 @@ export class DesktopMain {
 
   private registerIpcRoutes(): void {
     new DesktopIpcStateRoutes({
-      getMenubarDisplay: () => this.menubarDisplayStore.read(),
+      getDesktopPreferences: () => this.preferencesStore.read(),
+      getStatusEntryDisplay: () => this.statusEntryDisplayStore.read(),
       getNotificationsMuted: () => this.notificationMuteStore.read(),
       getProfileFeatureEnabled: () => this.profileFeatureStore.read(),
       inputs: this.inputs,
       notifyLocalStateReset: () => this.shell.notifyLocalStateReset(),
       notifyNotificationHistoryChanged: () => this.shell.notifyNotificationHistoryChanged(),
+      notifyPreferencesChanged: () => this.shell.notifyPreferencesChanged(),
       refreshAll: () => this.reloadAll(),
       refreshDesktopState: (options) => this.refreshDesktopState(options),
-      setLanguagePreference: (language) => this.languageStore.write(language),
-      setMenubarDisplayMode: (mode) => {
-        const next = this.menubarDisplayStore.writeMode(mode);
-        this.syncTrayTitle();
+      migrateDesktopPreferences: (raw) => {
+        const next = this.preferencesStore.migrateLegacy(raw);
+        this.statusEntryController.sync();
+        return next;
+      },
+      setDesktopPreferences: (preferences) => {
+        const next = this.preferencesStore.write(preferences);
+        this.statusEntryController.sync();
+        return next;
+      },
+      setLanguagePreference: (language) => this.preferencesStore.write({
+        ...this.preferencesStore.read(),
+        language,
+      }).language,
+      setStatusEntryDisplayMode: (mode) => {
+        const next = this.statusEntryDisplayStore.writeMode(mode);
+        this.statusEntryController.sync();
         return next;
       },
       setNotificationsMuted: (muted) => this.notificationMuteStore.write(muted),
       setProfileFeatureEnabled: (enabled) => this.profileFeatureStore.write(enabled),
       stateStore: this.stateStore,
-      toggleMenubarTickerAgent: (agentId) => {
-        const next = this.toggleMenubarTickerAgent(agentId);
-        this.syncTrayTitle();
+      toggleStatusEntrySelectedAgent: (agentId) => {
+        const next = this.statusEntryController.toggleSelectedAgent(agentId);
+        this.statusEntryController.sync();
         return next;
       },
       updateAgentHome: (agentId, path) => this.updateAgentHome(agentId, path),
@@ -351,6 +386,7 @@ export class DesktopMain {
       openExternalUrl: (url) => this.shell.openExternalUrl(url),
       openGitHubIssues: async () => await this.shell.openGitHubIssues(),
       openSettings: () => this.shell.showSettings(),
+      quitApp: () => app.quit(),
       openSupportEmail: async () => await this.shell.openSupportEmail(),
     }).register();
   }
@@ -390,9 +426,7 @@ export class DesktopMain {
   private resetDesktopLocalState(): void {
     this.connectionManager.clearPreparedConnectionDrafts();
     this.connectionAlertStore.clearCache();
-    if (this.credentialStore instanceof BackendCredentialStore) {
-      this.credentialStore.clearUnlockedCredentials();
-    }
+    this.credentialStorageSession.clearUnlockedCredentials();
     this.agentRuntimeCommandsStore.clear();
     const next = mergeAgentHomes(this.options.agentHomes, {});
     for (const key of Object.keys(this.agentHomes) as AgentId[]) {
@@ -401,48 +435,6 @@ export class DesktopMain {
     Object.assign(this.agentHomes, next);
     for (const key of Object.keys(this.agentRuntimeCommandOverrides) as AgentId[]) {
       delete this.agentRuntimeCommandOverrides[key];
-    }
-  }
-
-  private clearManagedApiKeyEnvironment(): void {
-    const session = this.connectionGateway.openSession();
-    try {
-      const preservedEnvKeys = this.readManagedOpenClawEnvKeys();
-      const managedEnvironment = new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment);
-      managedEnvironment.clearForSession(session, [...preservedEnvKeys]);
-    } finally {
-      session.close();
-    }
-  }
-
-  private async syncManagedApiKeyEnvironment(): Promise<void> {
-    const session = this.connectionGateway.openSession();
-    try {
-      const preservedEnvKeys = [...this.readManagedOpenClawEnvKeys()];
-      const managedEnvironment = new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment);
-      for (const failure of managedEnvironment.syncForSession(session, preservedEnvKeys)) {
-        this.logger.warn("desktop.managed_env.sync_failed", {
-          connectionId: failure.connectionId,
-          error: failure.error.message,
-        });
-      }
-    } finally {
-      session.close();
-    }
-  }
-
-  private readManagedOpenClawEnvKeys(): Set<string> {
-    const openclawHome = this.agentHomes.openclaw;
-    if (!openclawHome) {
-      return new Set();
-    }
-    try {
-      return new Set(new DesktopOpenClawEnvironmentReader(openclawHome).readManagedEnvKeys());
-    } catch (error) {
-      this.logger.warn("desktop.openclaw.managed_config_read_failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return new Set();
     }
   }
 
@@ -467,30 +459,15 @@ export class DesktopMain {
     }
   }
 
-  private refreshMenubarUsage(): Promise<void> {
-    return this.stateRefresher.refreshMenubarUsage();
+  private refreshStatusEntryUsage(): Promise<void> {
+    return this.stateRefresher.refreshStatusEntryUsage();
   }
 
-  private toggleMenubarTickerAgent(agentId: AgentId) {
-    const preferences = this.menubarDisplayStore.read();
-    const nextSelectedAgentIds = DesktopTrayTickerTitle.toggleSelectedAgentIds(
-      this.stateStore.peekMenubarState(),
-      preferences,
-      agentId,
-    );
-    return this.menubarDisplayStore.writeTickerAgentIds(nextSelectedAgentIds);
+  private clearManagedApiKeyEnvironment(): void {
+    this.managedEnvironmentLifecycle.clearBeforeReset();
   }
+}
 
-  private syncTrayTitle(): void { void this.syncTrayTitleAsync(); }
-
-  private async syncTrayTitleAsync(): Promise<void> {
-    const connectionQuotaMetricPreferences = await this.shell.readConnectionQuotaMetricPreferences().catch(() => ({}));
-    this.shell.setTrayTitle(
-      DesktopTrayTickerTitle.format(
-        this.stateStore.peekMenubarState(),
-        this.menubarDisplayStore.read(),
-        connectionQuotaMetricPreferences,
-      ),
-    );
-  }
+function createDesktopCredentialStore(databasePath: string): CredentialStore {
+  return createPlatformWorkspaceCredentialStore(databasePath);
 }

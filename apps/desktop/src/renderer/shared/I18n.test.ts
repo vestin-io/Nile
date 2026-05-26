@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { createTranslator } from "./I18n";
-import { MESSAGE_CATALOG } from "./i18n/catalog";
+import { MESSAGE_CATALOG } from "../../state/i18n/catalog";
 
 describe("I18n", () => {
   it("keeps every language catalog aligned with english", () => {
     const englishKeys = Object.keys(MESSAGE_CATALOG.en).sort();
 
-    for (const [language, messages] of Object.entries(MESSAGE_CATALOG)) {
+    for (const [language, messages] of Object.entries(MESSAGE_CATALOG) as Array<[string, Record<string, string>]>) {
       expect(Object.keys(messages).sort(), language).toEqual(englishKeys);
     }
   });

@@ -7,6 +7,7 @@ declare global {
     nileDesktopEvents: {
       onLocalStateReset(callback: () => void): () => void;
       onNotificationHistoryChanged(callback: () => void): () => void;
+      onPreferencesChanged(callback: () => void): () => void;
       onStateChanged(callback: () => void): () => void;
       onNotificationTarget(callback: (target: DesktopNotificationTarget) => void): () => void;
     };

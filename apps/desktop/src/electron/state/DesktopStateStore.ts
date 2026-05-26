@@ -1,11 +1,11 @@
 import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent";
 import { StateReset, type RemoveConnectionResult, type ResetStateResult } from "@nile/builtins/local";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/builtins/cursor-usage";
 import { NileLogger } from "@nile/core/services/NileLogger";
 
 import { DesktopSurface } from "../../state/Surface";
-import type { DesktopConnection, HistoryState, MenubarState, SettingsState } from "../../state/Types";
+import type { DesktopUsageRefreshMode } from "../../state/UsageCache";
+import type { DesktopConnection, DesktopStatusEntryState, HistoryState, SettingsState } from "../../state/Types";
 import type { DesktopNotificationHistoryFilterInput } from "../notifications/contracts";
 import { ConnectionAlertOverlay } from "../alerts/Overlay";
 import type { ConnectionAlertStore, CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../alerts/Store";
@@ -49,10 +49,11 @@ type DesktopStateStoreOptions = {
 
 type GetSettingsStateOptions = {
   refreshUsage?: boolean;
+  usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
 export class DesktopStateStore {
-  private readonly menubarState: CachedValue<MenubarState> = this.createCachedValue();
+  private readonly statusEntryState: CachedValue<DesktopStatusEntryState> = this.createCachedValue();
   private readonly settingsState: CachedValue<SettingsState> = this.createCachedValue();
   private readonly historyState: CachedValue<HistoryState> = this.createCachedValue();
 
@@ -73,21 +74,29 @@ export class DesktopStateStore {
     this.hydrateSnapshots();
   }
 
-  peekMenubarState(): MenubarState | null {
-    return this.menubarState.value;
+  peekStatusEntryState(): DesktopStatusEntryState | null {
+    return this.statusEntryState.value;
   }
 
   peekSettingsState(): SettingsState | null {
     return this.settingsState.value;
   }
 
-  async getMenubarState(): Promise<MenubarState> {
-    return await this.readState(this.menubarState, async () => await this.options.surface.getMenubarState());
+  async getStatusEntryState(): Promise<DesktopStatusEntryState> {
+    return await this.readState(this.statusEntryState, async () => await this.options.surface.getStatusEntryState());
   }
 
   async getSettingsState(options: GetSettingsStateOptions = {}): Promise<SettingsState> {
-    return await this.readState(this.settingsState, async () => {
+    if (options.refreshUsage === false) {
       const state = await this.options.surface.getSettingsState(options);
+      return this.connectionAlertOverlay ? this.connectionAlertOverlay.decorateSettingsState(state) : state;
+    }
+
+    return await this.readState(this.settingsState, async () => {
+      const state = await this.options.surface.getSettingsState({
+        ...options,
+        usageRefreshMode: options.usageRefreshMode ?? "auto",
+      });
       return this.connectionAlertOverlay ? this.connectionAlertOverlay.decorateSettingsState(state) : state;
     });
   }
@@ -108,11 +117,11 @@ export class DesktopStateStore {
   }
 
   async primeStartupState(): Promise<void> {
-    const menubarVersion = this.menubarState.version;
+    const statusEntryVersion = this.statusEntryState.version;
     const settingsVersion = this.settingsState.version;
     const result = await this.options.surface.primeStartupState();
-    if (this.menubarState.version === menubarVersion) {
-      this.storeResolvedValue(this.menubarState, result.menubarState);
+    if (this.statusEntryState.version === statusEntryVersion) {
+      this.storeResolvedValue(this.statusEntryState, result.statusEntryState);
     }
     if (this.settingsState.version === settingsVersion) {
       const shouldPreserveSnapshot = this.settingsState.value !== null && this.settingsState.dirty;
@@ -146,19 +155,19 @@ export class DesktopStateStore {
     this.notificationHistory.markReadByFilter(filter);
   }
 
-  async refreshMenubarUsage(): Promise<void> {
-    await this.options.surface.refreshMenubarUsage();
-    this.markDirty(this.menubarState, this.settingsState);
+  async refreshStatusEntryUsage(options?: { mode?: DesktopUsageRefreshMode }): Promise<void> {
+    await this.options.surface.refreshStatusEntryUsage(options);
+    this.markDirty(this.statusEntryState, this.settingsState);
   }
 
-  async refreshMenubarState(): Promise<MenubarState> {
-    this.menubarState.dirty = true;
-    return await this.getMenubarState();
+  async refreshStatusEntryState(): Promise<DesktopStatusEntryState> {
+    this.statusEntryState.dirty = true;
+    return await this.getStatusEntryState();
   }
 
   invalidateAll(): void {
     this.markDirty(
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
       this.historyState,
     );
@@ -167,7 +176,7 @@ export class DesktopStateStore {
   async switchConnection(agentId: AgentId, connectionId: string): Promise<DesktopConnection> {
     return await this.runAsyncMutation(
       async () => await this.options.connectionGateway.switchConnection(agentId, connectionId),
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
       this.historyState,
     );
@@ -176,7 +185,7 @@ export class DesktopStateStore {
   async rollbackLatestMutation(agentId: AgentId): Promise<RollbackLatestAgentResult> {
     return await this.runAsyncMutation(
       async () => this.options.connectionGateway.rollbackLatestMutation(agentId),
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
       this.historyState,
     );
@@ -185,7 +194,7 @@ export class DesktopStateStore {
   async addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary> {
     return await this.runAsyncMutation(
       async () => await this.options.connectionManager.addConnection(input),
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
       this.historyState,
     );
@@ -194,7 +203,7 @@ export class DesktopStateStore {
   async updateConnection(input: DesktopUpdateConnectionInput): Promise<DesktopConnectionSummary> {
     return await this.runAsyncMutation(
       async () => await this.options.connectionManager.updateConnection(input),
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
       this.historyState,
     );
@@ -203,16 +212,7 @@ export class DesktopStateStore {
   async savePreparedConnection(input: DesktopSavePreparedConnectionInput): Promise<DesktopConnectionSummary> {
     return await this.runAsyncMutation(
       async () => await this.options.connectionManager.savePreparedConnection(input),
-      this.menubarState,
-      this.settingsState,
-      this.historyState,
-    );
-  }
-
-  async importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult> {
-    return await this.runAsyncMutation(
-      async () => await this.options.connectionGateway.importDetectedSetups(scanIds),
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
       this.historyState,
     );
@@ -228,7 +228,7 @@ export class DesktopStateStore {
       return await this.runAsyncMutation(
         async () => {
           const result = await this.options.connectionGateway.importCurrentConnection(input);
-          this.logger.info("desktop.import_current_connection.state_store.succeeded", {
+        this.logger.info("desktop.import_current_connection.state_store.succeeded", {
             agentId: input.agentId,
             connectionId: result.id,
             reused: result.reused ?? false,
@@ -236,7 +236,7 @@ export class DesktopStateStore {
           });
           return result;
         },
-        this.menubarState,
+        this.statusEntryState,
         this.settingsState,
         this.historyState,
       );
@@ -252,7 +252,7 @@ export class DesktopStateStore {
   removeConnection(connectionId: string): RemoveConnectionResult {
     return this.runMutation(
       () => this.options.connectionGateway.removeConnection(connectionId),
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
       this.historyState,
     );
@@ -268,7 +268,7 @@ export class DesktopStateStore {
   bindCursorUsage(connectionId: string, sessionToken: string): BindCursorUsageResult {
     return this.runMutation(
       () => this.options.connectionGateway.bindCursorUsage(connectionId, sessionToken),
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
     );
   }
@@ -297,7 +297,7 @@ export class DesktopStateStore {
   autoBindAllCursorUsage(): CursorUsageAutoBindResult[] {
     const results = this.options.connectionGateway.autoBindAllCursorUsage();
     if (results.some((result) => result.status === "bound")) {
-      this.markDirty(this.menubarState, this.settingsState);
+      this.markDirty(this.statusEntryState, this.settingsState);
     }
     return results;
   }
@@ -305,7 +305,7 @@ export class DesktopStateStore {
   resetState(): ResetStateResult {
     return this.runMutation(
       () => this.stateReset.reset(this.options.databasePath),
-      this.menubarState,
+      this.statusEntryState,
       this.settingsState,
       this.historyState,
     );
@@ -384,9 +384,9 @@ export class DesktopStateStore {
 
   private hydrateSnapshots(): void {
     const snapshot = this.snapshotStore.read();
-    if (snapshot.menubarState) {
-      this.menubarState.value = snapshot.menubarState;
-      this.menubarState.dirty = true;
+    if (snapshot.statusEntryState) {
+      this.statusEntryState.value = snapshot.statusEntryState;
+      this.statusEntryState.dirty = true;
     }
     if (snapshot.settingsState) {
       this.settingsState.value = snapshot.settingsState;
@@ -395,8 +395,8 @@ export class DesktopStateStore {
   }
 
   private persistSnapshot<T>(cached: CachedValue<T>, value: T): void {
-    if (cached === this.menubarState) {
-      this.snapshotStore.writeMenubarState(value as MenubarState);
+    if (cached === this.statusEntryState) {
+      this.snapshotStore.writeStatusEntryState(value as DesktopStatusEntryState);
       return;
     }
     if (cached === this.settingsState) {

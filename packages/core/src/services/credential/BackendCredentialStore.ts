@@ -4,13 +4,14 @@ import type { StoredCredential } from "./Types";
 import { EncryptedLocalCredentialStore } from "./EncryptedLocalCredentialStore";
 import { KeychainCredentialStore } from "./KeychainCredentialStore";
 import {
+  type CredentialStorageSession,
   type CredentialStorageBackend,
   type CredentialStore,
   type CredentialStoreTarget,
   normalizeCredentialStoreTarget,
 } from "./Store";
 
-export class BackendCredentialStore implements CredentialStore {
+export class BackendCredentialStore implements CredentialStore, CredentialStorageSession {
   private readonly encryptedLocalStore: EncryptedLocalCredentialStore;
 
   constructor(

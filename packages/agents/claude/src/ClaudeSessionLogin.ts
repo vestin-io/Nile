@@ -1,5 +1,5 @@
 import { spawn as spawnChild } from "node:child_process";
-import { dirname } from "node:path";
+import { dirname, posix, win32 } from "node:path";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import { RuntimeCommandResolver } from "@nile/core/services/RuntimeCommandResolver";
@@ -32,6 +32,7 @@ export class ClaudeSessionLogin {
     private readonly environment: EnvironmentSource = EnvironmentSource.from(process.env),
     private readonly spawn: SpawnFn = spawnChild,
     private readonly isElectronProcess: () => boolean = () => Boolean(process.versions.electron),
+    private readonly platform: NodeJS.Platform = process.platform,
   ) {}
 
   async signIn(claudeHome: string, options: { commandPathOverride?: string | null } = {}): Promise<void> {
@@ -50,11 +51,10 @@ export class ClaudeSessionLogin {
     }
 
     await this.waitForExit(
-      this.spawn("osascript", ["-e", this.buildTerminalScript(env, claudeCommand)], {
-        stdio: "ignore",
-        env,
-      }),
-      "opening Terminal for Claude sign-in",
+      this.spawn(...this.readDetachedTerminalSpawn(env, claudeCommand)),
+      this.platform === "win32"
+        ? "opening terminal for Claude sign-in"
+        : "opening Terminal for Claude sign-in",
     );
   }
 
@@ -79,11 +79,36 @@ export class ClaudeSessionLogin {
     return {
       ...process.env,
       PATH: ShellPath.merge(dirname(claudeCommand), pathValue),
-      HOME: dirname(claudeHome),
+      HOME: this.readHomeDirectory(claudeHome),
     };
   }
 
-  private buildTerminalScript(env: NodeJS.ProcessEnv, claudeCommand: string): string {
+  private readDetachedTerminalSpawn(
+    env: NodeJS.ProcessEnv,
+    claudeCommand: string,
+  ): Parameters<SpawnFn> {
+    if (this.platform === "win32") {
+      return [
+        "cmd.exe",
+        ["/d", "/c", "start", "", "cmd.exe", "/k", this.buildWindowsTerminalCommand(env, claudeCommand)],
+        {
+          stdio: "ignore",
+          env,
+        },
+      ];
+    }
+
+    return [
+      "osascript",
+      ["-e", this.buildMacTerminalScript(env, claudeCommand)],
+      {
+        stdio: "ignore",
+        env,
+      },
+    ];
+  }
+
+  private buildMacTerminalScript(env: NodeJS.ProcessEnv, claudeCommand: string): string {
     const command = [
       `export HOME=${this.quoteForShell(env.HOME ?? "")}`,
       `export PATH=${this.quoteForShell(env.PATH ?? "")}`,
@@ -102,12 +127,34 @@ export class ClaudeSessionLogin {
     ].join("\n");
   }
 
+  private buildWindowsTerminalCommand(env: NodeJS.ProcessEnv, claudeCommand: string): string {
+    return [
+      this.writeWindowsEnv("HOME", env.HOME ?? ""),
+      this.writeWindowsEnv("PATH", env.PATH ?? ""),
+      "echo Complete Claude sign-in in this terminal window using the account you want to add to Nile.",
+      "echo.",
+      `${this.quoteForCmd(claudeCommand)} login`,
+    ].join(" && ");
+  }
+
   private canUseAttachedTerminal(): boolean {
     return !this.isElectronProcess() && process.stdin.isTTY === true && process.stdout.isTTY === true;
   }
 
+  private readHomeDirectory(claudeHome: string): string {
+    return this.platform === "win32" ? win32.dirname(claudeHome) : posix.dirname(claudeHome);
+  }
+
   private quoteForShell(value: string): string {
     return `'${value.replaceAll("'", `'\"'\"'`)}'`;
+  }
+
+  private writeWindowsEnv(key: string, value: string): string {
+    return `set "${key}=${value.replaceAll('"', '""')}"`;
+  }
+
+  private quoteForCmd(value: string): string {
+    return `"${value.replaceAll('"', '""')}"`;
   }
 
   private resolveClaudeCommand(pathValue: string, commandPathOverride?: string | null): string {

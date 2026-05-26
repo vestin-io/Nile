@@ -31,7 +31,7 @@ describe("NileCli reset", () => {
           "Local Nile state reset",
           `database: removed (${databasePath})`,
           `history: removed (${historyPath})`,
-          "credentials: no Nile-managed keychain entries found",
+          "credentials: no Nile-managed credential entries or local credential files found",
           "",
         ].join("\n"),
       );
@@ -104,6 +104,28 @@ describe("NileCli reset", () => {
       expect(prompt.inputCalls).toEqual(["Type RESET to confirm"]);
       expect(existsSync(databasePath)).toBe(false);
       expect(existsSync(historyPath)).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it("removes sibling encrypted-local credential files during reset", async () => {
+    const root = mkdtempSync(join(tmpdir(), "nile-cli-reset-credentials-"));
+    try {
+      const databasePath = join(root, "switcher.sqlite");
+      const credentialPath = join(root, "credentials", "encrypted-local.v1.json");
+
+      mkdirSync(dirname(credentialPath), { recursive: true });
+      writeFileSync(credentialPath, "{\"schemaVersion\":1}");
+
+      const cli = createCli(databasePath);
+      const result = await cli.run(["reset", "--yes", "--confirm-reset"]);
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain(
+        "credentials: removed Nile-managed credential entries or local credential files",
+      );
+      expect(existsSync(credentialPath)).toBe(false);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

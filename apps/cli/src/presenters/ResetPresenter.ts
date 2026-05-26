@@ -16,7 +16,7 @@ export class ResetPresenter {
 
   private formatCredentials(removed: boolean): string {
     return removed
-      ? "removed Nile-managed keychain entries"
-      : "no Nile-managed keychain entries found";
+      ? "removed Nile-managed credential entries or local credential files"
+      : "no Nile-managed credential entries or local credential files found";
   }
 }

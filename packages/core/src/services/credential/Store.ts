@@ -78,6 +78,21 @@ export interface CredentialStore {
   remove(target: CredentialStoreTarget): void;
 }
 
+export interface CredentialStorageSession {
+  hasEncryptedLocalVault(): boolean;
+  isEncryptedLocalUnlocked(): boolean;
+  unlockEncryptedLocalStorage(passphrase: string): void;
+  clearUnlockedCredentials(): void;
+}
+
+export function isCredentialStorageSession(value: CredentialStore): value is CredentialStore & CredentialStorageSession {
+  const candidate = value as Partial<CredentialStorageSession>;
+  return typeof candidate.hasEncryptedLocalVault === "function"
+    && typeof candidate.isEncryptedLocalUnlocked === "function"
+    && typeof candidate.unlockEncryptedLocalStorage === "function"
+    && typeof candidate.clearUnlockedCredentials === "function";
+}
+
 export function normalizeCredentialStoreTarget(
   target: CredentialStoreTarget,
 ): { reference: string; backend: CredentialStorageBackend } {

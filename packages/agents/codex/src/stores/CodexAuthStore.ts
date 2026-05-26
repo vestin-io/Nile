@@ -48,16 +48,15 @@ export class CodexAuthStore {
     }
 
     const record = parsed as Record<string, unknown>;
-    if (typeof record.OPENAI_API_KEY === "string" && record.OPENAI_API_KEY.trim()) {
-      return {
-        kind: "api_key",
-        source: "direct",
-        apiKey: record.OPENAI_API_KEY,
-      };
-    }
-
     const tokens = record.tokens;
     if (typeof tokens !== "object" || tokens === null || Array.isArray(tokens)) {
+      if (typeof record.OPENAI_API_KEY === "string" && record.OPENAI_API_KEY.trim()) {
+        return {
+          kind: "api_key",
+          source: "direct",
+          apiKey: record.OPENAI_API_KEY,
+        };
+      }
       return null;
     }
 

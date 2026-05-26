@@ -1,15 +1,19 @@
 import { StateReset } from "@nile/builtins/local";
+import type { CredentialStore } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { InteractivePrompt } from "../InteractivePrompt";
 import type { ResolvedCliOptions } from "../types";
 
 export class ResetCommands {
-  private readonly stateReset = new StateReset();
+  private readonly stateReset: StateReset;
 
   constructor(
     private readonly prompt: InteractivePrompt,
     private readonly logger: NileLogger,
-  ) {}
+    credentialStore?: CredentialStore,
+  ) {
+    this.stateReset = new StateReset(credentialStore);
+  }
 
   async resetState(options: ResolvedCliOptions, flags: Map<string, string | boolean>) {
     if (flags.get("yes") === true && flags.get("confirm-reset") === true) {

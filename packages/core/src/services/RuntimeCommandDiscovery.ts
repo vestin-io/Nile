@@ -5,7 +5,7 @@ export function listCommandsInPath(pathValue: string, commandName: string): stri
   return pathValue
     .split(delimiter)
     .filter((value) => value.trim().length > 0)
-    .map((entry) => join(entry, commandName));
+    .flatMap((entry) => listCommandCandidates(entry, commandName));
 }
 
 export function listCommandsInNvm(
@@ -28,7 +28,20 @@ export function listCommandsInNvm(
 
   return versionNames
     .sort(compareVersionNamesDescending)
-    .map((versionName) => join(nodeVersionsRoot, versionName, "bin", commandName));
+    .flatMap((versionName) => listCommandCandidates(join(nodeVersionsRoot, versionName, "bin"), commandName));
+}
+
+function listCommandCandidates(directory: string, commandName: string): string[] {
+  if (process.platform !== "win32") {
+    return [join(directory, commandName)];
+  }
+
+  return [
+    join(directory, `${commandName}.cmd`),
+    join(directory, `${commandName}.exe`),
+    join(directory, `${commandName}.bat`),
+    join(directory, commandName),
+  ];
 }
 
 function readNodeVersionDirectories(path: string): string[] {

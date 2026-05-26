@@ -6,73 +6,78 @@ import { build as esbuild } from "esbuild";
 import postcss from "postcss";
 import tailwindcss from "tailwindcss";
 
-const root = dirname(fileURLToPath(import.meta.url));
-const src = join(root, "src");
-const dist = join(root, "dist");
-const repoRoot = join(root, "..", "..");
-const isReleaseBuild = process.env.NILE_BUILD_RELEASE === "1";
+class DesktopBuilder {
+  private readonly root = dirname(fileURLToPath(import.meta.url));
+  private readonly src = join(this.root, "src");
+  private readonly dist = join(this.root, "dist");
+  private readonly repoRoot = join(this.root, "..", "..");
 
-async function build(): Promise<void> {
-  rmSync(dist, { recursive: true, force: true });
-  await buildEntry(join(src, "electron", "main.ts"), join(dist, "electron", "main.cjs"), "node");
-  await buildEntry(join(src, "electron", "preload.ts"), join(dist, "electron", "preload.cjs"), "node");
-  await buildEntry(join(src, "renderer", "app", "menubar.ts"), join(dist, "renderer", "menubar.js"), "browser");
-  await buildEntry(join(src, "renderer", "app", "settings.tsx"), join(dist, "renderer", "settings.js"), "browser");
-  copyCoreKeychainHelper(join(dist, "electron", "KeychainGenericPasswordHelper"));
+  constructor(private readonly isReleaseBuild: boolean) {}
 
-  copyAsset(join(src, "renderer", "app", "menubar.html"), join(dist, "renderer", "menubar.html"));
-  copyAsset(join(src, "renderer", "app", "settings.html"), join(dist, "renderer", "settings.html"));
-  await buildCss(join(src, "renderer", "app", "styles.css"), join(dist, "renderer", "styles.css"));
-}
+  async run(): Promise<void> {
+    rmSync(this.dist, { recursive: true, force: true });
+    await this.buildEntry(join(this.src, "electron", "main.ts"), join(this.dist, "electron", "main.cjs"), "node");
+    await this.buildEntry(join(this.src, "electron", "preload.ts"), join(this.dist, "electron", "preload.cjs"), "node");
+    await this.buildEntry(join(this.src, "renderer", "app", "menubar.ts"), join(this.dist, "renderer", "menubar.js"), "browser");
+    await this.buildEntry(join(this.src, "renderer", "app", "settings.tsx"), join(this.dist, "renderer", "settings.js"), "browser");
+    this.copyCoreKeychainHelper(join(this.dist, "electron", "KeychainGenericPasswordHelper"));
 
-async function buildEntry(entrypoint: string, outfile: string, target: "node" | "browser"): Promise<void> {
-  mkdirSync(dirname(outfile), { recursive: true });
-
-  await esbuild({
-    entryPoints: [entrypoint],
-    outfile,
-    tsconfig: join(repoRoot, "tsconfig.base.json"),
-    platform: target === "node" ? "node" : "browser",
-    bundle: true,
-    format: target === "node" ? "cjs" : "esm",
-    sourcemap: !isReleaseBuild,
-    external: target === "node" ? ["electron"] : [],
-    loader: {
-      ".svg": "text",
-      ".png": "dataurl",
-    },
-    jsx: "automatic",
-    legalComments: "none",
-    logLevel: "silent",
-    minify: isReleaseBuild,
-  });
-}
-
-async function buildCss(inputPath: string, outputPath: string): Promise<void> {
-  mkdirSync(dirname(outputPath), { recursive: true });
-  const source = readFileSync(inputPath, "utf8");
-  const result = await postcss([
-    tailwindcss({ config: join(root, "tailwind.config.cjs") }),
-    autoprefixer(),
-  ]).process(source, {
-    from: inputPath,
-    to: outputPath,
-  });
-  writeFileSync(outputPath, result.css, "utf8");
-}
-
-function copyAsset(from: string, to: string): void {
-  mkdirSync(dirname(to), { recursive: true });
-  cpSync(from, to);
-}
-
-function copyCoreKeychainHelper(targetPath: string): void {
-  const helperPath = join(root, "..", "..", "packages", "core", "dist", "services", "credential", "KeychainGenericPasswordHelper");
-  if (!existsSync(helperPath)) {
-    return;
+    this.copyAsset(join(this.src, "renderer", "app", "menubar.html"), join(this.dist, "renderer", "menubar.html"));
+    this.copyAsset(join(this.src, "renderer", "app", "settings.html"), join(this.dist, "renderer", "settings.html"));
+    await this.buildCss(join(this.src, "renderer", "app", "styles.css"), join(this.dist, "renderer", "styles.css"));
   }
 
-  copyAsset(helperPath, targetPath);
+  private async buildEntry(entrypoint: string, outfile: string, target: "node" | "browser"): Promise<void> {
+    mkdirSync(dirname(outfile), { recursive: true });
+
+    await esbuild({
+      entryPoints: [entrypoint],
+      outfile,
+      tsconfig: join(this.repoRoot, "tsconfig.base.json"),
+      platform: target === "node" ? "node" : "browser",
+      bundle: true,
+      format: target === "node" ? "cjs" : "esm",
+      sourcemap: !this.isReleaseBuild,
+      external: target === "node" ? ["electron"] : [],
+      loader: {
+        ".svg": "text",
+        ".png": "dataurl",
+      },
+      jsx: "automatic",
+      legalComments: "none",
+      logLevel: "silent",
+      minify: this.isReleaseBuild,
+    });
+  }
+
+  private async buildCss(inputPath: string, outputPath: string): Promise<void> {
+    mkdirSync(dirname(outputPath), { recursive: true });
+    const source = readFileSync(inputPath, "utf8");
+    const result = await postcss([
+      tailwindcss({ config: join(this.root, "tailwind.config.cjs") }),
+      autoprefixer(),
+    ]).process(source, {
+      from: inputPath,
+      to: outputPath,
+    });
+    writeFileSync(outputPath, result.css, "utf8");
+  }
+
+  private copyAsset(from: string, to: string): void {
+    mkdirSync(dirname(to), { recursive: true });
+    cpSync(from, to);
+  }
+
+  private copyCoreKeychainHelper(targetPath: string): void {
+    const helperPath = join(this.root, "..", "..", "packages", "core", "dist", "services", "credential", "KeychainGenericPasswordHelper");
+    if (!existsSync(helperPath)) {
+      return;
+    }
+
+    this.copyAsset(helperPath, targetPath);
+  }
 }
 
-await build();
+const isReleaseBuild = process.argv.includes("--release") || process.env.NILE_BUILD_RELEASE === "1";
+
+await new DesktopBuilder(isReleaseBuild).run();

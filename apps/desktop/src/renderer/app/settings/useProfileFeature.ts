@@ -14,7 +14,7 @@ export function useProfileFeature(): ProfileFeatureState {
 
   useEffect(() => {
     let cancelled = false;
-    void window.nileDesktop.state.getProfileFeatureEnabled().then((enabled) => {
+    void window.nileDesktop.profileFeatures.getProfileFeatureEnabled().then((enabled) => {
       if (cancelled) {
         return;
       }
@@ -38,7 +38,7 @@ export function useProfileFeature(): ProfileFeatureState {
     async setProfileFeatureEnabled(enabled: boolean) {
       setIsSaving(true);
       try {
-        const next = await window.nileDesktop.state.setProfileFeatureEnabled(enabled);
+        const next = await window.nileDesktop.profileFeatures.setProfileFeatureEnabled(enabled);
         setProfileFeatureEnabledState(next);
       } finally {
         setIsSaving(false);

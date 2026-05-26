@@ -19,19 +19,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  macos-release:
-    name: Build macOS release
-    runs-on: macos-latest
+  validate-release:
+    name: Validate desktop release
+    runs-on: ubuntu-latest
     defaults:
       run:
         shell: bash
-    env:
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_ID: ${{ secrets.NILE_DESKTOP_APPLE_ID || secrets.APPLE_ID }}
-      APPLE_TEAM_ID: ${{ secrets.NILE_DESKTOP_APPLE_TEAM_ID || secrets.APPLE_TEAM_ID }}
-      CSC_KEY_PASSWORD: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_PASSWORD || secrets.CSC_KEY_PASSWORD }}
-      CSC_LINK: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_P12 || secrets.CSC_LINK }}
-      GH_TOKEN: ${{ github.token }}
+    outputs:
+      release_tag: ${{ steps.version.outputs.tag }}
+      release_version: ${{ steps.version.outputs.version }}
+      release_notes_path: ${{ steps.notes.outputs.path }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -49,20 +46,6 @@ jobs:
             packages/host-local/package-lock.json
             apps/cli/package-lock.json
             apps/desktop/package-lock.json
-
-      - name: Validate signing secrets
-        run: |
-          missing=()
-          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
-            if [[ -z "${!name:-}" ]]; then
-              missing+=("$name")
-            fi
-          done
-
-          if ((${#missing[@]} > 0)); then
-            printf 'Missing required macOS release secrets: %s\n' "${missing[*]}" >&2
-            exit 1
-          fi
 
       - name: Derive release version
         id: version
@@ -127,25 +110,27 @@ jobs:
           }
           EOF
 
-      - name: Build signed macOS release
-        run: npm run build:app --prefix apps/desktop
+  ensure-release:
+    name: Create or update GitHub release
+    runs-on: ubuntu-latest
+    needs: validate-release
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Upload release assets
+      - name: Create or update GitHub release
         env:
-          RELEASE_NOTES_FILE: ${{ steps.notes.outputs.path }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_NOTES_FILE: ${{ needs.validate-release.outputs.release_notes_path }}
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+          RELEASE_VERSION: ${{ needs.validate-release.outputs.release_version }}
         run: |
-          artifacts=()
-          while IFS= read -r -d '' artifact; do
-            artifacts+=("${artifact}")
-          done < <(find apps/desktop/release -maxdepth 1 -type f \( -name '*.dmg' -o -name '*.zip' \) -print0 | sort -z)
-
-          if ((${#artifacts[@]} == 0)); then
-            printf 'No desktop release assets were produced.\n' >&2
-            exit 1
-          fi
-
           prerelease_args=()
           if [[ "${RELEASE_VERSION}" == *-* ]]; then
             prerelease_args+=(--prerelease)
@@ -160,6 +145,121 @@ jobs:
             gh release edit "${RELEASE_TAG}" \
               --title "Nile Desktop ${RELEASE_TAG}" \
               --notes-file "${RELEASE_NOTES_FILE}"
+          fi
+
+  macos-release:
+    name: Build macOS release
+    runs-on: macos-latest
+    needs: [validate-release, ensure-release]
+    defaults:
+      run:
+        shell: bash
+    env:
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_ID: ${{ secrets.NILE_DESKTOP_APPLE_ID || secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.NILE_DESKTOP_APPLE_TEAM_ID || secrets.APPLE_TEAM_ID }}
+      CSC_KEY_PASSWORD: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_PASSWORD || secrets.CSC_KEY_PASSWORD }}
+      CSC_LINK: ${{ secrets.NILE_DESKTOP_MAC_CERTIFICATE_P12 || secrets.CSC_LINK }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            packages/core/package-lock.json
+            packages/host-local/package-lock.json
+            apps/cli/package-lock.json
+            apps/desktop/package-lock.json
+
+      - name: Validate signing secrets
+        run: |
+          missing=()
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if ((${#missing[@]} > 0)); then
+            printf 'Missing required macOS release secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build signed macOS release
+        run: npm run build:app --prefix apps/desktop
+
+      - name: Upload macOS release assets
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+        run: |
+          artifacts=()
+          while IFS= read -r -d '' artifact; do
+            artifacts+=("${artifact}")
+          done < <(find apps/desktop/release -maxdepth 1 -type f \( -name '*.dmg' -o -name '*-mac.zip' \) -print0 | sort -z)
+
+          if ((${#artifacts[@]} == 0)); then
+            printf 'No macOS release assets were produced.\n' >&2
+            exit 1
+          fi
+
+          gh release upload "${RELEASE_TAG}" "${artifacts[@]}" --clobber
+
+  windows-release:
+    name: Build Windows release
+    runs-on: windows-latest
+    needs: [validate-release, ensure-release]
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            packages/core/package-lock.json
+            packages/host-local/package-lock.json
+            apps/cli/package-lock.json
+            apps/desktop/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows release
+        run: npm run build:app:unsigned --prefix apps/desktop
+
+      - name: Upload Windows release assets
+        env:
+          RELEASE_TAG: ${{ needs.validate-release.outputs.release_tag }}
+        run: |
+          artifacts=()
+          while IFS= read -r -d '' artifact; do
+            artifacts+=("${artifact}")
+          done < <(find apps/desktop/release -maxdepth 1 -type f -name '*.exe' -print0 | sort -z)
+
+          if ((${#artifacts[@]} == 0)); then
+            printf 'No Windows release assets were produced.\n' >&2
+            exit 1
           fi
 
           gh release upload "${RELEASE_TAG}" "${artifacts[@]}" --clobber

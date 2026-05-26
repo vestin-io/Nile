@@ -29,6 +29,7 @@ export type {
 } from "./Factory";
 export {
   CredentialAlreadyExistsError,
+  isCredentialStorageSession,
   CredentialNotFoundError,
   CredentialStoreCommandError,
   EncryptedLocalCredentialStoreCorruptedError,
@@ -40,6 +41,7 @@ export {
   normalizeCredentialStoreTarget,
 } from "./Store";
 export type {
+  CredentialStorageSession,
   CredentialStorageBackend,
   CredentialStore,
   CredentialStoreTarget,
@@ -47,5 +49,7 @@ export type {
 export { KeychainCredentialStore } from "./KeychainCredentialStore";
 export { EncryptedLocalCredentialStore } from "./EncryptedLocalCredentialStore";
 export { BackendCredentialStore, buildCredentialStoreTarget } from "./BackendCredentialStore";
+export { createPlatformCredentialStore, createPlatformWorkspaceCredentialStore } from "./PlatformStore";
+export { WindowsCredentialManagerStore } from "./WindowsCredentialManagerStore";
 export { GenericPasswordWriter } from "./GenericPasswordWriter";
 export { SecurityCli, type SecurityCliResult } from "./SecurityCli";

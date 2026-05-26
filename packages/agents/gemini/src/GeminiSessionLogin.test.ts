@@ -34,6 +34,7 @@ describe("GeminiSessionLogin", () => {
         return exitedProcess(0);
       },
       () => false,
+      "darwin",
       () => "/tmp/nile-gemini-wrapper",
       (path) => {
         removedDirs.push(path);
@@ -65,6 +66,7 @@ describe("GeminiSessionLogin", () => {
         return exitedProcess(0);
       },
       () => false,
+      "darwin",
       () => "/tmp/nile-gemini-wrapper",
     );
 
@@ -78,7 +80,7 @@ describe("GeminiSessionLogin", () => {
     expect(calls[0]?.args[1]).toContain('tell application "Terminal"');
     expect(calls[0]?.args[1]).toContain("GEMINI_CLI_HOME='/tmp/test-home/.gemini'");
     expect(calls[0]?.args[1]).toContain('trap \\"rm -rf \'/tmp/nile-gemini-wrapper\'\\" EXIT');
-    expect(calls[0]?.args[1]).toContain(install.command);
+    expect(calls[0]?.args[1]).toContain(install.command.replaceAll("\\", "\\\\"));
   });
 
   it("opens Terminal for Gemini sign-in inside Electron even when a TTY exists", async () => {
@@ -94,6 +96,7 @@ describe("GeminiSessionLogin", () => {
         return exitedProcess(0);
       },
       () => true,
+      "darwin",
     );
 
     await login.signIn("/tmp/test-home/.gemini");
@@ -103,6 +106,36 @@ describe("GeminiSessionLogin", () => {
       command: "osascript",
       stdio: "ignore",
     });
+  });
+
+  it("opens a Windows terminal for Gemini sign-in when no attached terminal is available", async () => {
+    setTty("stdin", false);
+    setTty("stdout", false);
+    const install = createGeminiCliInstall("windows");
+    process.env.PATH = install.bin;
+    const calls: Array<{ command: string; args: string[]; stdio: "inherit" | "ignore"; env: NodeJS.ProcessEnv }> = [];
+    const login = new GeminiSessionLogin(
+      EnvironmentSource.empty(),
+      (command, args, options) => {
+        calls.push({ command, args, stdio: options.stdio, env: options.env });
+        return exitedProcess(0);
+      },
+      () => true,
+      "win32",
+    );
+
+    await login.signIn("C:\\Users\\tester\\.gemini");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      command: "cmd.exe",
+      stdio: "ignore",
+    });
+    expect(calls[0]?.args).toEqual(expect.arrayContaining(["/d", "/c", "start", "", "cmd.exe", "/k"]));
+    const script = calls[0]?.args.at(-1) ?? "";
+    expect(script).toContain('set "GEMINI_CLI_HOME=C:\\Users\\tester\\.gemini"');
+    expect(script).toContain('set "HOME=C:\\Users\\tester"');
+    expect(script).toContain(install.command);
   });
 
   it("prefers an explicit Gemini CLI override over PATH auto-detection", async () => {
@@ -119,6 +152,7 @@ describe("GeminiSessionLogin", () => {
         return exitedProcess(0);
       },
       () => false,
+      "darwin",
       () => "/tmp/nile-gemini-wrapper",
     );
 
@@ -127,7 +161,7 @@ describe("GeminiSessionLogin", () => {
     });
 
     expect(calls[0]?.command).toBe(overrideInstall.command);
-    expect(calls[0]?.env.PATH?.split(":")[1]).toBe(overrideInstall.bin);
+    expect(calls[0]?.env.PATH).toContain(overrideInstall.bin);
   });
 });
 

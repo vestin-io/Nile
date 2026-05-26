@@ -1,6 +1,6 @@
 import { SqliteDatabase } from "@nile/core/services/database";
 
-import type { MenubarState, SettingsState } from "../../state/Types";
+import type { DesktopStatusEntryState, SettingsState } from "../../state/Types";
 
 type SnapshotRow = {
   payload: string;
@@ -8,7 +8,7 @@ type SnapshotRow = {
 };
 
 type DesktopStateSnapshot = {
-  menubarState: MenubarState | null;
+  statusEntryState: DesktopStatusEntryState | null;
   settingsState: SettingsState | null;
 };
 
@@ -24,7 +24,7 @@ export class DesktopStateSnapshotStore {
     try {
       this.initialize(database);
       return {
-        menubarState: this.readValue(database, MENUBAR_STATE_KEY, isMenubarState),
+        statusEntryState: this.readValue(database, MENUBAR_STATE_KEY, isStatusEntryState),
         settingsState: this.readValue(database, SETTINGS_STATE_KEY, isSettingsState),
       };
     } finally {
@@ -32,7 +32,7 @@ export class DesktopStateSnapshotStore {
     }
   }
 
-  writeMenubarState(state: MenubarState): void {
+  writeStatusEntryState(state: DesktopStatusEntryState): void {
     this.writeValue(MENUBAR_STATE_KEY, state);
   }
 
@@ -60,10 +60,17 @@ export class DesktopStateSnapshotStore {
     }
   }
 
-  private writeValue(key: string, value: MenubarState | SettingsState): void {
+  private writeValue(key: string, value: DesktopStatusEntryState | SettingsState): void {
+    const payload = JSON.stringify(value);
     const database = SqliteDatabase.open(this.databasePath);
     try {
       this.initialize(database);
+      const existing = database.query<SnapshotRow>(
+        "SELECT payload, version FROM desktop_state_snapshots WHERE snapshot_key = ?",
+      ).get(key);
+      if (existing?.version === SNAPSHOT_VERSION && existing.payload === payload) {
+        return;
+      }
       database.run(
         `
           INSERT INTO desktop_state_snapshots (snapshot_key, version, payload, updated_at)
@@ -75,7 +82,7 @@ export class DesktopStateSnapshotStore {
         `,
         key,
         SNAPSHOT_VERSION,
-        JSON.stringify(value),
+        payload,
       );
     } finally {
       database.close();
@@ -94,7 +101,7 @@ export class DesktopStateSnapshotStore {
   }
 }
 
-function isMenubarState(value: unknown): value is MenubarState {
+function isStatusEntryState(value: unknown): value is DesktopStatusEntryState {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
