@@ -1,6 +1,6 @@
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { spawn as spawnChild } from "node:child_process";
-import { delimiter, dirname, join } from "node:path";
+import { delimiter, dirname, join, posix, win32 } from "node:path";
 import { tmpdir } from "node:os";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
@@ -48,7 +48,7 @@ export class GeminiSessionLogin {
         null,
       ),
       GEMINI_CLI_HOME: geminiHome,
-      HOME: dirname(geminiHome),
+      HOME: this.readHomeDirectory(geminiHome),
     };
 
     if (this.canUseAttachedTerminal()) {
@@ -95,6 +95,10 @@ export class GeminiSessionLogin {
 
   private canUseAttachedTerminal(): boolean {
     return !this.isElectronProcess() && process.stdin.isTTY === true && process.stdout.isTTY === true;
+  }
+
+  private readHomeDirectory(geminiHome: string): string {
+    return this.platform === "win32" ? win32.dirname(geminiHome) : posix.dirname(geminiHome);
   }
 
   private readOpenWrapperDirectory(): string {

@@ -1,5 +1,5 @@
 import { spawn as spawnChild } from "node:child_process";
-import { dirname } from "node:path";
+import { dirname, posix, win32 } from "node:path";
 
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
 import { RuntimeCommandResolver } from "@nile/core/services/RuntimeCommandResolver";
@@ -79,7 +79,7 @@ export class ClaudeSessionLogin {
     return {
       ...process.env,
       PATH: ShellPath.merge(dirname(claudeCommand), pathValue),
-      HOME: dirname(claudeHome),
+      HOME: this.readHomeDirectory(claudeHome),
     };
   }
 
@@ -139,6 +139,10 @@ export class ClaudeSessionLogin {
 
   private canUseAttachedTerminal(): boolean {
     return !this.isElectronProcess() && process.stdin.isTTY === true && process.stdout.isTTY === true;
+  }
+
+  private readHomeDirectory(claudeHome: string): string {
+    return this.platform === "win32" ? win32.dirname(claudeHome) : posix.dirname(claudeHome);
   }
 
   private quoteForShell(value: string): string {

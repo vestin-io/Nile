@@ -2,6 +2,31 @@
 
 ## 2026-05-27
 
+### Codex login and runtime-path regression cleanup
+
+- Fixed the Codex CLI resolver so login execution and UI display no longer share the same path semantics:
+  - login execution still resolves to the packaged vendor binary
+  - desktop/runtime surfaces keep showing the user-facing launcher path
+- Tightened Codex auth parsing so auth payloads with both `OPENAI_API_KEY` and session `tokens` are treated as OpenAI sessions first instead of stalling session login polling.
+- Fixed Windows detached-login environment setup for Claude and Gemini by deriving `HOME` with win32 path rules during simulated Windows flows.
+- Updated the affected regression fixtures:
+  - Codex current-credential test now uses a silent logger explicitly
+  - builtins runtime Codex fixture now makes the resolved vendor binary executable and functional
+  - SavedConnections expectations now include the stable default `credentialStorageBackend`
+
+#### Key findings
+
+- The original Codex resolver bug was real: any plain `bin/codex` launcher could be mistaken for the packaged binary just because the basename matched `codex`.
+- Using the same resolved path for “what Nile should execute” and “what the UI should show” was the wrong abstraction. Those are related but not identical values.
+- The Windows `HOME` regressions were not platform-runtime bugs on Windows itself; they came from using host-platform `path.dirname(...)` while unit tests simulated win32 paths on macOS.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/models/connection/SavedConnections.test.ts packages/agents/codex/src/CodexSessionLogin.test.ts packages/agents/claude/src/ClaudeSessionLogin.test.ts packages/agents/gemini/src/GeminiSessionLogin.test.ts`
+- `./node_modules/.bin/vitest run packages/builtins/src/runtime/NileSession.test.ts packages/agents/codex/src/live-setup/CurrentCredentialReader.test.ts`
+- `./node_modules/.bin/vitest run packages/agents/codex/src/CodexSessionLogin.test.ts packages/builtins/src/runtime/NileSession.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run verify:pre-push`
+
 ### Quick setup duplicate saved-connection display cleanup
 
 - Reused the shared local-setup visibility rule inside the quick-setup agent cards.

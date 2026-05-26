@@ -5,6 +5,7 @@ import { listCommandsInNvm, listCommandsInPath } from "@nile/core/services/Runti
 
 export type CodexCliCommandResolution = {
   command: string | null;
+  launcherCommand: string | null;
   invalidCommandPaths: readonly string[];
 };
 
@@ -30,6 +31,7 @@ export class CliCommandResolver {
       if (this.pathExists(command) && vendorBinaryPath) {
         return {
           command: vendorBinaryPath,
+          launcherCommand: command,
           invalidCommandPaths,
         };
       }
@@ -46,6 +48,7 @@ export class CliCommandResolver {
       if (this.pathExists(command) && vendorBinaryPath) {
         return {
           command: vendorBinaryPath,
+          launcherCommand: command,
           invalidCommandPaths,
         };
       }
@@ -56,6 +59,7 @@ export class CliCommandResolver {
 
     return {
       command: null,
+      launcherCommand: null,
       invalidCommandPaths,
     };
   }
@@ -65,6 +69,7 @@ export class CliCommandResolver {
     if (!normalized) {
       return {
         command: null,
+        launcherCommand: null,
         invalidCommandPaths: [],
       };
     }
@@ -73,32 +78,28 @@ export class CliCommandResolver {
     if (this.pathExists(normalized) && vendorBinaryPath) {
       return {
         command: vendorBinaryPath,
+        launcherCommand: normalized,
         invalidCommandPaths: [],
       };
     }
 
     return {
       command: null,
+      launcherCommand: null,
       invalidCommandPaths: [normalized],
     };
   }
 
   private readVendorBinaryPath(command: string): string | null {
-    let resolvedCommandPath: string;
-    try {
-      resolvedCommandPath = this.realpath(command);
-    } catch {
-      return null;
-    }
+    for (const candidateRoot of this.listCommandPathCandidates(command)) {
+      if (this.isVendorBinaryPath(candidateRoot)) {
+        return candidateRoot;
+      }
 
-    const binaryName = readVendorBinaryName();
-    if (basename(resolvedCommandPath).toLowerCase() === binaryName.toLowerCase()) {
-      return resolvedCommandPath;
-    }
-
-    for (const candidate of this.listVendorBinaryCandidates(resolvedCommandPath)) {
-      if (this.pathExists(candidate)) {
-        return candidate;
+      for (const candidate of this.listVendorBinaryCandidates(candidateRoot)) {
+        if (this.pathExists(candidate)) {
+          return candidate;
+        }
       }
     }
 
@@ -163,6 +164,33 @@ export class CliCommandResolver {
     }
 
     return Array.from(new Set(candidates));
+  }
+
+  private listCommandPathCandidates(command: string): string[] {
+    const candidates = [command];
+    try {
+      candidates.push(this.realpath(command));
+    } catch {
+      return candidates;
+    }
+    return Array.from(new Set(candidates));
+  }
+
+  private isVendorBinaryPath(commandPath: string): boolean {
+    const binaryName = readVendorBinaryName();
+    if (basename(commandPath).toLowerCase() !== binaryName.toLowerCase()) {
+      return false;
+    }
+
+    const commandDirectory = dirname(commandPath);
+    const parentDirectory = dirname(commandDirectory);
+    if (basename(commandDirectory) === "codex" && basename(parentDirectory) === readTargetTriple()) {
+      return basename(dirname(parentDirectory)) === "vendor";
+    }
+    if (basename(commandDirectory) === "bin" && basename(parentDirectory) === readTargetTriple()) {
+      return basename(dirname(parentDirectory)) === "vendor";
+    }
+    return false;
   }
 }
 

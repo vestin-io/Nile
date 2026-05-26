@@ -203,9 +203,7 @@ class StubCredentialStore {
 function writeFakeCodex(binDir: string): void {
   mkdirSync(binDir, { recursive: true });
   const scriptPath = join(binDir, "codex");
-  writeFileSync(
-    scriptPath,
-    `#!/bin/sh
+  const script = `#!/bin/sh
 set -eu
 /bin/mkdir -p "$CODEX_HOME"
 /bin/cat > "$CODEX_HOME/auth.json" <<'EOF'
@@ -220,7 +218,10 @@ set -eu
   "last_refresh": "2026-05-05T00:00:00.000Z"
 }
 EOF
-`,
+`;
+  writeFileSync(
+    scriptPath,
+    script,
     "utf8",
   );
   chmodSync(scriptPath, 0o755);
@@ -231,7 +232,9 @@ EOF
   }
   const vendorRoot = join(dirname(binDir), "node_modules", "@openai", readOptionalPackageDirectoryName(), "vendor", targetTriple, "codex");
   mkdirSync(vendorRoot, { recursive: true });
-  writeFileSync(join(vendorRoot, "codex"), "", "utf8");
+  const vendorPath = join(vendorRoot, "codex");
+  writeFileSync(vendorPath, script, "utf8");
+  chmodSync(vendorPath, 0o755);
 }
 
 const CURSOR_WEB_SESSION_TOKEN =

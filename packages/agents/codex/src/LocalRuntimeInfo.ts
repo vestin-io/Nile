@@ -7,9 +7,9 @@ const resolver = new CliCommandResolver();
 export const CODEX_LOCAL_RUNTIME_INFO = {
   read(context) {
     const explicitResolution = resolver.resolveExplicit(context.runtimeCommandPathOverride);
-    if (explicitResolution.command) {
+    if (explicitResolution.launcherCommand) {
       return {
-        runtimeCommandPath: explicitResolution.command,
+        runtimeCommandPath: explicitResolution.launcherCommand,
       };
     }
     if (explicitResolution.invalidCommandPaths.length > 0) {
@@ -23,7 +23,7 @@ export const CODEX_LOCAL_RUNTIME_INFO = {
       homeDirectory: context.environment.read("HOME") ?? process.env.HOME,
     });
     return {
-      runtimeCommandPath: resolution.command,
+      runtimeCommandPath: resolution.launcherCommand,
     };
   },
 } as const satisfies AgentLocalRuntimeInfoProvider;
