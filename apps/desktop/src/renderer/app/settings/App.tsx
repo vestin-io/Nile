@@ -21,8 +21,9 @@ import { UpdatePrompt } from "./UpdatePrompt";
 import { useSettingsConnectionActions } from "./useConnectionActions";
 import { useCredentialStorageSession } from "./useCredentialStorageSession";
 import { useSettingsFlow } from "./useFlow";
+import { useSettingsWindowActions } from "./useWindowActions";
 import { readCurrentProfile } from "../../../profiles/CurrentProfile";
-import { useWorkspaceProfiles, type WorkspaceProfileAssignment } from "../../profiles/useProfiles";
+import { useWorkspaceProfiles } from "../../profiles/useProfiles";
 import { EncryptedLocalAccessProvider } from "../../shared/EncryptedLocalAccess";
 import { readCredentialStorageModeState } from "../../shared/CredentialStorageMode";
 import { useSettingsPageContentProps } from "./usePageContentProps";
@@ -265,6 +266,16 @@ export function SettingsApp() {
     onActionError: setActionError,
     requestEncryptedLocalUnlock,
   });
+  const windowActions = useSettingsWindowActions({
+    refresh,
+    reload,
+    refreshProfiles,
+    setNotificationsMuted,
+    setPreferences,
+    setProfileFeatureEnabled,
+    setStatusEntryDisplayMode,
+    settingsState,
+  });
   const pageContentProps = useSettingsPageContentProps({
     addConnection,
     addConnectionDefinitions,
@@ -309,7 +320,6 @@ export function SettingsApp() {
     refreshCredentialStorageState,
     refreshProfiles,
     releaseInfo,
-    reload,
     reloadNotificationHistory,
     removeConnection,
     requestEncryptedLocalUnlock,
@@ -325,7 +335,6 @@ export function SettingsApp() {
     setCurrentPage,
     setNotificationHistoryFilter,
     setPreferences,
-    setRepairUsageConnectionId,
     setSelectedAgentDetailId,
     setSelectedAgentDetailTab,
     setSelectedConnectionContextAgentId,
@@ -339,63 +348,7 @@ export function SettingsApp() {
     useConnection,
     useExistingConnectionForAgent,
     visiblePage,
-    windowActions: {
-      checkForUpdates: async () => {
-        await window.nileDesktop.updates.checkForUpdates().catch(() => ({ status: "unavailable" as const }));
-      },
-      createConnectionAlert: async (input) => {
-        await window.nileDesktop.connections.createUsageAlert(input);
-        await reload();
-      },
-      deleteConnectionAlert: async (connectionId, alertId) => {
-        await window.nileDesktop.connections.deleteUsageAlert(connectionId, alertId);
-        await reload();
-      },
-      languageChange: (language) => setPreferences((current) => ({ ...current, language })),
-      openProvidersLink: async (url) => {
-        await window.nileDesktop.app.openExternalUrl(url);
-      },
-      profileApply: async (profileId) => {
-        await window.nileDesktop.profiles.applyProfile(profileId);
-      },
-      profileCreate: async (name, emoji, assignments: WorkspaceProfileAssignment[]) => {
-        const profile = await window.nileDesktop.profiles.createProfile(name, emoji, assignments);
-        await refreshProfiles();
-        return profile.id;
-      },
-      profileDelete: async (profileId) => {
-        await window.nileDesktop.profiles.deleteProfile(profileId);
-      },
-      profileFeatureEnabledChange: setProfileFeatureEnabled,
-      profileSave: async (profileId, name, emoji, assignments) => {
-        await window.nileDesktop.profiles.updateProfile(profileId, name, emoji, assignments);
-      },
-      saveAgentHome: async (agentId, path) => {
-        await window.nileDesktop.app.updateAgentHome(agentId, path);
-      },
-      saveAgentRuntimeCommand: async (agentId, path) => {
-        await window.nileDesktop.app.updateAgentRuntimeCommand(agentId, path);
-      },
-      setStatusEntryDisplayMode,
-      setNotificationsMuted,
-      themeChange: (theme) => setPreferences((current) => ({ ...current, theme })),
-      updateAgentConnectionModel: async (agentId, connectionId, modelId) => {
-        await window.nileDesktop.connections.updateAgentConnectionModel({
-          agentId,
-          connectionId,
-          modelId,
-        });
-        const agent = settingsState.agents.find((entry) => entry.agentId === agentId) ?? null;
-        if (agent?.currentConnection?.id === connectionId) {
-          await window.nileDesktop.connections.switchConnection(agentId, connectionId);
-        }
-        await refresh();
-      },
-      updateConnectionAlert: async (input) => {
-        await window.nileDesktop.connections.updateUsageAlert(input);
-        await reload();
-      },
-    },
+    windowActions,
   });
 
   return (

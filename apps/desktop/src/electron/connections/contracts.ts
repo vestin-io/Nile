@@ -1,5 +1,4 @@
 import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { RemoveConnectionResult, ResetStateResult } from "@nile/builtins/local";
 import type { BindCursorUsageResult } from "@nile/builtins/cursor-usage";
 import type { AuthMode } from "@nile/core/models/access";
@@ -129,7 +128,6 @@ export type DesktopConnectionBridge = {
   rollbackLatestMutation(agentId: AgentId): Promise<RollbackLatestAgentResult>;
   addConnection(input: DesktopAddConnectionInput): Promise<DesktopConnectionSummary>;
   updateConnection(input: DesktopUpdateConnectionInput): Promise<DesktopConnectionSummary>;
-  importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult>;
   importCurrentConnection(input: DesktopImportCurrentConnectionInput): Promise<DesktopConnectionSummary>;
   removeConnection(connectionId: string): Promise<RemoveConnectionResult>;
   updateAgentConnectionModel(input: DesktopUpdateAgentConnectionModelInput): Promise<string | null>;

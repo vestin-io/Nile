@@ -1,19 +1,19 @@
 import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
+import { SettingsConnectionInputBuilder } from "./ConnectionInput";
+import { SettingsConnectionMutationCoordinator } from "./ConnectionMutation";
 import type { SettingsState } from "../../shared/DesktopData";
-import type { Definition } from "../../shared/DesktopData";
 import type {
   AddConnectionReturnTarget,
   PageId,
   ReusedConnectionDialogState,
 } from "./useNavigation";
-import { applyAddConnectionCompletionTarget } from "./useNavigation";
 import type {
   AddConnectionPreparedSaveInput,
   AddConnectionSubmitInput,
   PreparedConnectionDraft,
 } from "../../connections/add/Types";
-import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
 type UseSettingsConnectionActionsOptions = {
   addConnectionReturnTarget: AddConnectionReturnTarget;
@@ -46,40 +46,21 @@ export function useSettingsConnectionActions({
   setSelectedConnectionId,
   onActionError,
 }: UseSettingsConnectionActionsOptions) {
+  const inputBuilder = new SettingsConnectionInputBuilder();
+  const mutationCoordinator = new SettingsConnectionMutationCoordinator({
+    addConnectionReturnTarget,
+    setCurrentPage,
+    setReusedConnectionDialog,
+    setSelectedConnectionId,
+  });
+
   const addConnection = async (input: AddConnectionSubmitInput) => {
-    const created = await window.nileDesktop.connections.addConnection({
-      preset: input.preset,
-      authMode: input.authMode as Definition["supportedAuthModes"][number],
-      label: input.label,
-      endpointUrl: input.endpointUrl,
-      enabledAgents: input.enabledAgents,
-      allowUndetectedGateway: input.allowUndetectedGateway,
-      credentialStorageBackend: input.credentialStorageBackend,
-      encryptedLocalPassphrase: input.encryptedLocalPassphrase,
-      apiKeySource: input.apiKeySource,
-      apiKey: input.apiKey,
-      envKey: input.envKey,
-      sessionSource: input.sessionSource,
-      sessionAuthJsonPath: input.sessionAuthJsonPath,
-    });
+    const created = await window.nileDesktop.connections.addConnection(inputBuilder.build(input));
     await completeConnectionMutation(created.id, created.reused === true);
   };
 
   const prepareConnectionDraft = async (input: AddConnectionSubmitInput): Promise<PreparedConnectionDraft> => {
-    return await window.nileDesktop.connections.prepareConnectionDraft({
-      preset: input.preset,
-      authMode: input.authMode as Definition["supportedAuthModes"][number],
-      label: input.label,
-      endpointUrl: input.endpointUrl,
-      enabledAgents: input.enabledAgents,
-      credentialStorageBackend: input.credentialStorageBackend,
-      encryptedLocalPassphrase: input.encryptedLocalPassphrase,
-      apiKeySource: input.apiKeySource,
-      apiKey: input.apiKey,
-      envKey: input.envKey,
-      sessionSource: input.sessionSource,
-      sessionAuthJsonPath: input.sessionAuthJsonPath,
-    });
+    return await window.nileDesktop.connections.prepareConnectionDraft(inputBuilder.build(input));
   };
 
   const savePreparedConnection = async (input: AddConnectionPreparedSaveInput) => {
@@ -187,24 +168,12 @@ export function useSettingsConnectionActions({
   };
 
   const continueReusedConnection = () => {
-    if (!reusedConnectionDialog) {
-      return;
-    }
-    const { connectionId, target } = reusedConnectionDialog;
-    setReusedConnectionDialog(null);
-    applyAddConnectionCompletionTarget(target, connectionId, setCurrentPage, setSelectedConnectionId);
+    mutationCoordinator.continue(reusedConnectionDialog);
   };
 
   const completeConnectionMutation = async (connectionId: string, reused: boolean) => {
     await reload();
-    if (reused) {
-      setReusedConnectionDialog({
-        connectionId,
-        target: addConnectionReturnTarget,
-      });
-      return;
-    }
-    applyAddConnectionCompletionTarget(addConnectionReturnTarget, connectionId, setCurrentPage, setSelectedConnectionId);
+    mutationCoordinator.complete(connectionId, reused);
   };
 
   return {

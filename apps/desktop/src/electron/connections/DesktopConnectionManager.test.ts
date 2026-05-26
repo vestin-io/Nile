@@ -743,77 +743,6 @@ describe("DesktopConnectionManager", () => {
     expect(useCalls).toEqual([["openclaw", "gateway-shared-api-key"]]);
   });
 
-  it("ensures managed env keys for batch detected-setup imports", async () => {
-    const ensureCalls: string[] = [];
-    const sessionStub = {
-      listSavedConnections: () => [{
-        id: "existing-system-secure",
-        credentialStorageBackend: "system_secure_storage" as const,
-      }],
-      getAgentStatus: () => ({
-        reconciliation: { state: "unavailable", issues: [] },
-      }),
-      scanLocalSetups: () => ({ items: [] }),
-      captureMatchedImportState: vi.fn(),
-      restoreMatchedImportState: vi.fn(),
-      importDetectedSetups: async () => ({
-        results: [
-          {
-            scanId: "claude",
-            status: "created" as const,
-            connectionId: "gateway-shared-api-key",
-            connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
-          },
-          {
-            scanId: "codex",
-            status: "created" as const,
-            connectionId: "work-session",
-            connectionLabel: "Work Session",
-          },
-        ],
-      }),
-      close: () => {},
-    };
-
-    class SessionStubbedDesktopConnectionGateway extends DesktopConnectionGateway {
-      override openSession(): never {
-        return sessionStub as never;
-      }
-    }
-
-    const setup = createSetup();
-    const gateway = new SessionStubbedDesktopConnectionGateway({
-      databasePath: setup.dbPath,
-      environment: EnvironmentSource.empty(),
-      credentialStore: setup.credentialStore,
-      managedApiKeyEnvironment: {
-        ensureForConnection: async (_session: unknown, connectionId: string) => {
-          ensureCalls.push(connectionId);
-          return null;
-        },
-        removeForConnection: () => {},
-      } as never,
-    });
-
-    const result = await gateway.importDetectedSetups(["claude", "codex"]);
-
-    expect(result.results).toEqual([
-      {
-        scanId: "claude",
-        status: "created",
-        connectionId: "gateway-shared-api-key",
-        connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
-      },
-      {
-        scanId: "codex",
-        status: "created",
-        connectionId: "work-session",
-        connectionLabel: "Work Session",
-      },
-    ]);
-    expect(ensureCalls).toEqual(["gateway-shared-api-key", "work-session"]);
-  });
-
   it("rolls back a newly imported connection when managed env promotion fails", async () => {
     const removeConnection = vi.fn();
     const restoreMatchedImportState = vi.fn();
@@ -941,9 +870,7 @@ describe("DesktopConnectionManager", () => {
     expect(restoreMatchedImportState).toHaveBeenCalledWith(snapshot);
   });
 
-  it("marks batch imports as failed when managed env promotion fails for a created connection", async () => {
-    const removeConnection = vi.fn();
-    const removeForConnection = vi.fn();
+  it("surfaces an explicit encrypted-local fallback when import-current system secure storage is denied", async () => {
     const sessionStub = {
       listSavedConnections: () => [{
         id: "existing-system-secure",
@@ -955,17 +882,9 @@ describe("DesktopConnectionManager", () => {
       scanLocalSetups: () => ({ items: [] }),
       captureMatchedImportState: vi.fn(),
       restoreMatchedImportState: vi.fn(),
-      importDetectedSetups: async () => ({
-        results: [
-          {
-            scanId: "claude",
-            status: "created" as const,
-            connectionId: "gateway-shared-api-key",
-            connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
-          },
-        ],
-      }),
-      removeConnection,
+      importCurrentConnection: async () => {
+        throw new SystemSecureCredentialStoreDeniedError();
+      },
       close: () => {},
     };
 
@@ -980,110 +899,11 @@ describe("DesktopConnectionManager", () => {
       databasePath: setup.dbPath,
       environment: EnvironmentSource.empty(),
       credentialStore: setup.credentialStore,
-      managedApiKeyEnvironment: {
-        ensureForConnection: async () => {
-          throw new Error("keychain unavailable");
-        },
-        removeForConnection,
-      } as never,
     });
 
-    const result = await gateway.importDetectedSetups(["claude"]);
-
-    expect(result.results).toEqual([
-      {
-        scanId: "claude",
-        status: "failed",
-        message: "keychain unavailable",
-      },
-    ]);
-    expect(removeForConnection).toHaveBeenCalledWith(sessionStub, "gateway-shared-api-key");
-    expect(removeConnection).toHaveBeenCalledWith("gateway-shared-api-key");
-  });
-
-  it("restores reused batch imports when managed env promotion fails", async () => {
-    const restoreMatchedImportState = vi.fn();
-    const snapshot = {
-      agentId: "claude",
-      connectionId: "gateway-shared-api-key",
-      endpointId: "gateway-shared",
-      endpointProtocols: {
-        anthropic: {
-          authSchemes: ["x-api-key"],
-        },
-      },
-      identityKey: null,
-      credential: {
-        kind: "api_key",
-        source: "direct",
-        apiKey: "gateway-secret",
-      },
-      selection: null,
-      modelSetting: null,
-    };
-    const sessionStub = {
-      listSavedConnections: () => [{
-        id: "existing-system-secure",
-        credentialStorageBackend: "system_secure_storage" as const,
-      }],
-      getAgentStatus: () => ({
-        agentId: "claude",
-        liveConnection: {
-          id: "gateway-shared-api-key",
-          label: "Gateway (llmfk.dpdns.org) API Key",
-        },
-        currentSelection: null,
-        currentConnection: null,
-        currentConnectionState: "none" as const,
-        rollback: "unsupported" as const,
-        supportsHistory: false,
-        detectedSetup: null,
-        issues: [],
-        reconciliation: { state: "already_saved" as const },
-      }),
-      captureMatchedImportState: vi.fn(() => snapshot),
-      restoreMatchedImportState,
-      importDetectedSetups: async () => ({
-        results: [
-          {
-            scanId: "claude",
-            status: "reused" as const,
-            connectionId: "gateway-shared-api-key",
-            connectionLabel: "Gateway (llmfk.dpdns.org) API Key",
-          },
-        ],
-      }),
-      close: () => {},
-    };
-
-    class SessionStubbedDesktopConnectionGateway extends DesktopConnectionGateway {
-      override openSession(): never {
-        return sessionStub as never;
-      }
-    }
-
-    const setup = createSetup();
-    const gateway = new SessionStubbedDesktopConnectionGateway({
-      databasePath: setup.dbPath,
-      environment: EnvironmentSource.empty(),
-      credentialStore: setup.credentialStore,
-      managedApiKeyEnvironment: {
-        ensureForConnection: async () => {
-          throw new Error("keychain unavailable");
-        },
-      } as never,
-    });
-
-    const result = await gateway.importDetectedSetups(["claude"]);
-
-    expect(result.results).toEqual([
-      {
-        scanId: "claude",
-        status: "failed",
-        message: "keychain unavailable",
-      },
-    ]);
-    expect(restoreMatchedImportState).toHaveBeenCalledWith(snapshot);
+    await expect(gateway.importCurrentConnection("claude")).rejects.toThrow(
+      "System secure storage was denied by the operating system. Choose Encrypted local storage to continue without system secure storage.",
+    );
   });
 
   it("re-applies updated connection to selected agents when syncSelectedAgents is enabled", async () => {

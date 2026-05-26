@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 
 import type { RollbackLatestAgentResult } from "@nile/core/models/agent";
 import type { RemoveConnectionResult, ResetStateResult } from "@nile/builtins/local";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/builtins/cursor-usage";
 import { SqliteDatabase } from "@nile/core/services/database";
 
@@ -604,10 +603,6 @@ class StubConnectionGateway {
       configurableAgents: [],
       selectedByAgents: [],
     };
-  }
-
-  importDetectedSetups(): ImportDetectedSetupsResult {
-    return { results: [] };
   }
 
   rollbackLatestMutation(agentId: string): RollbackLatestAgentResult {

@@ -1,6 +1,5 @@
 import type { AgentId, RollbackLatestAgentResult } from "@nile/core/models/agent";
 import { StateReset, type RemoveConnectionResult, type ResetStateResult } from "@nile/builtins/local";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/builtins/cursor-usage";
 import { NileLogger } from "@nile/core/services/NileLogger";
 
@@ -208,15 +207,6 @@ export class DesktopStateStore {
   async savePreparedConnection(input: DesktopSavePreparedConnectionInput): Promise<DesktopConnectionSummary> {
     return await this.runAsyncMutation(
       async () => await this.options.connectionManager.savePreparedConnection(input),
-      this.statusEntryState,
-      this.settingsState,
-      this.historyState,
-    );
-  }
-
-  async importDetectedSetups(scanIds: AgentId[]): Promise<ImportDetectedSetupsResult> {
-    return await this.runAsyncMutation(
-      async () => await this.options.connectionGateway.importDetectedSetups(scanIds),
       this.statusEntryState,
       this.settingsState,
       this.historyState,

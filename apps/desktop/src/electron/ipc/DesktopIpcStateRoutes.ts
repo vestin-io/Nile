@@ -39,6 +39,13 @@ export class DesktopIpcStateRoutes {
   constructor(private readonly options: DesktopIpcStateRoutesOptions) {}
 
   register(): void {
+    this.registerReadRoutes();
+    this.registerNotificationRoutes();
+    this.registerPreferenceRoutes();
+    this.registerMutationRoutes();
+  }
+
+  private registerReadRoutes(): void {
     const { inputs, stateStore } = this.options;
 
     ipcMain.handle("desktop:get-status-entry-state", () => stateStore.getStatusEntryState());
@@ -52,6 +59,13 @@ export class DesktopIpcStateRoutes {
     ipcMain.handle("desktop:get-notification-history-connections", (_event, filter: unknown) =>
       stateStore.getNotificationHistoryConnections(inputs.readNotificationHistoryFilter(filter)));
     ipcMain.handle("desktop:has-unread-notifications", () => stateStore.hasUnreadNotifications());
+    ipcMain.handle("desktop:get-notifications-muted", () => this.options.getNotificationsMuted());
+    ipcMain.handle("desktop:get-profile-feature-enabled", () => this.options.getProfileFeatureEnabled());
+  }
+
+  private registerNotificationRoutes(): void {
+    const { inputs, stateStore } = this.options;
+
     ipcMain.handle("desktop:mark-notification-history-read", (_event, entryIds: unknown) => {
       stateStore.markNotificationHistoryRead(inputs.readStringArray(entryIds, "entryIds"));
       this.options.notifyNotificationHistoryChanged();
@@ -60,6 +74,14 @@ export class DesktopIpcStateRoutes {
       stateStore.markNotificationHistoryReadByFilter(inputs.readNotificationHistoryFilter(filter));
       this.options.notifyNotificationHistoryChanged();
     });
+    ipcMain.handle("desktop:set-notifications-muted", (_event, muted: unknown) => {
+      return this.options.setNotificationsMuted(inputs.readBoolean(muted, "muted"));
+    });
+  }
+
+  private registerPreferenceRoutes(): void {
+    const { inputs } = this.options;
+
     ipcMain.handle("desktop:migrate-desktop-preferences", (_event, raw: unknown) => {
       return this.options.migrateDesktopPreferences(inputs.readNullableString(raw, "raw"));
     });
@@ -73,13 +95,8 @@ export class DesktopIpcStateRoutes {
       this.options.notifyPreferencesChanged();
       return next;
     });
-    ipcMain.handle("desktop:get-notifications-muted", () => this.options.getNotificationsMuted());
-    ipcMain.handle("desktop:get-profile-feature-enabled", () => this.options.getProfileFeatureEnabled());
     ipcMain.handle("desktop:set-status-entry-display-mode", (_event, mode: unknown) => {
       return this.options.setStatusEntryDisplayMode(this.readStatusEntryDisplayMode(mode));
-    });
-    ipcMain.handle("desktop:set-notifications-muted", (_event, muted: unknown) => {
-      return this.options.setNotificationsMuted(inputs.readBoolean(muted, "muted"));
     });
     ipcMain.handle("desktop:toggle-status-entry-selected-agent", (_event, agentId: unknown) => {
       return this.options.toggleStatusEntrySelectedAgent(inputs.readAgentId(agentId));
@@ -87,6 +104,11 @@ export class DesktopIpcStateRoutes {
     ipcMain.handle("desktop:set-profile-feature-enabled", (_event, enabled: unknown) => {
       return this.options.setProfileFeatureEnabled(inputs.readBoolean(enabled, "enabled"));
     });
+  }
+
+  private registerMutationRoutes(): void {
+    const { inputs, stateStore } = this.options;
+
     ipcMain.handle("desktop:switch-connection", async (_event, agentId: unknown, connectionId: unknown) => {
       const result = await stateStore.switchConnection(
         inputs.readAgentId(agentId),
@@ -99,12 +121,6 @@ export class DesktopIpcStateRoutes {
       const result = await stateStore.rollbackLatestMutation(inputs.readAgentId(agentId));
       this.options.refreshAll();
       return result;
-    });
-    ipcMain.handle("desktop:import-detected-setups", (_event, scanIds: unknown) => {
-      return stateStore.importDetectedSetups(inputs.readAgentIds(scanIds, "scanIds")).then((result) => {
-        this.options.refreshAll();
-        return result;
-      });
     });
     ipcMain.handle("desktop:reset-state", () => {
       const result = stateStore.resetState();

@@ -13,7 +13,6 @@ import {
 } from "@nile/builtins/session";
 import {
   type CredentialStorageBackend,
-  SystemSecureCredentialStoreDeniedError,
   type CredentialStore,
 } from "@nile/core/services/credential";
 import { isAgentId, type AgentHomes, type AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
@@ -40,6 +39,7 @@ import { DesktopConnectionModelCatalog } from "./ModelCatalog";
 import { DesktopPreparedDraftStore } from "./DesktopPreparedDraftStore";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 import { SessionRunner } from "./SessionRunner";
+import { DesktopConnectionStorageSupport } from "./StorageSupport";
 import { resolveDesktopCredentialStorageMode } from "./CredentialStorageMode";
 
 type DesktopConnectionManagerOptions = {
@@ -67,6 +67,7 @@ export class DesktopConnectionManager {
   private readonly preparedDrafts: DesktopPreparedDraftStore;
   private readonly modelCatalog = new DesktopConnectionModelCatalog();
   private readonly managedApiKeyEnvironment: ManagedApiKeyEnvironment | NoopManagedApiKeyEnvironment;
+  private readonly storage: DesktopConnectionStorageSupport;
 
   constructor(
     private readonly options: DesktopConnectionManagerOptions,
@@ -82,6 +83,7 @@ export class DesktopConnectionManager {
     );
     this.managedApiKeyEnvironment = this.options.managedApiKeyEnvironment ?? new NoopManagedApiKeyEnvironment();
     this.sessions = new SessionRunner(this);
+    this.storage = new DesktopConnectionStorageSupport(this.options.credentialStorageSession ?? null);
     this.preparedDrafts = new DesktopPreparedDraftStore({
       maxPreparedDrafts: this.options.maxPreparedDrafts ?? DesktopConnectionManager.defaultMaxPreparedDrafts,
       preparedDraftTtlMs: this.options.preparedDraftTtlMs ?? DesktopConnectionManager.defaultPreparedDraftTtlMs,
@@ -95,7 +97,7 @@ export class DesktopConnectionManager {
           session,
           input.credentialStorageBackend,
         );
-        this.prepareCredentialStorage(credentialStorageBackend, input.encryptedLocalPassphrase, {
+        this.storage.prepare(credentialStorageBackend, input.encryptedLocalPassphrase, {
           allowCreate: true,
         });
         const created = this.applyCursorUsageFollowUp(
@@ -108,7 +110,7 @@ export class DesktopConnectionManager {
         return this.buildConnectionSummary(ensured ?? created);
       });
     } catch (error) {
-      throw this.mapCredentialStorageError(error, input.credentialStorageBackend);
+      throw this.storage.mapError(error, input.credentialStorageBackend);
     }
   }
 
@@ -140,7 +142,7 @@ export class DesktopConnectionManager {
         return this.buildConnectionSummary(ensured ?? updated);
       });
     } catch (error) {
-      throw this.mapCredentialStorageError(error, credentialStorageBackend);
+      throw this.storage.mapError(error, credentialStorageBackend);
     }
   }
 
@@ -196,7 +198,7 @@ export class DesktopConnectionManager {
           session,
           input.credentialStorageBackend,
         );
-        this.prepareCredentialStorage(credentialStorageBackend, input.encryptedLocalPassphrase, {
+        this.storage.prepare(credentialStorageBackend, input.encryptedLocalPassphrase, {
           allowCreate: false,
         });
         const credential = await this.localCredentialResolver.resolveAsync(this.resolveCredentialRequest(input));
@@ -230,7 +232,7 @@ export class DesktopConnectionManager {
         };
       });
     } catch (error) {
-      throw this.mapCredentialStorageError(error, input.credentialStorageBackend);
+      throw this.storage.mapError(error, input.credentialStorageBackend);
     }
   }
 
@@ -246,7 +248,7 @@ export class DesktopConnectionManager {
           session,
           draft.credentialStorageBackend,
         );
-        this.prepareCredentialStorage(credentialStorageBackend, draft.encryptedLocalPassphrase, {
+        this.storage.prepare(credentialStorageBackend, draft.encryptedLocalPassphrase, {
           allowCreate: true,
         });
         const created = this.applyCursorUsageFollowUp(await session.createConnection({
@@ -262,7 +264,7 @@ export class DesktopConnectionManager {
         return this.buildConnectionSummary(ensured ?? created);
       });
     } catch (error) {
-      throw this.mapCredentialStorageError(error, draft.credentialStorageBackend);
+      throw this.storage.mapError(error, draft.credentialStorageBackend);
     } finally {
       this.preparedDrafts.discard(input.draftId);
     }
@@ -295,7 +297,7 @@ export class DesktopConnectionManager {
   }
 
   unlockEncryptedLocalStorage(passphrase: string): void {
-    this.requireCredentialStorageSession().unlockEncryptedLocalStorage(passphrase);
+    this.storage.unlockEncryptedLocalStorage(passphrase);
   }
 
   private resolveCredentialRequest(input: DesktopAddConnectionInput): LocalCredentialRequest {
@@ -355,33 +357,4 @@ export class DesktopConnectionManager {
     }, (workspace) => workspace.applyFollowUp(result));
   }
 
-  private prepareCredentialStorage(
-    backend: CredentialStorageBackend | undefined,
-    passphrase: string | undefined,
-    options: { allowCreate: boolean },
-  ): void {
-    this.requireCredentialStorageSession().prepareStorage(backend, passphrase, options);
-  }
-
-  private mapCredentialStorageError(
-    error: unknown,
-    backend: CredentialStorageBackend | undefined,
-  ): Error {
-    if (
-      backend === "system_secure_storage"
-      && (
-        error instanceof SystemSecureCredentialStoreDeniedError
-        || (error instanceof Error && error.message.includes("System secure storage access was denied."))
-      )
-    ) {
-      return new Error(
-        "System secure storage was denied by the operating system. Choose Encrypted local storage to continue without system secure storage.",
-      );
-    }
-    return error instanceof Error ? error : new Error(String(error));
-  }
-
-  private requireCredentialStorageSession(): DesktopCredentialStorageSession {
-    return this.options.credentialStorageSession ?? new DesktopCredentialStorageSession(null);
-  }
 }

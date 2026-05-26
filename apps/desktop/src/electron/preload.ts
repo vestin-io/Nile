@@ -28,7 +28,6 @@ const bridge: DesktopBridge = {
     rollbackLatestMutation: (agentId) => ipcRenderer.invoke("desktop:rollback-latest-mutation", agentId),
     addConnection: (input) => ipcRenderer.invoke("desktop:add-connection", input),
     updateConnection: (input) => ipcRenderer.invoke("desktop:update-connection", input),
-    importDetectedSetups: (scanIds) => ipcRenderer.invoke("desktop:import-detected-setups", scanIds),
     importCurrentConnection: (input) => ipcRenderer.invoke("desktop:import-current-connection", input),
     removeConnection: (connectionId) => ipcRenderer.invoke("desktop:remove-connection", connectionId),
     updateAgentConnectionModel: (input) => ipcRenderer.invoke("desktop:update-agent-connection-model", input),

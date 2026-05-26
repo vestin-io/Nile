@@ -185,6 +185,152 @@
 
 - `npm run build -w @nile/desktop`
 
+### Settings data loader cleanup
+
+- Split the bridge-reading strategy out of the settings data hook:
+  - `renderer/app/settings/DataLoader.ts` now owns snapshot reads, live refresh reads, and the shared supplementary-data fetch
+  - `useData.ts` now focuses on request-id ordering, mounted guards, React state updates, and desktop event subscription
+- Added narrow loader tests to lock the two read modes:
+  - snapshot mode returns the settings snapshot first and exposes the follow-up read separately
+  - refresh mode reads live settings state together with history/definitions
+  - refresh forwarding stays a direct bridge call
+
+#### Key findings
+
+- This pass intentionally did not change the request cancellation model in `useData.ts`; stale-request suppression still lives in the hook via `requestIdRef` and mounted checks.
+- `useData.ts` is only slightly shorter in raw lines because the hook still owns lifecycle wiring, but the bridge-fetch policy is now isolated and directly testable. The new split is `useData.ts` at 162 lines and `DataLoader.ts` at 64 lines.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/renderer/app/settings/DataLoader.test.ts apps/desktop/src/renderer/app/settings/ConnectionInput.test.ts apps/desktop/src/renderer/app/settings/ConnectionMutation.test.ts apps/desktop/src/renderer/app/settings/useFlow.test.ts`
+- `npx tsc -p tsconfig.renderer.json --noEmit`
+- `npx tsc -p tsconfig.node.json --noEmit`
+- `npm run build -w @nile/desktop`
+
+### Agent Windows login fallback
+
+- Added a Windows-specific detached-terminal fallback for desktop interactive sign-in:
+  - `packages/agents/claude/src/ClaudeSessionLogin.ts` now opens a new `cmd.exe` window on `win32` instead of trying to use `osascript`
+  - `packages/agents/gemini/src/GeminiSessionLogin.ts` now does the same for Gemini CLI sign-in on `win32`
+- Kept existing macOS behavior unchanged:
+  - macOS still opens Terminal via AppleScript when no attached terminal is available
+  - attached-terminal behavior still runs the CLI directly
+- Added regression coverage for both preserved macOS behavior and new Windows behavior:
+  - `packages/agents/claude/src/ClaudeSessionLogin.test.ts`
+  - `packages/agents/gemini/src/GeminiSessionLogin.test.ts`
+
+#### Key findings
+
+- I did not add broad Windows `homeCandidates` in this pass. After reviewing the current agent implementations, the clearer defect was the `osascript` desktop-login fallback in Claude and Gemini. Several agents already use dot-home directories as their user-state location on Windows, so inventing `AppData` candidates without source-of-truth evidence would have been riskier than leaving the manifests alone.
+- This fixes the Windows desktop sign-in gap for agents that actually expose `interactiveSessionLogin`. It does not add a new desktop-initiated login path for agents like Cursor or OpenClaw that currently rely on import/current-local-state flows instead.
+
+### Verification
+
+- `npx vitest run packages/agents/claude/src/ClaudeSessionLogin.test.ts packages/agents/gemini/src/GeminiSessionLogin.test.ts`
+- `npx tsc -p tsconfig.node.json --noEmit`
+- `npm run build -w @nile/desktop`
+
+### Settings connection action cleanup
+
+- Split the duplicated desktop connection input mapping out of the settings action hook:
+  - `renderer/app/settings/ConnectionInput.ts` now owns `AddConnectionSubmitInput -> DesktopAddConnectionInput`
+  - `useConnectionActions.ts` reuses the same builder for both `addConnection()` and `prepareConnectionDraft()`
+- Split the add/save completion follow-up out of the hook:
+  - `renderer/app/settings/ConnectionMutation.ts` now owns reused-connection dialog staging and post-save navigation target application
+  - `useConnectionActions.ts` now stays focused on bridge calls, unlock retry, and action-level decisions
+- Added narrow renderer tests for both extracted responsibilities:
+  - `ConnectionInput.test.ts`
+  - `ConnectionMutation.test.ts`
+
+#### Key findings
+
+- This pass intentionally did not change the unlock retry/error mapping flow in `useConnectionActions.ts`; it only removed repeated payload construction and repeated completion-target logic.
+- `useConnectionActions.ts` is still an orchestrator, but it is narrower now: the hook dropped from 235 lines to 204, and the two pure responsibilities that were easiest to drift are now directly testable.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/renderer/app/settings/ConnectionInput.test.ts apps/desktop/src/renderer/app/settings/ConnectionMutation.test.ts apps/desktop/src/renderer/app/settings/useFlow.test.ts`
+- `npx tsc -p tsconfig.renderer.json --noEmit`
+- `npx tsc -p tsconfig.node.json --noEmit`
+- `npm run build -w @nile/desktop`
+
+### Settings page content assembly cleanup
+
+- Split the remaining page-content action assembly out of the thin props hook:
+  - `renderer/app/settings/PageContentBuilder.ts` now owns the `SettingsPageContentProps` action wiring
+  - `renderer/app/settings/usePageContentProps.ts` is now a small projection wrapper for data fields plus builder output
+- Kept `SettingsApp` focused on feature hook composition instead of inline page action construction:
+  - `App.tsx` now passes a single `windowActions` collaborator plus state/data inputs
+  - removed stale builder inputs that were no longer consumed after the split
+- The settings-side orchestration shape is now flatter:
+  - `usePageContentProps.ts` is down to 52 lines
+  - `App.tsx` is down to 452 lines
+  - `DesktopIpcStateRoutes.ts` remains split and stays at 168 lines
+
+#### Key findings
+
+- This was a behavior-preserving cleanup. The only regressions encountered were stale `App.tsx` builder inputs (`reload`, `setRepairUsageConnectionId`) left behind after moving the action assembly.
+- The desktop build stayed green even while renderer typecheck caught those stale props, so `tsconfig.renderer` remains the more useful gate for this kind of settings refactor.
+
+### Verification
+
+- `npx tsc -p tsconfig.node.json --noEmit`
+- `npx tsc -p tsconfig.renderer.json --noEmit`
+- `npm run build -w @nile/desktop`
+
+### Connection path architecture cleanup
+
+- Extracted shared desktop credential-storage write-path behavior into:
+  - `electron/connections/StorageSupport.ts`
+- Reused that support in both:
+  - `electron/connections/DesktopConnectionManager.ts`
+  - `electron/connections/DesktopConnectionGateway.ts`
+- Unified the behavior that had started to drift:
+  - encrypted-local storage preparation before mutations/imports
+  - system secure storage denial mapping to the encrypted-local fallback message
+- Removed the stale desktop renderer/public `importDetectedSetups` path because it no longer matched the current credential-storage model:
+  - dropped it from `preload`, desktop IPC state routes, the desktop renderer bridge contract, and `DesktopStateStore`
+  - removed the desktop-only batch-import gateway/import helper branches and their tests
+- Added gateway coverage for the previously missing mapped error path:
+  - `importCurrentConnection()` now returns the same explicit system-secure-storage fallback error that add/save connection already used
+
+#### Key findings
+
+- The remaining desktop import surface is now the explicit `importCurrentConnection` path. The older batch `importDetectedSetups` desktop bridge had become dead surface after quick setup moved to per-agent save/import flows.
+- `npm run build -w @nile/desktop` initially failed once on this machine because `build:core` hit a transient Windows filesystem/export-artifact race (`ENOTEMPTY` / missing built artifact during validation). A sequential rerun passed without code changes, so this was treated as an environment/build-script flake rather than a regression from this patch.
+
+### Verification
+
+- `npx vitest run apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts apps/desktop/src/electron/state/DesktopStateStore.test.ts`
+- `npm run build -w @nile/desktop`
+- `npx tsc -p tsconfig.node.json --noEmit`
+- `npx tsc -p tsconfig.renderer.json --noEmit`
+
+### Settings orchestration and state IPC cleanup
+
+- Split settings renderer orchestration support into smaller units:
+  - `renderer/app/settings/useWindowActions.ts` now owns the desktop/window side-effect action bundle
+  - `renderer/app/settings/PageContentProps.ts` now owns the wide page-content prop contract
+- Reduced the central settings files:
+  - `renderer/app/settings/App.tsx` now focuses on state assembly and composition instead of inlining the whole action bundle
+  - `renderer/app/settings/PageContent.tsx` now focuses on page routing/rendering instead of also owning the full prop schema
+- Split `electron/ipc/DesktopIpcStateRoutes.ts` registration into grouped methods:
+  - read routes
+  - notification routes
+  - preference routes
+  - mutation routes
+
+#### Key findings
+
+- This pass intentionally did not redesign the settings page architecture. It removed the most obvious concentration points without changing the current settings data flow or page routing model.
+- `SettingsApp` is still the main renderer composition root for the desktop settings surface. The file is healthier, but future growth should prefer new hooks/components instead of adding another inline action/config block there.
+
+### Verification
+
+- `npx tsc -p tsconfig.node.json --noEmit`
+- `npx tsc -p tsconfig.renderer.json --noEmit`
+- `npm run build -w @nile/desktop`
+
 ### Windows branch hardening follow-up
 
 - Restored the Windows status-entry configuration path:

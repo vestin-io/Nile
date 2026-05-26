@@ -28,6 +28,7 @@ export class GeminiSessionLogin {
     private readonly environment: EnvironmentSource = EnvironmentSource.from(process.env),
     private readonly spawn: SpawnFn = spawnChild,
     private readonly isElectronProcess: () => boolean = () => Boolean(process.versions.electron),
+    private readonly platform: NodeJS.Platform = process.platform,
     private readonly createWrapperDirectory: (() => string) | null = null,
     private readonly removeDirectory: (path: string) => void = (path) => {
       rmSync(path, { recursive: true, force: true });
@@ -35,9 +36,9 @@ export class GeminiSessionLogin {
   ) {}
 
   async signIn(geminiHome: string, options: { commandPathOverride?: string | null } = {}): Promise<void> {
-    const openWrapperDir = this.readOpenWrapperDirectory();
     const basePath = ShellPath.merge(process.env.PATH, this.environment.read("PATH")) ?? "";
     const geminiCommand = this.resolveGeminiCommand(basePath, options.commandPathOverride);
+    const openWrapperDir = this.platform === "win32" ? null : this.readOpenWrapperDirectory();
     const env = {
       ...process.env,
       PATH: ShellPath.merge(
@@ -60,21 +61,24 @@ export class GeminiSessionLogin {
           "gemini sign-in",
         );
       } finally {
-        this.removeDirectory(openWrapperDir);
+        if (openWrapperDir) {
+          this.removeDirectory(openWrapperDir);
+        }
       }
       return;
     }
 
     try {
       await this.waitForExit(
-        this.spawn("osascript", ["-e", this.buildTerminalScript(env, openWrapperDir, geminiCommand)], {
-          stdio: "ignore",
-          env,
-        }),
-        "opening Terminal for Gemini sign-in",
+        this.spawn(...this.readDetachedTerminalSpawn(env, openWrapperDir, geminiCommand)),
+        this.platform === "win32"
+          ? "opening terminal for Gemini sign-in"
+          : "opening Terminal for Gemini sign-in",
       );
     } catch (error) {
-      this.removeDirectory(openWrapperDir);
+      if (openWrapperDir) {
+        this.removeDirectory(openWrapperDir);
+      }
       throw error;
     }
   }
@@ -95,6 +99,32 @@ export class GeminiSessionLogin {
 
   private readOpenWrapperDirectory(): string {
     return this.createWrapperDirectory?.() ?? this.createOpenWrapperDirectory();
+  }
+
+  private readDetachedTerminalSpawn(
+    env: NodeJS.ProcessEnv,
+    openWrapperDir: string | null,
+    geminiCommand: string,
+  ): Parameters<SpawnFn> {
+    if (this.platform === "win32") {
+      return [
+        "cmd.exe",
+        ["/d", "/c", "start", "", "cmd.exe", "/k", this.buildWindowsTerminalCommand(env, geminiCommand)],
+        {
+          stdio: "ignore",
+          env,
+        },
+      ];
+    }
+
+    return [
+      "osascript",
+      ["-e", this.buildMacTerminalScript(env, openWrapperDir ?? "", geminiCommand)],
+      {
+        stdio: "ignore",
+        env,
+      },
+    ];
   }
 
   private createOpenWrapperDirectory(): string {
@@ -126,7 +156,7 @@ export class GeminiSessionLogin {
     return wrapperDir;
   }
 
-  private buildTerminalScript(
+  private buildMacTerminalScript(
     env: NodeJS.ProcessEnv,
     openWrapperDir: string,
     geminiCommand: string,
@@ -150,8 +180,27 @@ export class GeminiSessionLogin {
     ].join("\n");
   }
 
+  private buildWindowsTerminalCommand(env: NodeJS.ProcessEnv, geminiCommand: string): string {
+    return [
+      this.writeWindowsEnv("GEMINI_CLI_HOME", env.GEMINI_CLI_HOME ?? ""),
+      this.writeWindowsEnv("HOME", env.HOME ?? ""),
+      this.writeWindowsEnv("PATH", env.PATH ?? ""),
+      "echo Complete Gemini sign-in in this terminal window using the account you want to add to Nile.",
+      "echo.",
+      this.quoteForCmd(geminiCommand),
+    ].join(" && ");
+  }
+
   private quoteForShell(value: string): string {
     return `'${value.replaceAll("'", `'\"'\"'`)}'`;
+  }
+
+  private writeWindowsEnv(key: string, value: string): string {
+    return `set "${key}=${value.replaceAll('"', '""')}"`;
+  }
+
+  private quoteForCmd(value: string): string {
+    return `"${value.replaceAll('"', '""')}"`;
   }
 
   private resolveGeminiCommand(pathValue: string, commandPathOverride?: string | null): string {

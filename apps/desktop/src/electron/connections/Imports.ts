@@ -1,10 +1,8 @@
 import type { AgentId, ImportCurrentConnectionResult } from "@nile/core/models/agent";
-import type { ImportDetectedSetupsResult } from "@nile/core/actions/local-setup";
 import { NileSession } from "@nile/builtins/runtime";
 import type { MatchedImportStateSnapshot } from "@nile/core/runtime-local/import-state";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import { NileLogger } from "@nile/core/services/NileLogger";
-import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import type { DesktopImportCurrentConnectionInput } from "./contracts";
 import { ManagedApiKeyEnvironment, NoopManagedApiKeyEnvironment } from "./ManagedApiKeyEnvironment";
 
@@ -54,41 +52,6 @@ export class DesktopManagedConnectionImports {
     }
   }
 
-  async importDetectedSetups(
-    session: NileSession,
-    scanIds: AgentId[],
-    credentialStorageBackend: CredentialStorageBackend,
-  ): Promise<ImportDetectedSetupsResult> {
-    const result = await session.importDetectedSetups({
-      credentialStorageBackend,
-      selections: scanIds.map((scanId) => ({ scanId })),
-    });
-    await this.ensureManagedDetectedSetups(session, result, scanIds);
-    return result;
-  }
-
-  private async ensureManagedDetectedSetups(
-    session: NileSession,
-    result: ImportDetectedSetupsResult,
-    scanIds: AgentId[],
-  ): Promise<void> {
-    const snapshotsByAgent = this.captureMatchedImportStates(session, scanIds);
-    for (const item of result.results) {
-      if (!item.connectionId) {
-        continue;
-      }
-      try {
-        await this.ensureManagedConnectionId(session, item.connectionId);
-      } catch (error) {
-        this.rollbackDetectedSetupImport(session, item, snapshotsByAgent.get(item.scanId) ?? null);
-        item.status = "failed";
-        item.message = error instanceof Error ? error.message : String(error);
-        delete item.connectionId;
-        delete item.connectionLabel;
-      }
-    }
-  }
-
   private async ensureManagedConnection(
     session: NileSession,
     imported: ImportCurrentConnectionResult | SavedConnectionSummary,
@@ -118,24 +81,6 @@ export class DesktopManagedConnectionImports {
     session.removeConnection(imported.id);
   }
 
-  private rollbackDetectedSetupImport(
-    session: NileSession,
-    item: ImportDetectedSetupsResult["results"][number],
-    snapshot: MatchedImportStateSnapshot | null,
-  ): void {
-    if (!item.connectionId) {
-      return;
-    }
-    if (item.status === "created") {
-      this.managedApiKeyEnvironment.removeForConnection(session, item.connectionId);
-      session.removeConnection(item.connectionId);
-      return;
-    }
-    if (item.status === "reused" && snapshot) {
-      session.restoreMatchedImportState(snapshot);
-    }
-  }
-
   private captureMatchedImportState(
     session: NileSession,
     agentId: AgentId,
@@ -144,26 +89,6 @@ export class DesktopManagedConnectionImports {
     return matchedConnectionId
       ? session.captureMatchedImportState(agentId, matchedConnectionId)
       : null;
-  }
-
-  private captureMatchedImportStates(
-    session: NileSession,
-    agentIds: AgentId[],
-  ): Map<AgentId, MatchedImportStateSnapshot> {
-    return new Map(
-      agentIds
-        .map((agentId) => {
-          const matchedConnectionId = this.readSingleMatchedConnectionId(session, agentId);
-          if (!matchedConnectionId) {
-            return null;
-          }
-          return [
-            agentId,
-            session.captureMatchedImportState(agentId, matchedConnectionId),
-          ] as const;
-        })
-        .filter((entry): entry is readonly [AgentId, MatchedImportStateSnapshot] => entry !== null),
-    );
   }
 
   private readSingleMatchedConnectionId(
