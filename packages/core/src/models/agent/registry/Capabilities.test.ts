@@ -13,6 +13,7 @@ describe("AgentCapabilities", () => {
       iconKey: "openclaw",
       requiredApplyRequirements: ["selected-model", "env-backed-api-key"],
       supportsManagedEnvBackedApiKey: true,
+      requiresManagedApiKeyShellEnvironment: true,
       supportedConnectionFamilyIds: [
         "openai-api-key",
         "anthropic-api-key",
@@ -30,6 +31,7 @@ describe("AgentCapabilities", () => {
       iconKey: "codex",
       requiredApplyRequirements: [],
       supportsManagedEnvBackedApiKey: true,
+      requiresManagedApiKeyShellEnvironment: false,
       supportedConnectionFamilyIds: ["openai-api-key", "openai-session"],
       autoSyncMatchedSelection: true,
       connectionEntryMode: "configure_or_import",

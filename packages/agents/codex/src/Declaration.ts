@@ -6,6 +6,7 @@ export const CODEX_DECLARATION = {
   iconKey: "codex",
   requiredApplyRequirements: [],
   supportsManagedEnvBackedApiKey: true,
+  requiresManagedApiKeyShellEnvironment: false,
   supportedConnectionFamilyIds: ["openai-api-key", "openai-session"],
   autoSyncMatchedSelection: true,
   connectionEntryMode: "configure_or_import",

@@ -7,7 +7,7 @@ import type { DesktopStateReadContext } from "./ReadContext";
 import type { DesktopStatusEntryAgentState, DesktopStatusEntryState } from "./Types";
 import { DesktopConnectionListPresenter } from "./connection/List";
 import { DesktopConnectionStatusPresenter } from "./connection/Status";
-import { DesktopUsageCache } from "./UsageCache";
+import { DesktopUsageCache, type DesktopUsageRefreshMode } from "./UsageCache";
 
 export class DesktopStatusEntryStateQuery {
   constructor(
@@ -29,7 +29,10 @@ export class DesktopStatusEntryStateQuery {
     };
   }
 
-  async refreshUsage(session: NileSession): Promise<void> {
+  async refreshUsage(
+    session: NileSession,
+    options?: { mode?: DesktopUsageRefreshMode },
+  ): Promise<void> {
     const savedConnections = session.listSavedConnections();
     const statuses = this.listStatuses(session);
     const currentConnectionIds = new Set(
@@ -38,7 +41,10 @@ export class DesktopStatusEntryStateQuery {
       }).filter((connectionId): connectionId is string => connectionId !== null),
     );
 
-    await this.usage.refreshByConnectionId(session, [...currentConnectionIds], { force: true });
+    await this.usage.refreshByConnectionId(session, [...currentConnectionIds], {
+      force: true,
+      mode: options?.mode,
+    });
   }
 
   private buildAgents(

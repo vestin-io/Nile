@@ -61,9 +61,16 @@ export class DesktopStateSnapshotStore {
   }
 
   private writeValue(key: string, value: DesktopStatusEntryState | SettingsState): void {
+    const payload = JSON.stringify(value);
     const database = SqliteDatabase.open(this.databasePath);
     try {
       this.initialize(database);
+      const existing = database.query<SnapshotRow>(
+        "SELECT payload, version FROM desktop_state_snapshots WHERE snapshot_key = ?",
+      ).get(key);
+      if (existing?.version === SNAPSHOT_VERSION && existing.payload === payload) {
+        return;
+      }
       database.run(
         `
           INSERT INTO desktop_state_snapshots (snapshot_key, version, payload, updated_at)
@@ -75,7 +82,7 @@ export class DesktopStateSnapshotStore {
         `,
         key,
         SNAPSHOT_VERSION,
-        JSON.stringify(value),
+        payload,
       );
     } finally {
       database.close();

@@ -22,7 +22,7 @@ export type DesktopSettingsDataBridge = {
   getSettingsState(): Promise<import("../../state/Types").SettingsState>;
   getSettingsStateSnapshot(): Promise<import("../../state/Types").SettingsState>;
   getHistoryState(): Promise<import("../../state/Types").HistoryState>;
-  refreshSettings(): Promise<void>;
+  refreshSettings(): Promise<import("../../state/Types").SettingsState>;
 };
 
 export type DesktopNotificationBridge = {

@@ -41,6 +41,10 @@ export class DesktopShellEnvironment {
     this.writeState([...next].sort());
   }
 
+  has(envKey: string): boolean {
+    return this.readManagedKeys().includes(this.normalizeEnvKey(envKey));
+  }
+
   sync(envKeys: string[]): void {
     const keys = [...new Set(envKeys.map((envKey) => this.normalizeEnvKey(envKey)))].sort();
     this.writeState(keys);

@@ -31,6 +31,7 @@ describe("ManagedApiKeyEnvironment", () => {
         write,
       } as never,
       {
+        has: vi.fn().mockReturnValue(false),
         ensure: ensureShell,
         remove: vi.fn(),
       } as never,
@@ -58,7 +59,10 @@ describe("ManagedApiKeyEnvironment", () => {
       updateConnection,
     } as never, "gateway-shared-api-key");
 
-    expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
+    expect(write).toHaveBeenCalledWith(
+      "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+      "gateway-secret",
+    );
     expect(ensureShell).not.toHaveBeenCalled();
     expect(setConnectionDirectApiKeyEnvKey).toHaveBeenCalledWith(
       "gateway-shared-api-key",
@@ -120,7 +124,11 @@ describe("ManagedApiKeyEnvironment", () => {
       } satisfies SavedConnectionSummary),
     } as never, "gateway-shared-api-key");
 
-    expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
+    expect(write).toHaveBeenCalledWith(
+      "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+      "gateway-secret",
+      { mirrorToSystem: true },
+    );
     expect(ensureShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
   });
 
@@ -129,10 +137,12 @@ describe("ManagedApiKeyEnvironment", () => {
     const write = vi.fn();
     const ensureShell = vi.fn();
     const removeShell = vi.fn();
+    const removeSystemCopy = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
       {
         read,
         write,
+        removeSystemCopy,
       } as never,
       {
         ensure: ensureShell,
@@ -166,6 +176,7 @@ describe("ManagedApiKeyEnvironment", () => {
     expect(write).not.toHaveBeenCalled();
     expect(ensureShell).not.toHaveBeenCalled();
     expect(removeShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+    expect(removeSystemCopy).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
     expect(result?.envKey).toBe("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
   });
 
@@ -178,6 +189,7 @@ describe("ManagedApiKeyEnvironment", () => {
         write,
       } as never,
       {
+        has: vi.fn().mockReturnValue(false),
         ensure: ensureShell,
         remove: vi.fn(),
       } as never,
@@ -206,7 +218,11 @@ describe("ManagedApiKeyEnvironment", () => {
       setConnectionDirectApiKeyEnvKey: vi.fn(),
     } as never, "gateway-shared-api-key");
 
-    expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
+    expect(write).toHaveBeenCalledWith(
+      "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+      "gateway-secret",
+      { mirrorToSystem: true },
+    );
     expect(ensureShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
     expect(result?.envKey).toBe("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
   });
@@ -221,6 +237,7 @@ describe("ManagedApiKeyEnvironment", () => {
         write,
       } as never,
       {
+        has: vi.fn().mockReturnValue(true),
         ensure: ensureShell,
         remove: vi.fn(),
       } as never,
@@ -404,7 +421,11 @@ describe("ManagedApiKeyEnvironment", () => {
       setConnectionDirectApiKeyEnvKey,
     } as never, "gateway-shared-api-key")).rejects.toThrow("profile locked");
 
-    expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
+    expect(write).toHaveBeenCalledWith(
+      "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+      "gateway-secret",
+      { mirrorToSystem: true },
+    );
     expect(ensureShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
     expect(remove).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
     expect(setConnectionDirectApiKeyEnvKey).toHaveBeenNthCalledWith(
@@ -416,11 +437,13 @@ describe("ManagedApiKeyEnvironment", () => {
 
   it("removes the managed shell export when deleting a connection env key", () => {
     const remove = vi.fn();
+    const removeSystemCopy = vi.fn();
     const removeShell = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
       {
         read: vi.fn().mockReturnValue(null),
         remove,
+        removeSystemCopy,
       } as never,
       {
         ensure: vi.fn(),
@@ -446,6 +469,7 @@ describe("ManagedApiKeyEnvironment", () => {
     } as never, "gateway-shared-api-key");
 
     expect(remove).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
+    expect(removeSystemCopy).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
     expect(removeShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
   });
 
@@ -499,6 +523,7 @@ describe("ManagedApiKeyEnvironment", () => {
         write,
       } as never,
       {
+        has: vi.fn().mockReturnValue(false),
         ensure: vi.fn(),
         sync: syncShell,
         remove: vi.fn(),
@@ -549,7 +574,11 @@ describe("ManagedApiKeyEnvironment", () => {
     } as never);
 
     expect(failures).toEqual([]);
-    expect(write).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY", "gateway-secret");
+    expect(write).toHaveBeenCalledWith(
+      "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+      "gateway-secret",
+      { mirrorToSystem: true },
+    );
     expect(syncShell).toHaveBeenCalledTimes(1);
     expect(syncShell).toHaveBeenCalledWith(["NILE_GATEWAY_SHARED_API_KEY_API_KEY"]);
     expect(setConnectionDirectApiKeyEnvKey).toHaveBeenCalledWith(
@@ -663,11 +692,13 @@ describe("ManagedApiKeyEnvironment", () => {
 
   it("clears removed managed env keys and syncs the preserved shell set once", () => {
     const remove = vi.fn();
+    const removeSystemCopy = vi.fn();
     const sync = vi.fn();
     const environment = new ManagedApiKeyEnvironment(
       {
         read: vi.fn().mockReturnValue(null),
         remove,
+        removeSystemCopy,
       } as never,
       {
         ensure: vi.fn(),
@@ -709,6 +740,7 @@ describe("ManagedApiKeyEnvironment", () => {
 
     expect(remove).toHaveBeenCalledTimes(1);
     expect(remove).toHaveBeenCalledWith("NILE_REMOVE_API_KEY");
+    expect(removeSystemCopy).toHaveBeenCalledWith("NILE_REMOVE_API_KEY");
     expect(sync).toHaveBeenCalledTimes(1);
     expect(sync).toHaveBeenCalledWith(["NILE_KEEP_API_KEY"]);
   });

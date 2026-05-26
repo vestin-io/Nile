@@ -639,3 +639,41 @@
 
 - The reset confirmation no longer names a macOS-only credential store on Windows or other platforms, even in non-English locales.
 - Several non-English storage-option strings still rely on English fallback keys for the newer platform-specific system-store description; this follow-up only corrected the stale reset wording.
+
+## Follow-up Build: Managed Env Local-Store Support
+
+### Tasks Completed
+
+- Added a desktop environment storage-mode reader so managed `NILE_*` API-key values now follow the machine-level credential storage mode instead of hardcoding macOS to the keychain-backed environment store.
+- Updated `DesktopEnvironmentStore` to re-evaluate the current machine-level mode from local state on each access:
+  - Windows still keeps the existing desktop file-backed environment store path.
+  - macOS now uses the desktop file-backed environment store when the machine mode is `encrypted_local_storage`.
+  - The first-save flow no longer requires an app restart before managed env writes switch over to the local store.
+- Kept external shell-backed managed env flows working for the current OpenClaw-style path by mirroring to the system store only when shell export wiring is still required.
+- Added regression coverage for:
+  - machine-mode resolution from saved connections vs desktop preferences
+  - macOS file-backed managed env persistence in encrypted-local mode
+  - dynamic in-session mode switching for the environment store
+  - shell-backed mirror behavior and mirror cleanup in managed-env orchestration
+
+### Files Changed
+
+- `apps/desktop/src/electron/environment/StorageMode.ts`
+- `apps/desktop/src/electron/environment/StorageMode.test.ts`
+- `apps/desktop/src/electron/environment/Store.ts`
+- `apps/desktop/src/electron/environment/Store.test.ts`
+- `apps/desktop/src/electron/environment/Shell.ts`
+- `apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.ts`
+- `apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts`
+
+### Verification Commands Run
+
+- `npx vitest run apps/desktop/src/electron/environment/StorageMode.test.ts apps/desktop/src/electron/environment/Store.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts apps/desktop/src/electron/environment/Shell.test.ts`
+- `npm run build -w @nile/desktop`
+- `npm run typecheck`
+
+### Key Findings
+
+- The key startup prompt was not coming from saved-connection credentials anymore; it was coming from the separate managed-environment store still reading macOS keychain entries even after the machine mode had moved to encrypted local storage.
+- Re-evaluating the machine mode on each environment-store access is necessary. Caching the backend at app startup would still leave same-session first-save/import flows on the old keychain path until restart.
+- This pass does not remove legacy `nile.switcher.environment` keychain entries that older desktop builds may already have written. In encrypted-local mode Nile now stops reading them for normal desktop-managed API-key flows, but shell-backed flows that still need external env export keep using a controlled system-store mirror until a file-backed shell bridge exists.

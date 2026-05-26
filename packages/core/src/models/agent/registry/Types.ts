@@ -16,6 +16,7 @@ export type AgentManifestDefinition = {
   homeCandidates: readonly AgentHomeCandidateDefinition[];
   requiredApplyRequirements: ConnectionApplyRequirementKind[];
   supportsManagedEnvBackedApiKey: boolean;
+  requiresManagedApiKeyShellEnvironment: boolean;
   supportedConnectionFamilyIds: ConnectionFamilyId[];
   autoSyncMatchedSelection: boolean;
   connectionEntryMode: AgentConnectionEntryMode;

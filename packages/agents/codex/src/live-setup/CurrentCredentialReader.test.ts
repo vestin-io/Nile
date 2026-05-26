@@ -3,6 +3,9 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
+import { NileLogger } from "@nile/core/services/NileLogger";
+
 import { CodexCurrentCredentialReader } from "./CurrentCredentialReader";
 import { CodexSessionLogin } from "../CodexSessionLogin";
 
@@ -92,6 +95,10 @@ function writeOpenAiSessionAtPath(authPath: string, accountId: string): void {
 
 class StubCodexSessionLogin extends CodexSessionLogin {
   readonly calls: string[] = [];
+
+  constructor() {
+    super(EnvironmentSource.empty(), undefined, undefined, NileLogger.silent());
+  }
 
   override async signIn(codexHome: string): Promise<void> {
     this.calls.push(codexHome);

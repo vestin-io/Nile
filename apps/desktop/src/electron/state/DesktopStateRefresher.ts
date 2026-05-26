@@ -1,14 +1,17 @@
 import type { NileLogger } from "@nile/core/services/NileLogger";
 
+import type { DesktopUsageRefreshMode } from "../../state/UsageCache";
 import { ConnectionUsageAlertEvaluator } from "../alerts/Evaluator";
 import { DesktopStateStore } from "./DesktopStateStore";
 
 type RefreshDesktopStateOptions = {
   invalidate: boolean;
   notifyRenderer: boolean;
+  usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
 type RefreshStatusEntryUsageOptions = {
+  mode?: DesktopUsageRefreshMode;
   notifyRenderer?: boolean;
   tolerateFailures?: boolean;
 };
@@ -30,7 +33,7 @@ export class DesktopStateRefresher {
 
     await Promise.all([
       this.options.stateStore.refreshStatusEntryState(),
-      this.options.stateStore.refreshStatusEntryUsage(),
+      this.options.stateStore.refreshStatusEntryUsage({ mode: options.usageRefreshMode }),
     ]);
     await this.evaluateAlerts();
 
@@ -44,7 +47,7 @@ export class DesktopStateRefresher {
     const tolerateFailures = options.tolerateFailures ?? true;
 
     try {
-      await this.options.stateStore.refreshStatusEntryUsage();
+      await this.options.stateStore.refreshStatusEntryUsage({ mode: options.mode });
       await this.evaluateAlerts();
       if (notifyRenderer) {
         this.options.notifyRenderer();

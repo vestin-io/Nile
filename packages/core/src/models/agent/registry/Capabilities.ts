@@ -16,6 +16,7 @@ export type AgentCapability = {
   iconKey: AgentDeclaration["iconKey"];
   requiredApplyRequirements: ConnectionApplyRequirementKind[];
   supportsManagedEnvBackedApiKey: boolean;
+  requiresManagedApiKeyShellEnvironment: boolean;
   supportedConnectionFamilyIds: ConnectionSupportKind[];
   autoSyncMatchedSelection: boolean;
   connectionEntryMode: AgentConnectionEntryMode;
@@ -40,6 +41,7 @@ export class AgentCapabilities {
       iconKey: manifest.iconKey,
       requiredApplyRequirements: [...manifest.requiredApplyRequirements],
       supportsManagedEnvBackedApiKey: manifest.supportsManagedEnvBackedApiKey,
+      requiresManagedApiKeyShellEnvironment: manifest.requiresManagedApiKeyShellEnvironment,
       supportedConnectionFamilyIds: [...manifest.supportedConnectionFamilyIds],
       autoSyncMatchedSelection: manifest.autoSyncMatchedSelection,
       connectionEntryMode: manifest.connectionEntryMode,

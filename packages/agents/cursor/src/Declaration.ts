@@ -6,6 +6,7 @@ export const CURSOR_DECLARATION = {
   iconKey: "cursor",
   requiredApplyRequirements: [],
   supportsManagedEnvBackedApiKey: false,
+  requiresManagedApiKeyShellEnvironment: false,
   supportedConnectionFamilyIds: ["cursor-api-key", "cursor-session"],
   autoSyncMatchedSelection: true,
   connectionEntryMode: "configure_or_import",
