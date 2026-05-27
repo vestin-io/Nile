@@ -19,6 +19,7 @@ import { useNotificationTargetNavigation, type NotificationTargetNavigatorOption
 import { useDesktopReleaseInfo } from "./useReleaseInfo";
 import { UpdatePrompt } from "./UpdatePrompt";
 import { useSettingsConnectionActions } from "./useConnectionActions";
+import { useCredentialPortability } from "./useCredentialPortability";
 import { useCredentialStorageSession } from "./useCredentialStorageSession";
 import { useSettingsFlow } from "./useFlow";
 import { useSettingsWindowActions } from "./useWindowActions";
@@ -204,6 +205,24 @@ export function SettingsApp() {
     void window.nileDesktop.statusEntry.refreshStatusEntry().catch(() => undefined);
   }, [preferences.language, preferences.theme]);
 
+  const credentialStorageModeState = readCredentialStorageModeState(
+    preferences.credentialStorageMode,
+    settingsState?.advanced.credentialStorageMode ?? null,
+    (settingsState?.advanced.savedConnectionCount ?? 0) > 0,
+    settingsState?.advanced.credentialStorageModeMixed ?? false,
+  );
+  const credentialStorageMode = credentialStorageModeState.mode;
+  const portability = useCredentialPortability({
+    credentialStorageMode,
+    credentialStorageState,
+    isMixed: credentialStorageModeState.isMixed,
+    requestEncryptedLocalUnlock,
+    refresh,
+    refreshCredentialStorageState,
+    setActionError,
+    t,
+  });
+
   if (isLoading && (!settingsState || !historyState)) {
     return <LoadingShell label={t("loading.desktop")} />;
   }
@@ -230,14 +249,6 @@ export function SettingsApp() {
     return <LoadingShell label={t("loading.desktop")} />;
   }
 
-  const credentialStorageModeState = readCredentialStorageModeState(
-    preferences.credentialStorageMode,
-    settingsState.advanced.credentialStorageMode,
-    settingsState.advanced.savedConnectionCount > 0,
-    settingsState.advanced.credentialStorageModeMixed,
-  );
-  const credentialStorageMode = credentialStorageModeState.mode;
-
   const {
     addConnection,
     bindCursorUsage,
@@ -253,7 +264,6 @@ export function SettingsApp() {
     useConnection,
   } = useSettingsConnectionActions({
     addConnectionReturnTarget,
-    reload,
     refresh,
     reusedConnectionDialog,
     settingsState,
@@ -267,6 +277,8 @@ export function SettingsApp() {
     requestEncryptedLocalUnlock,
   });
   const windowActions = useSettingsWindowActions({
+    exportCredentials: portability.onOpenExport,
+    importCredentials: portability.onOpenImport,
     refresh,
     reload,
     refreshProfiles,
@@ -291,6 +303,7 @@ export function SettingsApp() {
     definitions,
     historyState,
     importCurrentConnection,
+    isCredentialPortabilityBusy: portability.isBusy,
     isLoadedStatusEntryDisplay: isStatusEntryDisplayLoaded,
     isLoadedNotificationMute: isNotificationMuteLoaded,
     isLoadingNotificationHistory,
@@ -390,6 +403,27 @@ export function SettingsApp() {
       </EncryptedLocalAccessProvider>
 
       <SettingsDialogs
+        credentialStorageState={credentialStorageState}
+        exportConnectionCount={portability.exportConnectionCount}
+        exportError={portability.exportError}
+        exportFilePath={portability.exportFilePath}
+        exportPassphrase={portability.exportPassphrase}
+        exportPassphraseConfirmation={portability.exportPassphraseConfirmation}
+        importEncryptedLocalPassphrase={portability.importEncryptedLocalPassphrase}
+        importEncryptedLocalPassphraseConfirmation={portability.importEncryptedLocalPassphraseConfirmation}
+        importError={portability.importError}
+        importExportPassphrase={portability.importExportPassphrase}
+        importFilePath={portability.importFilePath}
+        importPreview={portability.importPreview}
+        importResult={portability.importResult}
+        importStrategy={portability.importStrategy}
+        importTargetStorageMode={portability.importTargetStorageMode}
+        isApplyingCredentialImport={portability.isApplyingImport}
+        isExportDialogOpen={portability.isExportDialogOpen}
+        isExportingCredentials={portability.isExporting}
+        isImportDialogOpen={portability.isImportDialogOpen}
+        isImportResultDialogOpen={portability.isImportResultDialogOpen}
+        isPreviewingCredentialImport={portability.isPreviewingImport}
         isResetDialogOpen={resetDialogOpen}
         isResetting={isResetting}
         isSupportOpen={nileDialogOpen}
@@ -397,6 +431,7 @@ export function SettingsApp() {
         isUnlockingEncryptedLocalStorage={isUnlockingEncryptedLocalStorage}
         repairUsageConnection={repairUsageConnection}
         reusedConnectionDialog={reusedConnectionDialog}
+        selectedImportStableKeys={portability.selectedImportStableKeys}
         t={t}
         unlockEncryptedLocalStorageError={unlockEncryptedLocalStorageError}
         unlockEncryptedLocalStorageHint={unlockEncryptedLocalStorageHint}
@@ -410,14 +445,28 @@ export function SettingsApp() {
         onOpenSupport={async () => {
           await window.nileDesktop.app.openSupportEmail();
         }}
+        onPreviewImport={portability.onPreviewImport}
         onRefresh={refresh}
         onContinueReusedConnection={continueReusedConnection}
         onResetConfirm={async () => {
           await resetDesktopState(() => setResetDialogOpen(false));
         }}
+        onSetExportDialogOpen={portability.onSetExportDialogOpen}
+        onSetExportPassphrase={portability.onSetExportPassphrase}
+        onSetExportPassphraseConfirmation={portability.onSetExportPassphraseConfirmation}
+        onSetImportDialogOpen={portability.onSetImportDialogOpen}
+        onSetImportEncryptedLocalPassphrase={portability.onSetImportEncryptedLocalPassphrase}
+        onSetImportEncryptedLocalPassphraseConfirmation={portability.onSetImportEncryptedLocalPassphraseConfirmation}
+        onSetImportExportPassphrase={portability.onSetImportExportPassphrase}
+        onSetImportResultDialogOpen={portability.onSetImportResultDialogOpen}
+        onSetImportStrategy={portability.onSetImportStrategy}
+        onSetImportTargetStorageMode={portability.onSetImportTargetStorageMode}
+        onSetSelectedImportStableKeys={portability.onSetSelectedImportStableKeys}
         onSetNileDialogOpen={setNileDialogOpen}
         onSetResetDialogOpen={setResetDialogOpen}
         onSetUnlockEncryptedLocalStorageDialogOpen={setUnlockEncryptedLocalStorageDialogOpen}
+        onSubmitExport={portability.onSubmitExport}
+        onSubmitImport={portability.onSubmitImport}
         onUnlockEncryptedLocalStorage={unlockEncryptedLocalStorage}
       />
 

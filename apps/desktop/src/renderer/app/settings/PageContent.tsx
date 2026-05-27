@@ -17,6 +17,7 @@ export function SettingsPageContent({
   credentialStorageState,
   isCredentialStorageModeLocked,
   isCredentialStorageModeMixed,
+  isCredentialPortabilityBusy,
   defaultOpenAiAuthJsonPath,
   definitions,
   historyState,
@@ -39,6 +40,7 @@ export function SettingsPageContent({
   profileError,
   profiles,
   releaseInfo,
+  savedConnectionCount,
   selectedAgentDetailId,
   selectedAgentDetailTab,
   selectedConnectionContextAgent,
@@ -66,7 +68,9 @@ export function SettingsPageContent({
   onUseExistingQuickSetupConnection,
   onCreateProfile,
   onDeleteProfile,
+  onExportCredentials,
   onInstallUpdate,
+  onImportCredentials,
   onLanguageChange,
   onStatusEntryDisplayModeChange,
   onNotificationsMutedChange,
@@ -163,12 +167,15 @@ export function SettingsPageContent({
           detailContextAgent={selectedConnectionContextAgent}
           defaultOpenAiAuthJsonPath={defaultOpenAiAuthJsonPath}
           isCredentialStorageModeMixed={isCredentialStorageModeMixed}
+          isCredentialPortabilityBusy={isCredentialPortabilityBusy}
         definitions={definitions}
         language={language}
         state={settingsState}
         selectedConnectionId={selectedConnectionId}
         t={t}
         onBackFromAgentDetail={onBackFromAgentDetail}
+        onExportConnections={onExportCredentials}
+        onImportConnections={onImportCredentials}
         onOpenAddPage={onOpenAddConnection}
         onSelectConnection={(connectionId) => {
           onSelectConnection(connectionId);

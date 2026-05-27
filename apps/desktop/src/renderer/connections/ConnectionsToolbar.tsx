@@ -1,4 +1,4 @@
-import { Plus, Search } from "lucide-react";
+import { Download, Plus, Search, Upload } from "lucide-react";
 
 import type { Translator } from "../shared/I18n";
 import type { DesktopConnection } from "../../state/Types";
@@ -9,26 +9,36 @@ import { type ComboboxItem, Combobox } from "../ui/combobox";
 import { Input } from "../ui/input";
 
 type ConnectionsToolbarProps = {
+  isPortabilityBusy?: boolean;
+  selectedConnectionCount?: number;
   t: Translator;
   showAddButton?: boolean;
+  showPortabilityActions?: boolean;
   showSearchAndFilter?: boolean;
   providerFilter?: DesktopConnection["endpointFamily"] | "all";
   providers?: DesktopConnection["endpointFamily"][];
   searchQuery?: string;
   onProviderFilterChange?(value: DesktopConnection["endpointFamily"] | "all"): void;
+  onExportSelected?(): Promise<void>;
+  onImport?(): Promise<void>;
   onOpenAddPage(): void;
   onRefresh(): Promise<void>;
   onSearchQueryChange?(value: string): void;
 };
 
 export function ConnectionsToolbar({
+  isPortabilityBusy = false,
+  selectedConnectionCount = 0,
   t,
   showAddButton = true,
+  showPortabilityActions = false,
   showSearchAndFilter = true,
   providerFilter = "all",
   providers = [],
   searchQuery = "",
   onProviderFilterChange,
+  onExportSelected,
+  onImport,
   onOpenAddPage,
   onRefresh,
   onSearchQueryChange,
@@ -70,21 +80,63 @@ export function ConnectionsToolbar({
           </div>
         </div>
       ) : <div className="flex-1" />}
-      <div className="flex shrink-0 items-center gap-2">
-        {showAddButton ? (
-          <Button className="h-11 rounded-xl px-5" onClick={onOpenAddPage}>
-            <Plus className="h-4 w-4" />
-            {t("common.addConnection")}
-          </Button>
-        ) : null}
-        <RefreshButton
-          className="h-11 w-11 rounded-xl p-0"
-          iconOnly
-          label={t("common.refresh")}
-          size="default"
-          variant="outline"
-          onRefresh={onRefresh}
-        />
+      <div className="flex shrink-0 items-center">
+        <div className="flex overflow-hidden rounded-xl border bg-background">
+          {showPortabilityActions ? (
+            <>
+              <Button
+                variant="ghost"
+                className="h-11 rounded-none border-r px-4 lg:px-5"
+                disabled={!onImport || isPortabilityBusy}
+                aria-label={t("settings.credentialPortability.importAction")}
+                title={t("settings.credentialPortability.importAction")}
+                onClick={() => {
+                  void onImport?.();
+                }}
+              >
+                <Download className="h-4 w-4" />
+                <span className="hidden lg:inline">{t("settings.credentialPortability.importAction")}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                className="h-11 rounded-none border-r px-4 lg:px-5"
+                disabled={!onExportSelected || isPortabilityBusy}
+                aria-label={t("settings.credentialPortability.exportAction")}
+                title={t("settings.credentialPortability.exportAction")}
+                onClick={() => {
+                  void onExportSelected?.();
+                }}
+              >
+                <Upload className="h-4 w-4" />
+                <span className="hidden lg:inline">
+                  {selectedConnectionCount > 0
+                    ? `${t("settings.credentialPortability.exportAction")} (${selectedConnectionCount})`
+                    : t("settings.credentialPortability.exportAction")}
+                </span>
+              </Button>
+            </>
+          ) : null}
+          {showAddButton ? (
+            <Button
+              variant="ghost"
+              className="h-11 rounded-none border-r px-4 lg:px-5"
+              aria-label={t("common.addConnection")}
+              title={t("common.addConnection")}
+              onClick={onOpenAddPage}
+            >
+              <Plus className="h-4 w-4" />
+              <span className="hidden lg:inline">{t("common.addConnection")}</span>
+            </Button>
+          ) : null}
+          <RefreshButton
+            className="h-11 rounded-none border-0 px-4 shadow-none"
+            iconOnly
+            label={t("common.refresh")}
+            size="default"
+            variant="ghost"
+            onRefresh={onRefresh}
+          />
+        </div>
       </div>
     </div>
   );

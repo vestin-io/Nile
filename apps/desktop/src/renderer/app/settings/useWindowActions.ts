@@ -4,6 +4,8 @@ import type { WorkspaceProfileAssignment } from "../../profiles/useProfiles";
 import type { SettingsPageContentProps } from "./PageContentProps";
 
 type SettingsWindowActionsOptions = {
+  exportCredentials(selectedConnectionIds?: string[]): Promise<void>;
+  importCredentials(): Promise<void>;
   refresh(): Promise<void>;
   reload(): Promise<void>;
   refreshProfiles(): Promise<void>;
@@ -20,6 +22,8 @@ export type SettingsWindowActions = {
   checkForUpdates(): Promise<void>;
   createConnectionAlert: SettingsPageContentProps["onCreateConnectionAlert"];
   deleteConnectionAlert: SettingsPageContentProps["onDeleteConnectionAlert"];
+  exportCredentials(selectedConnectionIds?: string[]): Promise<void>;
+  importCredentials(): Promise<void>;
   languageChange(language: SettingsPageContentProps["language"]): void;
   openProvidersLink(url: string): Promise<void>;
   profileApply(profileId: string): Promise<void>;
@@ -49,6 +53,8 @@ export function useSettingsWindowActions(options: SettingsWindowActionsOptions):
       await window.nileDesktop.connections.deleteUsageAlert(connectionId, alertId);
       await options.reload();
     },
+    exportCredentials: options.exportCredentials,
+    importCredentials: options.importCredentials,
     languageChange: (language) => options.setPreferences((current) => ({ ...current, language })),
     openProvidersLink: async (url) => {
       await window.nileDesktop.app.openExternalUrl(url);

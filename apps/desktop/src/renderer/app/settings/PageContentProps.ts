@@ -20,6 +20,7 @@ export type SettingsPageContentProps = {
   credentialStorageMode: CredentialStorageBackend | null;
   isCredentialStorageModeLocked: boolean;
   isCredentialStorageModeMixed: boolean;
+  isCredentialPortabilityBusy: boolean;
   credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
   addConnectionDefinitions: Definition[];
   addConnectionTargetAgentId: AgentId | null;
@@ -46,6 +47,7 @@ export type SettingsPageContentProps = {
   profileError: string | null;
   profiles: WorkspaceProfile[];
   releaseInfo: DesktopReleaseInfo | null;
+  savedConnectionCount: number;
   selectedAgentDetailId: AgentId | null;
   selectedAgentDetailTab: AgentDetailTab;
   selectedConnectionContextAgent: DesktopAgentState | null;
@@ -63,6 +65,7 @@ export type SettingsPageContentProps = {
   onBindCursorUsage(connectionId: string): Promise<void>;
   onCreateConnectionAlert(input: CreateConnectionAlertInput): Promise<void>;
   onCheckForUpdates(): Promise<void>;
+  onExportCredentials(selectedConnectionIds?: string[]): Promise<void>;
   onCloseAddConnectionPage(): void;
   onConfigureAgent(agentId: AgentId): void;
   onRememberCredentialStorageMode(backend: CredentialStorageBackend): void;
@@ -82,6 +85,7 @@ export type SettingsPageContentProps = {
   onCreateProfile(name: string, emoji: string, assignments: WorkspaceProfileAssignment[]): Promise<string>;
   onDeleteProfile(profileId: string): Promise<void>;
   onInstallUpdate(): Promise<void>;
+  onImportCredentials(): Promise<void>;
   onLanguageChange(language: LanguagePreference): void;
   onStatusEntryDisplayModeChange(
     mode: Awaited<ReturnType<typeof window.nileDesktop.statusEntry.getStatusEntryDisplay>>["mode"],

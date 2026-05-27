@@ -10,6 +10,11 @@ import {
 
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
 import type {
+  DesktopApplyCredentialImportResult,
+  DesktopCredentialExportPreview,
+  DesktopCredentialImportPreview,
+  DesktopCredentialStorageModeState,
+  DesktopPreviewCredentialExportInput,
   DesktopUnlockEncryptedLocalStorageFailure,
   DesktopUnlockEncryptedLocalStorageResult,
 } from "../connections/contracts";
@@ -18,8 +23,21 @@ import { DesktopStateStore } from "../state/DesktopStateStore";
 
 type DesktopIpcConnectionRoutesOptions = {
   chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null>;
+  chooseCredentialExportPath(defaultFileName?: string): Promise<string | null>;
+  chooseCredentialImportPath(defaultPath?: string): Promise<string | null>;
   connectionManager: DesktopConnectionManager;
+  getCredentialStorageModeState(): DesktopCredentialStorageModeState;
   inputs: DesktopIpcInputValidator;
+  previewCredentialExport(input: DesktopPreviewCredentialExportInput): DesktopCredentialExportPreview;
+  exportCredentialBundle(input: { filePath: string; exportPassphrase: string; selectedConnectionIds?: string[] }): void;
+  previewCredentialImport(input: { filePath: string; exportPassphrase: string }): DesktopCredentialImportPreview;
+  applyCredentialImport(input: {
+    filePath: string;
+    exportPassphrase: string;
+    strategy: "skip_existing" | "replace_existing";
+    selectedStableKeys?: string[];
+    targetStorageMode?: "system_secure_storage" | "encrypted_local_storage";
+  }): Promise<DesktopApplyCredentialImportResult>;
   refreshAll(): void;
   stateStore: DesktopStateStore;
   logger?: NileLogger;
@@ -37,6 +55,7 @@ export class DesktopIpcConnectionRoutes {
 
     ipcMain.handle("desktop:list-connection-definitions", () => SHARED_CONNECTION_CATALOG.listDefinitions());
     ipcMain.handle("desktop:get-credential-storage-state", () => connectionManager.getCredentialStorageState());
+    ipcMain.handle("desktop:get-credential-storage-mode-state", () => this.options.getCredentialStorageModeState());
     ipcMain.handle("desktop:unlock-encrypted-local-storage", (_event, passphrase: unknown) => {
       try {
         connectionManager.unlockEncryptedLocalStorage(inputs.readRequiredString(passphrase, "passphrase"));
@@ -54,6 +73,26 @@ export class DesktopIpcConnectionRoutes {
     });
     ipcMain.handle("desktop:choose-openai-auth-json-path", async (_event, defaultPath?: unknown) => {
       return await this.options.chooseOpenAiAuthJsonPath(inputs.readOptionalString(defaultPath, "defaultPath"));
+    });
+    ipcMain.handle("desktop:choose-credential-export-path", async (_event, defaultFileName?: unknown) => {
+      return await this.options.chooseCredentialExportPath(inputs.readOptionalString(defaultFileName, "defaultFileName"));
+    });
+    ipcMain.handle("desktop:choose-credential-import-path", async (_event, defaultPath?: unknown) => {
+      return await this.options.chooseCredentialImportPath(inputs.readOptionalString(defaultPath, "defaultPath"));
+    });
+    ipcMain.handle("desktop:preview-credential-export", (_event, input: unknown) =>
+      this.options.previewCredentialExport(inputs.readPreviewCredentialExportInput(input)),
+    );
+    ipcMain.handle("desktop:export-credential-bundle", (_event, input: unknown) =>
+      this.options.exportCredentialBundle(inputs.readExportCredentialBundleInput(input)),
+    );
+    ipcMain.handle("desktop:preview-credential-import", (_event, input: unknown) =>
+      this.options.previewCredentialImport(inputs.readPreviewCredentialImportInput(input)),
+    );
+    ipcMain.handle("desktop:apply-credential-import", async (_event, input: unknown) => {
+      const result = await this.options.applyCredentialImport(inputs.readApplyCredentialImportInput(input));
+      this.options.refreshAll();
+      return result;
     });
     ipcMain.handle("desktop:describe-connection-onboarding", (_event, input: unknown) =>
       connectionManager.describeConnectionOnboarding(inputs.readAddConnectionInput(input)),

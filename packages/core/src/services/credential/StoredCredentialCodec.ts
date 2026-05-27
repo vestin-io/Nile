@@ -11,7 +11,7 @@ export class StoredCredentialCodec {
   ) {}
 
   serialize(credential: StoredCredential): string {
-    this.validateCredential(credential);
+    this.parse(credential);
     return this.wrap(JSON.stringify(credential));
   }
 
@@ -24,8 +24,12 @@ export class StoredCredentialCodec {
       throw new CredentialStoreValidationError("Stored credential payload is not valid JSON");
     }
 
-    this.validateCredential(parsed);
-    return parsed;
+    return this.parse(parsed);
+  }
+
+  parse(credential: unknown): StoredCredential {
+    this.validateCredential(credential);
+    return credential;
   }
 
   private validateCredential(credential: unknown): asserts credential is StoredCredential {

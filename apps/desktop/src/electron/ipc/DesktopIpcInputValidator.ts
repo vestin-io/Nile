@@ -11,10 +11,14 @@ import {
 
 import type {
   DesktopAddConnectionInput,
+  DesktopApplyCredentialImportInput,
   DesktopDescribeSavedConnectionOnboardingInput,
   DesktopDiscardPreparedConnectionDraftInput,
+  DesktopExportCredentialBundleInput,
   DesktopGetConnectionModelCatalogInput,
   DesktopImportCurrentConnectionInput,
+  DesktopPreviewCredentialExportInput,
+  DesktopPreviewCredentialImportInput,
   DesktopSavePreparedConnectionInput,
   DesktopUpdateAgentConnectionModelInput,
   DesktopUpdateConnectionInput,
@@ -148,6 +152,48 @@ export class DesktopIpcInputValidator {
     return {
       agentId: this.readAgentId(record.agentId, "agentId"),
       ...this.readOptionalCredentialStorageModeFields(record),
+    };
+  }
+
+  readPreviewCredentialExportInput(input: unknown): DesktopPreviewCredentialExportInput {
+    const record = input === undefined ? {} : this.readRecord(input, "preview credential export input");
+    return {
+      selectedConnectionIds: record.selectedConnectionIds === undefined
+        ? undefined
+        : this.readStringArray(record.selectedConnectionIds, "selectedConnectionIds"),
+    };
+  }
+
+  readExportCredentialBundleInput(input: unknown): DesktopExportCredentialBundleInput {
+    const record = this.readRecord(input, "export credential bundle input");
+    return {
+      filePath: this.readRequiredString(record.filePath, "filePath"),
+      exportPassphrase: this.readRequiredString(record.exportPassphrase, "exportPassphrase"),
+      selectedConnectionIds: record.selectedConnectionIds === undefined
+        ? undefined
+        : this.readStringArray(record.selectedConnectionIds, "selectedConnectionIds"),
+    };
+  }
+
+  readPreviewCredentialImportInput(input: unknown): DesktopPreviewCredentialImportInput {
+    const record = this.readRecord(input, "preview credential import input");
+    return {
+      filePath: this.readRequiredString(record.filePath, "filePath"),
+      exportPassphrase: this.readRequiredString(record.exportPassphrase, "exportPassphrase"),
+    };
+  }
+
+  readApplyCredentialImportInput(input: unknown): DesktopApplyCredentialImportInput {
+    const record = this.readRecord(input, "apply credential import input");
+    return {
+      filePath: this.readRequiredString(record.filePath, "filePath"),
+      exportPassphrase: this.readRequiredString(record.exportPassphrase, "exportPassphrase"),
+      strategy: this.readPortableImportStrategy(record.strategy),
+      selectedStableKeys: record.selectedStableKeys === undefined
+        ? undefined
+        : this.readStringArray(record.selectedStableKeys, "selectedStableKeys"),
+      targetStorageMode: this.readOptionalCredentialStorageBackend(record.targetStorageMode),
+      encryptedLocalPassphrase: this.readOptionalString(record.encryptedLocalPassphrase, "encryptedLocalPassphrase"),
     };
   }
 
@@ -379,6 +425,13 @@ export class DesktopIpcInputValidator {
   private readNotificationHistoryKind(value: unknown): "all" | "alerts" {
     if (value !== "all" && value !== "alerts") {
       throw new Error("notification history filter kind is not supported");
+    }
+    return value;
+  }
+
+  private readPortableImportStrategy(value: unknown): "skip_existing" | "replace_existing" {
+    if (value !== "skip_existing" && value !== "replace_existing") {
+      throw new Error("strategy is not supported");
     }
     return value;
   }

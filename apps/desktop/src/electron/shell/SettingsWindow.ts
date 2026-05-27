@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, type OpenDialogOptions } from "electron";
+import { BrowserWindow, dialog, type OpenDialogOptions, type SaveDialogOptions } from "electron";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -107,6 +107,36 @@ export class DesktopSettingsWindow {
       buttonLabel: "Use this file",
       defaultPath: this.resolveDialogPath(defaultPath),
       filters: [{ name: "JSON files", extensions: ["json"] }],
+      properties: ["openFile"],
+    };
+    const result = this.window
+      ? await dialog.showOpenDialog(this.window, options)
+      : await dialog.showOpenDialog(options);
+    if (result.canceled) {
+      return null;
+    }
+    return result.filePaths[0] ?? null;
+  }
+
+  async chooseCredentialExportPath(defaultFileName?: string): Promise<string | null> {
+    const options: SaveDialogOptions = {
+      title: "Export Nile credentials",
+      buttonLabel: "Export",
+      defaultPath: this.resolveDialogPath(defaultFileName),
+      filters: [{ name: "Nile credential bundles", extensions: ["nilevault"] }],
+    };
+    const result = this.window
+      ? await dialog.showSaveDialog(this.window, options)
+      : await dialog.showSaveDialog(options);
+    return result.canceled ? null : (result.filePath ?? null);
+  }
+
+  async chooseCredentialImportPath(defaultPath?: string): Promise<string | null> {
+    const options: OpenDialogOptions = {
+      title: "Import Nile credentials",
+      buttonLabel: "Import this bundle",
+      defaultPath: this.resolveDialogPath(defaultPath),
+      filters: [{ name: "Nile credential bundles", extensions: ["nilevault"] }],
       properties: ["openFile"],
     };
     const result = this.window

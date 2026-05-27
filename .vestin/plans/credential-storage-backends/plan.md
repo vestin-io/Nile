@@ -30,6 +30,7 @@
 - [Milestone MVP](./milestone-mvp/plan.md)
 - [Milestone Reliability](./milestone-reliability/plan.md)
 - [Milestone Scale](./milestone-scale/plan.md)
+- [Milestone Portability](./milestone-portability/plan.md)
 
 ## Cross-Milestone Risks / Spikes
 
@@ -42,3 +43,6 @@
   - on-demand encrypted-local unlock, wrong-passphrase recovery, and reset-as-recovery must stay explicit and understandable
 - Future import/export is a product constraint:
   - the local vault format must stay stable and portable enough to support later export/import without redesigning storage semantics
+- Portable import/export will introduce a second long-lived contract:
+  - runtime vault format may evolve for local operation
+  - portable bundle format must remain stable across platforms and app versions

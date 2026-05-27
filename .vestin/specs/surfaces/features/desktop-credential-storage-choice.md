@@ -2,6 +2,12 @@
 
 Desktop credential storage mode defines how the Electron surface lets the user establish one machine-level storage mode, how it enforces that mode for later saves, and how it unlocks encrypted-local storage only when a user action needs decrypted credentials.
 
+This feature also owns the first desktop import/export UX for credential portability:
+
+- export selected saved connections into one Nile portable encrypted bundle
+- import a portable encrypted bundle into the current machine storage mode
+- allow partial import and explicit merge strategy choice in desktop
+
 ## Requirements
 
 ### Mode Selection Flow
@@ -70,6 +76,44 @@ Desktop credential storage mode defines how the Electron surface lets the user e
 - No legacy save/import entry point may bypass the active machine-level mode by falling back to an implicit default.
 - If an action touches only non-secret metadata and does not read or write credentials, desktop MAY allow it without unlock even while encrypted-local storage remains locked.
 
+### Desktop Export Rules
+
+- Desktop MUST expose an export entry point in settings or another clearly machine-scoped surface.
+- Desktop MUST support:
+  - export all saved connections
+  - export a selected subset of saved connections
+- Desktop MUST require the user to set and confirm a dedicated export passphrase before writing a portable bundle.
+- Desktop MUST NOT reuse the encrypted-local runtime unlock state as the export passphrase contract.
+- Desktop MUST explain that the export bundle is encrypted for cross-machine transfer.
+- If a requested credential cannot be read from the current machine storage backend, desktop MUST fail export with a user-recoverable result instead of silently skipping the connection.
+
+### Desktop Import Rules
+
+- Desktop MUST expose an import entry point in settings or another clearly machine-scoped surface.
+- Desktop MUST let the user choose a bundle file and enter the bundle passphrase before mutation begins.
+- Desktop MUST preview import candidates before commit.
+- Desktop MUST support partial import by allowing the user to choose which bundle connections to import.
+- Desktop MUST show whether each candidate is:
+  - new
+  - duplicate
+  - unavailable / failed
+- Desktop MUST let the user choose a merge strategy before import commit:
+  - `Skip existing`
+  - `Replace existing`
+- Desktop MUST explain in plain language that imports land in the current machine storage mode, not the source machine's storage backend.
+- Desktop MUST block import into a mixed legacy backend workspace and route the user to explicit reset/recovery.
+
+### Desktop Merge And Result Rules
+
+- If the user chooses `Skip existing`, desktop MUST preserve existing duplicate connections untouched and report them as skipped.
+- If the user chooses `Replace existing`, desktop MUST explain that Nile will fully replace the imported connection's saved credential and connection-owned settings.
+- Desktop MUST present a final structured result summary including counts for:
+  - imported
+  - replaced
+  - skipped
+  - failed
+- Desktop SHOULD present per-connection failure reasons without exposing raw IPC or platform exception strings.
+
 ## Verification
 
 - Unit test desktop preference reads/writes for:
@@ -86,6 +130,13 @@ Desktop credential storage mode defines how the Electron surface lets the user e
   - canceling unlock leaving the original action incomplete
   - successful unlock resuming the original action
 - Unit test agent import / quick setup parity so legacy inline import buttons do not fall back to an implicit backend.
+- Unit test desktop export/import flow for:
+  - choosing bundle passphrase
+  - previewing import candidates
+  - selecting a subset
+  - choosing `Skip existing`
+  - choosing `Replace existing`
+  - rendering structured result summaries
 - Manual verification:
   - choose one mode and save the first connection
   - verify the same first-save behavior holds for legacy inline import/save affordances
@@ -93,6 +144,9 @@ Desktop credential storage mode defines how the Electron surface lets the user e
   - verify add connection, quick setup, and inline `Save to Nile` all use the same mode
   - verify encrypted-local actions prompt unlock only when the user tries to continue a blocked action
   - verify reset clears the mode and re-exposes first-time mode selection
+  - export selected saved connections into a bundle
+  - import a subset of that bundle into another workspace
+  - verify duplicate candidates can be skipped or replaced explicitly
 
 ## Data Model Impact
 
@@ -109,6 +163,11 @@ Desktop app-session state gains:
 
 - encrypted-local unlocked session state reused across the current run
 - unlock-dialog context for the current blocked action
+- import/export dialog state for:
+  - selected bundle path
+  - selected connection subset
+  - merge strategy
+  - bundle passphrase entry
 
 ## Failure And Edge Cases
 
@@ -118,3 +177,5 @@ Desktop app-session state gains:
 - If the user dismisses an unlock dialog, encrypted-local-backed actions remain unavailable until the user explicitly unlocks later in the same app run.
 - If system-secure storage is unavailable on a platform, desktop may hide the recommendation state but must keep the product-level naming consistent with the shared core contract.
 - If older local state already contains mixed legacy connection backends, desktop MUST route the user to explicit recovery/reset instead of pretending the workspace is in a valid single-mode state.
+- If the user enters the wrong export-bundle passphrase during import, desktop MUST fail closed before any import mutation begins.
+- If the import preview shows duplicates, desktop MUST require an explicit merge strategy instead of silently choosing one.

@@ -17,6 +17,7 @@ export type SettingsPageContentBuilderOptions = {
     isLocked: boolean;
     isMixed: boolean;
   };
+  isCredentialPortabilityBusy: boolean;
   defaultOpenAiAuthJsonPath: string;
   definitions: SettingsPageContentProps["definitions"];
   historyState: SettingsPageContentProps["historyState"];
@@ -105,7 +106,9 @@ export function readSettingsPageContentActions(
   | "onCreateProfile"
   | "onDeleteConnectionAlert"
   | "onDeleteProfile"
+  | "onExportCredentials"
   | "onInstallUpdate"
+  | "onImportCredentials"
   | "onLanguageChange"
   | "onMarkNotificationHistoryRead"
   | "onMarkNotificationHistoryReadByFilter"
@@ -187,8 +190,14 @@ export function readSettingsPageContentActions(
       await input.windowActions.profileDelete(profileId);
       await input.refreshProfiles();
     },
+    onExportCredentials: async (selectedConnectionIds) => {
+      await input.windowActions.exportCredentials(selectedConnectionIds);
+    },
     onInstallUpdate: async () => {
       await window.nileDesktop.updates.installUpdate().catch(() => ({ status: "unavailable" as const }));
+    },
+    onImportCredentials: async () => {
+      await input.windowActions.importCredentials();
     },
     onLanguageChange: input.windowActions.languageChange,
     onMarkNotificationHistoryRead: input.markNotificationHistoryRead,

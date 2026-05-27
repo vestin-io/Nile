@@ -31,12 +31,15 @@ type ConnectionsPageProps = {
   defaultOpenAiAuthJsonPath: string;
   definitions: Definition[];
   isCredentialStorageModeMixed?: boolean;
+  isCredentialPortabilityBusy: boolean;
   language: LanguagePreference;
   state: SettingsState;
   selectedConnectionId: string | null;
   t: Translator;
   onBackFromAgentDetail(): void;
   onOpenAddPage(): void;
+  onExportConnections(selectedConnectionIds?: string[]): Promise<void>;
+  onImportConnections(): Promise<void>;
   onSelectConnection(connectionId: string | null): void;
   onRefresh(): Promise<void>;
   onBindCursorUsage(connectionId: string): Promise<void>;
@@ -100,12 +103,15 @@ export function ConnectionsPage({
   defaultOpenAiAuthJsonPath,
   definitions,
   isCredentialStorageModeMixed = false,
+  isCredentialPortabilityBusy,
   language,
   state,
   selectedConnectionId,
   t,
   onBackFromAgentDetail,
   onOpenAddPage,
+  onExportConnections,
+  onImportConnections,
   onSelectConnection,
   onRefresh,
   onBindCursorUsage,
@@ -118,6 +124,7 @@ export function ConnectionsPage({
 }: ConnectionsPageProps) {
   const { requestUnlock } = useEncryptedLocalAccessRecovery();
   const [mode, setMode] = useState<"detail" | "edit">("detail");
+  const [selectedConnectionIds, setSelectedConnectionIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [providerFilter, setProviderFilter] = useState<(typeof state.connections)[number]["endpointFamily"] | "all">("all");
   const selectedConnection = state.connections.find((connection) => connection.id === selectedConnectionId) ?? null;
@@ -147,10 +154,24 @@ export function ConnectionsPage({
     });
   }, [providerFilter, searchQuery, state.connections]);
   const hasActiveFilters = searchQuery.trim().length > 0 || providerFilter !== "all";
+  const filteredConnectionIds = useMemo(
+    () => filteredConnections.map((connection) => connection.id),
+    [filteredConnections],
+  );
+  const filteredSelectedConnectionIds = useMemo(
+    () => selectedConnectionIds.filter((connectionId) => filteredConnectionIds.includes(connectionId)),
+    [filteredConnectionIds, selectedConnectionIds],
+  );
+  const hasSelectedConnections = filteredSelectedConnectionIds.length > 0;
 
   useEffect(() => {
     setMode("detail");
   }, [selectedConnectionId]);
+
+  useEffect(() => {
+    const allowedIds = new Set(state.connections.map((connection) => connection.id));
+    setSelectedConnectionIds((current) => current.filter((connectionId) => allowedIds.has(connectionId)));
+  }, [state.connections]);
 
   if (selectedConnection) {
       if (mode === "edit") {
@@ -226,12 +247,21 @@ export function ConnectionsPage({
   return (
     <div className="space-y-4">
       <ConnectionsToolbar
+        isPortabilityBusy={isCredentialPortabilityBusy}
+        selectedConnectionCount={filteredSelectedConnectionIds.length}
+        showPortabilityActions
         t={t}
         providerFilter={providerFilter}
         providers={providers}
         searchQuery={searchQuery}
         onProviderFilterChange={setProviderFilter}
         onOpenAddPage={onOpenAddPage}
+        onExportSelected={hasSelectedConnections
+          ? async () => {
+            await onExportConnections(filteredSelectedConnectionIds);
+          }
+          : undefined}
+        onImport={onImportConnections}
         onRefresh={async () => {
           if (isCredentialStorageModeMixed) {
             return;
@@ -297,8 +327,10 @@ export function ConnectionsPage({
       ) : (
         <ConnectionTable
           connections={filteredConnections}
+          selectedConnectionIds={selectedConnectionIds}
           t={t}
           onOpenDetails={onSelectConnection}
+          onSelectedConnectionIdsChange={setSelectedConnectionIds}
         />
       )}
     </div>

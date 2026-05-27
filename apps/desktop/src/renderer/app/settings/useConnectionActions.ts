@@ -17,7 +17,6 @@ import type {
 
 type UseSettingsConnectionActionsOptions = {
   addConnectionReturnTarget: AddConnectionReturnTarget;
-  reload(): Promise<void>;
   refresh(): Promise<void>;
   requestEncryptedLocalUnlock(): Promise<void>;
   reusedConnectionDialog: ReusedConnectionDialogState;
@@ -33,7 +32,6 @@ type UseSettingsConnectionActionsOptions = {
 
 export function useSettingsConnectionActions({
   addConnectionReturnTarget,
-  reload,
   refresh,
   requestEncryptedLocalUnlock,
   reusedConnectionDialog,
@@ -172,7 +170,7 @@ export function useSettingsConnectionActions({
   };
 
   const completeConnectionMutation = async (connectionId: string, reused: boolean) => {
-    await reload();
+    await refresh();
     mutationCoordinator.complete(connectionId, reused);
   };
 

@@ -1,0 +1,421 @@
+# Milestone Portability
+
+## 1) References
+
+- Plan index: [../plan.md](../plan.md)
+- Spec index: [../../../specs/spec.json](../../../specs/spec.json)
+- Module specs:
+  - [../../../specs/core/module.md](../../../specs/core/module.md)
+  - [../../../specs/surfaces/module.md](../../../specs/surfaces/module.md)
+- Existing storage specs:
+  - [../../../specs/core/features/credential-storage-backends.md](../../../specs/core/features/credential-storage-backends.md)
+  - [../../../specs/surfaces/features/desktop-credential-storage-choice.md](../../../specs/surfaces/features/desktop-credential-storage-choice.md)
+- Architecture: [../../../architect.md](../../../architect.md)
+
+## 2) Milestone Goal
+
+Deliver cross-platform-safe credential portability built on Nile’s encrypted local storage model:
+
+- export from:
+  - `system_secure_storage`
+  - `encrypted_local_storage`
+- portable transfer through one Nile-defined encrypted bundle format
+- import into the current machine’s active storage mode
+- partial import at the connection level
+- merge into an existing workspace with explicit duplicate handling
+
+Done means a user can:
+
+- export a selected subset of saved connections from a Mac using Keychain or local encrypted storage
+- carry that encrypted bundle to another machine/platform
+- inspect import candidates before commit
+- import a subset into the target machine
+- choose how duplicates are handled:
+  - `skip existing`
+  - `replace existing`
+- land imported credentials into the target machine’s current storage mode rather than replaying the source machine’s backend layout
+
+## 3) Planning Assumptions
+
+- Portable transfer format is **not** the runtime vault file verbatim.
+- Portable transfer format **does** reuse the same crypto primitives and secret payload codec family as local encrypted storage wherever practical.
+- `system_secure_storage` remains a source/target adapter only:
+  - never the cross-machine transport format
+- This milestone intentionally keeps one machine-level storage mode per workspace instance:
+  - import must respect the current machine mode
+  - import must not recreate mixed backend state
+- Duplicate detection is frozen as:
+  - prefer identity/account fingerprint when available
+  - otherwise fall back to normalized endpoint family + endpoint id/url + auth mode
+- `replace existing` is frozen as full connection replacement for connection-owned state:
+  - secret
+  - label
+  - enabled/configurable agents
+  - selected bindings
+  - model selections
+  - connection metadata
+  - but not history, alerts, usage cache, or UI preferences
+- Export bundles use a dedicated export passphrase:
+  - never reuse machine-local encrypted-storage unlock state as the bundle passphrase contract
+- Desktop ships first; CLI parity is deferred beyond this milestone.
+- Portable bundle container is frozen as:
+  - versioned JSON envelope
+  - whole-payload authenticated encryption
+
+## 4) Spec Coverage
+
+- Included in this planning slice:
+  - portable bundle schema and crypto envelope
+  - source-store export adapters
+  - target-store import adapters
+  - partial import
+  - merge into existing saved connections
+  - duplicate detection and conflict strategy
+  - desktop import/export UX
+- Explicit exclusions:
+  - cloud sync
+  - automatic background backup
+  - per-secret selective merge
+  - passphrase rotation
+  - bundle editing by hand
+  - merge strategy `keep both`
+  - non-desktop first-party import/export UX
+
+## 5) Execution Units
+
+### Feature: Core Portable Bundle Contract
+
+- Feature ref:
+  - `module`: `core`
+  - `feature`: `credential-storage-backends`
+- Milestone: Portability
+- Dependencies:
+  - `milestone-mvp / core credential-storage-backends`
+- Tree todo:
+  - [ ] Prerequisite checks
+    - [ ] `PC-201` Inventory the minimum connection metadata required to recreate a saved connection without leaking runtime-only or UI-only state.
+    - [ ] `PC-202` Inventory all credential kinds that can currently be persisted:
+      - direct API key
+      - env-key reference
+      - OpenAI session
+      - Claude session
+      - Gemini CLI session
+      - Cursor session
+      - future token bundle shapes if already persisted
+    - [ ] `PC-203` Decide the stable duplicate key inputs:
+      - endpoint family
+      - endpoint id / url
+      - auth mode
+      - identity key / account fingerprint when available
+  - [ ] Build
+    - [ ] `B-201` Define portable export schema
+      - Work:
+        - add explicit bundle version
+        - define source metadata envelope
+        - define decrypted portable payload shape
+        - define stable per-connection record shape
+      - Subtodos:
+        - [ ] `B-201a` Separate transport schema from runtime vault schema
+        - [ ] `B-201b` Exclude SQLite-only/runtime-only/UI-only fields
+        - [ ] `B-201c` Add checksum/integrity metadata if needed beyond AEAD
+      - Done when:
+        - one stable bundle contract exists independent from the runtime vault file layout
+    - [ ] `B-202` Implement portable bundle codec
+      - Work:
+        - reuse current passphrase KDF choices where appropriate
+        - wrap export payload in a versioned encrypted envelope
+      - Subtodos:
+        - [ ] `B-202a` Define serialized binary or JSON envelope shape
+        - [ ] `B-202b` Implement encrypt/decrypt helpers
+        - [ ] `B-202c` Implement error classification:
+          - wrong passphrase or corrupted bundle
+          - invalid schema
+          - unsupported version
+      - Done when:
+        - core can turn portable payloads into encrypted bundles and back
+    - [ ] `B-203` Implement portable secret serialization
+      - Work:
+        - normalize persisted credential kinds into portable secret payloads
+        - ensure target store adapters can reconstruct native stored credentials
+      - Subtodos:
+        - [ ] `B-203a` map system-store reads to portable secret payloads
+        - [ ] `B-203b` map local-vault reads to portable secret payloads
+        - [ ] `B-203c` map portable secret payloads back to stored credential writes
+      - Done when:
+        - export/import no longer depends on backend-specific raw secret file shapes
+    - [ ] `B-204` Implement duplicate detection primitives
+      - Work:
+        - define stable connection identity key for imports
+        - provide matching helpers for existing saved connections
+      - Subtodos:
+        - [ ] `B-204a` duplicate detection by stable key
+        - [ ] `B-204b` duplicate detection fallback when identity key absent
+        - [ ] `B-204c` test endpoint/auth/account collision cases
+      - Done when:
+        - import can deterministically classify incoming connections as new or duplicate
+  - [ ] Verification
+    - [ ] `V-201` Prove portable bundle round-trip
+      - Steps:
+        - run core unit tests for bundle encode/decode
+        - verify all supported credential kinds survive export/import serialization
+      - Expected outcome:
+        - portable bundle survives round-trip without backend-specific leakage
+
+### Feature: Core Export / Import Workflows
+
+- Feature ref:
+  - `module`: `core`
+  - `feature`: `credential-storage-backends`
+- Milestone: Portability
+- Dependencies:
+  - `Core Portable Bundle Contract`
+- Tree todo:
+  - [ ] Prerequisite checks
+    - [ ] `PC-211` Inventory current readers/writers for:
+      - system secure storage
+      - encrypted local storage
+    - [ ] `PC-212` Confirm which saved-connection fields are safe to replace during merge:
+      - label
+      - enabled agents
+      - model selections
+      - env key refs
+      - account fingerprints
+  - [ ] Build
+    - [ ] `B-211` Implement source-store export readers
+      - Work:
+        - export from system-secure mode
+        - export from encrypted-local mode
+      - Subtodos:
+        - [ ] `B-211a` export whole-workspace saved connections
+        - [ ] `B-211b` export selected connection ids only
+        - [ ] `B-211c` reject missing/unreadable credentials cleanly
+      - Done when:
+        - core can read saved connections from either supported source mode into portable payload records
+    - [ ] `B-212` Implement target-store import writers
+      - Work:
+        - write imported secrets into the current machine mode
+        - never recreate mixed backend state
+      - Subtodos:
+        - [ ] `B-212a` import into system secure storage
+        - [ ] `B-212b` import into encrypted local storage
+        - [ ] `B-212c` enforce machine-mode lock during import
+      - Done when:
+        - imported connections land in the target machine’s active mode only
+    - [ ] `B-213` Implement partial import workflow
+      - Work:
+        - accept a selected subset of bundle connections
+        - skip unselected records without side effects
+      - Subtodos:
+        - [ ] `B-213a` parse bundle and expose import candidates
+        - [ ] `B-213b` apply selection list
+        - [ ] `B-213c` produce import result summary per selected item
+      - Done when:
+        - callers can import an explicit subset from one bundle
+    - [ ] `B-214` Implement merge workflow
+      - Work:
+        - support:
+          - `skip existing`
+          - `replace existing`
+      - Subtodos:
+        - [ ] `B-214a` classify incoming candidates as new or duplicate
+        - [ ] `B-214b` implement skip semantics without mutation
+        - [ ] `B-214c` implement replace semantics with credential rewrite
+        - [ ] `B-214d` define which metadata fields replace vs preserve
+      - Done when:
+        - imports into non-empty workspaces can be applied intentionally without mixed backend drift
+    - [ ] `B-215` Implement import/export result reporting
+      - Work:
+        - provide structured result rows:
+          - exported
+          - skipped
+          - replaced
+          - failed
+      - Subtodos:
+        - [ ] `B-215a` per-connection result codes
+        - [ ] `B-215b` aggregate summary counts
+        - [ ] `B-215c` user-safe error messages for known failure classes
+      - Done when:
+        - surfaces can render deterministic import/export summaries without parsing raw exceptions
+  - [ ] Verification
+    - [ ] `V-211` Prove export/import cross-mode behavior
+      - Steps:
+        - export from system secure storage and import into encrypted local storage
+        - export from encrypted local storage and import into system secure storage
+        - verify no mixed-state output is created
+      - Expected outcome:
+        - source/target mode adapters behave correctly through one portable bundle format
+
+### Feature: Desktop Export / Import UX
+
+- Feature ref:
+  - `module`: `surfaces`
+  - `feature`: `desktop-credential-storage-choice`
+- Milestone: Portability
+- Dependencies:
+  - `Core Portable Bundle Contract`
+  - `Core Export / Import Workflows`
+- Tree todo:
+  - [ ] Prerequisite checks
+    - [ ] `PC-221` Inventory existing settings/app shells where import/export entrypoints belong.
+    - [ ] `PC-222` Inventory current file-pick/save IPC helpers and what must be added for desktop bundle selection.
+  - [ ] Build
+    - [ ] `B-221` Add export flow entrypoints
+      - Work:
+        - add settings action for export
+        - explain mode requirements and scope
+      - Subtodos:
+        - [ ] `B-221a` choose save-file destination
+        - [ ] `B-221b` choose whole-workspace vs selected connections
+        - [ ] `B-221c` prompt for export passphrase / confirmation
+      - Done when:
+        - user can start an export from desktop without CLI
+    - [ ] `B-222` Add import flow entrypoints
+      - Work:
+        - add settings action for import
+        - choose bundle file
+        - unlock bundle
+      - Subtodos:
+        - [ ] `B-222a` file picker
+        - [ ] `B-222b` bundle passphrase dialog
+        - [ ] `B-222c` candidate preview list
+      - Done when:
+        - user can inspect a portable bundle before mutation
+    - [ ] `B-223` Add partial import selection UI
+      - Work:
+        - render import candidate rows
+        - allow per-connection selection
+      - Subtodos:
+        - [ ] `B-223a` show duplicate/new status badges
+        - [ ] `B-223b` select all / clear all
+        - [ ] `B-223c` disable unimportable rows with reasons
+      - Done when:
+        - user can choose a subset before import commit
+    - [ ] `B-224` Add merge strategy UI
+      - Work:
+        - choose:
+          - `skip existing`
+          - `replace existing`
+      - Subtodos:
+        - [ ] `B-224a` explain conflict strategy in plain language
+        - [ ] `B-224b` show per-row impact preview
+        - [ ] `B-224c` confirm irreversible replace behavior
+      - Done when:
+        - user chooses merge semantics before import writes begin
+    - [ ] `B-225` Add progress and summary UI
+      - Work:
+        - show result rows and final counts
+      - Subtodos:
+        - [ ] `B-225a` export success/failure summary
+        - [ ] `B-225b` import success/failure summary
+        - [ ] `B-225c` per-connection retry/reset guidance for failures
+      - Done when:
+        - desktop communicates deterministic results for export/import sessions
+  - [ ] Verification
+    - [ ] `V-221` Prove desktop portability UX
+      - Steps:
+        - manual run:
+          - export selected connections
+          - import subset into workspace with duplicates
+          - validate skip and replace strategies
+      - Expected outcome:
+        - desktop supports export/import without hidden merge or backend surprises
+
+### Feature: Cross-Surface / CLI Support
+
+- Feature ref:
+  - `module`: `surfaces`
+  - `feature`: `desktop-credential-storage-choice`
+- Milestone: Portability
+- Dependencies:
+  - `Core Export / Import Workflows`
+- Tree todo:
+  - [ ] Prerequisite checks
+    - [ ] `PC-231` Decide whether CLI parity ships in the same milestone or behind a follow-up gate.
+  - [ ] Build
+    - [ ] `B-231` Add CLI export command surface
+      - Subtodos:
+        - [ ] `B-231a` select output path
+        - [ ] `B-231b` select all vs chosen connection ids
+        - [ ] `B-231c` prompt/non-interactive passphrase input handling
+    - [ ] `B-232` Add CLI import command surface
+      - Subtodos:
+        - [ ] `B-232a` bundle passphrase input
+        - [ ] `B-232b` selection / filter support
+        - [ ] `B-232c` merge strategy flags
+    - [ ] `B-233` Keep CLI and desktop result semantics aligned
+      - Subtodos:
+        - [ ] `B-233a` shared result codes
+        - [ ] `B-233b` shared duplicate strategy vocabulary
+        - [ ] `B-233c` shared user-safe failure mapping
+  - [ ] Verification
+    - [ ] `V-231` Prove CLI portability behavior
+      - Steps:
+        - import/export selected connections through CLI
+        - verify skip/replace flags match desktop behavior
+      - Expected outcome:
+        - CLI does not reintroduce divergent storage semantics
+
+## 6) Checkpoints
+
+- Checkpoint 1:
+  - portable bundle schema is defined and encrypted independently from the runtime vault file
+- Checkpoint 2:
+  - export can read from both supported machine storage modes
+- Checkpoint 3:
+  - import can write into either supported machine storage mode without creating mixed state
+- Checkpoint 4:
+  - partial import and merge (`skip` / `replace`) are implemented in core
+- Checkpoint 5:
+  - desktop import/export UX exposes selection, merge strategy, and summaries clearly
+
+## 7) Risks / Spikes
+
+- Risk 1:
+  - the runtime vault and portable bundle may drift if they over-share structure
+  - mitigation:
+    - keep one crypto/secret codec core, but separate transport schema from runtime vault layout
+- Risk 2:
+  - duplicate detection may be ambiguous for older saved connections with weak identity metadata
+  - mitigation:
+    - settle `stableKey` rules before writing merge UI
+- Risk 3:
+  - `replace existing` can accidentally overwrite user-customized metadata if field ownership is unclear
+  - mitigation:
+    - define a replace matrix explicitly before implementation
+- Risk 4:
+  - exporting from OS-native secure stores may surface platform-specific access-denied flows
+  - mitigation:
+    - keep source adapters user-safe and fail closed
+- Risk 5:
+  - import into a machine with an incompatible or mixed storage state can reintroduce storage-mode bugs
+  - mitigation:
+    - require a valid single machine mode or explicit reset before import commit
+
+## 8) Frozen Decisions
+
+- [x] `OD-001` Duplicate identity contract
+  - Duplicate detection MUST prefer `identityKey` / account fingerprint when present.
+  - When no identity/account fingerprint exists, duplicate detection MUST fall back to:
+    - normalized `endpointFamily`
+    - normalized `endpointId` or `endpointUrl`
+    - `authMode`
+- [x] `OD-002` Replace matrix
+  - `replace existing` MUST fully replace connection-owned state:
+    - secret
+    - label
+    - enabled/configurable agents
+    - selected agent bindings
+    - model selections
+    - connection metadata
+  - `replace existing` MUST NOT replace:
+    - history
+    - alerts
+    - usage cache
+    - desktop UI preferences
+- [x] `OD-003` Export passphrase policy
+  - Export MUST use a dedicated export passphrase per bundle.
+  - Export MUST NOT depend on, or reuse, the current machine's encrypted-local unlock state.
+- [x] `OD-004` CLI parity timing
+  - CLI import/export is explicitly deferred beyond this desktop milestone.
+- [x] `OD-005` Bundle container
+  - Portable bundles MUST use a versioned JSON envelope with whole-payload authenticated encryption.

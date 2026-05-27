@@ -5,20 +5,28 @@ import { AgentIconStack } from "../../agents/AgentIconStack";
 import { ConnectionUsageCell } from "../UsageCell";
 import { readProviderLabel } from "../ProviderDisplay";
 import { Card, CardContent } from "../../ui/card";
+import { Checkbox } from "../../ui/checkbox";
 import { Field } from "../../ui/field";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table";
 
 type ConnectionTableProps = {
   connections: SettingsState["connections"];
+  selectedConnectionIds: string[];
   t: Translator;
   onOpenDetails(connectionId: string): void;
+  onSelectedConnectionIdsChange(connectionIds: string[]): void;
 };
 
 export function ConnectionTable({
   connections,
+  selectedConnectionIds,
   t,
   onOpenDetails,
+  onSelectedConnectionIdsChange,
 }: ConnectionTableProps) {
+  const selectedIds = new Set(selectedConnectionIds);
+  const allSelected = connections.length > 0 && connections.every((connection) => selectedIds.has(connection.id));
+
   return (
     <>
       <div className="space-y-3 lg:hidden">
@@ -31,6 +39,17 @@ export function ConnectionTable({
             <CardContent className="space-y-4 p-4">
               <div className="min-w-0 space-y-1">
                 <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={selectedIds.has(connection.id)}
+                    onCheckedChange={(checked) => {
+                      onSelectedConnectionIdsChange(toggleConnectionSelection(
+                        selectedConnectionIds,
+                        connection.id,
+                        checked === true,
+                      ));
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                  />
                   <AgentIconStack agentIds={connection.selectedByAgents} t={t} />
                   <div className="font-medium">{connection.label}</div>
                 </div>
@@ -54,6 +73,15 @@ export function ConnectionTable({
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[52px]">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={(checked) => {
+                    onSelectedConnectionIdsChange(checked === true ? connections.map((connection) => connection.id) : []);
+                  }}
+                  aria-label="Select all connections"
+                />
+              </TableHead>
               <TableHead className="w-[84px]" />
               <TableHead>{t("common.name")}</TableHead>
               <TableHead>{t("common.provider")}</TableHead>
@@ -69,6 +97,20 @@ export function ConnectionTable({
                 className="cursor-pointer"
                 onClick={() => onOpenDetails(connection.id)}
               >
+                <TableCell>
+                  <Checkbox
+                    checked={selectedIds.has(connection.id)}
+                    onCheckedChange={(checked) => {
+                      onSelectedConnectionIdsChange(toggleConnectionSelection(
+                        selectedConnectionIds,
+                        connection.id,
+                        checked === true,
+                      ));
+                    }}
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label={connection.label}
+                  />
+                </TableCell>
                 <TableCell>
                   <AgentIconStack agentIds={connection.selectedByAgents} t={t} />
                 </TableCell>
@@ -88,4 +130,18 @@ export function ConnectionTable({
 
 function readAlertCountValue(activeAlertCount: number): string {
   return activeAlertCount > 0 ? String(activeAlertCount) : "";
+}
+
+function toggleConnectionSelection(
+  selectedConnectionIds: string[],
+  connectionId: string,
+  selected: boolean,
+): string[] {
+  const selectedIds = new Set(selectedConnectionIds);
+  if (selected) {
+    selectedIds.add(connectionId);
+  } else {
+    selectedIds.delete(connectionId);
+  }
+  return [...selectedIds];
 }

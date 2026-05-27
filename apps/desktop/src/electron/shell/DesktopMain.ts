@@ -1,4 +1,5 @@
 import { app } from "electron";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +26,7 @@ import { ConnectionAlertStore } from "../alerts/Store";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
 import { DesktopConnectionManager } from "../connections/DesktopConnectionManager";
 import { DesktopCredentialStorageSession } from "../connections/CredentialStorageSession";
+import { DesktopPortableTransferGateway } from "../connections/PortableTransferGateway";
 import { ManagedApiKeyEnvironment } from "../connections/ManagedApiKeyEnvironment";
 import { DesktopEnvironmentSource } from "../environment/Source";
 import { DesktopShellEnvironment } from "../environment/Shell";
@@ -79,6 +81,7 @@ export class DesktopMain {
   private readonly surface: DesktopSurface;
   private readonly connectionGateway: DesktopConnectionGateway;
   private readonly connectionManager: DesktopConnectionManager;
+  private readonly portableTransferGateway: DesktopPortableTransferGateway;
   private readonly stateStore: DesktopStateStore;
   private readonly stateRefresher: DesktopStateRefresher;
   private readonly workspaceWatcher: DesktopWorkspaceWatcher;
@@ -149,6 +152,14 @@ export class DesktopMain {
       credentialStore: this.credentialStore,
       credentialStorageSession: this.credentialStorageSession,
       logger: this.logger.child({ scope: "connection-gateway" }),
+    });
+    this.portableTransferGateway = new DesktopPortableTransferGateway({
+      appVersion: readDesktopPackageVersion(),
+      credentialStore: this.credentialStore,
+      credentialStorageSession: this.credentialStorageSession,
+      databasePath: options.databasePath,
+      openSession: () => this.connectionGateway.openSession(),
+      platform: process.platform,
     });
     this.stateStore = new DesktopStateStore({
       databasePath: options.databasePath,
@@ -362,9 +373,16 @@ export class DesktopMain {
     }).register();
     new DesktopIpcConnectionRoutes({
       chooseOpenAiAuthJsonPath: (defaultPath) => this.shell.chooseOpenAiAuthJsonPath(defaultPath),
+      chooseCredentialExportPath: (defaultFileName) => this.shell.chooseCredentialExportPath(defaultFileName),
+      chooseCredentialImportPath: (defaultPath) => this.shell.chooseCredentialImportPath(defaultPath),
       connectionManager: this.connectionManager,
+      getCredentialStorageModeState: () => this.portableTransferGateway.readStorageModeState(),
       inputs: this.inputs,
       logger: this.logger.child({ scope: "ipc-connection-routes" }),
+      previewCredentialExport: (input) => this.portableTransferGateway.previewExport(input),
+      exportCredentialBundle: (input) => this.portableTransferGateway.exportBundle(input),
+      previewCredentialImport: (input) => this.portableTransferGateway.previewImport(input),
+      applyCredentialImport: async (input) => await this.portableTransferGateway.applyImport(input),
       refreshAll: () => this.reloadAll(),
       stateStore: this.stateStore,
     }).register();
@@ -466,6 +484,12 @@ export class DesktopMain {
   private clearManagedApiKeyEnvironment(): void {
     this.managedEnvironmentLifecycle.clearBeforeReset();
   }
+}
+
+function readDesktopPackageVersion(): string {
+  const packageJsonPath = join(currentDir, "..", "..", "package.json");
+  const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: string };
+  return parsed.version?.trim() || "0.0.0";
 }
 
 function createDesktopCredentialStore(databasePath: string): CredentialStore {

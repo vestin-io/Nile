@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Layers3, Workflow } from "lucide-react";
+import { Layers3, Plus, Workflow } from "lucide-react";
 
 import type { AgentId } from "@nile/core/models/agent/definitions";
 
@@ -134,9 +134,18 @@ export function ProfilesPage({
         </div>
         {isAvailable ? (
           <div className="flex items-start">
-            <Button onClick={() => setIsCreatePageOpen(true)}>
-              {t("profiles.createAction")}
-            </Button>
+            <div className="flex overflow-hidden rounded-xl border bg-background">
+              <Button
+                variant="ghost"
+                className="rounded-none px-4"
+                aria-label={t("profiles.createAction")}
+                title={t("profiles.createAction")}
+                onClick={() => setIsCreatePageOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                <span>{t("profiles.createAction")}</span>
+              </Button>
+            </div>
           </div>
         ) : null}
       </div>

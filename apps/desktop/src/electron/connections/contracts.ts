@@ -4,7 +4,11 @@ import type { BindCursorUsageResult } from "@nile/builtins/cursor-usage";
 import type { AuthMode } from "@nile/core/models/access";
 import type { ConnectionPresetFamily, ConnectionOnboardingSuggestion, ConnectionModelCatalogResult } from "@nile/core/models/connection";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
-import type { CredentialStorageBackend } from "@nile/core/services/credential";
+import type {
+  CredentialStorageBackend,
+  PortableBundlePlatform,
+  PortableImportConflictStrategy,
+} from "@nile/core/services/credential";
 
 import type { DesktopConnectionAlert, DesktopConnection } from "../../state/Types";
 import type { CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../alerts/Store";
@@ -57,6 +61,12 @@ export type DesktopCredentialStorageState = {
   encryptedLocalUnlocked: boolean;
 };
 
+export type DesktopCredentialStorageModeState = {
+  mode: CredentialStorageBackend | null;
+  mixed: boolean;
+  connectionCount: number;
+};
+
 export type DesktopUnlockEncryptedLocalStorageResult =
   | { ok: true }
   | {
@@ -75,6 +85,59 @@ export type DesktopUnlockEncryptedLocalStorageFailure = Extract<
 >;
 
 export type DesktopConnectionModelCatalog = ConnectionModelCatalogResult;
+
+export type DesktopCredentialExportPreview = DesktopCredentialStorageModeState & {
+  canExport: boolean;
+  connectionCount: number;
+};
+
+export type DesktopPreviewCredentialExportInput = {
+  selectedConnectionIds?: string[];
+};
+
+export type DesktopExportCredentialBundleInput = {
+  filePath: string;
+  exportPassphrase: string;
+  selectedConnectionIds?: string[];
+};
+
+export type DesktopCredentialImportPreviewConnection = {
+  stableKey: string;
+  label: string;
+  duplicateConnectionId: string | null;
+};
+
+export type DesktopCredentialImportPreview = {
+  exportedAt: string;
+  source: {
+    appVersion: string;
+    platform: PortableBundlePlatform;
+    storageMode: CredentialStorageBackend;
+  };
+  machine: DesktopCredentialStorageModeState;
+  connections: DesktopCredentialImportPreviewConnection[];
+};
+
+export type DesktopPreviewCredentialImportInput = {
+  filePath: string;
+  exportPassphrase: string;
+};
+
+export type DesktopApplyCredentialImportInput = {
+  filePath: string;
+  exportPassphrase: string;
+  strategy: PortableImportConflictStrategy;
+  selectedStableKeys?: string[];
+  targetStorageMode?: CredentialStorageBackend;
+  encryptedLocalPassphrase?: string;
+};
+
+export type DesktopApplyCredentialImportResult = {
+  importedConnectionIds: string[];
+  replacedConnectionIds: string[];
+  skippedStableKeys: string[];
+  targetStorageMode: CredentialStorageBackend;
+};
 
 export type DesktopGetConnectionModelCatalogInput = {
   connectionId: string;
@@ -117,8 +180,15 @@ export type DesktopUpdateAgentConnectionModelInput = {
 export type DesktopConnectionBridge = {
   listConnectionDefinitions(): Promise<import("@nile/core/models/connection").ConnectionDefinition[]>;
   getCredentialStorageState(): Promise<DesktopCredentialStorageState>;
+  getCredentialStorageModeState(): Promise<DesktopCredentialStorageModeState>;
   unlockEncryptedLocalStorage(passphrase: string): Promise<DesktopUnlockEncryptedLocalStorageResult>;
   chooseOpenAiAuthJsonPath(defaultPath?: string): Promise<string | null>;
+  chooseCredentialExportPath(defaultFileName?: string): Promise<string | null>;
+  chooseCredentialImportPath(defaultPath?: string): Promise<string | null>;
+  previewCredentialExport(input?: DesktopPreviewCredentialExportInput): Promise<DesktopCredentialExportPreview>;
+  exportCredentialBundle(input: DesktopExportCredentialBundleInput): Promise<void>;
+  previewCredentialImport(input: DesktopPreviewCredentialImportInput): Promise<DesktopCredentialImportPreview>;
+  applyCredentialImport(input: DesktopApplyCredentialImportInput): Promise<DesktopApplyCredentialImportResult>;
   describeConnectionOnboarding(input: DesktopAddConnectionInput): Promise<ConnectionOnboardingSuggestion>;
   describeSavedConnectionOnboarding(input: DesktopDescribeSavedConnectionOnboardingInput): Promise<ConnectionOnboardingSuggestion>;
   prepareConnectionDraft(input: DesktopAddConnectionInput): Promise<DesktopPreparedConnectionDraft>;

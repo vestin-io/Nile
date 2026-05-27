@@ -53,3 +53,26 @@ export { createPlatformCredentialStore, createPlatformWorkspaceCredentialStore }
 export { WindowsCredentialManagerStore } from "./WindowsCredentialManagerStore";
 export { GenericPasswordWriter } from "./GenericPasswordWriter";
 export { SecurityCli, type SecurityCliResult } from "./SecurityCli";
+export {
+  PortableBundlePassphraseError,
+  PortableBundleValidationError,
+  PortableBundleVersionError,
+} from "./PortableBundleErrors";
+export type {
+  PortableBundleConnection,
+  PortableBundleEnvelope,
+  PortableBundlePayload,
+  PortableBundlePlatform,
+  PortableBundleSource,
+} from "./PortableBundleTypes";
+export { PortableBundleCodec, type CreatePortableBundleInput } from "./PortableBundleCodec";
+export { PortableBundleExport, type ExportPortableBundleInput } from "./PortableExport";
+export {
+  PortableBundleImport,
+  type ApplyPortableBundleInput,
+  type ApplyPortableBundleResult,
+  type PortableImportConflictStrategy,
+  type PortableImportPreview,
+  type PortableImportPreviewConnection,
+} from "./PortableImport";
+export { PortableConnectionIdentity, PORTABLE_CONNECTION_IDENTITY } from "./PortableIdentity";

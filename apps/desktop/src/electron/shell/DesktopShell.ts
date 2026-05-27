@@ -100,6 +100,14 @@ export class DesktopShell {
     return await this.settingsWindow.chooseOpenAiAuthJsonPath(defaultPath);
   }
 
+  async chooseCredentialExportPath(defaultFileName?: string): Promise<string | null> {
+    return await this.settingsWindow.chooseCredentialExportPath(defaultFileName);
+  }
+
+  async chooseCredentialImportPath(defaultPath?: string): Promise<string | null> {
+    return await this.settingsWindow.chooseCredentialImportPath(defaultPath);
+  }
+
   async openExternalUrl(url: string): Promise<void> {
     const parsed = new URL(url);
     if (parsed.protocol !== "https:") {
