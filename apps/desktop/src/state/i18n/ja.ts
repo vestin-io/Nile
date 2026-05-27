@@ -363,6 +363,7 @@ export const JA_MESSAGES: Messages = {
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "この接続の更新を続けるには、ローカル暗号化ストレージのロックを解除してください。",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "保存済み接続の更新を続けるには、ローカル暗号化ストレージのロックを解除してください。",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "移行パッケージのエクスポートを続けるには、ローカル暗号化ストレージのロックを解除してください。",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "移行パッケージのインポートを続けるには、ローカル暗号化ストレージのロックを解除してください。",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "この検出されたローカルセットアップを Nile に保存するには、ローカル暗号化ストレージのロックを解除してください。",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "この接続の保存を続けるには、ローカル暗号化ストレージのロックを解除してください。",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "この接続の更新を続けるには、ローカル暗号化ストレージのロックを解除してください。",

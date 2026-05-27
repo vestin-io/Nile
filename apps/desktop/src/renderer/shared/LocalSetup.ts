@@ -88,7 +88,7 @@ export class LocalSetupPresentation {
   shouldShowDetectedSetup(
     detectedSetup: DesktopOnboardingItem | null,
   ): boolean {
-    return Boolean(detectedSetup && !this.isSaved(detectedSetup));
+    return Boolean(detectedSetup && detectedSetup.reconciliationState !== "unavailable");
   }
 
   readActionKind(

@@ -162,6 +162,13 @@ export function useCredentialPortability({
       setActionError(t("settings.credentialStorage.mixedError"));
       return;
     }
+    if (
+      credentialStorageMode === "encrypted_local_storage"
+      && credentialStorageState.encryptedLocalVaultExists
+      && !credentialStorageState.encryptedLocalUnlocked
+    ) {
+      await requestEncryptedLocalUnlock(t("dialog.encryptedLocalUnlock.reasonImportBundle"));
+    }
     const filePath = await window.nileDesktop.connections.chooseCredentialImportPath();
     if (!filePath) {
       return;

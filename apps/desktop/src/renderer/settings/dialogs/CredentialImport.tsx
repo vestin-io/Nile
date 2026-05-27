@@ -74,10 +74,11 @@ export function CredentialImportDialog({
 }: CredentialImportDialogProps) {
   const systemSecureStorageName = readSystemSecureStorageName(t);
   const targetModeSelectable = preview !== null && preview.machine.mode === null;
-  const targetRequiresEncryptedLocalPassphrase = targetStorageMode === "encrypted_local_storage"
-    && (!credentialStorageState.encryptedLocalVaultExists || !credentialStorageState.encryptedLocalUnlocked);
-  const targetRequiresEncryptedLocalConfirmation = targetRequiresEncryptedLocalPassphrase
+  const targetNeedsEncryptedLocalSetup = targetStorageMode === "encrypted_local_storage"
+    && preview?.machine.mode === null
     && !credentialStorageState.encryptedLocalVaultExists;
+  const targetRequiresEncryptedLocalPassphrase = targetNeedsEncryptedLocalSetup;
+  const targetRequiresEncryptedLocalConfirmation = targetNeedsEncryptedLocalSetup;
   const missingEncryptedLocalPassphrase = targetRequiresEncryptedLocalPassphrase
     && !encryptedLocalPassphrase.trim();
   const mismatchedEncryptedLocalPassphrase = targetRequiresEncryptedLocalConfirmation
@@ -178,7 +179,7 @@ export function CredentialImportDialog({
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4">
                 <div className="grid gap-2">
                   <Label>{t("dialog.credentialImport.strategyLabel")}</Label>
                   <Select value={strategy} onValueChange={(value) => onStrategyChange(value as PortableImportConflictStrategy)}>
@@ -222,9 +223,7 @@ export function CredentialImportDialog({
               {targetRequiresEncryptedLocalPassphrase ? (
                 <div className="grid gap-4 rounded-xl border p-4">
                   <div className="text-sm text-muted-foreground">
-                    {credentialStorageState.encryptedLocalVaultExists
-                      ? t("dialog.credentialImport.targetEncryptedUnlockDescription")
-                      : t("dialog.credentialImport.targetEncryptedSetupDescription")}
+                    {t("dialog.credentialImport.targetEncryptedSetupDescription")}
                   </div>
 
                   <div className="grid gap-2">

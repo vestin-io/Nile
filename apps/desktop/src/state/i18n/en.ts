@@ -397,6 +397,7 @@ export const EN_MESSAGES: Messages = {
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "Unlock encrypted local storage to continue refreshing this connection.",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "Unlock encrypted local storage to continue refreshing saved connections.",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "Unlock encrypted local storage to continue exporting a migration package.",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "Unlock encrypted local storage to continue importing a migration package.",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "Unlock encrypted local storage to save this detected local setup to Nile.",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "Unlock encrypted local storage to continue saving this connection.",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "Unlock encrypted local storage to continue updating this connection.",

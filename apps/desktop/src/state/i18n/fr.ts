@@ -363,6 +363,7 @@ export const FR_MESSAGES: Messages = {
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "Déverrouillez le stockage local chiffré pour continuer à actualiser cette connexion.",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "Déverrouillez le stockage local chiffré pour continuer à actualiser les connexions enregistrées.",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "Déverrouillez le stockage local chiffré pour continuer à exporter le paquet de migration.",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "Déverrouillez le stockage local chiffré pour continuer à importer le paquet de migration.",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "Déverrouillez le stockage local chiffré pour enregistrer cette configuration locale détectée dans Nile.",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "Déverrouillez le stockage local chiffré pour continuer à enregistrer cette connexion.",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "Déverrouillez le stockage local chiffré pour continuer à mettre à jour cette connexion.",

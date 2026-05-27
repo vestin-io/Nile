@@ -363,6 +363,7 @@ export const DE_MESSAGES: Messages = {
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "Entsperre den lokal verschlüsselten Speicher, um das Aktualisieren dieser Verbindung fortzusetzen.",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "Entsperre den lokal verschlüsselten Speicher, um das Aktualisieren gespeicherter Verbindungen fortzusetzen.",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "Entsperre den lokal verschlüsselten Speicher, um den Export des Migrationspakets fortzusetzen.",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "Entsperre den lokal verschlüsselten Speicher, um den Import des Migrationspakets fortzusetzen.",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "Entsperre den lokal verschlüsselten Speicher, um dieses erkannte lokale Setup in Nile zu speichern.",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "Entsperre den lokal verschlüsselten Speicher, um das Speichern dieser Verbindung fortzusetzen.",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "Entsperre den lokal verschlüsselten Speicher, um das Aktualisieren dieser Verbindung fortzusetzen.",

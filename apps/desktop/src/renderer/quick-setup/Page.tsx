@@ -26,11 +26,13 @@ type QuickSetupPageProps = {
   canConfigureAgent(agentId: AgentId): boolean;
   credentialStorageMode: CredentialStorageBackend | null;
   credentialStorageState: Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>;
+  isCredentialPortabilityBusy: boolean;
   isCredentialStorageModeLocked: boolean;
   isCredentialStorageModeMixed: boolean;
   state: SettingsState;
   t: Translator;
   onConfigureAgent(agentId: AgentId): void;
+  onImportCredentials(): Promise<void>;
   onRefreshCredentialStorageState(): Promise<Awaited<ReturnType<typeof window.nileDesktop.connections.getCredentialStorageState>>>;
   onRememberCredentialStorageMode(backend: CredentialStorageBackend): void;
   onSaveAgent(
@@ -52,11 +54,13 @@ export function QuickSetupPage({
   canConfigureAgent,
   credentialStorageMode,
   credentialStorageState,
+  isCredentialPortabilityBusy,
   isCredentialStorageModeLocked,
   isCredentialStorageModeMixed,
   state,
   t,
   onConfigureAgent,
+  onImportCredentials,
   onRefreshCredentialStorageState,
   onRememberCredentialStorageMode,
   onSaveAgent,
@@ -307,7 +311,14 @@ export function QuickSetupPage({
           </CardContent>
         </Card>
 
-        <QuickSetupGuide onboarding={state.detectedSetups} t={t} />
+        <QuickSetupGuide
+          isImporting={isCredentialPortabilityBusy}
+          onboarding={state.detectedSetups}
+          t={t}
+          onImport={() => {
+            void onImportCredentials();
+          }}
+        />
 
         <div className="space-y-4">
           {state.agents.map((agent) => (

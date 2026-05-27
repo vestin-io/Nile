@@ -396,6 +396,7 @@ export const ZH_MESSAGES: Messages = { ...EN_MESSAGES, ...{
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "请先解锁本地加密存储，才能继续刷新这条连接。",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "请先解锁本地加密存储，才能继续刷新已保存的连接。",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "请先解锁本地加密存储，才能继续导出迁移包。",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "请先解锁本地加密存储，才能继续导入迁移包。",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "请先解锁本地加密存储，才能把这条检测到的本地配置保存到 Nile。",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "请先解锁本地加密存储，才能继续保存这条连接。",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "请先解锁本地加密存储，才能继续更新这条连接。",

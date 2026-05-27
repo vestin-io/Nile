@@ -39,6 +39,10 @@
 - Changed the export dialog’s file field to represent the default file name instead of implying that a concrete save path has already been chosen.
 - Updated `README.md` and added `docs/desktop-credentials.md` so the public docs reflect machine-level storage modes, encrypted local unlock behavior, `.nilevault` migration packages, and the Connections-page import/export entry points.
 - Corrected the public README surface/status section so it reflects current Windows desktop support instead of the older macOS-only wording.
+- Added a quick-setup guide-level import entry that reuses the global Connections import flow instead of introducing an agent-specific import path.
+- Changed import so encrypted-local machines must unlock before the migration-package preview flow starts; the import dialog now only asks for a local passphrase when it needs to initialize a brand-new encrypted-local vault.
+- Restored the Agents-page current-connection selector for already-saved setups after the quick-setup saved-checkmark fix accidentally leaked into the shared detected-setup rendering path.
+- Added the missing `dialog.encryptedLocalUnlock.reasonImportBundle` translation across the desktop locale set.
 
 ### Verification
 
@@ -51,3 +55,4 @@
 - Import failures that occur while writing into a target store still surface as normal action errors. Expected credential-store failures are user-readable, but import/export does not yet use a fully structured result code contract the way encrypted-local unlock does.
 - Connections-page export currently scopes to the user's explicit selection. If nothing is selected, export is disabled instead of silently falling back to export-all.
 - The public docs now describe the current desktop portability model, but they do not yet cover future CLI parity because CLI import/export is intentionally still out of scope for this milestone.
+- Quick setup and Agents now intentionally diverge for already-saved setups: quick setup shows a completion checkmark, while Agents falls back to the normal current-connection selector.

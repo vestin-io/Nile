@@ -363,6 +363,7 @@ export const KO_MESSAGES: Messages = {
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "이 연결 새로 고침을 계속하려면 로컬 암호화 저장소를 잠금 해제하세요.",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "저장된 연결 새로 고침을 계속하려면 로컬 암호화 저장소를 잠금 해제하세요.",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "마이그레이션 패키지 내보내기를 계속하려면 로컬 암호화 저장소를 잠금 해제하세요.",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "마이그레이션 패키지 가져오기를 계속하려면 로컬 암호화 저장소를 잠금 해제하세요.",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "감지된 이 로컬 설정을 Nile에 저장하려면 로컬 암호화 저장소를 잠금 해제하세요.",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "이 연결 저장을 계속하려면 로컬 암호화 저장소를 잠금 해제하세요.",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "이 연결 업데이트를 계속하려면 로컬 암호화 저장소를 잠금 해제하세요.",

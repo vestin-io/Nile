@@ -3,14 +3,22 @@ import mascotImage from "../../../../../assets/mascot/image.png";
 import type { DesktopOnboardingState } from "../../state/Types";
 import type { Translator } from "../shared/I18n";
 import { LOCAL_SETUP_PRESENTATION } from "../shared/LocalSetup";
+import { Button } from "../ui/button";
 import { cn } from "../ui/cn";
 
 type QuickSetupGuideProps = {
+  isImporting?: boolean;
   onboarding: DesktopOnboardingState;
   t: Translator;
+  onImport?(): void;
 };
 
-export function QuickSetupGuide({ onboarding, t }: QuickSetupGuideProps) {
+export function QuickSetupGuide({
+  isImporting = false,
+  onboarding,
+  t,
+  onImport,
+}: QuickSetupGuideProps) {
   const content = LOCAL_SETUP_PRESENTATION.readGuideContent(onboarding, t);
 
   return (
@@ -35,6 +43,19 @@ export function QuickSetupGuide({ onboarding, t }: QuickSetupGuideProps) {
           <div className={cn("text-sm leading-relaxed", content.descriptionClassName)}>
             {content.description}
           </div>
+          {onImport ? (
+            <div className="pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="rounded-xl"
+                disabled={isImporting}
+                onClick={onImport}
+              >
+                {t("settings.credentialPortability.importAction")}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

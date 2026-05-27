@@ -112,11 +112,13 @@ export function SettingsPageContent({
         canConfigureAgent={canConfigureAgent}
         credentialStorageState={credentialStorageState}
         credentialStorageMode={credentialStorageMode}
+        isCredentialPortabilityBusy={isCredentialPortabilityBusy}
         state={settingsState}
         isCredentialStorageModeLocked={isCredentialStorageModeLocked}
         isCredentialStorageModeMixed={isCredentialStorageModeMixed}
         t={t}
         onConfigureAgent={onConfigureAgent}
+        onImportCredentials={onImportCredentials}
         onSaveAgent={onQuickSetupSaveAgent}
         onDone={onCompleteQuickSetup}
         onRefreshCredentialStorageState={onRefreshCredentialStorageState}

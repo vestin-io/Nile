@@ -12,7 +12,6 @@ import { AgentConnectionModelDialog } from "../detail/ModelEditor";
 import { AgentCurrentConnectionPanel } from "./CurrentConnectionPanel";
 import { AgentLocalSetupSection } from "./LocalSetupSection";
 import { useAgentConnectionSwitchFlow } from "../useConnectionSwitchFlow";
-import { LOCAL_SETUP_PRESENTATION } from "../../shared/LocalSetup";
 
 type AgentCardProps = {
   agent: DesktopAgentState;
@@ -172,7 +171,12 @@ function readIssueLink(
 function shouldShowDetectedSetup(
   detectedSetup: DesktopOnboardingItem | null,
 ): boolean {
-  return LOCAL_SETUP_PRESENTATION.shouldShowDetectedSetup(detectedSetup);
+  if (!detectedSetup) {
+    return false;
+  }
+
+  return detectedSetup.reconciliationState !== "unavailable"
+    && detectedSetup.reconciliationState !== "already_saved";
 }
 
 function DragHandle() {

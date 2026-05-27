@@ -363,6 +363,7 @@ export const TH_MESSAGES: Messages = {
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "ปลดล็อกที่เก็บข้อมูลเข้ารหัสในเครื่องเพื่อรีเฟรชการเชื่อมต่อนี้ต่อ",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "ปลดล็อกที่เก็บข้อมูลเข้ารหัสในเครื่องเพื่อรีเฟรชการเชื่อมต่อที่บันทึกไว้ต่อ",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "ปลดล็อกที่เก็บข้อมูลเข้ารหัสในเครื่องเพื่อส่งออกแพ็กเกจย้ายข้อมูลต่อ",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "ปลดล็อกที่เก็บข้อมูลเข้ารหัสในเครื่องเพื่อนำเข้าแพ็กเกจย้ายข้อมูลต่อ",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "ปลดล็อกที่เก็บข้อมูลเข้ารหัสในเครื่องเพื่อบันทึกการตั้งค่าในเครื่องที่ตรวจพบนี้ลงใน Nile",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "ปลดล็อกที่เก็บข้อมูลเข้ารหัสในเครื่องเพื่อบันทึกการเชื่อมต่อนี้ต่อ",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "ปลดล็อกที่เก็บข้อมูลเข้ารหัสในเครื่องเพื่ออัปเดตการเชื่อมต่อนี้ต่อ",

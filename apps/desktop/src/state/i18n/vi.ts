@@ -363,6 +363,7 @@ export const VI_MESSAGES: Messages = {
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "Mở khóa bộ nhớ cục bộ được mã hóa để tiếp tục làm mới kết nối này.",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "Mở khóa bộ nhớ cục bộ được mã hóa để tiếp tục làm mới các kết nối đã lưu.",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "Mở khóa bộ nhớ cục bộ được mã hóa để tiếp tục xuất gói di chuyển.",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "Mở khóa bộ nhớ cục bộ được mã hóa để tiếp tục nhập gói di chuyển.",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "Mở khóa bộ nhớ cục bộ được mã hóa để lưu cấu hình cục bộ đã phát hiện này vào Nile.",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "Mở khóa bộ nhớ cục bộ được mã hóa để tiếp tục lưu kết nối này.",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "Mở khóa bộ nhớ cục bộ được mã hóa để tiếp tục cập nhật kết nối này.",

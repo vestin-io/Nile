@@ -363,6 +363,7 @@ export const ES_MESSAGES: Messages = {
     "dialog.encryptedLocalUnlock.reasonRefreshConnection": "Desbloquea el almacenamiento local cifrado para seguir actualizando esta conexión.",
     "dialog.encryptedLocalUnlock.reasonRefreshConnections": "Desbloquea el almacenamiento local cifrado para seguir actualizando las conexiones guardadas.",
     "dialog.encryptedLocalUnlock.reasonExportBundle": "Desbloquea el almacenamiento local cifrado para continuar exportando el paquete de migración.",
+    "dialog.encryptedLocalUnlock.reasonImportBundle": "Desbloquea el almacenamiento local cifrado para continuar importando el paquete de migración.",
     "dialog.encryptedLocalUnlock.reasonSaveLocalSetup": "Desbloquea el almacenamiento local cifrado para guardar esta configuración local detectada en Nile.",
     "dialog.encryptedLocalUnlock.reasonSaveConnection": "Desbloquea el almacenamiento local cifrado para seguir guardando esta conexión.",
     "dialog.encryptedLocalUnlock.reasonUpdateConnection": "Desbloquea el almacenamiento local cifrado para seguir actualizando esta conexión.",

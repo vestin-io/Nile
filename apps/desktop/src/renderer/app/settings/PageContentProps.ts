@@ -70,6 +70,7 @@ export type SettingsPageContentProps = {
   onConfigureAgent(agentId: AgentId): void;
   onRememberCredentialStorageMode(backend: CredentialStorageBackend): void;
   onConfirmImportAgent(agentId: AgentId): Promise<void>;
+  onImportCredentials(): Promise<void>;
   onQuickSetupSaveAgent(
     agentId: AgentId,
     input: {
@@ -85,7 +86,6 @@ export type SettingsPageContentProps = {
   onCreateProfile(name: string, emoji: string, assignments: WorkspaceProfileAssignment[]): Promise<string>;
   onDeleteProfile(profileId: string): Promise<void>;
   onInstallUpdate(): Promise<void>;
-  onImportCredentials(): Promise<void>;
   onLanguageChange(language: LanguagePreference): void;
   onStatusEntryDisplayModeChange(
     mode: Awaited<ReturnType<typeof window.nileDesktop.statusEntry.getStatusEntryDisplay>>["mode"],
