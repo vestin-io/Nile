@@ -177,8 +177,7 @@ export function SettingsApp() {
     [releaseInfo],
   );
   const shouldShowUpdatePrompt = releaseInfo !== null
-    && (releaseInfo.status === "ready" || releaseInfo.status === "error")
-    && updatePromptKey !== dismissedUpdatePromptKey;
+    && (releaseInfo.status === "ready" || releaseInfo.status === "error") && updatePromptKey !== dismissedUpdatePromptKey;
   const {
     credentialStorageState,
     isUnlockEncryptedLocalStorageDialogOpen,

@@ -43,11 +43,14 @@
 - Changed import so encrypted-local machines must unlock before the migration-package preview flow starts; the import dialog now only asks for a local passphrase when it needs to initialize a brand-new encrypted-local vault.
 - Restored the Agents-page current-connection selector for already-saved setups after the quick-setup saved-checkmark fix accidentally leaked into the shared detected-setup rendering path.
 - Added the missing `dialog.encryptedLocalUnlock.reasonImportBundle` translation across the desktop locale set.
+- Split the oversized `en.ts` and `zh.ts` locale files into dedicated quick-setup and portability message shards so they stay within the repository's 500-line structure limit.
+- Trimmed `SettingsApp` back under the structure limit after portability wiring pushed it over the desktop file-size ceiling.
 
 ### Verification
 
 - `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
 - `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+- `node ./scripts/check-structure.mjs`
 
 ### Key findings
 
@@ -56,3 +59,4 @@
 - Connections-page export currently scopes to the user's explicit selection. If nothing is selected, export is disabled instead of silently falling back to export-all.
 - The public docs now describe the current desktop portability model, but they do not yet cover future CLI parity because CLI import/export is intentionally still out of scope for this milestone.
 - Quick setup and Agents now intentionally diverge for already-saved setups: quick setup shows a completion checkmark, while Agents falls back to the normal current-connection selector.
+- The import dialog's package-passphrase field is still using the shared project input component; there is no portability-specific input styling layer anymore.

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { LOCAL_SETUP_PRESENTATION } from "./LocalSetup";
 
 describe("LocalSetupPresentation", () => {
-  it("hides already-saved detected setups from actionable surfaces", () => {
+  it("keeps already-saved detected setups visible for quick setup completion states", () => {
     expect(LOCAL_SETUP_PRESENTATION.shouldShowDetectedSetup({
       agentId: "claude",
       defaultSelected: false,
@@ -13,7 +13,7 @@ describe("LocalSetupPresentation", () => {
       scanId: "claude",
       subtitle: "Gateway (llmfk.dpdns.org) • api_key",
       title: "Claude · Gateway (llmfk.dpdns.org) API Key",
-    })).toBe(false);
+    })).toBe(true);
   });
 
   it("keeps new detected setups visible", () => {
