@@ -9,6 +9,7 @@ import type { BindCursorUsageResult, CursorUsageAutoBindResult } from "@nile/bui
 import { SqliteDatabase } from "@nile/core/services/database";
 
 import type { DesktopConnection, DesktopStatusEntryState, HistoryState, SettingsState } from "../../state/Types";
+import type { DesktopUsageRefreshResult } from "../../state/UsageCache";
 import { DesktopConnectionGateway } from "../connections/DesktopConnectionGateway";
 import type { DesktopAddConnectionInput, DesktopConnectionSummary } from "../connections/contracts";
 import { DesktopStateStore } from "./DesktopStateStore";
@@ -136,6 +137,107 @@ describe("DesktopStateStore", () => {
     expect(surface.getStatusEntryStateCalls).toBe(2);
   });
 
+  it("refreshes menubar and settings state together through a shared surface read", async () => {
+    const surface = new StubSurface();
+    const store = new DesktopStateStore({
+      databasePath: createDatabasePath(),
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    const settingsState = await store.refreshDesktopState({ usageRefreshMode: "manual" });
+
+    expect(settingsState).toEqual({
+      onboarding: null,
+      currentConnection: null,
+      currentConnectionState: "none",
+      liveConnection: null,
+      reconciliationState: "unavailable",
+      connections: [],
+      currentAgentConnections: [],
+      agents: [],
+      detectedSetups: {
+        mode: "empty",
+        importableCount: 0,
+        items: [],
+      },
+      advanced: {
+        agentHomes: [],
+        supportedAgents: [],
+        savedConnectionCount: 0,
+        importableSetupCount: 0,
+        credentialStorageMode: null,
+        credentialStorageModeMixed: false,
+      },
+    });
+    expect(surface.refreshDesktopStateCalls).toEqual([{
+      refreshSettingsUsage: false,
+      usageRefreshMode: "manual",
+    }]);
+    expect(surface.getStatusEntryStateCalls).toBe(0);
+    expect(surface.getSettingsStateCalls).toBe(1);
+    expect(store.peekStatusEntryState()).toEqual({ agents: [] });
+    expect(store.peekSettingsState()).toEqual(settingsState);
+  });
+
+  it("refreshes cached current usage without reloading desktop state", async () => {
+    const surface = new CachedUsageSurface();
+    const store = new DesktopStateStore({
+      databasePath: createDatabasePath(),
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.getStatusEntryState();
+    await store.getSettingsState();
+    const result = await store.refreshCachedCurrentUsage({ mode: "auto" });
+
+    expect(result).toEqual({
+      changed: true,
+      hasCachedState: true,
+      refreshed: true,
+      settingsState: createSettingsState("refreshed"),
+    });
+    expect(surface.getStatusEntryStateCalls).toBe(1);
+    expect(surface.getSettingsStateCalls).toBe(1);
+    expect(surface.refreshDesktopStateCalls).toEqual([]);
+    expect(surface.refreshUsageByConnectionIdCalls).toEqual([{
+      connectionIds: ["work"],
+      options: { mode: "auto" },
+    }]);
+    expect(store.peekStatusEntryState()).toEqual(createStatusEntryState("refreshed"));
+    expect(store.peekSettingsState()).toEqual(createSettingsState("refreshed"));
+  });
+
+  it("keeps automatic usage refreshes silent when the cache is still fresh", async () => {
+    const surface = new CacheHitUsageSurface();
+    const store = new DesktopStateStore({
+      databasePath: createDatabasePath(),
+      surface: surface as never,
+      connectionGateway: new StubConnectionGateway() as never,
+      connectionManager: new StubConnectionManager() as never,
+    });
+
+    await store.getStatusEntryState();
+    await store.getSettingsState();
+    const result = await store.refreshCachedCurrentUsage({ mode: "auto" });
+
+    expect(result).toEqual({
+      changed: false,
+      hasCachedState: true,
+      refreshed: false,
+      settingsState: createSettingsState("cached"),
+    });
+    expect(surface.refreshUsageByConnectionIdCalls).toEqual([{
+      connectionIds: ["work"],
+      options: { mode: "auto" },
+    }]);
+    expect(store.peekStatusEntryState()).toEqual(createStatusEntryState("cached"));
+    expect(store.peekSettingsState()).toEqual(createSettingsState("cached"));
+  });
+
   it("primes startup menubar and settings state into cache together", async () => {
     const surface = new StubSurface();
     const databasePath = createDatabasePath();
@@ -238,27 +340,6 @@ describe("DesktopStateStore", () => {
     expect(gateway.bindCursorUsageCalls).toEqual([["cursor-work", "session-token"]]);
     expect(surface.getStatusEntryStateCalls).toBe(2);
     expect(surface.getSettingsStateCalls).toBe(2);
-  });
-
-  it("invalidates cached settings state after updating an agent connection model", async () => {
-    const surface = new StubSurface();
-    const gateway = new StubConnectionGateway();
-    const store = new DesktopStateStore({
-      databasePath: createDatabasePath(),
-      surface: surface as never,
-      connectionGateway: gateway as never,
-      connectionManager: new StubConnectionManager() as never,
-    });
-
-    await store.getSettingsState();
-
-    const result = store.updateAgentConnectionModel("openclaw", "work", "gpt-5.3-codex");
-    await store.getSettingsState();
-
-    expect(result).toBe("gpt-5.3-codex");
-    expect(gateway.updateAgentConnectionModelCalls).toEqual([["openclaw", "work", "gpt-5.3-codex"]]);
-    expect(surface.getSettingsStateCalls).toBe(2);
-    expect(surface.getStatusEntryStateCalls).toBe(0);
   });
 
   it("hydrates cached menubar and settings state from the persisted desktop snapshot", async () => {
@@ -447,6 +528,11 @@ class StubSurface {
   getSettingsStateOptions: Array<{ refreshUsage?: boolean; usageRefreshMode?: "auto" | "manual" }> = [];
   getHistoryStateCalls = 0;
   primeStartupStateCalls = 0;
+  refreshDesktopStateCalls: Array<{ refreshSettingsUsage?: boolean; usageRefreshMode?: "auto" | "manual" }> = [];
+  refreshUsageByConnectionIdCalls: Array<{
+    connectionIds: Array<string | null>;
+    options?: { force?: boolean; mode?: "auto" | "manual" };
+  }> = [];
 
   async getStatusEntryState(): Promise<DesktopStatusEntryState> {
     this.getStatusEntryStateCalls += 1;
@@ -493,7 +579,36 @@ class StubSurface {
     };
   }
 
-  async refreshStatusEntryUsage(): Promise<void> {}
+  async refreshUsageByConnectionId(
+    connectionIds: Array<string | null>,
+    options?: { force?: boolean; mode?: "auto" | "manual" },
+  ): Promise<DesktopUsageRefreshResult> {
+    this.refreshUsageByConnectionIdCalls.push({ connectionIds, options });
+    return {
+      refreshedConnectionIds: [],
+      usageByConnectionId: new Map(
+        connectionIds.filter((connectionId): connectionId is string => connectionId !== null).map((connectionId) => [
+          connectionId,
+          null,
+        ]),
+      ),
+    };
+  }
+
+  async refreshDesktopState(
+    options: { refreshSettingsUsage?: boolean; usageRefreshMode?: "auto" | "manual" } = {},
+  ): Promise<{ statusEntryState: DesktopStatusEntryState; settingsState: SettingsState }> {
+    this.refreshDesktopStateCalls.push(options);
+    return {
+      statusEntryState: {
+        agents: [],
+      },
+      settingsState: await this.getSettingsState({
+        refreshUsage: options.refreshSettingsUsage,
+        usageRefreshMode: options.usageRefreshMode,
+      }),
+    };
+  }
 
   async primeStartupState(): Promise<{ statusEntryState: DesktopStatusEntryState; settingsState: SettingsState }> {
     this.primeStartupStateCalls += 1;
@@ -514,6 +629,52 @@ class UsageSurface extends StubSurface {
   override async getSettingsState(): Promise<SettingsState> {
     this.getSettingsStateCalls += 1;
     return createSettingsState(this.usageText);
+  }
+}
+
+class CachedUsageSurface extends StubSurface {
+  override async getStatusEntryState(): Promise<DesktopStatusEntryState> {
+    this.getStatusEntryStateCalls += 1;
+    return createStatusEntryState("cached");
+  }
+
+  override async getSettingsState(): Promise<SettingsState> {
+    this.getSettingsStateCalls += 1;
+    return createSettingsState("cached");
+  }
+
+  override async refreshUsageByConnectionId(
+    connectionIds: Array<string | null>,
+    options?: { force?: boolean; mode?: "auto" | "manual" },
+  ): Promise<DesktopUsageRefreshResult> {
+    this.refreshUsageByConnectionIdCalls.push({ connectionIds, options });
+    return {
+      refreshedConnectionIds: ["work"],
+      usageByConnectionId: new Map([["work", createUsageState("refreshed")]]),
+    };
+  }
+}
+
+class CacheHitUsageSurface extends StubSurface {
+  override async getStatusEntryState(): Promise<DesktopStatusEntryState> {
+    this.getStatusEntryStateCalls += 1;
+    return createStatusEntryState("cached");
+  }
+
+  override async getSettingsState(): Promise<SettingsState> {
+    this.getSettingsStateCalls += 1;
+    return createSettingsState("cached");
+  }
+
+  override async refreshUsageByConnectionId(
+    connectionIds: Array<string | null>,
+    options?: { force?: boolean; mode?: "auto" | "manual" },
+  ): Promise<DesktopUsageRefreshResult> {
+    this.refreshUsageByConnectionIdCalls.push({ connectionIds, options });
+    return {
+      refreshedConnectionIds: [],
+      usageByConnectionId: new Map([["work", createUsageState("cached")]]),
+    };
   }
 }
 
@@ -581,7 +742,6 @@ class StubConnectionManager {
 class StubConnectionGateway {
   bindCursorUsageCalls: Array<[string, string]> = [];
   switchConnectionCalls: Array<[string, string]> = [];
-  updateAgentConnectionModelCalls: Array<[string, string, string | null]> = [];
 
   importCurrentConnection(): DesktopConnectionSummary {
     return {
@@ -600,11 +760,6 @@ class StubConnectionGateway {
       removed: true,
       clearedAgents: [],
     };
-  }
-
-  updateAgentConnectionModel(agentId: string, connectionId: string, modelId: string | null): string | null {
-    this.updateAgentConnectionModelCalls.push([agentId, connectionId, modelId]);
-    return modelId;
   }
 
   async switchConnection(agentId: string, connectionId: string): Promise<DesktopConnection> {
@@ -666,7 +821,19 @@ class StubStateReset {
 function createSettingsState(usageText: string): SettingsState {
   return {
     onboarding: null,
-    currentConnection: null,
+    currentConnection: {
+      id: "work",
+      label: "Work",
+      endpointLabel: "OpenAI",
+      endpointFamily: "openai",
+      authMode: "api_key",
+      isCurrent: true,
+      usage: createUsageState(usageText),
+      activeAlertCount: 0,
+      enabledAgents: [],
+      configurableAgents: [],
+      selectedByAgents: [],
+    },
     currentConnectionState: "none",
     liveConnection: null,
     reconciliationState: "unavailable",
@@ -678,13 +845,7 @@ function createSettingsState(usageText: string): SettingsState {
         endpointFamily: "openai",
         authMode: "api_key",
         isCurrent: false,
-        usage: {
-          status: "available",
-          text: usageText,
-          windowLabel: "5h",
-          remainingPercent: 80,
-          windows: [],
-        },
+        usage: createUsageState(usageText),
         activeAlertCount: 0,
         enabledAgents: [],
         configurableAgents: [],
@@ -692,7 +853,46 @@ function createSettingsState(usageText: string): SettingsState {
       },
     ],
     currentAgentConnections: [],
-    agents: [],
+    agents: [
+      {
+        agentId: "codex",
+        agentLabel: "Codex",
+        canRollback: false,
+        latestRollbackableMutationId: null,
+        currentConnection: {
+          id: "work",
+          label: "Work",
+          endpointLabel: "OpenAI",
+          endpointFamily: "openai",
+          authMode: "api_key",
+          isCurrent: true,
+          usage: createUsageState(usageText),
+          activeAlertCount: 0,
+          enabledAgents: [],
+          configurableAgents: [],
+          selectedByAgents: [],
+        },
+        currentUsage: createUsageState(usageText),
+        currentConnectionState: "saved",
+        liveConnection: null,
+        reconciliationState: "unavailable",
+        connections: [
+          {
+            id: "work",
+            label: "Work",
+            endpointLabel: "OpenAI",
+            endpointFamily: "openai",
+            authMode: "api_key",
+            isCurrent: true,
+            usage: createUsageState(usageText),
+            activeAlertCount: 0,
+            enabledAgents: [],
+            configurableAgents: [],
+            selectedByAgents: [],
+          },
+        ],
+      },
+    ],
     detectedSetups: {
       mode: "empty",
       importableCount: 0,
@@ -706,5 +906,55 @@ function createSettingsState(usageText: string): SettingsState {
       credentialStorageMode: "system_secure_storage",
       credentialStorageModeMixed: false,
     },
+  };
+}
+
+function createStatusEntryState(usageText: string): DesktopStatusEntryState {
+  return {
+    agents: [
+      {
+        agentId: "codex",
+        agentLabel: "Codex",
+        currentConnection: {
+          id: "work",
+          label: "Work",
+          endpointLabel: "OpenAI",
+          endpointFamily: "openai",
+          authMode: "api_key",
+          isCurrent: true,
+          usage: createUsageState(usageText),
+          activeAlertCount: 0,
+          enabledAgents: [],
+          configurableAgents: [],
+          selectedByAgents: [],
+        },
+        currentUsage: createUsageState(usageText),
+        connections: [
+          {
+            id: "work",
+            label: "Work",
+            endpointLabel: "OpenAI",
+            endpointFamily: "openai",
+            authMode: "api_key",
+            isCurrent: true,
+            usage: createUsageState(usageText),
+            activeAlertCount: 0,
+            enabledAgents: [],
+            configurableAgents: [],
+            selectedByAgents: [],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+function createUsageState(usageText: string) {
+  return {
+    status: "available" as const,
+    text: usageText,
+    windowLabel: "5h",
+    remainingPercent: 80,
+    windows: [],
   };
 }

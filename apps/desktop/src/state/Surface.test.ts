@@ -79,7 +79,7 @@ describe("DesktopSurface", () => {
             authMode: "api_key",
             isCurrent: true,
             enabledAgents: ["codex"],
-            configurableAgents: ["codex", "openclaw"],
+            configurableAgents: ["codex", "openclaw", "opencode"],
             selectedByAgents: ["codex"],
             endpointUrl: "https://api.openai.com/v1",
             envKey: null,
@@ -96,7 +96,7 @@ describe("DesktopSurface", () => {
               isCurrent: true,
               usage: null,
               enabledAgents: ["codex"],
-              configurableAgents: ["codex", "openclaw"],
+              configurableAgents: ["codex", "openclaw", "opencode"],
               selectedByAgents: ["codex"],
               endpointUrl: "https://api.openai.com/v1",
               envKey: null,
@@ -110,7 +110,7 @@ describe("DesktopSurface", () => {
               isCurrent: false,
               usage: null,
               enabledAgents: ["codex"],
-              configurableAgents: ["codex", "openclaw"],
+              configurableAgents: ["codex", "openclaw", "opencode"],
               selectedByAgents: [],
               endpointUrl: "https://api.openai.com/v1",
             }),
@@ -153,7 +153,7 @@ describe("DesktopSurface", () => {
               isCurrent: false,
               usage: null,
               enabledAgents: ["codex"],
-              configurableAgents: ["codex", "openclaw"],
+              configurableAgents: ["codex", "openclaw", "opencode"],
               selectedByAgents: ["codex"],
               endpointUrl: "https://api.openai.com/v1",
               envKey: null,
@@ -167,7 +167,43 @@ describe("DesktopSurface", () => {
               isCurrent: false,
               usage: null,
               enabledAgents: ["codex"],
-              configurableAgents: ["codex", "openclaw"],
+              configurableAgents: ["codex", "openclaw", "opencode"],
+              selectedByAgents: [],
+              endpointUrl: "https://api.openai.com/v1",
+            }),
+          ]),
+        },
+        {
+          agentId: "opencode",
+          agentLabel: "OpenCode",
+          currentConnection: null,
+          currentUsage: null,
+          connections: expect.arrayContaining([
+            expect.objectContaining({
+              apiKeySource: "direct",
+              id: "work",
+              label: "Work",
+              endpointLabel: "OpenAI Official",
+              endpointFamily: "openai",
+              authMode: "api_key",
+              isCurrent: false,
+              usage: null,
+              enabledAgents: ["codex"],
+              configurableAgents: ["codex", "openclaw", "opencode"],
+              selectedByAgents: ["codex"],
+              endpointUrl: "https://api.openai.com/v1",
+              envKey: null,
+            }),
+            expect.objectContaining({
+              id: "personal",
+              label: "Personal",
+              endpointLabel: "OpenAI Official",
+              endpointFamily: "openai",
+              authMode: "openai_session",
+              isCurrent: false,
+              usage: null,
+              enabledAgents: ["codex"],
+              configurableAgents: ["codex", "openclaw", "opencode"],
               selectedByAgents: [],
               endpointUrl: "https://api.openai.com/v1",
             }),
@@ -231,7 +267,7 @@ describe("DesktopSurface", () => {
         authMode: "api_key",
         isCurrent: true,
         enabledAgents: ["codex"],
-        configurableAgents: ["codex", "openclaw"],
+        configurableAgents: ["codex", "openclaw", "opencode"],
         selectedByAgents: ["codex"],
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         envKey: null,
@@ -248,7 +284,7 @@ describe("DesktopSurface", () => {
         authMode: "api_key",
         isCurrent: true,
         enabledAgents: ["codex"],
-        configurableAgents: ["codex", "openclaw"],
+        configurableAgents: ["codex", "openclaw", "opencode"],
         selectedByAgents: ["codex"],
         endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
         envKey: null,
@@ -265,7 +301,7 @@ describe("DesktopSurface", () => {
           isCurrent: true,
           usage: null,
           enabledAgents: ["codex"],
-          configurableAgents: ["codex", "openclaw"],
+          configurableAgents: ["codex", "openclaw", "opencode"],
           selectedByAgents: ["codex"],
           endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
           envKey: null,
@@ -288,7 +324,7 @@ describe("DesktopSurface", () => {
           isCurrent: true,
           usage: null,
           enabledAgents: ["codex"],
-          configurableAgents: ["codex", "openclaw"],
+          configurableAgents: ["codex", "openclaw", "opencode"],
           selectedByAgents: ["codex"],
           endpointUrl: "https://example.cognitiveservices.azure.com/openai/v1",
           envKey: null,
@@ -469,6 +505,10 @@ describe("DesktopSurface", () => {
         agentId: "openclaw",
         importable: false,
       }),
+      expect.objectContaining({
+        agentId: "opencode",
+        importable: false,
+      }),
     ]);
     expect(state.agents).toEqual(expect.arrayContaining([
       expect.objectContaining({
@@ -532,7 +572,7 @@ describe("DesktopSurface", () => {
       expect.objectContaining({
         id: "gateway-shared-api-key",
         enabledAgents: ["codex", "claude"],
-        configurableAgents: ["codex", "claude", "openclaw"],
+        configurableAgents: ["codex", "claude", "openclaw", "opencode"],
       }),
     ]);
   });
@@ -744,6 +784,13 @@ describe("DesktopSurface", () => {
         {
           agentId: "openclaw",
           agentLabel: "OpenClaw",
+          currentConnection: null,
+          currentUsage: null,
+          connections: [],
+        },
+        {
+          agentId: "opencode",
+          agentLabel: "OpenCode",
           currentConnection: null,
           currentUsage: null,
           connections: [],
@@ -1230,6 +1277,7 @@ function createSetup(options?: {
   claudeHome: string;
   geminiHome: string;
   openclawHome: string;
+  opencodeHome: string;
   credentialStore: StubCredentialStore;
   secureSnapshots: MemorySecureSnapshotStore;
 } {
@@ -1265,6 +1313,10 @@ function createSetup(options?: {
   mkdirSync(openclawHome, { recursive: true });
   writeFileSync(join(openclawHome, "openclaw.json"), "{ models: { mode: 'merge', providers: {} } }\n", "utf8");
 
+  const opencodeHome = join(dir, ".config", "opencode");
+  mkdirSync(opencodeHome, { recursive: true });
+  writeFileSync(join(opencodeHome, "opencode.json"), "{}\n", "utf8");
+
   return {
     dbPath: join(dir, "switcher.sqlite"),
     codexHome,
@@ -1272,6 +1324,7 @@ function createSetup(options?: {
     claudeHome,
     geminiHome,
     openclawHome,
+    opencodeHome,
     credentialStore: new StubCredentialStore(),
     secureSnapshots: new MemorySecureSnapshotStore(),
   };
@@ -1284,6 +1337,7 @@ function createSurface(setup: {
   claudeHome: string;
   geminiHome: string;
   openclawHome: string;
+  opencodeHome: string;
   credentialStore: StubCredentialStore;
   secureSnapshots: MemorySecureSnapshotStore;
 }): DesktopSurface {
@@ -1304,6 +1358,7 @@ function applySavedConnection(
     claudeHome: string;
     geminiHome: string;
     openclawHome: string;
+    opencodeHome: string;
     credentialStore: StubCredentialStore;
     secureSnapshots: MemorySecureSnapshotStore;
   },
@@ -1332,6 +1387,7 @@ function setAgentConnectionModel(
     claudeHome: string;
     geminiHome: string;
     openclawHome: string;
+    opencodeHome: string;
     credentialStore: StubCredentialStore;
     secureSnapshots: MemorySecureSnapshotStore;
   },
@@ -1361,6 +1417,7 @@ async function updateConnectionEnabledAgents(
     claudeHome: string;
     geminiHome: string;
     openclawHome: string;
+    opencodeHome: string;
     credentialStore: StubCredentialStore;
     secureSnapshots: MemorySecureSnapshotStore;
   },
@@ -1390,6 +1447,7 @@ function createAgentHomes(setup: {
   claudeHome: string;
   geminiHome: string;
   openclawHome: string;
+  opencodeHome: string;
 }) {
   return {
     codex: setup.codexHome,
@@ -1397,6 +1455,7 @@ function createAgentHomes(setup: {
     claude: setup.claudeHome,
     gemini: setup.geminiHome,
     openclaw: setup.openclawHome,
+    opencode: setup.opencodeHome,
   } as const;
 }
 

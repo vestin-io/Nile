@@ -1,7 +1,7 @@
 import {
   BUILTIN_AGENT_DECLARATIONS,
   registerBuiltinAgentDeclarations
-} from "../chunk-4QZ2XO37.js";
+} from "../chunk-V44RJOZR.js";
 export {
   BUILTIN_AGENT_DECLARATIONS,
   registerBuiltinAgentDeclarations

@@ -54,6 +54,7 @@ import { DesktopStateStore } from "../state/DesktopStateStore";
 import { DesktopWorkspaceWatcher } from "./DesktopWorkspaceWatcher";
 import { DesktopManagedEnvironmentLifecycle } from "./ManagedEnvironmentLifecycle";
 import { DesktopStatusEntryController } from "./StatusEntryController";
+import { DesktopUsageAutoRefresh } from "./UsageAutoRefresh";
 
 const currentDir = typeof __dirname === "string" ? __dirname : dirname(fileURLToPath(import.meta.url));
 
@@ -92,6 +93,7 @@ export class DesktopMain {
   private readonly notifications: DesktopNotificationService;
   private readonly managedEnvironmentLifecycle: DesktopManagedEnvironmentLifecycle;
   private readonly statusEntryController: DesktopStatusEntryController;
+  private readonly usageAutoRefresh: DesktopUsageAutoRefresh;
   private readonly inputs = new DesktopIpcInputValidator();
   private isQuitting = false;
 
@@ -289,6 +291,10 @@ export class DesktopMain {
       shell: this.shell,
       writeSelectedAgentIds: (agentIds) => this.statusEntryDisplayStore.writeSelectedAgentIds(agentIds),
     });
+    this.usageAutoRefresh = new DesktopUsageAutoRefresh({
+      logger: this.logger.child({ scope: "usage-auto-refresh" }),
+      refreshAutomaticUsage: async (options) => await this.stateRefresher.refreshAutomaticUsage(options),
+    });
   }
 
   async start(): Promise<void> {
@@ -308,14 +314,7 @@ export class DesktopMain {
     void this.stateStore.primeStartupState().catch((error) => {
       this.logger.error("desktop.startup.prime_state_failed", error);
     });
-    setTimeout(() => {
-      if (this.isQuitting) {
-        return;
-      }
-      void this.refreshStatusEntryUsage().catch((error) => {
-        this.logger.error("desktop.startup.refresh_usage_failed", error);
-      });
-    }, 1500);
+    this.usageAutoRefresh.start();
     void this.autoBindCursorUsageInBackground();
 
     app.on("before-quit", () => {
@@ -323,6 +322,7 @@ export class DesktopMain {
       this.connectionManager.clearPreparedConnectionDrafts();
       this.credentialStorageSession.clearUnlockedCredentials();
       this.workspaceWatcher.stop();
+      this.usageAutoRefresh.stop();
     });
     app.on("activate", () => {
       this.shell.showSettings();
@@ -384,6 +384,7 @@ export class DesktopMain {
       previewCredentialImport: (input) => this.portableTransferGateway.previewImport(input),
       applyCredentialImport: async (input) => await this.portableTransferGateway.applyImport(input),
       refreshAll: () => this.reloadAll(),
+      refreshDesktopState: async (options) => await this.refreshDesktopState(options),
       stateStore: this.stateStore,
     }).register();
     new DesktopIpcProfileRoutes({
@@ -457,8 +458,12 @@ export class DesktopMain {
   }
 
   private async refreshDesktopState(options: {
+    forceStatusEntryUsageRefresh?: boolean;
     invalidate: boolean;
     notifyRenderer: boolean;
+    refreshSettingsUsage?: boolean;
+    refreshStatusEntryUsage?: boolean;
+    usageRefreshMode?: "auto" | "manual";
   }): Promise<void> {
     this.workspaceWatcher.ignoreChangesFor(1000);
     await this.stateRefresher.refreshDesktopState(options);
@@ -475,10 +480,6 @@ export class DesktopMain {
         error: error instanceof Error ? error.message : String(error),
       });
     }
-  }
-
-  private refreshStatusEntryUsage(): Promise<void> {
-    return this.stateRefresher.refreshStatusEntryUsage();
   }
 
   private clearManagedApiKeyEnvironment(): void {

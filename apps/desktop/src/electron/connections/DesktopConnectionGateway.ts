@@ -122,8 +122,21 @@ export class DesktopConnectionGateway {
     });
   }
 
-  updateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): string | null {
-    return this.sessions.run((session) => session.setAgentConnectionModel(agentId, connectionId, modelId));
+  async saveAgentConnectionModel(
+    agentId: AgentId,
+    connectionId: string,
+    modelId: string | null,
+    options?: { applyIfCurrent?: boolean },
+  ): Promise<string | null> {
+    return await this.sessions.runAsync(async (session) => {
+      const nextModelId = session.setAgentConnectionModel(agentId, connectionId, modelId);
+      if (!options?.applyIfCurrent) {
+        return nextModelId;
+      }
+      await this.enableAgentForConnectionIfNeeded(session, agentId, connectionId);
+      session.useConnection(agentId, connectionId);
+      return nextModelId;
+    });
   }
 
   async switchConnection(agentId: AgentId, connectionId: string): Promise<DesktopConnection> {

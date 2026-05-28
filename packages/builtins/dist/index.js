@@ -1,6 +1,6 @@
 import {
   registerBuiltinAgentDeclarations
-} from "./chunk-4QZ2XO37.js";
+} from "./chunk-V44RJOZR.js";
 
 // src/index.ts
 import { CLAUDE_AGENT_MODULE } from "@nile/agent-claude/module";
@@ -8,6 +8,7 @@ import { CODEX_AGENT_MODULE } from "@nile/agent-codex/module";
 import { CURSOR_AGENT_MODULE } from "@nile/agent-cursor/module";
 import { GEMINI_AGENT_MODULE } from "@nile/agent-gemini/module";
 import { OPENCLAW_AGENT_MODULE } from "@nile/agent-openclaw/module";
+import { OPENCODE_AGENT_MODULE } from "@nile/agent-opencode/module";
 import { ANTHROPIC_API_KEY_MODULE } from "@nile/connections/anthropic-api-key/module";
 import { CLAUDE_SESSION_MODULE } from "@nile/connections/claude-session/module";
 import { CURSOR_API_KEY_MODULE } from "@nile/connections/cursor-api-key/module";
@@ -76,7 +77,8 @@ function registerBuiltins() {
     CURSOR_AGENT_MODULE,
     CLAUDE_AGENT_MODULE,
     GEMINI_AGENT_MODULE,
-    OPENCLAW_AGENT_MODULE
+    OPENCLAW_AGENT_MODULE,
+    OPENCODE_AGENT_MODULE
   ]);
   CONNECTION_FAMILY_REGISTRY.register([
     OPENAI_API_KEY_MODULE,

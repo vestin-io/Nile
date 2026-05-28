@@ -5,6 +5,7 @@ import cursorSvg from "@lobehub/icons-static-svg/icons/cursor.svg";
 import claudeCodeSvg from "@lobehub/icons-static-svg/icons/claudecode-color.svg";
 import geminiCliSvg from "@lobehub/icons-static-svg/icons/geminicli-color.svg";
 import openClawSvg from "@lobehub/icons-static-svg/icons/openclaw-color.svg";
+import openCodeSvg from "@lobehub/icons-static-svg/icons/opencode.svg";
 
 const cursorColorSvg = cursorSvg.replaceAll("currentColor", "#3478F6");
 const AGENT_ICON_SVGS = {
@@ -13,6 +14,7 @@ const AGENT_ICON_SVGS = {
   cursor: cursorColorSvg,
   gemini: geminiCliSvg,
   openclaw: openClawSvg,
+  opencode: openCodeSvg,
 } as const;
 
 export function renderAgentIcon(agentId: AgentId, instanceId?: string): string {

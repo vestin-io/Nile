@@ -5,15 +5,17 @@ import { ConnectionUsageAlertEvaluator } from "../alerts/Evaluator";
 import { DesktopStateStore } from "./DesktopStateStore";
 
 type RefreshDesktopStateOptions = {
+  forceStatusEntryUsageRefresh?: boolean;
   invalidate: boolean;
   notifyRenderer: boolean;
+  refreshSettingsUsage?: boolean;
+  refreshStatusEntryUsage?: boolean;
   usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
-type RefreshStatusEntryUsageOptions = {
-  mode?: DesktopUsageRefreshMode;
-  notifyRenderer?: boolean;
-  tolerateFailures?: boolean;
+type RefreshAutomaticUsageOptions = {
+  fallbackToDesktopRefresh?: boolean;
+  force?: boolean;
 };
 
 type DesktopStateRefresherOptions = {
@@ -31,43 +33,52 @@ export class DesktopStateRefresher {
       this.options.stateStore.invalidateAll();
     }
 
-    await Promise.all([
-      this.options.stateStore.refreshStatusEntryState(),
-      this.options.stateStore.refreshStatusEntryUsage({ mode: options.usageRefreshMode }),
-    ]);
-    await this.evaluateAlerts();
+    const settingsState = await this.options.stateStore.refreshDesktopState({
+      ...(typeof options.forceStatusEntryUsageRefresh === "boolean"
+        ? { forceStatusEntryUsageRefresh: options.forceStatusEntryUsageRefresh }
+        : {}),
+      refreshSettingsUsage: options.refreshSettingsUsage,
+      refreshStatusEntryUsage: options.refreshStatusEntryUsage,
+      usageRefreshMode: options.usageRefreshMode,
+    });
+    this.evaluateAlerts(settingsState);
 
     if (options.notifyRenderer) {
       this.options.notifyRenderer();
     }
   }
 
-  async refreshStatusEntryUsage(options: RefreshStatusEntryUsageOptions = {}): Promise<void> {
-    const notifyRenderer = options.notifyRenderer ?? true;
-    const tolerateFailures = options.tolerateFailures ?? true;
-
-    try {
-      await this.options.stateStore.refreshStatusEntryUsage({ mode: options.mode });
-      await this.evaluateAlerts();
-      if (notifyRenderer) {
-        this.options.notifyRenderer();
-      }
-    } catch (error) {
-      if (!tolerateFailures) {
-        throw error;
-      }
-
-      this.options.logger.warn("desktop.status_entry_usage_refresh_failed", {
-        error: error instanceof Error ? error.message : String(error),
+  async refreshAutomaticUsage(options: RefreshAutomaticUsageOptions = {}): Promise<void> {
+    const result = await this.options.stateStore.refreshCachedCurrentUsage({
+      force: options.force,
+      mode: "auto",
+    });
+    if (!result.hasCachedState && options.fallbackToDesktopRefresh === true) {
+      await this.refreshDesktopState({
+        forceStatusEntryUsageRefresh: true,
+        invalidate: false,
+        notifyRenderer: true,
+        refreshSettingsUsage: false,
+        refreshStatusEntryUsage: true,
+        usageRefreshMode: "auto",
       });
+      return;
     }
+
+    if (!result.changed) {
+      return;
+    }
+
+    if (result.settingsState) {
+      this.evaluateAlerts(result.settingsState);
+    }
+    this.options.notifyRenderer();
   }
 
-  private async evaluateAlerts(): Promise<void> {
+  private evaluateAlerts(settingsState: Awaited<ReturnType<DesktopStateStore["getSettingsState"]>>): void {
     if (!this.options.alertEvaluator) {
       return;
     }
-    const settingsState = await this.options.stateStore.getSettingsState({ refreshUsage: false });
     this.options.alertEvaluator.evaluate(settingsState);
   }
 }

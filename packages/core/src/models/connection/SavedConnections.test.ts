@@ -59,7 +59,7 @@ describe("SavedConnections", () => {
           authMode: "openai_session",
           credentialStorageBackend: "system_secure_storage",
           enabledAgents: ["codex"],
-          configurableAgents: ["codex", "openclaw"],
+          configurableAgents: ["codex", "openclaw", "opencode"],
           selectedByAgents: ["codex"],
         },
       ]);
@@ -110,6 +110,7 @@ describe("SavedConnections", () => {
       expect(connections.listForAgent("codex").map((entry) => entry.id)).toEqual(["frank"]);
       expect(connections.listForAgent("claude").map((entry) => entry.id)).toEqual(["frank"]);
       expect(connections.listForAgent("openclaw").map((entry) => entry.id)).toEqual(["frank"]);
+      expect(connections.listForAgent("opencode").map((entry) => entry.id)).toEqual(["frank"]);
     } finally {
       connections.close();
     }
@@ -140,7 +141,14 @@ describe("SavedConnections", () => {
       expect(connections.listForAgent("openclaw")).toEqual([
         expect.objectContaining({
           id: "openai-session",
-          configurableAgents: ["codex", "openclaw"],
+          configurableAgents: ["codex", "openclaw", "opencode"],
+          enabledAgents: ["codex"],
+        }),
+      ]);
+      expect(connections.listForAgent("opencode")).toEqual([
+        expect.objectContaining({
+          id: "openai-session",
+          configurableAgents: ["codex", "openclaw", "opencode"],
           enabledAgents: ["codex"],
         }),
       ]);
@@ -211,11 +219,12 @@ describe("SavedConnections", () => {
       expect(connections.list()).toEqual([
         expect.objectContaining({
           id: "broken-openai-session",
-          configurableAgents: ["codex", "openclaw"],
+          configurableAgents: ["codex", "openclaw", "opencode"],
         }),
       ]);
       expect(connections.listForAgent("codex")).toEqual([]);
       expect(connections.listForAgent("openclaw")).toEqual([]);
+      expect(connections.listForAgent("opencode")).toEqual([]);
     } finally {
       connections.close();
     }
@@ -259,7 +268,7 @@ describe("SavedConnections", () => {
         expect.objectContaining({
           id: "gateway-primary",
           endpointFamily: "gateway",
-          configurableAgents: ["codex", "openclaw"],
+          configurableAgents: ["codex", "openclaw", "opencode"],
         }),
       ]);
     } finally {
@@ -360,7 +369,7 @@ describe("SavedConnections", () => {
           id: "gateway-managed-direct",
           apiKeySource: "direct",
           envKey: "NILE_GATEWAY_MANAGED_DIRECT_API_KEY",
-          configurableAgents: ["codex", "claude", "openclaw"],
+          configurableAgents: ["codex", "claude", "openclaw", "opencode"],
         }),
       );
       expect(connections.list()).toEqual([
@@ -369,7 +378,7 @@ describe("SavedConnections", () => {
           endpointUrl: "https://gateway.example.com/v1",
           apiKeySource: "direct",
           envKey: "NILE_GATEWAY_MANAGED_DIRECT_API_KEY",
-          configurableAgents: ["codex", "claude", "openclaw"],
+          configurableAgents: ["codex", "claude", "openclaw", "opencode"],
         }),
       ]);
     } finally {
@@ -509,7 +518,7 @@ describe("SavedConnections", () => {
         authMode: "openai_session",
         credentialStorageBackend: "system_secure_storage",
         enabledAgents: ["codex"],
-        configurableAgents: ["codex", "openclaw"],
+        configurableAgents: ["codex", "openclaw", "opencode"],
         selectedByAgents: ["codex"],
       });
     } finally {

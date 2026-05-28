@@ -18,7 +18,7 @@ describe("DesktopPreferences", () => {
   it("appends newly supported agents to stored preferences", () => {
     expect(parseDesktopPreferences(JSON.stringify({
       agentOrder: ["codex", "claude", "cursor", "openclaw"],
-    })).agentOrder).toEqual(["codex", "claude", "cursor", "openclaw", "gemini"]);
+    })).agentOrder).toEqual(["codex", "claude", "cursor", "openclaw", "gemini", "opencode"]);
   });
 
   it("preserves normalized connection quota metric preferences", () => {

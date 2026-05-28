@@ -1,4 +1,4 @@
-export type AgentId = "codex" | "cursor" | "claude" | "gemini" | "openclaw";
+export type AgentId = "codex" | "cursor" | "claude" | "gemini" | "openclaw" | "opencode";
 
 export const SUPPORTED_AGENT_IDS: readonly AgentId[] = [
   "codex",
@@ -6,6 +6,7 @@ export const SUPPORTED_AGENT_IDS: readonly AgentId[] = [
   "claude",
   "gemini",
   "openclaw",
+  "opencode",
 ];
 
 const SUPPORTED_AGENT_ID_SET = new Set<string>(SUPPORTED_AGENT_IDS);

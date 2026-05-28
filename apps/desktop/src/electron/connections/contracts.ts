@@ -175,6 +175,7 @@ export type DesktopUpdateAgentConnectionModelInput = {
   agentId: AgentId;
   connectionId: string;
   modelId: string | null;
+  applyIfCurrent?: boolean;
 };
 
 export type DesktopConnectionBridge = {

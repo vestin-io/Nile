@@ -128,6 +128,7 @@ export class DesktopIpcInputValidator {
       agentId: this.readAgentId(record.agentId, "agentId"),
       connectionId: this.readRequiredString(record.connectionId, "connectionId"),
       modelId: record.modelId === undefined ? null : this.readNullableString(record.modelId, "modelId"),
+      applyIfCurrent: this.readOptionalBoolean(record.applyIfCurrent, "applyIfCurrent"),
     };
   }
 

@@ -1,12 +1,15 @@
-import { mkdirSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 
 import pino, { type Logger as PinoLogger } from "pino";
+
+import { BoundedLogDestination } from "./BoundedLogDestination";
 
 type LogFields = Record<string, unknown>;
 
 export class NileLogger {
+  private static readonly MAX_LOG_BYTES = 10 * 1024 * 1024;
+
   static createDefault(options?: { logPath?: string; level?: string; module?: string }): NileLogger {
     const logger = this.createPinoLogger(options);
 
@@ -48,15 +51,16 @@ export class NileLogger {
     };
 
     try {
-      return pino(config, pino.destination({ dest: this.ensureLogPath(preferredPath), sync: false }));
+      return pino(config, new BoundedLogDestination({
+        path: preferredPath,
+        maxBytes: this.MAX_LOG_BYTES,
+      }));
     } catch {
-      return pino(config, pino.destination({ dest: this.ensureLogPath(fallbackPath), sync: false }));
+      return pino(config, new BoundedLogDestination({
+        path: fallbackPath,
+        maxBytes: this.MAX_LOG_BYTES,
+      }));
     }
-  }
-
-  private static ensureLogPath(preferredPath: string): string {
-    mkdirSync(dirname(preferredPath), { recursive: true });
-    return preferredPath;
   }
 
   child(bindings: LogFields): NileLogger {

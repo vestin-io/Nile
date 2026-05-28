@@ -7,7 +7,7 @@ import type { DesktopStateReadContext } from "./ReadContext";
 import type { DesktopStatusEntryAgentState, DesktopStatusEntryState } from "./Types";
 import { DesktopConnectionListPresenter } from "./connection/List";
 import { DesktopConnectionStatusPresenter } from "./connection/Status";
-import { DesktopUsageCache, type DesktopUsageRefreshMode } from "./UsageCache";
+import { DesktopUsageCache, type DesktopUsageRefreshMode, type DesktopUsageRefreshResult } from "./UsageCache";
 
 export class DesktopStatusEntryStateQuery {
   constructor(
@@ -31,18 +31,29 @@ export class DesktopStatusEntryStateQuery {
 
   async refreshUsage(
     session: NileSession,
-    options?: { mode?: DesktopUsageRefreshMode },
-  ): Promise<void> {
-    const savedConnections = session.listSavedConnections();
-    const statuses = this.listStatuses(session);
+    options?: { force?: boolean; mode?: DesktopUsageRefreshMode },
+  ): Promise<DesktopUsageRefreshResult> {
+    return await this.refreshUsageFromContext(session, {
+      savedConnections: session.listSavedConnections(),
+      statuses: this.listStatuses(session),
+    }, options);
+  }
+
+  async refreshUsageFromContext(
+    session: NileSession,
+    context: Pick<DesktopStateReadContext, "savedConnections" | "statuses">,
+    options?: { force?: boolean; mode?: DesktopUsageRefreshMode },
+  ): Promise<DesktopUsageRefreshResult> {
+    const savedConnections = context.savedConnections;
+    const statuses = context.statuses;
     const currentConnectionIds = new Set(
       statuses.map((status) => {
         return this.status.resolveEffectiveCurrentConnection(status, savedConnections)?.id ?? null;
       }).filter((connectionId): connectionId is string => connectionId !== null),
     );
 
-    await this.usage.refreshByConnectionId(session, [...currentConnectionIds], {
-      force: true,
+    return await this.usage.refreshByConnectionId(session, [...currentConnectionIds], {
+      force: options?.force ?? true,
       mode: options?.mode,
     });
   }

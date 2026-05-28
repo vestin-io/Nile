@@ -100,7 +100,7 @@ describe("LiveSetupImportSupport", () => {
       expect(setup.accessRegistry.get(result.id)).toEqual(
         expect.objectContaining({
           endpointId: "gateway-gateway-example-test",
-          enabledAgents: ["claude", "openclaw"],
+          enabledAgents: ["claude", "openclaw", "opencode"],
         }),
       );
     } finally {
@@ -182,7 +182,7 @@ describe("LiveSetupImportSupport", () => {
       expect(setup.accessRegistry.get("gateway-key")).toEqual(
         expect.objectContaining({
           endpointId: "gateway-gateway-example-test",
-          enabledAgents: ["codex", "claude", "openclaw"],
+          enabledAgents: ["codex", "claude", "openclaw", "opencode"],
         }),
       );
       expect(setup.endpointRegistry.get("gateway-gateway-example-test")?.protocols).toEqual({
@@ -316,7 +316,7 @@ describe("LiveSetupImportSupport", () => {
       expect(setup.accessRegistry.get("gateway-key")).toEqual(
         expect.objectContaining({
           label: "Custom Gateway Label",
-          enabledAgents: ["claude", "codex", "openclaw"],
+          enabledAgents: ["claude", "codex", "openclaw", "opencode"],
         }),
       );
       expect(setup.endpointRegistry.get("gateway-gateway-example-test")).toEqual(
@@ -630,7 +630,7 @@ describe("LiveSetupImportSupport", () => {
       }));
 
       expect(result.endpointFamily).toBe("gateway");
-      expect(setup.accessRegistry.get(result.id)?.enabledAgents).toEqual(["codex", "claude", "openclaw"]);
+      expect(setup.accessRegistry.get(result.id)?.enabledAgents).toEqual(["codex", "claude", "openclaw", "opencode"]);
       expect(setup.endpointRegistry.get(result.endpointId)?.protocols).toEqual({
         openai: {
           basePath: "/v1",

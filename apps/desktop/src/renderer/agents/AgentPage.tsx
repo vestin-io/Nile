@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { AgentId } from "@nile/core/models/agent/definitions";
 
@@ -13,6 +13,7 @@ import { AgentDetailPage } from "./detail/Page";
 import type { AgentDetailTab } from "./detail/Page";
 import type { Translator } from "../shared/I18n";
 import { AgentListView } from "./list/View";
+import { QuickSetupConnectionDialog } from "../quick-setup/ConnectionDialog";
 
 type AgentPageProps = {
   agents: DesktopAgentState[];
@@ -67,6 +68,7 @@ export function AgentPage({
   onSelectedDetailTabChange,
   onSwitch,
 }: AgentPageProps) {
+  const [configureAgentId, setConfigureAgentId] = useState<AgentId | null>(null);
   const fallbackOrderIndex = useMemo(
     () => new Map(agents.map((agent, index) => [agent.agentId, index])),
     [agents],
@@ -77,6 +79,16 @@ export function AgentPage({
       - (agentOrder.indexOf(right.agentId) >= 0 ? agentOrder.indexOf(right.agentId) : (fallbackOrderIndex.get(right.agentId) ?? Number.MAX_SAFE_INTEGER))),
     [agentOrder, agents, fallbackOrderIndex],
   );
+
+  useEffect(() => {
+    if (!configureAgentId) {
+      return;
+    }
+
+    if (!orderedAgents.find((agent) => agent.agentId === configureAgentId)) {
+      setConfigureAgentId(null);
+    }
+  }, [configureAgentId, orderedAgents]);
 
   useEffect(() => {
     if (!selectedDetailAgentId) {
@@ -93,35 +105,67 @@ export function AgentPage({
   }
 
   if (!selectedDetailAgentId) {
+    const selectedConfigureAgent = configureAgentId
+      ? orderedAgents.find((agent) => agent.agentId === configureAgentId) ?? null
+      : null;
+
     return (
-      <AgentListView
-        agents={orderedAgents}
-        canConfigureAgent={canConfigureAgent}
-        detectedSetups={detectedSetups}
-        showQuickSetupEntry={showQuickSetupEntry}
-        t={t}
-        onConfigureAgent={onConfigureAgent}
-        onImport={onImport}
-        onOpenQuickSetup={onOpenQuickSetup}
-        onReorderAgents={(draggedAgentId, targetAgentId) => {
-          const currentOrder = [...agentOrder];
-          const draggedIndex = currentOrder.indexOf(draggedAgentId);
-          const targetIndex = currentOrder.indexOf(targetAgentId);
-          if (draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) {
-            return;
-          }
-          const [moved] = currentOrder.splice(draggedIndex, 1);
-          currentOrder.splice(targetIndex, 0, moved);
-          onAgentOrderChange(currentOrder);
-        }}
-        onOpenDetails={(agentId, tab = "connections") => {
-          onSelectedDetailTabChange(tab);
-          onSelectedDetailAgentIdChange(agentId);
-        }}
-        onRefresh={onRefresh}
-        onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
-        onSwitch={onSwitch}
-      />
+      <>
+        <AgentListView
+          agents={orderedAgents}
+          canConfigureAgent={canConfigureAgent}
+          detectedSetups={detectedSetups}
+          showQuickSetupEntry={showQuickSetupEntry}
+          t={t}
+          onConfigureAgent={(agentId) => {
+            const targetAgent = orderedAgents.find((agent) => agent.agentId === agentId) ?? null;
+            if (!targetAgent || targetAgent.connections.length === 0) {
+              onConfigureAgent(agentId);
+              return;
+            }
+            setConfigureAgentId(agentId);
+          }}
+          onImport={onImport}
+          onOpenQuickSetup={onOpenQuickSetup}
+          onReorderAgents={(draggedAgentId, targetAgentId) => {
+            const currentOrder = [...agentOrder];
+            const draggedIndex = currentOrder.indexOf(draggedAgentId);
+            const targetIndex = currentOrder.indexOf(targetAgentId);
+            if (draggedIndex < 0 || targetIndex < 0 || draggedIndex === targetIndex) {
+              return;
+            }
+            const [moved] = currentOrder.splice(draggedIndex, 1);
+            currentOrder.splice(targetIndex, 0, moved);
+            onAgentOrderChange(currentOrder);
+          }}
+          onOpenDetails={(agentId, tab = "connections") => {
+            onSelectedDetailTabChange(tab);
+            onSelectedDetailAgentIdChange(agentId);
+          }}
+          onRefresh={onRefresh}
+          onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
+          onSwitch={onSwitch}
+        />
+        <QuickSetupConnectionDialog
+          agentId={configureAgentId}
+          connections={selectedConfigureAgent?.connections ?? []}
+          open={configureAgentId !== null}
+          t={t}
+          onAddNew={onConfigureAgent}
+          onOpenModelSetup={(agentId) => {
+            setConfigureAgentId(null);
+            onSelectedDetailTabChange("connections");
+            onSelectedDetailAgentIdChange(agentId);
+          }}
+          onOpenChange={(open) => {
+            if (!open) {
+              setConfigureAgentId(null);
+            }
+          }}
+          onUpdateAgentConnectionModel={onUpdateAgentConnectionModel}
+          onUseExistingConnection={onSwitch}
+        />
+      </>
     );
   }
 

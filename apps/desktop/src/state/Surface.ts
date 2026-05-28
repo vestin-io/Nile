@@ -21,7 +21,11 @@ import { DesktopHistoryStateQuery } from "./HistoryQuery";
 import type { DesktopStateReadContext } from "./ReadContext";
 import { DesktopSettingsStateQuery } from "./SettingsQuery";
 import { DesktopStatusEntryStateQuery } from "./StatusEntryQuery";
-import { DesktopUsageCache, type DesktopUsageRefreshMode } from "./UsageCache";
+import {
+  DesktopUsageCache,
+  type DesktopUsageRefreshMode,
+  type DesktopUsageRefreshResult,
+} from "./UsageCache";
 
 type DesktopSurfaceOptions = {
   databasePath: string;
@@ -36,6 +40,18 @@ type DesktopSurfaceOptions = {
 type DesktopSettingsStateOptions = {
   refreshUsage?: boolean;
   usageRefreshMode?: DesktopUsageRefreshMode;
+};
+
+type DesktopRefreshStateOptions = {
+  forceStatusEntryUsageRefresh?: boolean;
+  refreshSettingsUsage?: boolean;
+  refreshStatusEntryUsage?: boolean;
+  usageRefreshMode?: DesktopUsageRefreshMode;
+};
+
+export type DesktopRefreshStateResult = {
+  settingsState: SettingsState;
+  statusEntryState: DesktopStatusEntryState;
 };
 
 export class DesktopSurface {
@@ -76,7 +92,7 @@ export class DesktopSurface {
     return state;
   }
 
-  async refreshStatusEntryUsage(options?: { mode?: DesktopUsageRefreshMode }): Promise<void> {
+  async refreshStatusEntryUsage(options?: { force?: boolean; mode?: DesktopUsageRefreshMode }): Promise<void> {
     if (this.menubarUsageRefresh) {
       return await this.menubarUsageRefresh;
     }
@@ -90,8 +106,39 @@ export class DesktopSurface {
     return await this.menubarUsageRefresh;
   }
 
+  async refreshUsageByConnectionId(
+    connectionIds: Array<string | null>,
+    options?: { force?: boolean; mode?: DesktopUsageRefreshMode },
+  ): Promise<DesktopUsageRefreshResult> {
+    return await this.withSession("usage-refresh", async (session) =>
+      await this.usage.refreshByConnectionId(session, connectionIds, options));
+  }
+
   async getSettingsState(options: DesktopSettingsStateOptions = {}): Promise<SettingsState> {
     return await this.withSession("settings-state", async (session) => await this.settings.read(session, options));
+  }
+
+  async refreshDesktopState(options: DesktopRefreshStateOptions = {}): Promise<DesktopRefreshStateResult> {
+    return await this.withSession("desktop-refresh", async (session) => {
+      const context = this.createReadContext(session);
+      if (options.refreshStatusEntryUsage ?? true) {
+        await this.statusEntry.refreshUsageFromContext(session, context, {
+          ...(typeof options.forceStatusEntryUsageRefresh === "boolean"
+            ? { force: options.forceStatusEntryUsageRefresh }
+            : {}),
+          mode: options.usageRefreshMode,
+        });
+      }
+      const statusEntryState = this.statusEntry.readFromContext(context);
+      const settingsState = await this.settings.readFromContext(session, context, {
+        refreshUsage: options.refreshSettingsUsage,
+        usageRefreshMode: options.usageRefreshMode,
+      });
+      return {
+        statusEntryState,
+        settingsState,
+      };
+    });
   }
 
   async primeStartupState(): Promise<{ statusEntryState: DesktopStatusEntryState; settingsState: SettingsState }> {

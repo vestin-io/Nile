@@ -7,7 +7,7 @@ export const AZURE_OPENAI_PRESET_MODULE: ConnectionPresetModule<"azure-openai"> 
     iconKey: "azure-openai",
     supportedAuthModes: ["api_key"],
     requiresEndpointUrl: true,
-    configurableAgents: ["codex", "openclaw"],
+    configurableAgents: ["codex", "openclaw", "opencode"],
     defaultEnabledAgents: ["codex"],
     suggestEnabledAgents: false,
   },

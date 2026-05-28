@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DesktopStateRefresher } from "./DesktopStateRefresher";
 
 describe("DesktopStateRefresher", () => {
-  it("refreshes both status-entry state and usage before notifying the renderer", async () => {
+  it("refreshes desktop state before notifying the renderer", async () => {
     const calls: string[] = [];
     const evaluate = vi.fn();
     const refresher = new DesktopStateRefresher({
@@ -16,12 +16,15 @@ describe("DesktopStateRefresher", () => {
         invalidateAll: () => {
           calls.push("invalidate");
         },
-        refreshStatusEntryState: async () => {
-          calls.push("state");
+        refreshCachedCurrentUsage: async () => ({
+          changed: false,
+          hasCachedState: true,
+          refreshed: false,
+          settingsState: null,
+        }),
+        refreshDesktopState: async () => {
+          calls.push("refresh");
           return {} as never;
-        },
-        refreshStatusEntryUsage: async () => {
-          calls.push("usage");
         },
         getSettingsState: async () => ({}) as never,
       } as never,
@@ -32,7 +35,7 @@ describe("DesktopStateRefresher", () => {
       notifyRenderer: true,
     });
 
-    expect(calls).toEqual(["invalidate", "state", "usage", "notify"]);
+    expect(calls).toEqual(["invalidate", "refresh", "notify"]);
     expect(evaluate).toHaveBeenCalled();
   });
 
@@ -43,10 +46,15 @@ describe("DesktopStateRefresher", () => {
       notifyRenderer,
       stateStore: {
         invalidateAll: vi.fn(),
-        refreshStatusEntryState: async () => {
+        refreshCachedCurrentUsage: async () => ({
+          changed: false,
+          hasCachedState: true,
+          refreshed: false,
+          settingsState: null,
+        }),
+        refreshDesktopState: async () => {
           throw new Error("status entry failed");
         },
-        refreshStatusEntryUsage: async () => {},
         getSettingsState: async () => ({}) as never,
       } as never,
     });
@@ -58,75 +66,20 @@ describe("DesktopStateRefresher", () => {
     expect(notifyRenderer).not.toHaveBeenCalled();
   });
 
-  it("rethrows usage refresh failures when strict refresh is requested", async () => {
-    const notifyRenderer = vi.fn();
-    const refresher = new DesktopStateRefresher({
-      logger: createLoggerStub(),
-      notifyRenderer,
-      stateStore: {
-        invalidateAll: vi.fn(),
-        refreshStatusEntryState: async () => ({}) as never,
-        refreshStatusEntryUsage: async () => {
-          throw new Error("usage failed");
-        },
-        getSettingsState: async () => ({}) as never,
-      } as never,
-    });
-
-    await expect(refresher.refreshDesktopState({
-      invalidate: false,
-      notifyRenderer: true,
-    })).rejects.toThrow("usage failed");
-    expect(notifyRenderer).not.toHaveBeenCalled();
-  });
-
-  it("keeps tolerant status-entry usage refreshes non-fatal", async () => {
-    const notifyRenderer = vi.fn();
-    const refresher = new DesktopStateRefresher({
-      logger: createLoggerStub(),
-      notifyRenderer,
-      stateStore: {
-        invalidateAll: vi.fn(),
-        refreshStatusEntryState: async () => ({}) as never,
-        refreshStatusEntryUsage: async () => {
-          throw new Error("usage failed");
-        },
-        getSettingsState: async () => ({}) as never,
-      } as never,
-    });
-
-    await expect(refresher.refreshStatusEntryUsage()).resolves.toBeUndefined();
-    expect(notifyRenderer).not.toHaveBeenCalled();
-  });
-
-  it("evaluates alerts after a successful standalone usage refresh", async () => {
-    const evaluate = vi.fn();
-    const refresher = new DesktopStateRefresher({
-      alertEvaluator: { evaluate } as never,
-      logger: createLoggerStub(),
-      notifyRenderer: vi.fn(),
-      stateStore: {
-        invalidateAll: vi.fn(),
-        refreshStatusEntryState: async () => ({}) as never,
-        refreshStatusEntryUsage: async () => {},
-        getSettingsState: async () => ({ connections: [] }) as never,
-      } as never,
-    });
-
-    await refresher.refreshStatusEntryUsage();
-
-    expect(evaluate).toHaveBeenCalled();
-  });
-
   it("passes manual usage refresh mode through desktop refreshes", async () => {
-    const refreshStatusEntryUsage = vi.fn(async () => {});
+    const refreshDesktopState = vi.fn(async () => ({}));
     const refresher = new DesktopStateRefresher({
       logger: createLoggerStub(),
       notifyRenderer: vi.fn(),
       stateStore: {
         invalidateAll: vi.fn(),
-        refreshStatusEntryState: async () => ({}) as never,
-        refreshStatusEntryUsage,
+        refreshCachedCurrentUsage: async () => ({
+          changed: false,
+          hasCachedState: true,
+          refreshed: false,
+          settingsState: null,
+        }),
+        refreshDesktopState,
         getSettingsState: async () => ({}) as never,
       } as never,
     });
@@ -137,7 +90,88 @@ describe("DesktopStateRefresher", () => {
       usageRefreshMode: "manual",
     });
 
-    expect(refreshStatusEntryUsage).toHaveBeenCalledWith({ mode: "manual" });
+    expect(refreshDesktopState).toHaveBeenCalledWith({
+      refreshSettingsUsage: undefined,
+      usageRefreshMode: "manual",
+    });
+  });
+
+  it("keeps automatic usage refreshes silent when nothing changed", async () => {
+    const notifyRenderer = vi.fn();
+    const refresher = new DesktopStateRefresher({
+      alertEvaluator: { evaluate: vi.fn() } as never,
+      logger: createLoggerStub(),
+      notifyRenderer,
+      stateStore: {
+        invalidateAll: vi.fn(),
+        refreshCachedCurrentUsage: async () => ({
+          changed: false,
+          hasCachedState: true,
+          refreshed: false,
+          settingsState: null,
+        }),
+        refreshDesktopState: async () => ({}) as never,
+        getSettingsState: async () => ({}) as never,
+      } as never,
+    });
+
+    await refresher.refreshAutomaticUsage();
+
+    expect(notifyRenderer).not.toHaveBeenCalled();
+  });
+
+  it("evaluates alerts and notifies after a changed automatic usage refresh", async () => {
+    const evaluate = vi.fn();
+    const notifyRenderer = vi.fn();
+    const refresher = new DesktopStateRefresher({
+      alertEvaluator: { evaluate } as never,
+      logger: createLoggerStub(),
+      notifyRenderer,
+      stateStore: {
+        invalidateAll: vi.fn(),
+        refreshCachedCurrentUsage: async () => ({
+          changed: true,
+          hasCachedState: true,
+          refreshed: true,
+          settingsState: { connections: [] } as never,
+        }),
+        refreshDesktopState: async () => ({}) as never,
+        getSettingsState: async () => ({}) as never,
+      } as never,
+    });
+
+    await refresher.refreshAutomaticUsage();
+
+    expect(evaluate).toHaveBeenCalledWith({ connections: [] });
+    expect(notifyRenderer).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to a full desktop refresh when startup auto usage has no cached state", async () => {
+    const refreshDesktopState = vi.fn(async () => ({}));
+    const refresher = new DesktopStateRefresher({
+      logger: createLoggerStub(),
+      notifyRenderer: vi.fn(),
+      stateStore: {
+        invalidateAll: vi.fn(),
+        refreshCachedCurrentUsage: async () => ({
+          changed: false,
+          hasCachedState: false,
+          refreshed: false,
+          settingsState: null,
+        }),
+        refreshDesktopState,
+        getSettingsState: async () => ({}) as never,
+      } as never,
+    });
+
+    await refresher.refreshAutomaticUsage({ fallbackToDesktopRefresh: true, force: true });
+
+    expect(refreshDesktopState).toHaveBeenCalledWith({
+      forceStatusEntryUsageRefresh: true,
+      refreshSettingsUsage: false,
+      refreshStatusEntryUsage: true,
+      usageRefreshMode: "auto",
+    });
   });
 });
 

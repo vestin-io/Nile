@@ -17,6 +17,7 @@ import {
 import { Field } from "../ui/field";
 import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { formatEnvBackedApiKeyRequirement, formatModelUnavailable } from "../shared/AgentText";
 
 type QuickSetupConnectionDialogProps = {
   agentId: AgentId | null;
@@ -50,11 +51,6 @@ export function QuickSetupConnectionDialog({
     () => connections.find((connection) => connection.id === selectedConnectionId) ?? null,
     [connections, selectedConnectionId],
   );
-
-  if (!agentId) {
-    return null;
-  }
-
   const shouldShowModelField = Boolean(
     selectedConnection
     && (
@@ -75,7 +71,7 @@ export function QuickSetupConnectionDialog({
     showField: shouldShowModelField,
   });
   const modelOptions = modelSelection.modelOptions;
-  const pendingRequirements = selectedConnection
+  const pendingRequirements = agentId && selectedConnection
     ? readConnectionApplyRequirements(agentId, selectedConnection, selectedModelId.trim() || null)
     : null;
   const needsInlineModelSelection = modelSelection.mode === "select";
@@ -113,6 +109,10 @@ export function QuickSetupConnectionDialog({
     setSelectedModelId(modelSelection.nextSelectedModelId);
   }, [modelSelection.nextSelectedModelId, open, selectedConnection, shouldShowModelField]);
 
+  if (!agentId) {
+    return null;
+  }
+
   const agentLabel = formatAgentLabel(agentId);
 
   return (
@@ -138,7 +138,7 @@ export function QuickSetupConnectionDialog({
             </Alert>
           ) : requiresEnvBackedApiKey ? (
             <Alert variant="destructive">
-              <AlertDescription>{t("agents.model.openclawEnvKeyRequired")}</AlertDescription>
+              <AlertDescription>{formatEnvBackedApiKeyRequirement(agentLabel, t)}</AlertDescription>
             </Alert>
           ) : null}
 
@@ -196,7 +196,7 @@ export function QuickSetupConnectionDialog({
                         onChange={(event) => setSelectedModelId(event.target.value)}
                       />
                       <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
-                        <span>{isLoadingModels ? t("quickSetup.detectingModels") : (modelSelection.message ?? t("quickSetup.openclawModelUnavailable"))}</span>
+                        <span>{isLoadingModels ? t("quickSetup.detectingModels") : (modelSelection.message ?? formatModelUnavailable(agentLabel, t))}</span>
                         <Button
                           size="sm"
                           variant="outline"
@@ -225,10 +225,10 @@ export function QuickSetupConnectionDialog({
                 setActionError(null);
                 setPendingConnectionId(selectedConnection.id);
                 void (async () => {
-                if (shouldShowModelField) {
-                  const nextModelId = selectedModelId.trim() || null;
-                  await onUpdateAgentConnectionModel(agentId, selectedConnection.id, nextModelId);
-                }
+                  if (shouldShowModelField) {
+                    const nextModelId = selectedModelId.trim() || null;
+                    await onUpdateAgentConnectionModel(agentId, selectedConnection.id, nextModelId);
+                  }
                   await onUseExistingConnection(agentId, selectedConnection.id);
                   onOpenChange(false);
                 })()

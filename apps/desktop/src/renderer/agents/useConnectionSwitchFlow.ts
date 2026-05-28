@@ -5,6 +5,7 @@ import {
   hasConnectionApplyRequirement,
   readConnectionApplyRequirements,
 } from "../shared/ApplyRequirements";
+import { formatEnvBackedApiKeyRequirement } from "../shared/AgentText";
 import type { Translator } from "../shared/I18n";
 
 type UseAgentConnectionSwitchFlowOptions = {
@@ -102,7 +103,7 @@ export function useAgentConnectionSwitchFlow({
         draftModelId.trim() ? draftModelId : null,
       );
       if (shouldSwitchAfterSave && hasConnectionApplyRequirement(nextRequirements, "env-backed-api-key")) {
-        setModelError(t("agents.model.openclawEnvKeyRequired"));
+        setModelError(formatEnvBackedApiKeyRequirement(agent.agentLabel, t));
         return;
       }
       if (shouldSwitchAfterSave) {
@@ -143,7 +144,7 @@ export function useAgentConnectionSwitchFlow({
       setPendingSwitchAfterSaveConnectionId(null);
       setEditingConnection(connection);
       setDraftModelId(connection.agentModelId ?? "");
-      setModelError(t("agents.model.openclawEnvKeyRequired"));
+      setModelError(formatEnvBackedApiKeyRequirement(agent.agentLabel, t));
       return;
     }
 

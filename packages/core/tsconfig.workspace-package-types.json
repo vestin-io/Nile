@@ -134,6 +134,24 @@
       "@nile/agent-openclaw/projection": [
         "packages/agents/openclaw/types/projection.d.ts"
       ],
+      "@nile/agent-opencode": [
+        "packages/agents/opencode/types/index.d.ts"
+      ],
+      "@nile/agent-opencode/module": [
+        "packages/agents/opencode/types/module.d.ts"
+      ],
+      "@nile/agent-opencode/manifest": [
+        "packages/agents/opencode/types/manifest.d.ts"
+      ],
+      "@nile/agent-opencode/declaration": [
+        "packages/agents/opencode/types/declaration.d.ts"
+      ],
+      "@nile/agent-opencode/runtime-factory": [
+        "packages/agents/opencode/types/runtime-factory.d.ts"
+      ],
+      "@nile/agent-opencode/projection": [
+        "packages/agents/opencode/types/projection.d.ts"
+      ],
       "@nile/connections/labeling": [
         "packages/connections/types/labeling/index.d.ts"
       ],

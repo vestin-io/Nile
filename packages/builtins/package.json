@@ -16,6 +16,7 @@
     "@nile/agent-cursor": "0.0.0",
     "@nile/agent-gemini": "0.0.0",
     "@nile/agent-openclaw": "0.0.0",
+    "@nile/agent-opencode": "0.0.0",
     "@nile/connections": "0.0.0"
   },
   "scripts": {

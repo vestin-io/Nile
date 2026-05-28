@@ -16,6 +16,7 @@ import { Button } from "../../ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../../ui/dialog";
 import { Field } from "../../ui/field";
 import { Input } from "../../ui/input";
+import { formatEnvBackedApiKeyRequirement } from "../../shared/AgentText";
 
 type AgentConnectionModelDialogProps = {
   agentId: AgentId;
@@ -119,7 +120,7 @@ export function AgentConnectionModelDialog({
           ) : requiresEnvBackedApiKey ? (
             <Alert variant="destructive">
               <AlertDescription className="flex items-center justify-between gap-3">
-                <span>{t("agents.model.openclawEnvKeyRequired")}</span>
+                <span>{formatEnvBackedApiKeyRequirement(agentLabel, t)}</span>
                 {onOpenConnection ? (
                   <Button
                     size="sm"

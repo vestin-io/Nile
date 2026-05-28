@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import { ConnectionAgentPolicy } from "./AgentPolicy";
 
 describe("ConnectionAgentPolicy", () => {
-  it("allows OpenClaw for official session-backed providers", () => {
+  it("allows session-backed official providers only where the agent supports them", () => {
     const policy = new ConnectionAgentPolicy();
 
     expect(policy.supportsAgent({ preset: "openai", authMode: "openai_session", agentId: "openclaw" })).toBe(true);
+    expect(policy.supportsAgent({ preset: "openai", authMode: "openai_session", agentId: "opencode" })).toBe(true);
     expect(policy.supportsAgent({ preset: "anthropic", authMode: "claude_session", agentId: "openclaw" })).toBe(true);
+    expect(policy.supportsAgent({ preset: "anthropic", authMode: "claude_session", agentId: "opencode" })).toBe(false);
   });
 
   it("treats OpenClaw-only OpenAI sessions as saved connections for OpenClaw only", () => {
@@ -56,8 +58,8 @@ describe("ConnectionAgentPolicy", () => {
       },
       authMode: "api_key",
     })).toEqual({
-      configurableAgents: ["codex", "openclaw"],
-      defaultEnabledAgents: ["codex", "openclaw"],
+      configurableAgents: ["codex", "openclaw", "opencode"],
+      defaultEnabledAgents: ["codex", "openclaw", "opencode"],
     });
   });
 });

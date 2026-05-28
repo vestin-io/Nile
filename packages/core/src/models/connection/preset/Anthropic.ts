@@ -7,7 +7,7 @@ export const ANTHROPIC_PRESET_MODULE: ConnectionPresetModule<"anthropic"> = {
     iconKey: "anthropic",
     supportedAuthModes: ["api_key", "claude_session"],
     requiresEndpointUrl: false,
-    configurableAgents: ["claude", "openclaw"],
+    configurableAgents: ["claude", "openclaw", "opencode"],
     defaultEnabledAgents: ["claude"],
     suggestEnabledAgents: false,
   },

@@ -22,6 +22,11 @@ import type {
 import { ConnectionAlerts } from "./ConnectionAlerts";
 import { NotificationHistoryState } from "./NotificationHistoryState";
 import { DesktopStateSnapshotStore } from "./SnapshotStore";
+import {
+  DesktopCachedUsageRefresher,
+  type DesktopCachedUsageRefreshResult,
+  type RefreshCachedCurrentUsageOptions,
+} from "./CachedUsageRefresher";
 
 type CachedValue<T> = {
   dirty: boolean;
@@ -52,6 +57,13 @@ type GetSettingsStateOptions = {
   usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
+type RefreshDesktopStateOptions = {
+  forceStatusEntryUsageRefresh?: boolean;
+  refreshSettingsUsage?: boolean;
+  refreshStatusEntryUsage?: boolean;
+  usageRefreshMode?: DesktopUsageRefreshMode;
+};
+
 export class DesktopStateStore {
   private readonly statusEntryState: CachedValue<DesktopStatusEntryState> = this.createCachedValue();
   private readonly settingsState: CachedValue<SettingsState> = this.createCachedValue();
@@ -62,6 +74,7 @@ export class DesktopStateStore {
   private readonly connectionAlerts: ConnectionAlerts;
   private readonly notificationHistory: NotificationHistoryState;
   private readonly snapshotStore: DesktopStateSnapshotStore;
+  private readonly cachedUsageRefresher: DesktopCachedUsageRefresher;
   private readonly logger: NileLogger;
 
   constructor(private readonly options: DesktopStateStoreOptions) {
@@ -71,6 +84,13 @@ export class DesktopStateStore {
     this.connectionAlerts = new ConnectionAlerts(options.connectionAlertStore ?? null);
     this.notificationHistory = new NotificationHistoryState(options.notificationHistory ?? null);
     this.snapshotStore = new DesktopStateSnapshotStore(options.databasePath);
+    this.cachedUsageRefresher = new DesktopCachedUsageRefresher({
+      settingsState: this.settingsState,
+      statusEntryState: this.statusEntryState,
+      surface: this.options.surface,
+      writeSettingsState: (value) => this.storeCurrentValue(this.settingsState, value),
+      writeStatusEntryState: (value) => this.storeCurrentValue(this.statusEntryState, value),
+    });
     this.hydrateSnapshots();
   }
 
@@ -155,14 +175,32 @@ export class DesktopStateStore {
     this.notificationHistory.markReadByFilter(filter);
   }
 
-  async refreshStatusEntryUsage(options?: { mode?: DesktopUsageRefreshMode }): Promise<void> {
-    await this.options.surface.refreshStatusEntryUsage(options);
-    this.markDirty(this.statusEntryState, this.settingsState);
-  }
-
   async refreshStatusEntryState(): Promise<DesktopStatusEntryState> {
     this.statusEntryState.dirty = true;
     return await this.getStatusEntryState();
+  }
+
+  async refreshDesktopState(options: RefreshDesktopStateOptions = {}): Promise<SettingsState> {
+    const result = await this.options.surface.refreshDesktopState({
+      ...(typeof options.forceStatusEntryUsageRefresh === "boolean"
+        ? { forceStatusEntryUsageRefresh: options.forceStatusEntryUsageRefresh }
+        : {}),
+      refreshSettingsUsage: options.refreshSettingsUsage ?? false,
+      refreshStatusEntryUsage: options.refreshStatusEntryUsage,
+      usageRefreshMode: options.usageRefreshMode,
+    });
+    this.storeResolvedValue(this.statusEntryState, result.statusEntryState);
+    this.storeResolvedValue(
+      this.settingsState,
+      this.connectionAlertOverlay ? this.connectionAlertOverlay.decorateSettingsState(result.settingsState) : result.settingsState,
+    );
+    return this.settingsState.value!;
+  }
+
+  async refreshCachedCurrentUsage(
+    options: RefreshCachedCurrentUsageOptions = {},
+  ): Promise<DesktopCachedUsageRefreshResult> {
+    return await this.cachedUsageRefresher.refreshCurrentUsage(options);
   }
 
   invalidateAll(): void {
@@ -258,9 +296,15 @@ export class DesktopStateStore {
     );
   }
 
-  updateAgentConnectionModel(agentId: AgentId, connectionId: string, modelId: string | null): string | null {
-    return this.runMutation(
-      () => this.options.connectionGateway.updateAgentConnectionModel(agentId, connectionId, modelId),
+  async saveAgentConnectionModel(
+    agentId: AgentId,
+    connectionId: string,
+    modelId: string | null,
+    options?: { applyIfCurrent?: boolean },
+  ): Promise<string | null> {
+    return await this.runAsyncMutation(
+      async () => await this.options.connectionGateway.saveAgentConnectionModel(agentId, connectionId, modelId, options),
+      this.statusEntryState,
       this.settingsState,
     );
   }
@@ -380,6 +424,14 @@ export class DesktopStateStore {
     cached.value = value;
     cached.dirty = true;
     this.persistSnapshot(cached, value);
+  }
+
+  private storeCurrentValue<T>(cached: CachedValue<T>, value: T): void {
+    if (cached.dirty) {
+      this.storeSnapshotValue(cached, value);
+      return;
+    }
+    this.storeResolvedValue(cached, value);
   }
 
   private hydrateSnapshots(): void {

@@ -7,7 +7,7 @@ export const OPENAI_PRESET_MODULE: ConnectionPresetModule<"openai"> = {
     iconKey: "openai",
     supportedAuthModes: ["openai_session", "api_key"],
     requiresEndpointUrl: false,
-    configurableAgents: ["codex", "openclaw"],
+    configurableAgents: ["codex", "openclaw", "opencode"],
     defaultEnabledAgents: ["codex"],
     suggestEnabledAgents: false,
   },

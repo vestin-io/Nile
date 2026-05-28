@@ -154,7 +154,7 @@ function readIssueLink(
     return null;
   }
 
-  const requiresConfig = issues.some((issue) => /^OpenClaw config not found at .+$/.test(issue));
+  const requiresConfig = issues.some((issue) => /^(OpenClaw|OpenCode) config not found at .+$/.test(issue));
   if (requiresConfig) {
     return {
       label: t("common.needsConfiguration"),

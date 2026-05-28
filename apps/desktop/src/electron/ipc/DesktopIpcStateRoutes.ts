@@ -26,6 +26,7 @@ type DesktopIpcStateRoutesOptions = {
   refreshDesktopState(options: {
     invalidate: boolean;
     notifyRenderer: boolean;
+    refreshSettingsUsage?: boolean;
     usageRefreshMode?: DesktopUsageRefreshMode;
   }): Promise<void>;
   migrateDesktopPreferences(raw: string | null): DesktopPreferences;
@@ -137,9 +138,10 @@ export class DesktopIpcStateRoutes {
       await this.options.refreshDesktopState({
         invalidate: true,
         notifyRenderer: false,
+        refreshSettingsUsage: true,
         usageRefreshMode: "manual",
       });
-      return await stateStore.getSettingsState({ usageRefreshMode: "manual" });
+      return await stateStore.getSettingsState();
     });
     ipcMain.handle("desktop:refresh-status-entry", async () => {
       await this.options.refreshDesktopState({

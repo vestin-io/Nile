@@ -39,6 +39,13 @@ type DesktopIpcConnectionRoutesOptions = {
     targetStorageMode?: "system_secure_storage" | "encrypted_local_storage";
   }): Promise<DesktopApplyCredentialImportResult>;
   refreshAll(): void;
+  refreshDesktopState(options: {
+    invalidate: boolean;
+    notifyRenderer: boolean;
+    refreshSettingsUsage?: boolean;
+    refreshStatusEntryUsage?: boolean;
+    usageRefreshMode?: import("../../state/UsageCache").DesktopUsageRefreshMode;
+  }): Promise<void>;
   stateStore: DesktopStateStore;
   logger?: NileLogger;
 };
@@ -156,13 +163,7 @@ export class DesktopIpcConnectionRoutes {
     });
     ipcMain.handle("desktop:update-agent-connection-model", (_event, input: unknown) => {
       const record = inputs.readUpdateAgentConnectionModelInput(input);
-      const result = stateStore.updateAgentConnectionModel(
-        record.agentId,
-        record.connectionId,
-        record.modelId,
-      );
-      this.options.refreshAll();
-      return result;
+      return this.handleUpdateAgentConnectionModel(record);
     });
     ipcMain.handle("desktop:bind-cursor-usage", (_event, connectionId: unknown, sessionToken: unknown) => {
       const result = stateStore.bindCursorUsage(
@@ -184,6 +185,24 @@ export class DesktopIpcConnectionRoutes {
         inputs.readRequiredString(alertId, "alertId"),
       );
     });
+  }
+
+  private async handleUpdateAgentConnectionModel(
+    record: import("../connections/contracts").DesktopUpdateAgentConnectionModelInput,
+  ): Promise<string | null> {
+    const result = await this.options.stateStore.saveAgentConnectionModel(
+        record.agentId,
+        record.connectionId,
+        record.modelId,
+        { applyIfCurrent: record.applyIfCurrent === true },
+      );
+    await this.options.refreshDesktopState({
+      invalidate: false,
+      notifyRenderer: true,
+      refreshSettingsUsage: false,
+      refreshStatusEntryUsage: false,
+    });
+    return result;
   }
 
   private mapEncryptedLocalUnlockError(error: unknown): DesktopUnlockEncryptedLocalStorageFailure {

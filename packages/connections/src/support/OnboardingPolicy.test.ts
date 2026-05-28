@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ConnectionOnboardingPolicy } from "./OnboardingPolicy";
 
 describe("ConnectionOnboardingPolicy", () => {
-  it("suggests OpenClaw for generic gateways that support OpenAI-compatible or Anthropic protocols", () => {
+  it("suggests OpenClaw and OpenCode for generic gateways that support OpenAI-compatible or Anthropic protocols", () => {
     const policy = new ConnectionOnboardingPolicy();
 
     const suggestion = policy.suggest("gateway", {
@@ -25,8 +25,8 @@ describe("ConnectionOnboardingPolicy", () => {
       },
     });
 
-    expect(suggestion.configurableAgents).toEqual(["codex", "claude", "openclaw"]);
-    expect(suggestion.defaultEnabledAgents).toEqual(["codex", "claude", "openclaw"]);
+    expect(suggestion.configurableAgents).toEqual(["codex", "claude", "openclaw", "opencode"]);
+    expect(suggestion.defaultEnabledAgents).toEqual(["codex", "claude", "openclaw", "opencode"]);
   });
 
   it("suggests Cursor only when the gateway exposes cursor protocol", () => {

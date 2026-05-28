@@ -77,9 +77,9 @@ describe("DesktopUsageCache", () => {
     const second = await cache.refreshByConnectionId(session as never, ["openai-session"]);
     const third = await cache.refreshByConnectionId(session as never, ["openai-session"], { mode: "manual" });
 
-    expect(first.get("openai-session")).toBeNull();
-    expect(second.get("openai-session")).toBeNull();
-    expect(third.get("openai-session")).toEqual({
+    expect(first.usageByConnectionId.get("openai-session")).toBeNull();
+    expect(second.usageByConnectionId.get("openai-session")).toBeNull();
+    expect(third.usageByConnectionId.get("openai-session")).toEqual({
       status: "available",
       planLabel: "Plus",
       windows: [

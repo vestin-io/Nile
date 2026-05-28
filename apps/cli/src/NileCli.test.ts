@@ -177,8 +177,12 @@ describe("NileCli", () => {
     expect(JSON.parse(list.stdout)).toEqual([
       expect.objectContaining({
         id: "openai-api-key",
-        enabledAgents: ["codex", "openclaw"],
-        configurableAgents: expect.arrayContaining(["codex", "openclaw"]),
+        enabledAgents: ["codex", "openclaw", "opencode"],
+        configurableAgents: expect.arrayContaining([
+          "codex",
+          "openclaw",
+          "opencode",
+        ]),
       }),
     ]);
   });
@@ -1203,7 +1207,7 @@ describe("NileCli", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toBe(
-      "import requires an agent. Use `nile codex import`, `nile cursor import`, `nile claude import`, `nile gemini import`, or `nile openclaw import`.",
+      "import requires an agent. Use `nile codex import`, `nile cursor import`, `nile claude import`, `nile gemini import`, `nile openclaw import`, or `nile opencode import`.",
     );
   });
 
@@ -1215,7 +1219,7 @@ describe("NileCli", () => {
 
     expect(result.exitCode).toBe(1);
     expect(result.stderr).toBe(
-      "rollback requires an agent. Use `nile codex rollback`, `nile cursor rollback`, `nile claude rollback`, `nile gemini rollback`, or `nile openclaw rollback`.",
+      "rollback requires an agent. Use `nile codex rollback`, `nile cursor rollback`, `nile claude rollback`, `nile gemini rollback`, `nile openclaw rollback`, or `nile opencode rollback`.",
     );
   });
 

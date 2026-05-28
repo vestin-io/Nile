@@ -6,6 +6,10 @@ import type { ConnectionUsageResult } from "@nile/core/actions/usage/Result";
 import { type DesktopUsageState, UsageSummary } from "./UsageSummary";
 
 export type DesktopUsageRefreshMode = "auto" | "manual";
+export type DesktopUsageRefreshResult = {
+  refreshedConnectionIds: string[];
+  usageByConnectionId: Map<string, DesktopUsageState | null>;
+};
 
 export class DesktopUsageCache {
   private static readonly CACHE_TTL_MS = 60_000;
@@ -16,6 +20,10 @@ export class DesktopUsageCache {
   private readonly autoRefreshPausedConnectionIds = new Set<string>();
 
   constructor(private readonly logger: NileLogger) {}
+
+  static readCacheTtlMs(): number {
+    return DesktopUsageCache.CACHE_TTL_MS;
+  }
 
   peek(connectionId: string): DesktopUsageState | null {
     return this.usageByConnectionId.get(connectionId) ?? null;
@@ -34,13 +42,14 @@ export class DesktopUsageCache {
     savedConnections: SavedConnectionSummary[],
     options?: { mode?: DesktopUsageRefreshMode },
   ): Promise<Map<string, DesktopUsageState | null>> {
-    return await this.refreshByConnectionId(
+    const result = await this.refreshByConnectionId(
       session,
       savedConnections.map((connection) => connection.id),
       {
         mode: options?.mode,
       },
     );
+    return result.usageByConnectionId;
   }
 
   canAutoRefresh(connectionId: string): boolean {
@@ -51,29 +60,32 @@ export class DesktopUsageCache {
     session: NileSession,
     connectionIds: Array<string | null>,
     options?: { force?: boolean; mode?: DesktopUsageRefreshMode },
-  ): Promise<Map<string, DesktopUsageState | null>> {
+  ): Promise<DesktopUsageRefreshResult> {
     const uniqueConnectionIds = [...new Set(connectionIds.filter((connectionId): connectionId is string => Boolean(connectionId)))];
     const forceRefresh = options?.force ?? false;
     const refreshMode = options?.mode ?? "auto";
-    const shouldRefresh = uniqueConnectionIds.filter((connectionId) =>
+    const refreshedConnectionIds = uniqueConnectionIds.filter((connectionId) =>
       (refreshMode === "manual" || !this.autoRefreshPausedConnectionIds.has(connectionId))
         && (forceRefresh || !this.hasFreshUsageCache(connectionId)),
     );
 
-    if (shouldRefresh.length > 0) {
-      await this.refreshBatch(session, shouldRefresh, refreshMode);
+    if (refreshedConnectionIds.length > 0) {
+      await this.refreshBatch(session, refreshedConnectionIds, refreshMode);
     }
 
     const now = Date.now();
-    const result = new Map<string, DesktopUsageState | null>();
+    const usageByConnectionId = new Map<string, DesktopUsageState | null>();
     for (const connectionId of uniqueConnectionIds) {
       if (!this.usageByConnectionId.has(connectionId)) {
         this.usageByConnectionId.set(connectionId, null);
         this.usageReadAt.set(connectionId, now);
       }
-      result.set(connectionId, this.usageByConnectionId.get(connectionId) ?? null);
+      usageByConnectionId.set(connectionId, this.usageByConnectionId.get(connectionId) ?? null);
     }
-    return result;
+    return {
+      refreshedConnectionIds,
+      usageByConnectionId,
+    };
   }
 
   private async refreshBatch(

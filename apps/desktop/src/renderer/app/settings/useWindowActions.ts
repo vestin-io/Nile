@@ -84,16 +84,13 @@ export function useSettingsWindowActions(options: SettingsWindowActionsOptions):
     setStatusEntryDisplayMode: options.setStatusEntryDisplayMode,
     themeChange: (theme) => options.setPreferences((current) => ({ ...current, theme })),
     updateAgentConnectionModel: async (agentId, connectionId, modelId) => {
+      const agent = options.settingsState.agents.find((entry) => entry.agentId === agentId) ?? null;
       await window.nileDesktop.connections.updateAgentConnectionModel({
         agentId,
         connectionId,
         modelId,
+        applyIfCurrent: agent?.currentConnection?.id === connectionId,
       });
-      const agent = options.settingsState.agents.find((entry) => entry.agentId === agentId) ?? null;
-      if (agent?.currentConnection?.id === connectionId) {
-        await window.nileDesktop.connections.switchConnection(agentId, connectionId);
-      }
-      await options.refresh();
     },
     updateConnectionAlert: async (input) => {
       await window.nileDesktop.connections.updateUsageAlert(input);
