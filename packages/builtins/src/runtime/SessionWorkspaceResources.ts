@@ -8,7 +8,7 @@ import type { LocalCredentialResolver } from "@nile/core/application/local/Local
 import { LocalWorkspaceState } from "@nile/core/application/local/WorkspaceState";
 import { CurrentSessionResolver } from "@nile/core/session";
 import type { AgentAdapterLookup } from "@nile/core/models/agent";
-import type { AgentId } from "@nile/core/models/agent/Definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import { AgentConnectionSettings } from "@nile/core/models/agent-settings";
 import type { SavedConnections } from "@nile/core/models/connection/SavedConnections";
 import {

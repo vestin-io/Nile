@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 
 import type { WorkspaceProfileAssignment } from "../../profiles/useProfiles";
 import type { SettingsPageContentProps } from "./PageContentProps";

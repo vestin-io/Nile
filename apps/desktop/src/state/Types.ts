@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { AuthMode } from "@nile/core/models/access";
 import type { AgentSetupReconciliationState } from "@nile/core/actions/local-setup/reconciliation";
 import type { ConnectionApplyRequirements } from "@nile/core/models/connection/requirements";

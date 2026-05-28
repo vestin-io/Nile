@@ -1,5 +1,5 @@
 import type { AgentFactoryRegistration } from "@nile/core/runtime-local/Types";
-import { resolveAgentHome } from "@nile/core/models/agent/Homes";
+import { resolveAgentHome } from "@nile/core/models/agent";
 import { CursorAgentAdapter } from "./CursorAgentAdapter";
 import { CURSOR_AGENT_ID } from "./types";
 

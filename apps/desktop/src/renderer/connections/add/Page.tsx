@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
 

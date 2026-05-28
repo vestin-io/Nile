@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 
 import type { DesktopStatusEntryDisplayState } from "../../state/StatusEntryDisplay";
 import type { DesktopStatusEntryState } from "../../state/Types";

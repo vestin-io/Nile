@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 
 export const STATUS_ENTRY_DISPLAY_MODES = ["app_entry", "summary"] as const;
 export const LEGACY_STATUS_ENTRY_DISPLAY_MODES = ["app_entry", "ticker"] as const;

@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 
 import type { DesktopAgentState, DesktopOnboardingItem } from "../../state/Types";
 import { AgentCardHeader } from "../agents/AgentCardHeader";

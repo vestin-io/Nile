@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 

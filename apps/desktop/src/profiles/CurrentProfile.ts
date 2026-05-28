@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 
 import type { WorkspaceProfile, WorkspaceProfileAssignment } from "../electron/profiles/Store";
 import type { DesktopAdvancedState, DesktopAgentState } from "../state/Types";

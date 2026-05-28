@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { InteractiveSessionLoginInteractionMode } from "@nile/core/session";
 import {
   SHARED_SESSION_CONNECTION_METHODS,

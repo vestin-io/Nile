@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/Definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { MutationHistoryRecord } from "@nile/core/services/history/MutationHistoryTypes";
 import type { MatchedImportStateSnapshot } from "@nile/core/runtime-local/import-state";
 import { BuiltInAgentAdapters } from "@nile/core/runtime-local/BuiltInAdapters";

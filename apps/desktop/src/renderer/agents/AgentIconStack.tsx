@@ -1,5 +1,5 @@
 import { useId } from "react";
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 
 import type { Translator } from "../shared/I18n";
 import { renderAgentIcon } from "./AgentIcons";

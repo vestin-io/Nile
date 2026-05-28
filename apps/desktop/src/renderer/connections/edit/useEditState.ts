@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 
 import type { DesktopConnection } from "../../../state/Types";
 import { buildConnectionMethods, readSelectedMethodKey } from "../ConnectionFormParts";

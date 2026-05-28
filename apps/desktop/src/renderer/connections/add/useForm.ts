@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { CredentialStorageBackend } from "@nile/core/services/credential";
 import { SHARED_SESSION_CONNECTION_METHODS } from "@nile/builtins/session";
 import { EnabledAgentsPolicy } from "@nile/core/models/connection/enabled-agents-policy";

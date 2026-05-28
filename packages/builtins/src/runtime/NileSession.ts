@@ -18,7 +18,7 @@ import type {
 } from "@nile/core/models/agent";
 import type { AgentHomes } from "@nile/core/models/agent/Homes";
 import { defaultAgentHomes, mergeAgentHomes } from "@nile/core/models/agent/Homes";
-import type { AgentId } from "@nile/core/models/agent/Definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { SavedConnectionSummary } from "@nile/core/models/connection/SavedConnections";
 import type {
   ConnectionModelCatalogResult,

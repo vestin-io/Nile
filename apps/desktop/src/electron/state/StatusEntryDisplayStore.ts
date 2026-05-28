@@ -1,4 +1,4 @@
-import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
+import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent";
 import { SqliteDatabase } from "@nile/core/services/database";
 
 import {

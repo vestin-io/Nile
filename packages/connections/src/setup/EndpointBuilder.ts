@@ -1,6 +1,6 @@
 import type { StoredCredential } from "@nile/core/services/credential/Types";
 import type { AuthMode } from "@nile/core/models/access";
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { EndpointRegistryInput } from "@nile/core/models/endpoint";
 import type { GatewayCapabilityProbe } from "@nile/core/models/connection";
 import type { ConnectionPresetFamily } from "@nile/core/models/connection/preset";

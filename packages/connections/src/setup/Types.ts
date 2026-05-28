@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { AuthMode } from "@nile/core/models/access";
 import type { ConnectionPresetFamily } from "@nile/core/models/connection/preset";
 import type { EndpointRegistryInput } from "@nile/core/models/endpoint";

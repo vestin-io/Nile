@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent/definitions";
+import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent";
 
 import { parseDesktopPreferences } from "./DesktopPreferences";
 

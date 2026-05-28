@@ -1,5 +1,5 @@
 import type { AgentFactoryRegistration } from "@nile/core/runtime-local/Types";
-import { resolveAgentHome } from "@nile/core/models/agent/Homes";
+import { resolveAgentHome } from "@nile/core/models/agent";
 import { OpenClawAgentAdapter } from "./OpenClawAgentAdapter";
 import { OPENCLAW_AGENT_ID } from "./types";
 

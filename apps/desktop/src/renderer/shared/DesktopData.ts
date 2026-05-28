@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
 import type { DesktopConnection } from "../../state/Types";
 

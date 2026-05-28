@@ -2,7 +2,7 @@ import {
   isDirectApiKeyCredential,
   type StoredCredential,
 } from "@nile/core/services/credential/Types";
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { EndpointRegistryInput } from "@nile/core/models/endpoint";
 import type { GatewayCapabilityProbe } from "@nile/core/models/connection";
 import { ConnectionLabeler } from "../labeling";

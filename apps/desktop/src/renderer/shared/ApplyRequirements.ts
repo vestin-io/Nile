@@ -3,7 +3,7 @@ import {
   type ConnectionApplyRequirementKind,
   type ConnectionApplyRequirements,
 } from "@nile/core/models/connection/requirements";
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 
 import type { DesktopConnection } from "../../state/Types";
 

@@ -94,7 +94,7 @@
 
 - Investigated the rerun desktop release failure and found that multiple agent packages imported `@nile/core/models/agent/homes` while the actual source file is `Homes.ts`.
 - Local macOS development had hidden the mismatch because the filesystem is case-insensitive, but the GitHub Actions Linux runner failed module resolution during the test suite.
-- Updated agent source imports to reference `@nile/core/models/agent/Homes` so workspace path resolution matches the real source filename while leaving the lowercase exported subpath in `@nile/core` package exports untouched for compatibility.
+- Switched repo-internal imports over to the stable `@nile/core/models/agent` root export so tests and workspace builds no longer depend on lowercase package subpaths resolving through an unbuilt `dist/` tree on Linux.
 - Verified with:
   - `npm run test:core`
   - `npm run desktop:build`

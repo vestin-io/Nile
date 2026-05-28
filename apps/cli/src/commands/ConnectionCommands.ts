@@ -24,8 +24,8 @@ import type {
   AddConnectionResult,
   ResolvedCliOptions,
 } from "../types";
-import { formatAgentLabel } from "@nile/core/models/agent/definitions";
-import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
+import { formatAgentLabel } from "@nile/core/models/agent";
+import { AGENT_CAPABILITIES } from "@nile/core/models/agent";
 
 export class ConnectionCommands {
   private readonly addFlow: ConnectionAddFlow;

@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/Definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import { MutationHistory } from "@nile/core/services/history/MutationHistory";
 import type { MutationHistoryRecord } from "@nile/core/services/history/MutationHistoryTypes";
 import type { SessionRuntimeOptions } from "./Types";

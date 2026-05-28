@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AgentStatusView } from "@nile/core/actions/local-setup";
-import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
+import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent";
 import type { NileLogger } from "@nile/core/services/NileLogger";
 import type { NileSession } from "@nile/builtins/runtime";
 

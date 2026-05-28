@@ -2,10 +2,10 @@ import type { ConnectionDefinition } from "@nile/core/models/connection";
 import type { ConnectionOnboardingSuggestion } from "@nile/core/models/connection";
 import { SHARED_CONNECTION_AGENT_POLICY } from "@nile/builtins/connections";
 import { AGENT_CAPABILITIES, type AgentId } from "@nile/core/models/agent";
-import { SUPPORTED_AGENT_IDS, isAgentId } from "@nile/core/models/agent/definitions";
+import { SUPPORTED_AGENT_IDS, isAgentId } from "@nile/core/models/agent";
 import type { AuthMode } from "@nile/core/models/access";
 
-import { formatAgentLabel } from "@nile/core/models/agent/definitions";
+import { formatAgentLabel } from "@nile/core/models/agent";
 import { InteractivePrompt } from "../InteractivePrompt";
 
 type AgentSelectionInput = {

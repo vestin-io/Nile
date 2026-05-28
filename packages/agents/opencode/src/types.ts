@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/ids";
+import type { AgentId } from "@nile/core/models/agent";
 import type { AgentLiveStateValidity, MatchedAgentConnection } from "@nile/core/models/agent/Adapter";
 import type { EndpointFamily } from "@nile/core/models/endpoint";
 

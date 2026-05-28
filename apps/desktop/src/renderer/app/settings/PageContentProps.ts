@@ -1,4 +1,4 @@
-import type { AgentId } from "@nile/core/models/agent/definitions";
+import type { AgentId } from "@nile/core/models/agent";
 import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
 import type { CreateConnectionAlertInput, UpdateConnectionAlertInput } from "../../../electron/alerts/Store";
