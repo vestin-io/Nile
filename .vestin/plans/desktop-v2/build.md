@@ -322,6 +322,27 @@
 - `npm run test:core`
 - `npm run test:cli`
 
+### Step 49: Release CI Desktop Agent Import Case Fix
+
+- Fixed the next desktop release CI failure after the Cursor import patch.
+- The failing desktop tests still imported browser-safe core agent helpers through lowercase package subpaths like `@nile/core/models/agent/definitions` and `@nile/core/models/agent/capabilities`.
+- On local macOS this kept working because the filesystem is case-insensitive, but the Ubuntu release runner resolved those imports through the workspace source tree and failed on exact case.
+- Updated the desktop state and renderer modules to import the real source-case browser-safe entrypoints instead:
+  - `@nile/core/models/agent/Definitions`
+  - `@nile/core/models/agent/registry/Capabilities`
+- Updated the browser-safe import boundary test to allow the exact-case source entrypoints that the desktop app now relies on in workspace runs.
+
+#### Key findings
+
+- The release failure was not another missing build artifact. It was a workspace-resolution mismatch between public lowercase package exports and source-file case on Linux.
+- I intentionally did not add lowercase shim source files under `packages/core/src/models/agent`. On a case-insensitive macOS worktree those shims alias with the existing `Definitions.ts` / `Ids.ts` / `Homes.ts` files and create unstable local behavior.
+- The desktop app still uses the same browser-safe surface; only the import specifiers changed to the exact source-case paths that the workspace resolver can load on Linux.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/renderer/CoreImportBoundaries.test.ts apps/desktop/src/state/DesktopPreferences.test.ts apps/desktop/src/state/SettingsQuery.test.ts apps/desktop/src/state/StatusEntryQuery.test.ts apps/desktop/src/state/Surface.test.ts`
+- `npm run test:desktop`
+
 ### Settings data loader cleanup
 
 - Split the bridge-reading strategy out of the settings data hook:

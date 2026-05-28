@@ -1,4 +1,4 @@
-import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
+import { AGENT_CAPABILITIES } from "@nile/core/models/agent/registry/Capabilities";
 import type { AgentId } from "@nile/core/models/agent";
 import codexSvg from "@lobehub/icons-static-svg/icons/codex-color.svg";
 import cursorSvg from "@lobehub/icons-static-svg/icons/cursor.svg";

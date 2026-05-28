@@ -1,4 +1,4 @@
-import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent/definitions";
+import { SUPPORTED_AGENT_IDS } from "@nile/core/models/agent/Definitions";
 import type { AgentStatusView } from "@nile/core/actions/local-setup";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { NileSession } from "@nile/builtins/runtime";

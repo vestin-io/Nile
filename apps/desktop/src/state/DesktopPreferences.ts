@@ -1,4 +1,4 @@
-import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
+import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/Definitions";
 import type { CredentialStorageBackend } from "@nile/core/services/credential";
 
 import {

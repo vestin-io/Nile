@@ -1,6 +1,6 @@
 import type { AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
 import { AGENT_MODULE_REGISTRY } from "@nile/core/models/agent/module";
-import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/definitions";
+import { SUPPORTED_AGENT_IDS, type AgentId } from "@nile/core/models/agent/Definitions";
 import type { AgentStatusView } from "@nile/core/actions/local-setup";
 import type { SavedConnectionSummary } from "@nile/core/models/connection";
 import type { EnvironmentSource } from "@nile/core/services/EnvironmentSource";

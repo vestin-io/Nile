@@ -1,5 +1,5 @@
 import type { AgentId } from "@nile/core/models/agent";
-import { AGENT_CAPABILITIES } from "@nile/core/models/agent/capabilities";
+import { AGENT_CAPABILITIES } from "@nile/core/models/agent/registry/Capabilities";
 import type { DesktopConnection } from "../../state/Types";
 
 export type SettingsState = Awaited<ReturnType<typeof window.nileDesktop.settingsData.getSettingsState>>;
