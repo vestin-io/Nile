@@ -70,6 +70,11 @@ export class LiveSetupReader {
       envKey: CURSOR_ENV_KEY,
     };
 
+    const environmentCredential = this.readEnvironmentCredential();
+    if (environmentCredential) {
+      return this.buildResolvedState({ value: environmentCredential }, configState, endpoint, detectedEndpoint);
+    }
+
     let snapshot: ReturnType<CursorCredentialStore["snapshot"]>;
     try {
       snapshot = this.credentialStore.snapshot();
@@ -80,54 +85,25 @@ export class LiveSetupReader {
         endpoint: detectedEndpoint,
       };
     }
-    const resolvedCredential = this.resolveCredential(snapshot);
-    if ("error" in resolvedCredential) {
-      return {
-        error: true,
-        issues: [resolvedCredential.error],
-        endpoint: detectedEndpoint,
-      };
-    }
+    return this.buildResolvedState(this.resolveSnapshotCredential(snapshot), configState, endpoint, detectedEndpoint);
+  }
 
-    const detectedAccess = this.buildDetectedAccess(resolvedCredential.value, configState);
-    if ("error" in detectedAccess) {
-      return {
-        error: true,
-        issues: [detectedAccess.error],
-        endpoint: detectedEndpoint,
-        access: detectedAccess.access ?? undefined,
-      };
+  private readEnvironmentCredential(): StoredCredential | null {
+    const envApiKey = this.environment.read(CURSOR_ENV_KEY)?.trim();
+    if (!envApiKey) {
+      return null;
     }
 
     return {
-      value: {
-        endpoint,
-        access: {
-          label: detectedAccess.value.labelHint,
-          authMode: detectedAccess.value.authMode,
-          ...(detectedAccess.value.identityKey ? { identityKey: detectedAccess.value.identityKey } : {}),
-        },
-        detectedEndpoint,
-        credential: resolvedCredential.value,
-        detectedAccess: detectedAccess.value,
-      },
+      kind: "api_key",
+      source: "direct",
+      apiKey: envApiKey,
     };
   }
 
-  private resolveCredential(
+  private resolveSnapshotCredential(
     snapshot: ReturnType<CursorCredentialStore["snapshot"]>,
   ): { value: StoredCredential } | { error: string } {
-    const envApiKey = this.environment.read(CURSOR_ENV_KEY)?.trim();
-    if (envApiKey) {
-      return {
-        value: {
-          kind: "api_key",
-          source: "direct",
-          apiKey: envApiKey,
-        },
-      };
-    }
-
     const hasApiKey = Boolean(snapshot.apiKey);
     const hasAccessToken = Boolean(snapshot.accessToken);
     const hasRefreshToken = Boolean(snapshot.refreshToken);
@@ -165,6 +141,52 @@ export class LiveSetupReader {
         kind: "cursor_session",
         accessToken: snapshot.accessToken,
         refreshToken: snapshot.refreshToken,
+      },
+    };
+  }
+
+  private buildResolvedState(
+    resolvedCredential: { value: StoredCredential } | { error: string },
+    configState: CursorConfigState | null,
+    endpoint: EndpointRegistryInput,
+    detectedEndpoint: CursorDetectedEndpoint,
+  ):
+    | { value: ResolvedLiveState }
+    | {
+        error: true;
+        issues: string[];
+        endpoint?: CursorDetectedEndpoint;
+        access?: CursorDetectedAccess;
+      } {
+    if ("error" in resolvedCredential) {
+      return {
+        error: true,
+        issues: [resolvedCredential.error],
+        endpoint: detectedEndpoint,
+      };
+    }
+
+    const detectedAccess = this.buildDetectedAccess(resolvedCredential.value, configState);
+    if ("error" in detectedAccess) {
+      return {
+        error: true,
+        issues: [detectedAccess.error],
+        endpoint: detectedEndpoint,
+        access: detectedAccess.access ?? undefined,
+      };
+    }
+
+    return {
+      value: {
+        endpoint,
+        access: {
+          label: detectedAccess.value.labelHint,
+          authMode: detectedAccess.value.authMode,
+          ...(detectedAccess.value.identityKey ? { identityKey: detectedAccess.value.identityKey } : {}),
+        },
+        detectedEndpoint,
+        credential: resolvedCredential.value,
+        detectedAccess: detectedAccess.value,
       },
     };
   }

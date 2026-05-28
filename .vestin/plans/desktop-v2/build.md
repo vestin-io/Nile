@@ -302,6 +302,26 @@
 
 - `npm run build -w @nile/desktop`
 
+### Step 48: Release CI Cursor Env Credential Precedence Fix
+
+- Fixed the remaining desktop release CI failure in `apps/cli/src/NileCli.test.ts` for `imports the current cursor live state as a connection`.
+- Updated `packages/agents/cursor/src/live-setup/Reader.ts` so `CURSOR_API_KEY` is resolved before any keychain read.
+- This removes the hidden dependency on the macOS `security` CLI when Cursor live state is already fully provided by environment-backed API key credentials.
+- Added a regression test in `packages/agents/cursor/src/live-setup/Reader.test.ts` that proves env-backed Cursor import still succeeds even when keychain reads are unavailable.
+
+#### Key findings
+
+- The CI-only failure was not a Cursor import semantic mismatch. It was a platform assumption leak: the reader consulted macOS keychain state before checking the explicit env credential used by the test.
+- Local macOS runs masked the bug because `security` exists, while Ubuntu release runners exposed it immediately.
+- The fix intentionally keeps session/keychain probing unchanged for non-env paths; it only removes the unnecessary keychain dependency when `CURSOR_API_KEY` is already present.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/cursor/src/live-setup/Reader.test.ts`
+- `./node_modules/.bin/vitest run apps/cli/src/NileCli.test.ts --testNamePattern "imports the current cursor live state as a connection"`
+- `npm run test:core`
+- `npm run test:cli`
+
 ### Settings data loader cleanup
 
 - Split the bridge-reading strategy out of the settings data hook:
