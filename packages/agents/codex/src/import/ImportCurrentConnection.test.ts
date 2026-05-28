@@ -64,7 +64,7 @@ describe("ImportCurrentConnection", () => {
     importer.close();
   });
 
-  it("imports an unknown openai session connection and enables OpenClaw", async () => {
+  it("imports an unknown openai session connection and enables compatible agents", async () => {
     const setup = createSetup({
       authFile: openAiAuthFile("work@example.com"),
     });
@@ -87,7 +87,7 @@ describe("ImportCurrentConnection", () => {
       endpointFamily: "openai",
       authMode: "openai_session",
     });
-    expect(access?.enabledAgents).toEqual(["codex", "openclaw"]);
+    expect(access?.enabledAgents).toEqual(["codex", "openclaw", "opencode"]);
 
     importer.close();
   });
@@ -258,7 +258,7 @@ describe("ImportCurrentConnection", () => {
     });
     expect(migrated).toEqual(expect.objectContaining({
       authMode: "openai_session",
-      enabledAgents: ["openclaw", "codex"],
+      enabledAgents: ["openclaw", "codex", "opencode"],
     }));
     expect(migratedRegistry.readCredential("legacy-openclaw-session")).toEqual(
       openAiSessionCredential("work@example.com"),

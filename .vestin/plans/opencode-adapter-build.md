@@ -76,3 +76,16 @@
 - Importing an existing OpenCode OpenAI session reconstructs a Nile `openai_session` credential from the OAuth access/refresh tokens plus `accountId`. OpenCode does not persist a separate `idToken`, so Nile reuses the access token in that field for compatibility with the existing credential shape.
 - OpenCode’s effective runtime is influenced not just by the top-level `model`, but also by built-in `agent.*.model` overrides and `enabled_providers`. Only switching `model` is not sufficient when those keys already exist.
 - `npm run test:cli` is currently blocked in this repo by an unrelated `lipo` failure while building `packages/core/dist/services/credential/KeychainGenericPasswordHelper`. The CLI behavior changed in this batch was verified by running the CLI Vitest file directly instead of the wrapper script.
+
+### Step 9: Isolate OpenCode Runtime State For Custom Homes
+
+- Investigated a release-blocking CLI test regression and found that the CLI test helper only overrode OpenCode's config home, while the runtime still fell back to the real `~/.local/share/opencode/auth.json` for OAuth state.
+- Updated the OpenCode runtime adapter to derive a sibling data-home when Nile is pointed at a custom OpenCode config root such as `<tmp>/.config/opencode` or `<tmp>/.opencode`.
+- Extended the CLI test fixture to create isolated OpenCode config and auth stores under the temp workspace so local-setup scans no longer depend on the developer machine's real OpenCode state.
+- Verified with:
+  - `./node_modules/.bin/vitest run apps/cli/src/NileCli.test.ts`
+  - `npm run desktop:build`
+
+#### Key findings
+
+- Before this fix, CLI tests could read the developer machine's real OpenCode OAuth state even though the rest of the agent homes were isolated. That violated the repo rule against tests depending on personal machine state and only surfaced after adding OpenCode as a built-in agent.

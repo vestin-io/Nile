@@ -563,6 +563,7 @@ describe("NileCli", () => {
           cursor: setup.cursorHome,
           claude: setup.claudeHome,
           openclaw: setup.openclawHome,
+          opencode: setup.opencodeHome,
         },
         secureSnapshotStore: setup.secureSnapshots,
       },
@@ -1604,6 +1605,7 @@ function createSetup(options?: {
   claudeHome: string;
   geminiHome: string;
   openclawHome: string;
+  opencodeHome: string;
   credentialStore: StubCredentialStore;
   secureSnapshots: MemorySecureSnapshotStore;
 } {
@@ -1643,6 +1645,13 @@ function createSetup(options?: {
   mkdirSync(openclawHome, { recursive: true });
   writeFileSync(join(openclawHome, "openclaw.json"), "{ models: { mode: 'merge', providers: {} } }\n", "utf8");
 
+  const opencodeHome = join(dir, ".config", "opencode");
+  mkdirSync(opencodeHome, { recursive: true });
+  writeFileSync(join(opencodeHome, "opencode.json"), "{}\n", "utf8");
+  const opencodeDataHome = join(dir, ".local", "share", "opencode");
+  mkdirSync(opencodeDataHome, { recursive: true });
+  writeFileSync(join(opencodeDataHome, "auth.json"), "{}\n", "utf8");
+
   return {
     dbPath: join(dir, "switcher.sqlite"),
     codexHome,
@@ -1650,6 +1659,7 @@ function createSetup(options?: {
     claudeHome,
     geminiHome,
     openclawHome,
+    opencodeHome,
     credentialStore: new StubCredentialStore(),
     secureSnapshots: new MemorySecureSnapshotStore(),
   };
@@ -1708,6 +1718,7 @@ function createCli(
     claudeHome: string;
     geminiHome: string;
     openclawHome: string;
+    opencodeHome: string;
     credentialStore: StubCredentialStore;
     secureSnapshots: MemorySecureSnapshotStore;
   },
@@ -1723,6 +1734,7 @@ function createCli(
         claude: setup.claudeHome,
         gemini: setup.geminiHome,
         openclaw: setup.openclawHome,
+        opencode: setup.opencodeHome,
       },
       credentialStore: setup.credentialStore,
       secureSnapshotStore: setup.secureSnapshots,

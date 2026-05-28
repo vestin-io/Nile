@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 
 import type { CredentialStore } from "@nile/core/services/credential";
 import { EnvironmentSource } from "@nile/core/services/EnvironmentSource";
@@ -41,7 +41,7 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
   constructor(options: OpenCodeAgentAdapterOptions) {
     const databasePath = options.databasePath;
     const opencodeHome = options.opencodeHome ?? join(homedir(), ".config", "opencode");
-    const opencodeDataHome = options.opencodeDataHome ?? join(homedir(), ".local", "share", "opencode");
+    const opencodeDataHome = options.opencodeDataHome ?? resolveOpencodeDataHome(opencodeHome);
     const credentialStore = options.credentialStore;
     const environment = options.environment ?? EnvironmentSource.from(process.env);
     const secureSnapshotStore = options.secureSnapshotStore;
@@ -102,4 +102,16 @@ export class OpenCodeAgentAdapter implements AgentAdapter {
       };
     });
   }
+}
+
+function resolveOpencodeDataHome(opencodeHome: string): string {
+  const defaultDataHome = join(homedir(), ".local", "share", "opencode");
+  const homeName = basename(opencodeHome);
+  if (homeName === "opencode" && basename(dirname(opencodeHome)) === ".config") {
+    return join(dirname(dirname(opencodeHome)), ".local", "share", "opencode");
+  }
+  if (homeName === ".opencode") {
+    return join(dirname(opencodeHome), ".local", "share", "opencode");
+  }
+  return defaultDataHome;
 }
