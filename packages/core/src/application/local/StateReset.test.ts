@@ -104,13 +104,14 @@ describe("StateReset", () => {
     const databasePath = join(root, "switcher.sqlite");
     const historyPath = join(root, "history");
     const credentialStore = new FailingCredentialStore();
+    const secureSnapshots = new StubSecureSnapshotStore();
 
     mkdirSync(dirname(databasePath), { recursive: true });
     mkdirSync(join(historyPath, "mutation-1"), { recursive: true });
     writeFileSync(join(historyPath, "mutation-1", "before.json"), "{}");
     seedResetRefs(databasePath);
 
-    const result = new StateReset(credentialStore).reset(databasePath);
+    const result = new StateReset(credentialStore, secureSnapshots).reset(databasePath);
 
     expect(result).toEqual({
       databasePath,
