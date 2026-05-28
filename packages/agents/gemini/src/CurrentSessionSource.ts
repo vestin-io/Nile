@@ -1,5 +1,5 @@
 import type { CurrentSessionSourceManifest } from "@nile/core/session/Types";
-import { resolveAgentHome } from "@nile/core/models/agent/homes";
+import { resolveAgentHome } from "@nile/core/models/agent/Homes";
 import { GeminiSessionRefresh } from "./SessionRefresh";
 import { GeminiSessionStores } from "./Stores";
 

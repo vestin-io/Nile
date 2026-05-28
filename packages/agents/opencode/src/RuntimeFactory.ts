@@ -1,5 +1,5 @@
 import type { AgentFactoryRegistration } from "@nile/core/runtime-local/Types";
-import { resolveAgentHome } from "@nile/core/models/agent/homes";
+import { resolveAgentHome } from "@nile/core/models/agent/Homes";
 import { OpenCodeAgentAdapter } from "./OpenCodeAgentAdapter";
 import { OPENCODE_AGENT_ID } from "./types";
 

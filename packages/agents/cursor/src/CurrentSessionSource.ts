@@ -1,5 +1,5 @@
 import type { CurrentSessionSourceManifest } from "@nile/core/session/Types";
-import { resolveAgentHome } from "@nile/core/models/agent/homes";
+import { resolveAgentHome } from "@nile/core/models/agent/Homes";
 import { CurrentCredentialReader } from "./live-setup/CredentialReader";
 
 export const CURSOR_CURRENT_SESSION_SOURCE = {

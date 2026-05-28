@@ -89,3 +89,16 @@
 #### Key findings
 
 - Before this fix, CLI tests could read the developer machine's real OpenCode OAuth state even though the rest of the agent homes were isolated. That violated the repo rule against tests depending on personal machine state and only surfaced after adding OpenCode as a built-in agent.
+
+### Step 10: Fix Case-Sensitive Agent Home Imports For Linux CI
+
+- Investigated the rerun desktop release failure and found that multiple agent packages imported `@nile/core/models/agent/homes` while the actual source file is `Homes.ts`.
+- Local macOS development had hidden the mismatch because the filesystem is case-insensitive, but the GitHub Actions Linux runner failed module resolution during the test suite.
+- Updated agent source imports to reference `@nile/core/models/agent/Homes` so workspace path resolution matches the real source filename while leaving the lowercase exported subpath in `@nile/core` package exports untouched for compatibility.
+- Verified with:
+  - `npm run test:core`
+  - `npm run desktop:build`
+
+#### Key findings
+
+- This was not an OpenCode-only runtime bug. The new release path surfaced an existing cross-platform import-case defect shared by several agent packages, and Linux CI was the first environment strict enough to fail it.

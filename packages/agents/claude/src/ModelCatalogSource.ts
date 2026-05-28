@@ -4,7 +4,7 @@ import type {
   LocalModelCatalogSource,
   LocalModelCatalogSourceManifest,
 } from "@nile/core/application/local/ModelCatalogSourceTypes";
-import { resolveAgentHome } from "@nile/core/models/agent/homes";
+import { resolveAgentHome } from "@nile/core/models/agent/Homes";
 import { joinEndpointUrl } from "@nile/core/projection/Url";
 import type { EndpointRecord } from "@nile/core/models/endpoint";
 import { ClaudeGatewayModelCatalog } from "./GatewayModelCatalog";
