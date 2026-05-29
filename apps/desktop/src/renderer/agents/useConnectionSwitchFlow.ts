@@ -46,6 +46,17 @@ export function useAgentConnectionSwitchFlow({
     return () => window.clearTimeout(timeoutId);
   }, [highlightRecentSwitch, recentlyActivatedConnectionId]);
 
+  useEffect(() => {
+    if (!switchingConnectionId || agent.currentConnection?.id !== switchingConnectionId) {
+      return;
+    }
+
+    if (highlightRecentSwitch) {
+      setRecentlyActivatedConnectionId(switchingConnectionId);
+    }
+    setSwitchingConnectionId(null);
+  }, [agent.currentConnection?.id, highlightRecentSwitch, switchingConnectionId]);
+
   const openModelEditor = (connection: DesktopConnection) => {
     setPendingSwitchAfterSaveConnectionId(null);
     setEditingConnection(connection);
@@ -109,18 +120,15 @@ export function useAgentConnectionSwitchFlow({
       if (shouldSwitchAfterSave) {
         setSwitchingConnectionId(editingConnection.id);
         await onSwitch(agent.agentId, editingConnection.id);
-        if (highlightRecentSwitch) {
-          setRecentlyActivatedConnectionId(editingConnection.id);
-        }
       }
       setPendingSwitchAfterSaveConnectionId(null);
       setEditingConnection(null);
       setDraftModelId("");
     } catch (error) {
       setModelError(error instanceof Error ? error.message : String(error));
+      setSwitchingConnectionId(null);
     } finally {
       setIsSavingModel(false);
-      setSwitchingConnectionId(null);
     }
   };
 
@@ -151,11 +159,11 @@ export function useAgentConnectionSwitchFlow({
     setSwitchingConnectionId(connectionId);
     try {
       await onSwitch(agent.agentId, connectionId);
-      if (highlightRecentSwitch) {
-        setRecentlyActivatedConnectionId(connectionId);
-      }
-    } finally {
+    } catch (error) {
       setSwitchingConnectionId(null);
+      throw error;
+    } finally {
+      setPendingSwitchAfterSaveConnectionId(null);
     }
   };
 

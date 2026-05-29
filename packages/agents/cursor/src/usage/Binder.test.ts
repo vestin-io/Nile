@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 
 import { AccessRegistry } from "@nile/core/models/access";
 import { EndpointRegistry } from "@nile/core/models/endpoint";
+import { type CredentialStoreTarget, normalizeCredentialStoreTarget } from "@nile/core/services/credential";
 import { CursorUsageBinder } from "./Binder";
 import { CursorUsageBindingRegistry, CursorUsageBindingValidationError } from "./BindingRegistry";
 
@@ -156,6 +157,120 @@ describe("CursorUsageBinder", () => {
     accessRegistry.close();
     endpointRegistry.close();
   });
+
+  it("stores Cursor quota bindings in encrypted local storage when the connection uses it", () => {
+    const setup = createSetup();
+    const endpointRegistry = EndpointRegistry.open(setup.dbPath);
+    endpointRegistry.add({
+      id: "cursor",
+      label: "Cursor",
+      rootUrl: "https://api2.cursor.sh",
+      profile: "cursor-backend",
+      protocols: {
+        cursor: {},
+      },
+    });
+
+    const accessRegistry = AccessRegistry.open(setup.dbPath, setup.credentialStore);
+    accessRegistry.add({
+      id: "cursor-session",
+      endpointId: "cursor",
+      label: "cursor.user@example.com",
+      authMode: "cursor_session",
+      identityKey: "auth:auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+      credentialStorageBackend: "encrypted_local_storage",
+    }, {
+      kind: "cursor_session",
+      accessToken: "cursor-access-token",
+      refreshToken: "cursor-refresh-token",
+      authId: "auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+      email: "cursor.user@example.com",
+    });
+
+    const binder = new CursorUsageBinder(
+      endpointRegistry,
+      accessRegistry,
+      CursorUsageBindingRegistry.open(setup.dbPath, setup.credentialStore),
+    );
+
+    binder.bind("cursor-session", CURSOR_WEB_SESSION_TOKEN);
+
+    expect(setup.credentialStore.get({
+      reference: "usage:cursor:cursor-session",
+      backend: "encrypted_local_storage",
+    })).toEqual({
+      kind: "cursor_web_session",
+      sessionToken: CURSOR_WEB_SESSION_TOKEN,
+    });
+
+    accessRegistry.close();
+    endpointRegistry.close();
+  });
+
+  it("migrates an existing Cursor quota binding when the connection backend changes", () => {
+    const setup = createSetup();
+    const endpointRegistry = EndpointRegistry.open(setup.dbPath);
+    endpointRegistry.add({
+      id: "cursor",
+      label: "Cursor",
+      rootUrl: "https://api2.cursor.sh",
+      profile: "cursor-backend",
+      protocols: {
+        cursor: {},
+      },
+    });
+
+    const accessRegistry = AccessRegistry.open(setup.dbPath, setup.credentialStore);
+    accessRegistry.add({
+      id: "cursor-session",
+      endpointId: "cursor",
+      label: "cursor.user@example.com",
+      authMode: "cursor_session",
+      identityKey: "auth:auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+    }, {
+      kind: "cursor_session",
+      accessToken: "cursor-access-token",
+      refreshToken: "cursor-refresh-token",
+      authId: "auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+      email: "cursor.user@example.com",
+    });
+
+    const bindingRegistry = CursorUsageBindingRegistry.open(setup.dbPath, setup.credentialStore);
+    const binder = new CursorUsageBinder(
+      endpointRegistry,
+      accessRegistry,
+      bindingRegistry,
+    );
+
+    binder.bind("cursor-session", CURSOR_WEB_SESSION_TOKEN);
+    accessRegistry.update("cursor-session", {
+      credentialStorageBackend: "encrypted_local_storage",
+    });
+    accessRegistry.syncCredential("cursor-session", {
+      kind: "cursor_session",
+      accessToken: "cursor-access-token",
+      refreshToken: "cursor-refresh-token",
+      authId: "auth0|user_01K03K41CNGRCADY5VT0JPH69Y",
+      email: "cursor.user@example.com",
+    });
+    binder.bind("cursor-session", CURSOR_WEB_SESSION_TOKEN);
+
+    expect(setup.credentialStore.has("usage:cursor:cursor-session")).toBe(false);
+    expect(setup.credentialStore.get({
+      reference: "usage:cursor:cursor-session",
+      backend: "encrypted_local_storage",
+    })).toEqual({
+      kind: "cursor_web_session",
+      sessionToken: CURSOR_WEB_SESSION_TOKEN,
+    });
+    expect(bindingRegistry.get("cursor-session")).toMatchObject({
+      credentialStorageBackend: "encrypted_local_storage",
+    });
+
+    bindingRegistry.close();
+    accessRegistry.close();
+    endpointRegistry.close();
+  });
 });
 
 function createSetup(): {
@@ -173,28 +288,34 @@ function createSetup(): {
 class StubCredentialStore {
   private readonly credentials = new Map<string, unknown>();
 
-  create(id: string, credential: unknown): void {
-    this.credentials.set(id, credential);
+  create(target: CredentialStoreTarget, credential: unknown): void {
+    this.credentials.set(this.toKey(target), credential);
   }
 
-  update(id: string, credential: unknown): void {
-    this.credentials.set(id, credential);
+  update(target: CredentialStoreTarget, credential: unknown): void {
+    this.credentials.set(this.toKey(target), credential);
   }
 
-  get(id: string) {
-    const credential = this.credentials.get(id);
+  get(target: CredentialStoreTarget) {
+    const key = this.toKey(target);
+    const credential = this.credentials.get(key);
     if (!credential) {
-      throw new Error(`Missing stub credential: ${id}`);
+      throw new Error(`Missing stub credential: ${key}`);
     }
     return credential as never;
   }
 
-  has(id: string): boolean {
-    return this.credentials.has(id);
+  has(target: CredentialStoreTarget): boolean {
+    return this.credentials.has(this.toKey(target));
   }
 
-  remove(id: string): void {
-    this.credentials.delete(id);
+  remove(target: CredentialStoreTarget): void {
+    this.credentials.delete(this.toKey(target));
+  }
+
+  private toKey(target: CredentialStoreTarget): string {
+    const normalized = normalizeCredentialStoreTarget(target);
+    return `${normalized.backend}:${normalized.reference}`;
   }
 }
 

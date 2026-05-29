@@ -56,6 +56,7 @@ export function AgentCard({
     onSwitch,
     onUpdateAgentConnectionModel,
   });
+  const isSwitchingConnection = flow.switchingConnectionId !== null;
 
   const showDetectedSetup = shouldShowDetectedSetup(detectedSetup);
   const issueLink = readIssueLink(agent, t);
@@ -83,7 +84,8 @@ export function AgentCard({
       />
       <Card
         className={[
-          "rounded-2xl",
+          "rounded-2xl transition-[box-shadow,border-color,background-color] duration-300",
+          isSwitchingConnection ? "border-ring/50 shadow-[0_0_0_1px_rgba(255,255,255,0.08)]" : "",
           isEditingOrder ? "cursor-move select-none" : "",
           draggedAgentId === agent.agentId ? "opacity-60" : "",
           dropTargetAgentId === agent.agentId ? "ring-1 ring-ring" : "",
@@ -131,6 +133,7 @@ export function AgentCard({
                 <AgentCurrentConnectionPanel
                   agent={agent}
                   disabled={isEditingOrder}
+                  switchingConnectionId={flow.switchingConnectionId}
                   t={t}
                   onSwitch={(connectionId) => {
                     void flow.switchConnection(connectionId).catch(() => undefined);

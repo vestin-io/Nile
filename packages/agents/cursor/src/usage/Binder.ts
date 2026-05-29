@@ -47,6 +47,7 @@ export class CursorUsageBinder {
       {
         connectionId,
         accountFingerprint: localFingerprint,
+        credentialStorageBackend: access.credentialStorageBackend,
       },
       CursorUsageIdentity.normalizeToken(sessionToken),
     );

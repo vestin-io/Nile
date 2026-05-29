@@ -1,8 +1,10 @@
 import {
+  buildCredentialStoreTarget,
   type CredentialStore,
   CredentialAlreadyExistsError,
+  type CredentialStorageBackend,
   CredentialNotFoundError,
-} from "@nile/core/services/credential/Store";
+} from "@nile/core/services/credential";
 import {
   LocalCredentialSourceFactory,
   type CredentialSourceFactory,
@@ -62,27 +64,14 @@ export class CursorUsageBindingRegistry {
     const existing = this.bindingStore.get(record.connectionId);
 
     if (existing) {
-      const previousCredential = this.readStoredCursorCredential(existing.credentialSource.reference);
-      this.credentialStore.update(existing.credentialSource.reference, credential);
-      try {
-        this.bindingStore.update({
-          ...record,
-          credentialSource: existing.credentialSource,
-          createdAt: existing.createdAt,
-          updatedAt: createdAt,
-        });
-      } catch (error) {
-        this.restoreCredential(existing.credentialSource, previousCredential);
-        throw error;
-      }
-      return this.getOrThrow(record.connectionId);
+      return this.rebindExisting(existing, record, credential, createdAt);
     }
 
-    this.createCredential(record.credentialSource, credential);
+    this.createCredential(record.credentialSource, record.credentialStorageBackend, credential);
     try {
       this.bindingStore.insert(record);
     } catch (error) {
-      this.removeCredentialIfPresent(record.credentialSource);
+      this.removeCredentialIfPresent(record.credentialSource, record.credentialStorageBackend);
       throw error;
     }
     return this.getOrThrow(record.connectionId);
@@ -94,7 +83,9 @@ export class CursorUsageBindingRegistry {
 
   readCredential(connectionId: string): CursorWebSessionCredential {
     const binding = this.getOrThrow(connectionId);
-    const credential = this.credentialStore.get(binding.credentialSource.reference);
+    const credential = this.credentialStore.get(
+      this.buildTarget(binding.credentialSource.reference, binding.credentialStorageBackend),
+    );
     if (credential.kind !== "cursor_web_session") {
       throw new CursorUsageBindingValidationError(`Expected cursor_web_session credential for ${connectionId}`);
     }
@@ -107,12 +98,15 @@ export class CursorUsageBindingRegistry {
       return;
     }
 
-    const previousCredential = this.readStoredCursorCredential(existing.credentialSource.reference);
-    this.credentialStore.remove(existing.credentialSource.reference);
+    const previousCredential = this.readStoredCursorCredential(
+      existing.credentialSource.reference,
+      existing.credentialStorageBackend,
+    );
+    this.credentialStore.remove(this.buildTarget(existing.credentialSource.reference, existing.credentialStorageBackend));
     try {
       this.bindingStore.remove(connectionId);
     } catch (error) {
-      this.recreateCredential(existing.credentialSource, previousCredential);
+      this.recreateCredential(existing.credentialSource, existing.credentialStorageBackend, previousCredential);
       throw error;
     }
   }
@@ -153,6 +147,7 @@ export class CursorUsageBindingRegistry {
         ...(email ? { email } : {}),
       },
       credentialSource: this.credentialSourceFactory.createCursorUsageSource({ connectionId }),
+      ...(input.credentialStorageBackend ? { credentialStorageBackend: input.credentialStorageBackend } : {}),
       observedAt: timestamp,
       lastVerifiedAt: timestamp,
       createdAt: timestamp,
@@ -171,29 +166,108 @@ export class CursorUsageBindingRegistry {
     };
   }
 
-  private createCredential(credentialSource: CredentialSource, credential: CursorWebSessionCredential): void {
+  private rebindExisting(
+    existing: CursorUsageBindingRecord,
+    record: CursorUsageBindingRecord,
+    credential: CursorWebSessionCredential,
+    timestamp: string,
+  ): CursorUsageBindingRecord {
+    const previousCredential = this.readStoredCursorCredential(
+      existing.credentialSource.reference,
+      existing.credentialStorageBackend,
+    );
+    const nextBackend = record.credentialStorageBackend;
+    if (!this.hasStorageBackendChange(existing.credentialStorageBackend, nextBackend)) {
+      this.credentialStore.update(
+        this.buildTarget(existing.credentialSource.reference, existing.credentialStorageBackend),
+        credential,
+      );
+      try {
+        this.bindingStore.update({
+          ...record,
+          credentialSource: existing.credentialSource,
+          ...(nextBackend ? { credentialStorageBackend: nextBackend } : {}),
+          createdAt: existing.createdAt,
+          updatedAt: timestamp,
+        });
+      } catch (error) {
+        this.restoreCredential(existing.credentialSource, existing.credentialStorageBackend, previousCredential);
+        throw error;
+      }
+      return this.getOrThrow(record.connectionId);
+    }
+
+    const previousMigratedCredential = this.readStoredCursorCredentialIfPresent(
+      existing.credentialSource.reference,
+      nextBackend,
+    );
+    this.createCredential(existing.credentialSource, nextBackend, credential);
     try {
-      this.credentialStore.create(credentialSource.reference, credential);
+      this.removeCredentialIfPresent(existing.credentialSource, existing.credentialStorageBackend);
+    } catch (error) {
+      this.restoreMigratedCredential(existing.credentialSource, nextBackend, previousMigratedCredential);
+      throw error;
+    }
+    try {
+      this.bindingStore.update({
+        ...record,
+        credentialSource: existing.credentialSource,
+        ...(nextBackend ? { credentialStorageBackend: nextBackend } : {}),
+        createdAt: existing.createdAt,
+        updatedAt: timestamp,
+      });
+    } catch (error) {
+      this.recreateCredential(existing.credentialSource, existing.credentialStorageBackend, previousCredential);
+      this.restoreMigratedCredential(existing.credentialSource, nextBackend, previousMigratedCredential);
+      throw error;
+    }
+    return this.getOrThrow(record.connectionId);
+  }
+
+  private createCredential(
+    credentialSource: CredentialSource,
+    credentialStorageBackend: CredentialStorageBackend | undefined,
+    credential: CursorWebSessionCredential,
+  ): void {
+    try {
+      this.credentialStore.create(this.buildTarget(credentialSource.reference, credentialStorageBackend), credential);
     } catch (error) {
       if (error instanceof CredentialAlreadyExistsError) {
-        this.credentialStore.update(credentialSource.reference, credential);
+        this.credentialStore.update(this.buildTarget(credentialSource.reference, credentialStorageBackend), credential);
         return;
       }
       throw error;
     }
   }
 
-  private readStoredCursorCredential(reference: string): CursorWebSessionCredential {
-    const credential = this.credentialStore.get(reference);
+  private readStoredCursorCredential(
+    reference: string,
+    credentialStorageBackend: CredentialStorageBackend | undefined,
+  ): CursorWebSessionCredential {
+    const credential = this.credentialStore.get(this.buildTarget(reference, credentialStorageBackend));
     if (credential.kind !== "cursor_web_session") {
       throw new CursorUsageBindingValidationError(`Expected cursor_web_session credential for ${reference}`);
     }
     return credential;
   }
 
-  private restoreCredential(credentialSource: CredentialSource, credential: CursorWebSessionCredential): void {
+  private readStoredCursorCredentialIfPresent(
+    reference: string,
+    credentialStorageBackend: CredentialStorageBackend | undefined,
+  ): CursorWebSessionCredential | null {
+    const target = this.buildTarget(reference, credentialStorageBackend);
+    return this.credentialStore.has(target)
+      ? this.readStoredCursorCredential(reference, credentialStorageBackend)
+      : null;
+  }
+
+  private restoreCredential(
+    credentialSource: CredentialSource,
+    credentialStorageBackend: CredentialStorageBackend | undefined,
+    credential: CursorWebSessionCredential,
+  ): void {
     try {
-      this.credentialStore.update(credentialSource.reference, credential);
+      this.credentialStore.update(this.buildTarget(credentialSource.reference, credentialStorageBackend), credential);
     } catch {
       throw new CursorUsageBindingValidationError(
         `Failed to restore Cursor quota credential for ${credentialSource.reference}`,
@@ -201,9 +275,13 @@ export class CursorUsageBindingRegistry {
     }
   }
 
-  private recreateCredential(credentialSource: CredentialSource, credential: CursorWebSessionCredential): void {
+  private recreateCredential(
+    credentialSource: CredentialSource,
+    credentialStorageBackend: CredentialStorageBackend | undefined,
+    credential: CursorWebSessionCredential,
+  ): void {
     try {
-      this.credentialStore.create(credentialSource.reference, credential);
+      this.credentialStore.create(this.buildTarget(credentialSource.reference, credentialStorageBackend), credential);
     } catch {
       throw new CursorUsageBindingValidationError(
         `Failed to restore Cursor quota credential for ${credentialSource.reference}`,
@@ -211,14 +289,40 @@ export class CursorUsageBindingRegistry {
     }
   }
 
-  private removeCredentialIfPresent(credentialSource: CredentialSource): void {
+  private removeCredentialIfPresent(
+    credentialSource: CredentialSource,
+    credentialStorageBackend: CredentialStorageBackend | undefined,
+  ): void {
     try {
-      this.credentialStore.remove(credentialSource.reference);
+      this.credentialStore.remove(this.buildTarget(credentialSource.reference, credentialStorageBackend));
     } catch (error) {
       if (error instanceof CredentialNotFoundError) {
         return;
       }
       throw error;
     }
+  }
+
+  private restoreMigratedCredential(
+    credentialSource: CredentialSource,
+    credentialStorageBackend: CredentialStorageBackend | undefined,
+    credential: CursorWebSessionCredential | null,
+  ): void {
+    if (credential) {
+      this.restoreCredential(credentialSource, credentialStorageBackend, credential);
+      return;
+    }
+    this.removeCredentialIfPresent(credentialSource, credentialStorageBackend);
+  }
+
+  private hasStorageBackendChange(
+    previousBackend: CredentialStorageBackend | undefined,
+    nextBackend: CredentialStorageBackend | undefined,
+  ): boolean {
+    return (previousBackend ?? "system_secure_storage") !== (nextBackend ?? "system_secure_storage");
+  }
+
+  private buildTarget(reference: string, backend: CredentialStorageBackend | undefined) {
+    return buildCredentialStoreTarget(reference, backend);
   }
 }

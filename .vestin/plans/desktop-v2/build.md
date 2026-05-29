@@ -302,6 +302,26 @@
 
 - `npm run build -w @nile/desktop`
 
+### Agent card switch loading feedback
+
+- Added visible in-card switching feedback on the Agents list so a connection change no longer looks idle while the backend apply flow is still running:
+  - the card now picks up a transient active border without a page-level blocker
+  - the current-connection selector shows the pending target immediately, swaps its chevron for a spinner, and runs a subtle in-control shimmer until the switch settles
+  - the card shows an inline `Switching` status row and a loading skeleton for usage while the refresh catches up
+- Tightened the shared switch flow so renderer pending state stays alive until the agent state actually reports the new current connection:
+  - `switchingConnectionId` is now cleared by observing `agent.currentConnection.id`, not immediately after `onSwitch()` resolves
+  - failed switch attempts still clear the pending state immediately
+- This change applies to both the card list and the detail connections view because both surfaces share `useConnectionSwitchFlow.ts`.
+
+#### Key findings
+
+- I kept the animation intentionally light and local to the selector. This pass improves perceived responsiveness without adding a full-screen blocker or introducing new timing heuristics in the renderer.
+- The pending selector value is optimistic for the duration of the switch. That is deliberate: the user sees which connection is being activated even before the refreshed current connection snapshot arrives.
+
+### Verification
+
+- `npm run typecheck`
+
 ### Step 48: Release CI Cursor Env Credential Precedence Fix
 
 - Fixed the remaining desktop release CI failure in `apps/cli/src/NileCli.test.ts` for `imports the current cursor live state as a connection`.

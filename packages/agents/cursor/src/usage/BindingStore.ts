@@ -1,5 +1,9 @@
 import { SchemaMigrations, SqliteDatabase } from "@nile/core/services/database";
 import type { CredentialSource } from "@nile/core/services/credential/Source";
+import {
+  SUPPORTED_CREDENTIAL_STORAGE_BACKENDS,
+  type CredentialStorageBackend,
+} from "@nile/core/services/credential";
 import type { CursorUsageBindingRecord } from "./Types";
 
 type BindingRow = {
@@ -9,6 +13,7 @@ type BindingRow = {
   email: string | null;
   credential_source_kind: string;
   credential_source_ref: string;
+  credential_storage_backend: string | null;
   observed_at: string;
   last_verified_at: string;
   created_at: string;
@@ -30,11 +35,12 @@ export class SqliteBindingStore {
           email,
           credential_source_kind,
           credential_source_ref,
+          credential_storage_backend,
           observed_at,
           last_verified_at,
           created_at,
           updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       record.connectionId,
       record.accountFingerprint.authId,
@@ -42,6 +48,7 @@ export class SqliteBindingStore {
       record.accountFingerprint.email ?? null,
       record.credentialSource.kind,
       record.credentialSource.reference,
+      record.credentialStorageBackend ?? null,
       record.observedAt,
       record.lastVerifiedAt,
       record.createdAt,
@@ -56,6 +63,7 @@ export class SqliteBindingStore {
         SET auth_id = ?,
             workos_user_id = ?,
             email = ?,
+            credential_storage_backend = ?,
             observed_at = ?,
             last_verified_at = ?,
             updated_at = ?
@@ -64,6 +72,7 @@ export class SqliteBindingStore {
       record.accountFingerprint.authId,
       record.accountFingerprint.workosUserId,
       record.accountFingerprint.email ?? null,
+      record.credentialStorageBackend ?? null,
       record.observedAt,
       record.lastVerifiedAt,
       record.updatedAt,
@@ -82,6 +91,7 @@ export class SqliteBindingStore {
             email,
             credential_source_kind,
             credential_source_ref,
+            credential_storage_backend,
             observed_at,
             last_verified_at,
             created_at,
@@ -120,10 +130,15 @@ export class SqliteBindingStore {
           `,
         ],
       },
+      {
+        version: 2,
+        statements: ["ALTER TABLE cursor_usage_bindings ADD COLUMN credential_storage_backend TEXT;"],
+      },
     ]);
   }
 
   private mapRow(row: BindingRow): CursorUsageBindingRecord {
+    const credentialStorageBackend = this.mapCredentialStorageBackend(row.credential_storage_backend);
     return {
       connectionId: row.connection_id,
       accountFingerprint: {
@@ -132,6 +147,7 @@ export class SqliteBindingStore {
         ...(row.email ? { email: row.email } : {}),
       },
       credentialSource: this.mapCredentialSource(row),
+      ...(credentialStorageBackend ? { credentialStorageBackend } : {}),
       observedAt: row.observed_at,
       lastVerifiedAt: row.last_verified_at,
       createdAt: row.created_at,
@@ -150,5 +166,15 @@ export class SqliteBindingStore {
       scope: "usage",
       allowLocalMaterialization: true,
     };
+  }
+
+  private mapCredentialStorageBackend(value: string | null): CredentialStorageBackend | undefined {
+    if (value === null) {
+      return undefined;
+    }
+    if (SUPPORTED_CREDENTIAL_STORAGE_BACKENDS.includes(value as CredentialStorageBackend)) {
+      return value as CredentialStorageBackend;
+    }
+    throw new Error(`Unsupported credential storage backend in cursor_usage_bindings: ${value}`);
   }
 }
