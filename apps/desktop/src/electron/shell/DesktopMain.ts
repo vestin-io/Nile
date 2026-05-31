@@ -2,7 +2,6 @@ import { app } from "electron";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
 import { StateReset } from "@nile/builtins/local";
 import type { AgentHomes, AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
 import { mergeAgentHomes, type AgentId } from "@nile/core/models/agent";
