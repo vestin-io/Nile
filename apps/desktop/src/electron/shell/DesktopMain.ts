@@ -14,7 +14,6 @@ import {
 } from "@nile/core/services/credential";
 import { NileLogger } from "@nile/core/services/NileLogger";
 import { ShellEnvironment } from "@nile/host-local";
-
 import { DesktopSurface } from "../../state/Surface";
 import { DesktopApplicationMenu } from "./DesktopApplicationMenu";
 import { AgentHomesStore } from "../state/AgentHomesStore";
