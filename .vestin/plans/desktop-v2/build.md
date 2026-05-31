@@ -322,6 +322,20 @@
 
 - `npm run typecheck`
 
+### Usage refresh cadence
+
+- Increased the default desktop usage cache TTL and auto-refresh cadence from `60s` to `5m`.
+- This keeps the startup refresh behavior intact, but reduces steady-state background usage polling for idle desktop sessions.
+
+#### Key findings
+
+- The desktop auto-refresh timer already derives its interval from `DesktopUsageCache.readCacheTtlMs()`, so changing the cache TTL updates both freshness checks and the periodic background refresh cadence in one place.
+- Existing desktop usage refresh tests already read the cadence dynamically instead of hardcoding `60_000`, so no test fixture rewrite was needed for this change.
+
+### Verification
+
+- Code path review only; no behavioral test changes were required because cadence-sensitive tests already depend on `DesktopUsageCache.readCacheTtlMs()`.
+
 ### Step 48: Release CI Cursor Env Credential Precedence Fix
 
 - Fixed the remaining desktop release CI failure in `apps/cli/src/NileCli.test.ts` for `imports the current cursor live state as a connection`.

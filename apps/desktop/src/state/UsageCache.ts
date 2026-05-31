@@ -12,7 +12,7 @@ export type DesktopUsageRefreshResult = {
 };
 
 export class DesktopUsageCache {
-  private static readonly CACHE_TTL_MS = 60_000;
+  private static readonly CACHE_TTL_MS = 300_000;
   private static readonly REFRESH_CONCURRENCY = 4;
 
   private readonly usageByConnectionId = new Map<string, DesktopUsageState | null>();
