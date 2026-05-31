@@ -73,6 +73,8 @@ export class SessionWorkspaceResources {
       new CurrentSessionResolver(
         this.options.agentHomes,
         this.options.environment ?? EnvironmentSource.empty(),
+        this.options.agentRuntimeCommandOverrides,
+        this.options.openExternalUrl,
       ),
       this.options.logger ?? NileLogger.silent(),
     ));

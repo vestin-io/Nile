@@ -130,6 +130,29 @@ describe("Usage", () => {
     endpointRegistry.close();
   });
 
+  it("marks 401 OpenAI usage responses as credential_unauthorized", async () => {
+    const setup = createSetup();
+    const { accessRegistry, endpointRegistry } = seedOpenAiConnection(setup.dbPath, setup.credentialStore);
+    globalThis.fetch = (async () => new Response(null, { status: 401 })) as unknown as typeof fetch;
+
+    const result = await createUsage(setup.dbPath, setup.credentialStore, endpointRegistry, accessRegistry).get("work-session");
+
+    expect(result).toEqual({
+      connectionId: "work-session",
+      connectionLabel: "Work Session",
+      endpointFamily: "openai",
+      endpointLabel: "OpenAI",
+      status: "error",
+      source: "remote_api",
+      errorCode: "credential_unauthorized",
+      message: "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+      windows: [],
+    });
+
+    accessRegistry.close();
+    endpointRegistry.close();
+  });
+
   it("returns unavailable for cursor connections without a bound web session", async () => {
     const setup = createSetup();
     const endpointRegistry = EndpointRegistry.open(setup.dbPath);

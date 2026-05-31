@@ -1,6 +1,7 @@
 import type { ConnectionFamilyId } from "../models/connection/family/Types";
 import type { CurrentSessionSourceId } from "../models/connection/SourceTypes";
 import type { AgentHomes } from "../models/agent/Homes";
+import type { AgentRuntimeCommandOverrides } from "../models/agent/RuntimeCommands";
 import type { EnvironmentSource } from "../services/EnvironmentSource";
 import type { StoredCredential } from "../services/credential/Types";
 
@@ -20,7 +21,9 @@ export type CurrentSessionStoredCredential = Extract<
 
 export type CurrentSessionResolveContext = {
   agentHomes: AgentHomes | undefined;
+  agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides;
   environment: EnvironmentSource;
+  openExternalUrl?: (url: string) => Promise<void>;
 };
 
 export type CurrentSessionSourceManifest = {

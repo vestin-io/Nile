@@ -27,7 +27,12 @@ export class SessionCredentialResolver {
     private readonly openExternalUrl?: (url: string) => Promise<void>,
     private readonly agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides,
   ) {
-    this.currentSessionResolver = new CurrentSessionResolver(agentHomes, environment);
+    this.currentSessionResolver = new CurrentSessionResolver(
+      agentHomes,
+      environment,
+      agentRuntimeCommandOverrides,
+      openExternalUrl,
+    );
   }
 
   resolve(request: SessionCredentialRequest): SessionStoredCredential {

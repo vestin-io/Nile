@@ -11,6 +11,7 @@ import type {
 } from "@nile/core/actions/local-setup";
 import type {
   AgentCapabilitySupport,
+  AgentRuntimeCommandOverrides,
   ApplyAgentSelectionResult,
   ImportCurrentConnectionInput,
   ImportCurrentConnectionResult,
@@ -46,9 +47,11 @@ export type NileSessionOpenOptions = {
   databasePath: string;
   credentialStore: CredentialStore;
   environment?: EnvironmentSourceType;
+  openExternalUrl?: (url: string) => Promise<void>;
   secureSnapshotStore?: SecureSnapshotStore;
   logger?: NileLogger;
   agentHomes?: AgentHomes;
+  agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides;
 };
 
 export class NileSession {
@@ -59,7 +62,9 @@ export class NileSession {
       database,
       credentialStore: options.credentialStore,
       agentHomes: mergeAgentHomes(defaultAgentHomes(), options.agentHomes),
+      agentRuntimeCommandOverrides: options.agentRuntimeCommandOverrides,
       environment: options.environment,
+      openExternalUrl: options.openExternalUrl,
       secureSnapshotStore: options.secureSnapshotStore,
       logger: options.logger,
     };
@@ -67,6 +72,9 @@ export class NileSession {
       new LocalCredentialResolver(
         runtimeOptions.agentHomes,
         runtimeOptions.environment ?? EnvironmentSource.empty(),
+        undefined,
+        runtimeOptions.openExternalUrl,
+        runtimeOptions.agentRuntimeCommandOverrides,
       );
     const resources = new SessionResources(runtimeOptions, createLocalCredentialResolver);
     return new NileSession(resources, createLocalCredentialResolver, () => database.close());

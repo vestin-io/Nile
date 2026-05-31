@@ -346,3 +346,25 @@
 
 - `./node_modules/.bin/vitest run packages/agents/gemini/src/SessionRefresh.test.ts packages/builtins/src/runtime/RecoveringUsage.test.ts`
 - `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`
+
+### Interactive re-login recovery
+
+- extended current-session unauthorized recovery so Nile can recover when the saved or live session has crossed from silent refresh into a fully interactive re-auth flow:
+  - `openai_session` quota reads now map HTTP `401/403` to `errorCode: "credential_unauthorized"` instead of a generic status error
+  - Codex current-session recovery now re-runs `codex login` against the real `~/.codex` home and reuses the desktop browser opener when available
+  - Gemini current-session recovery now tries silent `refresh auth` first, then falls back to a real Gemini sign-in flow when the CLI output shows Google has switched to interactive re-auth
+- threaded recovery-only runtime context through `NileSession` and `CurrentSessionResolver` so background quota refreshes can still use:
+  - desktop `openExternalUrl(...)`
+  - per-agent runtime command overrides
+- extracted Gemini sign-in polling into a reusable `GeminiSignInFlow` so both add/import login and unauthorized recovery wait for the live session files to actually change before retrying quota
+
+### Key findings
+
+- The local log root cause was not a missing retry. Nile already retried, but it only knew how to do a headless Gemini refresh and then blindly re-read the same stale local session.
+- Codex had the opposite gap: quota 401s were not marked as `credential_unauthorized`, so the shared recovery path never even activated for `openai_session`.
+- Gemini still does not fall back to re-login on every refresh failure. The fallback is intentionally limited to refresh errors that clearly indicate interactive re-auth, so transient network or CLI installation problems do not unexpectedly launch sign-in flows.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/agents/gemini/src/UnauthorizedUsageRecovery.test.ts packages/agents/codex/src/UnauthorizedUsageRecovery.test.ts packages/core/src/actions/usage/Usage.test.ts packages/builtins/src/runtime/RecoveringUsage.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.node.json --noEmit`

@@ -1,9 +1,9 @@
 import type { CurrentSessionSourceManifest } from "@nile/core/session/Types";
 import { resolveAgentHome } from "@nile/core/models/agent";
-import { GeminiSessionRefresh } from "./SessionRefresh";
 import { GeminiSessionStores } from "./Stores";
+import { GeminiUnauthorizedUsageRecovery } from "./UnauthorizedUsageRecovery";
 
-const sessionRefresh = new GeminiSessionRefresh();
+const unauthorizedUsageRecovery = new GeminiUnauthorizedUsageRecovery();
 
 export const GEMINI_CURRENT_SESSION_SOURCE = {
   id: "current_gemini",
@@ -13,7 +13,7 @@ export const GEMINI_CURRENT_SESSION_SOURCE = {
   usageUnauthorizedRecovery: "sync_current_session_and_retry",
   recoverUnauthorizedUsage: async (context) => {
     const geminiHome = resolveAgentHome("gemini", context.agentHomes);
-    await sessionRefresh.refresh(geminiHome, context.environment);
+    await unauthorizedUsageRecovery.recover(geminiHome, context);
   },
   resolve: (context) => {
     const geminiHome = resolveAgentHome("gemini", context.agentHomes);

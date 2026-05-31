@@ -344,7 +344,9 @@ export class DesktopConnectionManager {
     return NileSession.open({
       databasePath: this.options.databasePath,
       agentHomes: this.options.agentHomes,
+      agentRuntimeCommandOverrides: this.options.agentRuntimeCommandOverrides,
       environment: this.options.environment,
+      openExternalUrl: this.options.openExternalUrl,
       credentialStore: this.options.credentialStore,
     });
   }

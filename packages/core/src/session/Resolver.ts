@@ -1,4 +1,5 @@
 import type { AgentHomes } from "../models/agent/Homes";
+import type { AgentRuntimeCommandOverrides } from "../models/agent/RuntimeCommands";
 import type { EnvironmentSource } from "../services/EnvironmentSource";
 import { CURRENT_SESSION_SOURCE_REGISTRY } from "./Registry";
 import type {
@@ -10,6 +11,8 @@ export class CurrentSessionResolver {
   constructor(
     private readonly agentHomes: AgentHomes | undefined,
     private readonly environment: EnvironmentSource,
+    private readonly agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides,
+    private readonly openExternalUrl?: (url: string) => Promise<void>,
   ) {}
 
   resolve(request: CurrentSessionCredentialRequest): CurrentSessionStoredCredential {
@@ -23,7 +26,9 @@ export class CurrentSessionResolver {
   private readContext() {
     return {
       agentHomes: this.agentHomes,
+      agentRuntimeCommandOverrides: this.agentRuntimeCommandOverrides,
       environment: this.environment,
+      openExternalUrl: this.openExternalUrl,
     };
   }
 }

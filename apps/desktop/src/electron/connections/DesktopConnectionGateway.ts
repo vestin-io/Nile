@@ -1,4 +1,10 @@
-import type { AgentHomes, AgentId, ImportCurrentConnectionResult, RollbackLatestAgentResult } from "@nile/core/models/agent";
+import type {
+  AgentHomes,
+  AgentId,
+  AgentRuntimeCommandOverrides,
+  ImportCurrentConnectionResult,
+  RollbackLatestAgentResult,
+} from "@nile/core/models/agent";
 import type { RemoveConnectionResult } from "@nile/builtins/local";
 import type {
   BindCursorUsageResult,
@@ -33,7 +39,9 @@ import type {
 type DesktopConnectionGatewayOptions = {
   databasePath: string;
   agentHomes?: AgentHomes;
+  agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides;
   environment: EnvironmentSource;
+  openExternalUrl?: (url: string) => Promise<void>;
   managedApiKeyEnvironment?: ManagedApiKeyEnvironment;
   credentialStore: CredentialStore;
   credentialStorageSession?: DesktopCredentialStorageSession;
@@ -190,7 +198,9 @@ export class DesktopConnectionGateway {
     return NileSession.open({
       databasePath: this.options.databasePath,
       agentHomes: this.options.agentHomes,
+      agentRuntimeCommandOverrides: this.options.agentRuntimeCommandOverrides,
       environment: this.options.environment,
+      openExternalUrl: this.options.openExternalUrl,
       credentialStore: this.options.credentialStore,
     });
   }

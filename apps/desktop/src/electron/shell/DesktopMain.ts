@@ -125,6 +125,7 @@ export class DesktopMain {
       agentHomes: this.agentHomes,
       agentRuntimeCommandOverrides: this.agentRuntimeCommandOverrides,
       environment: this.environment,
+      openExternalUrl: async (url) => await this.shell.openExternalUrl(url),
       credentialStore: this.credentialStore,
       logger: this.logger.child({ scope: "desktop-surface" }),
     });
@@ -145,7 +146,9 @@ export class DesktopMain {
     this.connectionGateway = new DesktopConnectionGateway({
       databasePath: options.databasePath,
       agentHomes: this.agentHomes,
+      agentRuntimeCommandOverrides: this.agentRuntimeCommandOverrides,
       environment: this.environment,
+      openExternalUrl: async (url) => await this.shell.openExternalUrl(url),
       managedApiKeyEnvironment: new ManagedApiKeyEnvironment(
         this.environmentStore,
         this.shellEnvironment,

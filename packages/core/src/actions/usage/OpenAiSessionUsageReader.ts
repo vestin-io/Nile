@@ -52,6 +52,13 @@ export class OpenAiSessionUsageReader {
       return this.buildErrorResult(input, this.readFetchErrorMessage(error));
     }
 
+    if (response.status === 401 || response.status === 403) {
+      return this.buildErrorResult(
+        input,
+        "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+        "credential_unauthorized",
+      );
+    }
     if (!response.ok) {
       return this.buildErrorResult(input, `Quota request failed with status ${response.status}`);
     }
@@ -133,6 +140,7 @@ export class OpenAiSessionUsageReader {
   private buildErrorResult(
     input: OpenAiSessionUsageReaderInput,
     message: string,
+    errorCode?: "credential_unauthorized",
   ): ConnectionUsageResult {
     return {
       connectionId: input.connectionId,
@@ -142,6 +150,7 @@ export class OpenAiSessionUsageReader {
       status: "error",
       source: "remote_api",
       message,
+      ...(errorCode ? { errorCode } : {}),
       windows: [],
     };
   }

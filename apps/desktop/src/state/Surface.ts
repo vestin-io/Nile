@@ -32,6 +32,7 @@ type DesktopSurfaceOptions = {
   agentHomes?: AgentHomes;
   agentRuntimeCommandOverrides?: AgentRuntimeCommandOverrides;
   environment?: EnvironmentSource;
+  openExternalUrl?: (url: string) => Promise<void>;
   credentialStore: CredentialStore;
   secureSnapshotStore?: SecureSnapshotStore;
   logger?: NileLogger;
@@ -171,7 +172,9 @@ export class DesktopSurface {
     return NileSession.open({
       databasePath: this.options.databasePath,
       agentHomes: this.options.agentHomes,
+      agentRuntimeCommandOverrides: this.options.agentRuntimeCommandOverrides,
       environment: this.options.environment,
+      openExternalUrl: this.options.openExternalUrl,
       credentialStore: this.options.credentialStore,
       secureSnapshotStore: this.options.secureSnapshotStore,
       logger: this.logger.child({ scope }),
