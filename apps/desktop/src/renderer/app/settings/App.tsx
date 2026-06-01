@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-
 import { readCodexAuthJsonPath } from "../../connections/AuthJsonPath";
 import type { AgentDetailTab } from "../../agents/detail/Page";
 import { useNotificationHistory } from "./useNotificationHistory";
@@ -402,7 +401,6 @@ export function SettingsApp() {
       <EncryptedLocalAccessProvider requestUnlock={requestEncryptedLocalUnlock}>
         <SettingsPageContent {...pageContentProps} />
       </EncryptedLocalAccessProvider>
-
       <SettingsDialogs
         credentialStorageState={credentialStorageState}
         exportConnectionCount={portability.exportConnectionCount}
