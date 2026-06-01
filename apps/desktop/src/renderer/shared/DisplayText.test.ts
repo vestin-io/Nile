@@ -10,6 +10,29 @@ describe("DisplayText", () => {
     expect(formatUsageValue(null, t)).toBe("未知");
   });
 
+  it("keeps generic non-available usage summaries localized", () => {
+    const t = createTranslator("zh");
+
+    expect(formatUsageValue({
+      status: "unavailable",
+      message: "Bind a Cursor web session for this connection to enable live quota.",
+      text: "Bind a Cursor web session for this connection to enable live quota.",
+      windows: [],
+    }, t)).toBe("未知");
+  });
+
+  it("returns the usage error text when reauthentication is required", () => {
+    const t = createTranslator("zh");
+
+    expect(formatUsageValue({
+      status: "error",
+      errorCode: "credential_unauthorized",
+      message: "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+      text: "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+      windows: [],
+    }, t)).toBe("需要重新认证");
+  });
+
   it("translates known OpenClaw live issues", () => {
     const t = createTranslator("zh");
 

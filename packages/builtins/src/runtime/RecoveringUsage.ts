@@ -19,17 +19,24 @@ export class RecoveringUsage {
     private readonly logger: NileLogger,
   ) {}
 
-  async get(connectionId: string): Promise<ConnectionUsageResult> {
+  async get(
+    connectionId: string,
+    options?: { recoverUnauthorizedCurrentSession?: boolean },
+  ): Promise<ConnectionUsageResult> {
     const result = await this.usage.get(connectionId);
-    const recovered = await this.retryAfterCurrentSessionSync(connectionId, result);
+    const recovered = await this.retryAfterCurrentSessionSync(connectionId, result, options);
     return recovered ?? result;
   }
 
   private async retryAfterCurrentSessionSync(
     connectionId: string,
     result: ConnectionUsageResult,
+    options?: { recoverUnauthorizedCurrentSession?: boolean },
   ): Promise<ConnectionUsageResult | null> {
     if (result.status !== "error" || result.errorCode !== "credential_unauthorized") {
+      return null;
+    }
+    if (options?.recoverUnauthorizedCurrentSession === false) {
       return null;
     }
 

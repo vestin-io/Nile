@@ -36,6 +36,26 @@ export type SetEnabledAgentsOptions = {
   userEdited?: boolean;
 };
 
+export function resolveSessionSourceSelection(
+  authMode: string,
+  sessionSource: SessionSourceSelection,
+  options?: { preferDefault?: boolean },
+): SessionSourceSelection {
+  const methods = SHARED_SESSION_CONNECTION_METHODS.listVisibleForAddConnectionForAuthMode(authMode);
+  const defaultMethod = SHARED_SESSION_CONNECTION_METHODS.readDefaultForAuthMode(authMode);
+  if (methods.length === 0 || !defaultMethod) {
+    return sessionSource;
+  }
+
+  if (options?.preferDefault) {
+    return defaultMethod.source;
+  }
+
+  return methods.some((method) => method.source === sessionSource)
+    ? sessionSource
+    : defaultMethod.source;
+}
+
 function createInitialFormState(
   defaultOpenAiAuthJsonPath: string,
   credentialStorageMode: CredentialStorageBackend | null,
@@ -64,6 +84,7 @@ export function useAddConnectionForm(
   const enabledAgentsPolicy = useMemo(() => new EnabledAgentsPolicy(), []);
   const previousDefaultOpenAiAuthJsonPath = useRef(defaultOpenAiAuthJsonPath);
   const previousCredentialStorageMode = useRef(credentialStorageMode);
+  const previousAuthMode = useRef("");
   const [enabledAgentsManuallyEdited, setEnabledAgentsManuallyEdited] = useState(false);
   const [formState, setFormState] = useState<AddConnectionFormState>(() =>
     createInitialFormState(defaultOpenAiAuthJsonPath, credentialStorageMode),
@@ -161,16 +182,17 @@ export function useAddConnectionForm(
   }, [selectedDefinition, formState.authMode]);
 
   useEffect(() => {
+    const preferDefault = previousAuthMode.current !== formState.authMode;
+    previousAuthMode.current = formState.authMode;
+
     setFormState((current) => {
-      const methods = SHARED_SESSION_CONNECTION_METHODS.listVisibleForAddConnectionForAuthMode(current.authMode);
-      const defaultMethod = SHARED_SESSION_CONNECTION_METHODS.readDefaultForAuthMode(current.authMode);
-      if (methods.length > 0 && defaultMethod) {
-        const nextSessionSource = methods.some((method) => method.source === current.sessionSource)
-          ? current.sessionSource
-          : defaultMethod.source;
-        if (nextSessionSource !== current.sessionSource) {
-          return { ...current, sessionSource: nextSessionSource };
-        }
+      const nextSessionSource = resolveSessionSourceSelection(
+        current.authMode,
+        current.sessionSource,
+        { preferDefault },
+      );
+      if (nextSessionSource !== current.sessionSource) {
+        return { ...current, sessionSource: nextSessionSource };
       }
 
       return current;

@@ -56,6 +56,7 @@ export function SettingsPageContent({
   onAgentOrderChange,
   onBackFromAgentDetail,
   onBindCursorUsage,
+  onReauthenticateConnection,
   onCreateConnectionAlert,
   onCheckForUpdates,
   onCloseAddConnectionPage,
@@ -188,6 +189,7 @@ export function SettingsPageContent({
         }}
         onRefresh={onRefresh}
         onBindCursorUsage={onBindCursorUsage}
+        onReauthenticateConnection={onReauthenticateConnection}
         onCreateAlert={onCreateConnectionAlert}
         onDeleteAlert={onDeleteConnectionAlert}
         onRemove={onRemoveConnection}

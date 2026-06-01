@@ -54,6 +54,7 @@ export type SettingsPageContentBuilderOptions = {
   visiblePage: SettingsPageContentProps["visiblePage"];
   addConnection: SettingsPageContentProps["onAddConnection"];
   bindCursorUsage: SettingsPageContentProps["onBindCursorUsage"];
+  reauthenticateConnection: SettingsPageContentProps["onReauthenticateConnection"];
   closeAddConnectionPage: SettingsPageContentProps["onCloseAddConnectionPage"];
   completeQuickSetup: SettingsPageContentProps["onCompleteQuickSetup"];
   importCurrentConnection: SettingsPageContentProps["onQuickSetupSaveAgent"];
@@ -97,6 +98,7 @@ export function readSettingsPageContentActions(
   | "onApplyProfile"
   | "onBackFromAgentDetail"
   | "onBindCursorUsage"
+  | "onReauthenticateConnection"
   | "onCheckForUpdates"
   | "onCloseAddConnectionPage"
   | "onCompleteQuickSetup"
@@ -156,6 +158,7 @@ export function readSettingsPageContentActions(
     },
     onBackFromAgentDetail: () => input.setCurrentPage("agents"),
     onBindCursorUsage: input.bindCursorUsage,
+    onReauthenticateConnection: input.reauthenticateConnection,
     onCheckForUpdates: input.windowActions.checkForUpdates,
     onCloseAddConnectionPage: input.closeAddConnectionPage,
     onCompleteQuickSetup: input.completeQuickSetup,

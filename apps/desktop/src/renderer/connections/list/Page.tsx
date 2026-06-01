@@ -43,6 +43,7 @@ type ConnectionsPageProps = {
   onSelectConnection(connectionId: string | null): void;
   onRefresh(): Promise<void>;
   onBindCursorUsage(connectionId: string): Promise<void>;
+  onReauthenticateConnection(connectionId: string): Promise<void>;
   onCreateAlert(input:
     | {
       connectionId: string;
@@ -115,6 +116,7 @@ export function ConnectionsPage({
   onSelectConnection,
   onRefresh,
   onBindCursorUsage,
+  onReauthenticateConnection,
   onCreateAlert,
   onDeleteAlert,
   onOpenNotificationHistory,
@@ -213,6 +215,7 @@ export function ConnectionsPage({
           onBackFromAgentDetail();
         } : undefined}
         onBindCursorUsage={onBindCursorUsage}
+        onReauthenticateConnection={onReauthenticateConnection}
         onCreateAlert={onCreateAlert}
           onDeleteAlert={onDeleteAlert}
           onEdit={() => {

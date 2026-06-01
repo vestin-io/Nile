@@ -63,6 +63,7 @@ export type SettingsPageContentProps = {
   onAgentOrderChange(agentOrder: AgentId[]): void;
   onBackFromAgentDetail(): void;
   onBindCursorUsage(connectionId: string): Promise<void>;
+  onReauthenticateConnection(connectionId: string): Promise<void>;
   onCreateConnectionAlert(input: CreateConnectionAlertInput): Promise<void>;
   onCheckForUpdates(): Promise<void>;
   onExportCredentials(selectedConnectionIds?: string[]): Promise<void>;

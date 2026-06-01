@@ -17,6 +17,7 @@ export type DesktopAvailableUsage = {
 
 export type DesktopUnavailableUsage = {
   status: "unavailable" | "unsupported" | "error";
+  errorCode?: "credential_unauthorized";
   planLabel?: string;
   freshness?: "live" | "cached" | "stale" | "expired";
   lastFetchedAt?: string;
@@ -36,6 +37,7 @@ export type DesktopResolvedUsageSummary = {
 
 type UsageInput = {
   endpointFamily: string;
+  errorCode?: "credential_unauthorized";
   planLabel?: string;
   status: string;
   freshness?: "live" | "cached" | "stale" | "expired";
@@ -67,11 +69,12 @@ export function canonicalizeUsageMetricKey(label: string): string {
 export class UsageSummary {
   static fromResult(result: UsageInput): DesktopUsageState | null {
     if (result.status !== "available") {
-      if (result.endpointFamily !== "cursor") {
+      if (result.endpointFamily !== "cursor" && result.errorCode !== "credential_unauthorized") {
         return null;
       }
       return {
         status: result.status as DesktopUnavailableUsage["status"],
+        errorCode: result.errorCode,
         planLabel: result.planLabel,
         freshness: result.freshness,
         lastFetchedAt: result.lastFetchedAt,

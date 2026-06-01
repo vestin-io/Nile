@@ -101,7 +101,7 @@ export class DesktopUsageCache {
         if (!connectionId) {
           return;
         }
-        const result = await this.readUsageSummary(session, connectionId);
+        const result = await this.readUsageSummary(session, connectionId, refreshMode);
         this.usageByConnectionId.set(connectionId, result.summary);
         if (result.cacheable) {
           this.usageReadAt.set(connectionId, Date.now());
@@ -126,9 +126,12 @@ export class DesktopUsageCache {
   private async readUsageSummary(
     session: NileSession,
     connectionId: string,
+    refreshMode: DesktopUsageRefreshMode,
   ): Promise<{ cacheable: boolean; summary: DesktopUsageState | null }> {
     try {
-      const result = await session.getConnectionUsage(connectionId);
+      const result = await session.getConnectionUsage(connectionId, {
+        recoverUnauthorizedCurrentSession: refreshMode === "manual",
+      });
       const summary = UsageSummary.fromResult(result);
       this.logGeminiQuotaResult(result, summary);
       return {

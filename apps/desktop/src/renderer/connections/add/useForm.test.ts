@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildConnectionMethods } from "../ConnectionFormParts";
-import { sameAgentSelection } from "./useForm";
+import { resolveSessionSourceSelection, sameAgentSelection } from "./useForm";
 import { resolveDetectedEnabledAgents } from "./useOnboardingState";
 
 describe("sameAgentSelection", () => {
@@ -74,5 +74,15 @@ describe("buildConnectionMethods", () => {
     }, (key) => key);
 
     expect(methods.map((method) => method.key)).toEqual(["gemini_cli_session:login"]);
+  });
+});
+
+describe("resolveSessionSourceSelection", () => {
+  it("prefers the current Codex import when OpenAI session auth becomes active", () => {
+    expect(resolveSessionSourceSelection("openai_session", "login", { preferDefault: true })).toBe("current_codex");
+  });
+
+  it("switches unsupported carry-over session sources to the auth mode default", () => {
+    expect(resolveSessionSourceSelection("gemini_cli_session", "current_codex", { preferDefault: true })).toBe("login");
   });
 });

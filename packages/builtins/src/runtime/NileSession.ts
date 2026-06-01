@@ -134,8 +134,11 @@ export class NileSession {
     return await this.resources.getAgentActions().importDetectedSetups.run(input);
   }
 
-  getConnectionUsage(connectionId: string): Promise<ConnectionUsageResult> {
-    return this.resources.getUsage().get(connectionId);
+  getConnectionUsage(
+    connectionId: string,
+    options?: { recoverUnauthorizedCurrentSession?: boolean },
+  ): Promise<ConnectionUsageResult> {
+    return this.resources.getUsage().get(connectionId, options);
   }
 
   getConnectionModelCatalog(connectionId: string): Promise<ConnectionModelCatalogResult> {

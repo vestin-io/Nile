@@ -66,13 +66,16 @@ var RecoveringUsage = class {
   }
   requestBuilder = new SessionCredentialRequestBuilder();
   identityKeyResolver = new ConnectionIdentityKeyResolver();
-  async get(connectionId) {
+  async get(connectionId, options) {
     const result = await this.usage.get(connectionId);
-    const recovered = await this.retryAfterCurrentSessionSync(connectionId, result);
+    const recovered = await this.retryAfterCurrentSessionSync(connectionId, result, options);
     return recovered ?? result;
   }
-  async retryAfterCurrentSessionSync(connectionId, result) {
+  async retryAfterCurrentSessionSync(connectionId, result, options) {
     if (result.status !== "error" || result.errorCode !== "credential_unauthorized") {
+      return null;
+    }
+    if (options?.recoverUnauthorizedCurrentSession === false) {
       return null;
     }
     const access = this.accessRegistry.get(connectionId);
@@ -199,7 +202,9 @@ var SessionWorkspaceResources = class {
       this.getWorkspaceState().getAccessRegistry(),
       new CurrentSessionResolver2(
         this.options.agentHomes,
-        this.options.environment ?? EnvironmentSource.empty()
+        this.options.environment ?? EnvironmentSource.empty(),
+        this.options.agentRuntimeCommandOverrides,
+        this.options.openExternalUrl
       ),
       this.options.logger ?? NileLogger.silent()
     );
@@ -397,13 +402,18 @@ var NileSession = class _NileSession {
       database,
       credentialStore: options.credentialStore,
       agentHomes: mergeAgentHomes(defaultAgentHomes(), options.agentHomes),
+      agentRuntimeCommandOverrides: options.agentRuntimeCommandOverrides,
       environment: options.environment,
+      openExternalUrl: options.openExternalUrl,
       secureSnapshotStore: options.secureSnapshotStore,
       logger: options.logger
     };
     const createLocalCredentialResolver = () => new LocalCredentialResolver(
       runtimeOptions.agentHomes,
-      runtimeOptions.environment ?? EnvironmentSource2.empty()
+      runtimeOptions.environment ?? EnvironmentSource2.empty(),
+      void 0,
+      runtimeOptions.openExternalUrl,
+      runtimeOptions.agentRuntimeCommandOverrides
     );
     const resources = new SessionResources(runtimeOptions, createLocalCredentialResolver);
     return new _NileSession(resources, createLocalCredentialResolver, () => database.close());
@@ -445,8 +455,8 @@ var NileSession = class _NileSession {
   async importDetectedSetups(input) {
     return await this.resources.getAgentActions().importDetectedSetups.run(input);
   }
-  getConnectionUsage(connectionId) {
-    return this.resources.getUsage().get(connectionId);
+  getConnectionUsage(connectionId, options) {
+    return this.resources.getUsage().get(connectionId, options);
   }
   getConnectionModelCatalog(connectionId) {
     return this.resources.getConnectionModelCatalog(connectionId);

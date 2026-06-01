@@ -33,6 +33,7 @@ type ConnectionDetailPageProps = {
   onBackToAgentList?(): void;
   onBackToAgentDetail?(): void;
   onBindCursorUsage(connectionId: string): Promise<void>;
+  onReauthenticateConnection(connectionId: string): Promise<void>;
   onEdit(): void;
   onRefresh(): Promise<void>;
   onRemove(connectionId: string): Promise<void>;
@@ -57,6 +58,7 @@ export function ConnectionDetailPage({
   onBackToAgentList,
   onBackToAgentDetail,
   onBindCursorUsage,
+  onReauthenticateConnection,
   onEdit,
   onRefresh,
   onRemove,
@@ -72,8 +74,22 @@ export function ConnectionDetailPage({
     connection.endpointFamily === "cursor"
     && connection.authMode === "cursor_session"
     && (!connection.usage || connection.usage.status === "unavailable");
+  const needsReauthentication =
+    connection.usage?.status === "error"
+    && connection.usage.errorCode === "credential_unauthorized";
+  const canReauthenticate =
+    needsReauthentication
+    && (
+      connection.authMode === "openai_session"
+      || connection.authMode === "claude_session"
+      || connection.authMode === "gemini_cli_session"
+    );
   const canRemove = connection.selectedByAgents.length === 0;
   const preferredMetricKey = quotaMetricPreferences.readPreference(connection.id);
+  const usage = connection.usage;
+  const reauthenticationMessage = needsReauthentication && usage && usage.status !== "available"
+    ? usage.message?.trim() || t("connections.reauthenticationRequiredDescription")
+    : t("connections.reauthenticationRequiredDescription");
 
   return (
     <div className="space-y-5">
@@ -150,6 +166,11 @@ export function ConnectionDetailPage({
                 {t("common.repairUsage")}
               </Button>
             ) : null}
+            {canReauthenticate ? (
+              <Button variant="secondary" onClick={() => void onReauthenticateConnection(connection.id)}>
+                {t("common.reauthenticate")}
+              </Button>
+            ) : null}
             <ConnectionActionGroup
               canRemove={canRemove}
               canEdit={!isCredentialStorageModeMixed}
@@ -168,6 +189,14 @@ export function ConnectionDetailPage({
       {isCredentialStorageModeMixed ? (
         <Alert variant="destructive">
           <AlertDescription>{t("settings.credentialStorage.mixedDescription")}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {needsReauthentication ? (
+        <Alert variant="destructive">
+          <AlertDescription>
+            {reauthenticationMessage}
+          </AlertDescription>
         </Alert>
       ) : null}
 

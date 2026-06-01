@@ -1,5 +1,65 @@
 # Desktop V2 Build Log
 
+## 2026-06-02
+
+### Review follow-up for session reauthentication
+
+- Routed the new desktop `Reauthenticate` action through the existing encrypted-local unlock recovery and action-error reporting flow instead of calling the connection update path bare.
+- Restored localized list-summary behavior for generic unavailable quota states, while keeping the dedicated `Reauthentication required` label for `credential_unauthorized`.
+- Added a focused regression assertion so generic unavailable usage summaries do not leak raw English backend messages into translated renderer surfaces.
+
+#### Key findings
+
+- The first reauthentication pass had the right mutation target but skipped the renderer's existing recovery wrapper, which meant locked encrypted-local storage and interactive-login failures could surface as unhandled action failures.
+- The longer quota error detail still belongs in the connection detail alert and usage panel. The compact list summary should stay localized unless the state is the explicit reauthentication CTA.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run apps/desktop/src/renderer/shared/DisplayText.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts apps/desktop/src/state/UsageSummary.test.ts apps/desktop/src/state/UsageCache.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+
+## 2026-06-01
+
+### OpenAI add-connection default session source regression
+
+- Fixed the desktop add-connection form so `openai_session` now actually defaults to `current_codex` when the auth mode becomes active, instead of silently keeping the form's generic initial `login` source.
+- Extracted the session-source normalization into a pure helper so auth-mode changes can explicitly prefer the mode default while still preserving valid user selections after that.
+- Added a focused regression test that covers:
+  - OpenAI session auth switching to `current_codex`
+  - incompatible carried-over session sources falling back to the target auth mode default
+
+#### Key findings
+
+- The regression was in renderer form state, not in Codex session detection or OAuth execution. The method catalog already ordered `current_codex` before `login`, but the form initialized `sessionSource` to `login` and then preserved that value because it was still considered valid.
+- Local Codex auth on this machine was healthy during the investigation: `~/.codex/auth.json` contained a valid OpenAI session for `jay.ji@spotto.ai`, so the unexpected browser sign-in prompt came from the wrong default branch, not from a missing local session.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run apps/desktop/src/renderer/connections/add/useForm.test.ts`
+
+### Session reauthentication UX for connection quota errors
+
+- Stopped automatic desktop quota refresh from launching interactive session recovery on its own:
+  - automatic usage refresh now reads connection quota with `recoverUnauthorizedCurrentSession: false`
+  - manual refresh paths still allow interactive reauthentication when the user explicitly asks for it
+- Preserved `credential_unauthorized` usage failures in desktop state instead of collapsing them to `unknown`, so session-backed connections can surface an actionable auth problem.
+- Added an explicit connection-level reauthentication path in the desktop UI:
+  - connection detail now shows a destructive alert when the current saved connection needs reauthentication
+  - the detail action bar now offers `Reauthenticate` for interactive session-backed connections
+  - the action reuses the existing `updateConnection({ sessionSource: "login" })` path instead of adding a second auth mutation surface
+- Shortened list/detail summary text for this state to a concise `Reauthentication required` label while keeping the longer provider-specific error message in the detail alert.
+
+#### Key findings
+
+- The unwanted browser login was not only an OpenAI session issue; it came from a deeper policy problem: startup auto-refresh and explicit user-triggered refresh were sharing the same unauthorized-recovery behavior.
+- Reusing the existing connection update path is the right shape here. The missing piece was state visibility and a clear user-owned entry point, not another login-specific IPC contract.
+- This pass intentionally keeps the explicit reauthentication CTA in connection detail rather than adding another clickable control into every list row. The list now exposes the auth problem clearly; the detail page owns the action.
+
+### Verification
+
+- `/Users/jiatwork/Works/nile/node_modules/.bin/vitest run apps/desktop/src/state/UsageSummary.test.ts apps/desktop/src/state/UsageCache.test.ts apps/desktop/src/renderer/shared/DisplayText.test.ts apps/desktop/src/renderer/connections/add/useForm.test.ts`
+- `npm run typecheck`
+
 ## 2026-05-27
 
 ### Codex login and runtime-path regression cleanup

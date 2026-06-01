@@ -99,6 +99,27 @@ export function useSettingsConnectionActions({
     setRepairUsageConnectionId(connectionId);
   };
 
+  const reauthenticateConnection = async (connectionId: string) => {
+    const connection = settingsState.connections.find((entry) => entry.id === connectionId);
+    if (!connection) {
+      throw new Error(`Connection not found: ${connectionId}`);
+    }
+    if (
+      connection.authMode !== "openai_session"
+      && connection.authMode !== "claude_session"
+      && connection.authMode !== "gemini_cli_session"
+    ) {
+      throw new Error(`Connection ${connectionId} does not support interactive reauthentication`);
+    }
+
+    await runWithEncryptedLocalUnlockRecovery(async () => {
+      await updateConnection({
+        connectionId,
+        sessionSource: "login",
+      });
+    });
+  };
+
   const removeConnection = async (connectionId: string) => {
     const connection = settingsState.connections.find((entry) => entry.id === connectionId);
     if (!connection || connection.selectedByAgents.length > 0) {
@@ -128,25 +149,9 @@ export function useSettingsConnectionActions({
   };
 
   const useConnection = async (agentId: AgentId, connectionId: string) => {
-    onActionError(null);
-    try {
+    await runWithEncryptedLocalUnlockRecovery(async () => {
       await window.nileDesktop.connections.switchConnection(agentId, connectionId);
-    } catch (error) {
-      const message = describeActionError(error);
-      if (isEncryptedLocalUnlockError(message)) {
-        try {
-          await requestEncryptedLocalUnlock();
-          await window.nileDesktop.connections.switchConnection(agentId, connectionId);
-          return;
-        } catch (unlockError) {
-          const unlockMessage = describeActionError(unlockError);
-          onActionError(unlockMessage);
-          throw new Error(unlockMessage);
-        }
-      }
-      onActionError(message);
-      throw new Error(message);
-    }
+    });
   };
 
   const useExistingConnectionForAgent = async (agentId: AgentId, connectionId: string) => {
@@ -174,9 +179,32 @@ export function useSettingsConnectionActions({
     mutationCoordinator.complete(connectionId, reused);
   };
 
+  const runWithEncryptedLocalUnlockRecovery = async (action: () => Promise<void>) => {
+    onActionError(null);
+    try {
+      await action();
+    } catch (error) {
+      const message = describeActionError(error);
+      if (isEncryptedLocalUnlockError(message)) {
+        try {
+          await requestEncryptedLocalUnlock();
+          await action();
+          return;
+        } catch (unlockError) {
+          const unlockMessage = describeActionError(unlockError);
+          onActionError(unlockMessage);
+          throw new Error(unlockMessage);
+        }
+      }
+      onActionError(message);
+      throw new Error(message);
+    }
+  };
+
   return {
     addConnection,
     bindCursorUsage,
+    reauthenticateConnection,
     importCurrentConnection,
     openConnection,
     prepareConnectionDraft,

@@ -50,6 +50,22 @@ describe("UsageSummary", () => {
     })).toBeNull();
   });
 
+  it("keeps credential unauthorized usage visible for session reauthentication flows", () => {
+    expect(UsageSummary.fromResult({
+      endpointFamily: "openai",
+      status: "error",
+      errorCode: "credential_unauthorized",
+      message: "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+      windows: [],
+    })).toEqual({
+      status: "error",
+      errorCode: "credential_unauthorized",
+      message: "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+      text: "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+      windows: [],
+    });
+  });
+
   it("resolves a preferred metric key when one is configured", () => {
     const usage = UsageSummary.fromResult({
       endpointFamily: "openai",

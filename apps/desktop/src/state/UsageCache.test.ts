@@ -144,6 +144,17 @@ describe("DesktopUsageCache", () => {
 
     expect(session.calls).toBe(3);
   });
+
+  it("disables interactive session recovery for automatic refresh but keeps it for manual refresh", async () => {
+    const logger = new StubLogger();
+    const cache = new DesktopUsageCache(logger as never);
+    const session = createRecoveryTrackingSession();
+
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "manual" });
+
+    expect(session.recoveryFlags).toEqual([false, true]);
+  });
 });
 
 function createSession(result: {
@@ -227,6 +238,32 @@ function createSequenceSession(results: Array<{
       const result = results[Math.min(calls, results.length - 1)];
       calls += 1;
       return result;
+    },
+  };
+}
+
+function createRecoveryTrackingSession() {
+  const recoveryFlags: boolean[] = [];
+  return {
+    get recoveryFlags() {
+      return recoveryFlags;
+    },
+    async getConnectionUsage(
+      _connectionId?: string,
+      options?: { recoverUnauthorizedCurrentSession?: boolean },
+    ) {
+      recoveryFlags.push(options?.recoverUnauthorizedCurrentSession === true);
+      return {
+        connectionId: "openai-session",
+        connectionLabel: "openai@example.com",
+        endpointFamily: "openai",
+        endpointLabel: "OpenAI",
+        status: "error",
+        errorCode: "credential_unauthorized" as const,
+        source: "remote_api",
+        message: "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+        windows: [],
+      };
     },
   };
 }

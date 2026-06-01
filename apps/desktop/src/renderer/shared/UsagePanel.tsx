@@ -75,7 +75,9 @@ export function UsagePanel({
           ))}
         </div>
       ) : (
-        <div className="text-sm text-muted-foreground">{t("common.unknown")}</div>
+        <div className="text-sm text-muted-foreground">
+          {usage?.text?.trim() || t("common.unknown")}
+        </div>
       )}
     </section>
   );

@@ -28,6 +28,9 @@ export function formatUsageValue(
     return t("common.unknown");
   }
   if (usage.status !== "available") {
+    if (usage.errorCode === "credential_unauthorized") {
+      return t("common.reauthenticationRequired");
+    }
     return t("common.unknown");
   }
   return resolveDesktopUsageSummary(usage, preferredMetricKey)?.text ?? usage.text;

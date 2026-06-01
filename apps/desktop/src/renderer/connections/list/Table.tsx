@@ -37,8 +37,8 @@ export function ConnectionTable({
             onClick={() => onOpenDetails(connection.id)}
           >
             <CardContent className="space-y-4 p-4">
-              <div className="min-w-0 space-y-1">
-                <div className="flex items-center gap-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                   <Checkbox
                     checked={selectedIds.has(connection.id)}
                     onCheckedChange={(checked) => {
@@ -50,9 +50,9 @@ export function ConnectionTable({
                     }}
                     onClick={(event) => event.stopPropagation()}
                   />
-                  <AgentIconStack agentIds={connection.selectedByAgents} t={t} />
-                  <div className="font-medium">{connection.label}</div>
+                  <div className="min-w-0 font-medium">{connection.label}</div>
                 </div>
+                <AgentIconStack agentIds={connection.selectedByAgents} t={t} />
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">

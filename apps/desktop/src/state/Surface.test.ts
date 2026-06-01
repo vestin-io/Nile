@@ -1018,6 +1018,9 @@ describe("DesktopSurface", () => {
 
   it("reads settings with a saved Gemini CLI connection from upgraded local state", async () => {
     const setup = createSetup();
+    globalThis.fetch = (async () => {
+      throw new Error("network unavailable");
+    }) as typeof fetch;
     seedProvider(setup.dbPath, {
       id: "gemini",
       label: "Gemini CLI",
