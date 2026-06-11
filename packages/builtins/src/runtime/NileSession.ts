@@ -98,6 +98,10 @@ export class NileSession {
     return this.resources.getSavedConnections().readCredential(connectionId);
   }
 
+  syncConnectionCredential(connectionId: string, credential: StoredCredential): SavedConnectionSummary {
+    return this.resources.getSavedConnections().syncCredential(connectionId, credential);
+  }
+
   setConnectionDirectApiKeyEnvKey(connectionId: string, envKey: string | null): SavedConnectionSummary {
     return this.resources.getSavedConnections().setDirectApiKeyEnvKey(connectionId, envKey);
   }

@@ -28,6 +28,7 @@ import { DesktopConnectionManager } from "./DesktopConnectionManager";
 
 const tempDirs: string[] = [];
 const originalFetch = globalThis.fetch;
+const originalPath = process.env.PATH;
 const originalSecurityCliRun = SecurityCli.prototype.run;
 
 afterEach(() => {
@@ -36,6 +37,7 @@ afterEach(() => {
   }
   globalThis.fetch = originalFetch;
   SecurityCli.prototype.run = originalSecurityCliRun;
+  process.env.PATH = originalPath;
   delete process.env.NILE_BROWSER_HOME;
   vi.useRealTimers();
 });
@@ -311,6 +313,51 @@ describe("DesktopConnectionManager", () => {
         authMode: "gemini_cli_session",
       }),
     );
+  });
+
+  it("refreshes the current Gemini session before reauthenticating a saved Gemini connection", async () => {
+    const setup = createSetup();
+    const binDir = join(dirname(setup.geminiHome), "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeGeminiSession(setup.geminiHome, "gemini.user@example.com", "gemini-sub-123");
+    writeFakeGeminiRefreshCommand(binDir, "gemini.user@example.com", "gemini-sub-123");
+    seedGeminiConnection(setup, "gemini.user@example.com", "gemini-sub-123");
+
+    const manager = new DesktopConnectionManager({
+      databasePath: setup.dbPath,
+      agentHomes: { gemini: setup.geminiHome },
+      environment: EnvironmentSource.from({ PATH: binDir, HOME: dirname(setup.geminiHome) }),
+      credentialStore: setup.credentialStore,
+    });
+
+    const result = await manager.updateConnection({
+      connectionId: "gemini-session",
+      recoverUnauthorizedCurrentSession: true,
+      sessionSource: "current_gemini",
+    });
+
+    expect(result).toEqual(expect.objectContaining({
+      id: "gemini-session",
+      endpointId: "gemini",
+      endpointFamily: "gemini",
+      authMode: "gemini_cli_session",
+    }));
+
+    const accessRegistry = AccessRegistry.open(setup.dbPath, setup.credentialStore);
+    try {
+      expect(accessRegistry.readCredential("gemini-session")).toEqual({
+        kind: "gemini_cli_session",
+        accessToken: "fresh-gemini-access-token",
+        refreshToken: "fresh-gemini-refresh-token",
+        idToken: buildUnsignedJwt({
+          email: "gemini.user@example.com",
+          sub: "gemini-sub-123",
+        }),
+        expiryDate: 1800000000000,
+      });
+    } finally {
+      accessRegistry.close();
+    }
   });
 
   it("allows saving a gateway after capability detection fails when manual fallback is requested", async () => {
@@ -1104,6 +1151,69 @@ function writeGeminiSession(geminiHome: string, email: string, subject: string):
     }, null, 2)}\n`,
     "utf8",
   );
+}
+
+function writeFakeGeminiRefreshCommand(binDir: string, email: string, subject: string): void {
+  writeFileSync(
+    join(binDir, "gemini"),
+    [
+      "#!/bin/sh",
+      "cat > \"$GEMINI_CLI_HOME/oauth_creds.json\" <<'EOF'",
+      JSON.stringify({
+        access_token: "fresh-gemini-access-token",
+        refresh_token: "fresh-gemini-refresh-token",
+        id_token: buildUnsignedJwt({
+          email,
+          sub: subject,
+        }),
+        expiry_date: 1800000000000,
+      }, null, 2),
+      "EOF",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+}
+
+function seedGeminiConnection(
+  setup: ReturnType<typeof createSetup>,
+  email: string,
+  subject: string,
+): void {
+  const endpointRegistry = EndpointRegistry.open(setup.dbPath);
+  const accessRegistry = AccessRegistry.open(setup.dbPath, setup.credentialStore);
+  try {
+    endpointRegistry.add({
+      id: "gemini",
+      label: "Gemini",
+      rootUrl: "https://cloudcode-pa.googleapis.com",
+      profile: "gemini-cli",
+      protocols: {
+        gemini: {
+          authTypes: ["oauth-personal"],
+        },
+      },
+    });
+    accessRegistry.add({
+      id: "gemini-session",
+      endpointId: "gemini",
+      label: email,
+      authMode: "gemini_cli_session",
+      identityKey: `google-sub:${subject}`,
+    }, {
+      kind: "gemini_cli_session",
+      accessToken: "stale-gemini-access-token",
+      refreshToken: "stale-gemini-refresh-token",
+      idToken: buildUnsignedJwt({
+        email,
+        sub: subject,
+      }),
+      expiryDate: 1777427411000,
+    });
+  } finally {
+    accessRegistry.close();
+    endpointRegistry.close();
+  }
 }
 
 class StubCredentialStore extends KeychainCredentialStore {

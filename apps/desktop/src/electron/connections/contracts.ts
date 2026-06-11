@@ -17,6 +17,7 @@ export type DesktopConnectionCredentialInput = {
   apiKeySource?: "direct" | "env_key";
   apiKey?: string;
   envKey?: string;
+  recoverUnauthorizedCurrentSession?: boolean;
   sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
   sessionAuthJsonPath?: string;
 };

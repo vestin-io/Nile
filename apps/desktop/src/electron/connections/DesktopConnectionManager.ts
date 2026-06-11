@@ -123,12 +123,26 @@ export class DesktopConnectionManager {
           throw new Error(`Connection not found: ${input.connectionId}`);
         }
         credentialStorageBackend = existing.credentialStorageBackend;
+        const credentialRequest = this.resolveUpdateCredentialRequest(input, existing.authMode);
+        if (
+          credentialRequest
+          && input.recoverUnauthorizedCurrentSession
+          && existing.authMode === "gemini_cli_session"
+          && credentialRequest.source === "current_gemini"
+        ) {
+          await this.localCredentialResolver.recoverUnauthorizedCurrentSession(credentialRequest);
+          const credential = await this.localCredentialResolver.resolveAsync(credentialRequest);
+          return this.buildConnectionSummary(session.syncConnectionCredential(input.connectionId, credential));
+        }
+        if (credentialRequest && input.recoverUnauthorizedCurrentSession) {
+          await this.localCredentialResolver.recoverUnauthorizedCurrentSession(credentialRequest);
+        }
         const updated = await session.updateConnection({
           connectionId: input.connectionId,
           label: input.label?.trim() || undefined,
           enabledAgents: input.enabledAgents,
           endpointUrl: input.endpointUrl?.trim() || undefined,
-          credentialRequest: this.resolveUpdateCredentialRequest(input, existing.authMode),
+          credentialRequest,
         });
         const ensured = await this.managedApiKeyEnvironment.ensureForConnection(session, updated.id);
         if (input.syncSelectedAgents) {

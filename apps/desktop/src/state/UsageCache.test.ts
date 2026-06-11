@@ -145,7 +145,7 @@ describe("DesktopUsageCache", () => {
     expect(session.calls).toBe(3);
   });
 
-  it("disables interactive session recovery for automatic refresh but keeps it for manual refresh", async () => {
+  it("disables interactive session recovery for both automatic and manual refresh", async () => {
     const logger = new StubLogger();
     const cache = new DesktopUsageCache(logger as never);
     const session = createRecoveryTrackingSession();
@@ -153,7 +153,7 @@ describe("DesktopUsageCache", () => {
     await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
     await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "manual" });
 
-    expect(session.recoveryFlags).toEqual([false, true]);
+    expect(session.recoveryFlags).toEqual([false, false]);
   });
 });
 

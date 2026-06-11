@@ -315,6 +315,7 @@ export class DesktopIpcInputValidator {
     apiKeySource?: "direct" | "env_key";
     apiKey?: string;
     envKey?: string;
+    recoverUnauthorizedCurrentSession?: boolean;
     sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
     sessionAuthJsonPath?: string;
   } {
@@ -325,6 +326,10 @@ export class DesktopIpcInputValidator {
       apiKeySource: this.readOptionalApiKeySource(record.apiKeySource),
       apiKey: this.readOptionalString(record.apiKey, "apiKey"),
       envKey: this.readOptionalString(record.envKey, "envKey"),
+      recoverUnauthorizedCurrentSession: this.readOptionalBoolean(
+        record.recoverUnauthorizedCurrentSession,
+        "recoverUnauthorizedCurrentSession",
+      ),
       sessionSource: this.readOptionalSessionSource(record.sessionSource),
       sessionAuthJsonPath: this.readOptionalString(record.sessionAuthJsonPath, "sessionAuthJsonPath"),
     };

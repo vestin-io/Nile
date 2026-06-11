@@ -1,5 +1,45 @@
 # Desktop V2 Build Log
 
+## 2026-06-11
+
+### Gemini explicit reauthentication flow fix
+
+- Restored Gemini `login` source to its original interactive-login semantics so add-connection and import flows can still start from a temporary clean Gemini home.
+- Changed the desktop `Reauthenticate` action for saved Gemini connections to stop using `sessionSource: "login"`.
+- Gemini reauthentication now runs a dedicated current-session recovery path:
+  - recover the current local Gemini session through the existing unauthorized-recovery flow
+  - resolve the refreshed `current_gemini` credential
+  - sync that credential directly into the saved connection without going through endpoint/auth update validation
+- Added focused coverage for:
+  - refreshing the current Gemini session through `LocalCredentialResolver`
+  - syncing a saved Gemini connection through `DesktopConnectionManager.updateConnection(...)`
+
+#### Key findings
+
+- The real bug was at the desktop action boundary, not in the generic Gemini login source. Saved Gemini connections need “refresh my current local Gemini session”, while `login` means “start an interactive sign-in flow that may target a different account”.
+- Gemini family updates already reject auth updates through the normal connection updater path. The reauthentication fix therefore has to sync credentials directly after recovery instead of pretending Gemini supports the same auth-update shape as OpenAI or Claude.
+- This keeps the existing AppleScript/Terminal login implementation intact for true Gemini sign-in flows and confines the recovery behavior to the explicit reauthentication path.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/core/src/application/local/LocalCredentialResolver.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts packages/agents/gemini/src/GeminiSessionLogin.test.ts packages/agents/gemini/src/SessionRefresh.test.ts apps/desktop/src/state/UsageCache.test.ts packages/builtins/src/runtime/RecoveringUsage.test.ts`
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+
+### Quick setup guide CTA cleanup
+
+- Removed the `Import package` button from the `Nile Guide` card in quick setup so the unsaved-local-setup message no longer competes with portability import actions in the same block.
+- Kept the dedicated portability import entry points elsewhere in settings unchanged; this change only simplifies the guide card.
+- Dropped the now-unused quick-setup import props from the guide/page render path.
+
+#### Key findings
+
+- The guide card was mixing two different intents: “save detected local setups” and “import a portability package”. The import CTA belongs to portability tooling, not to the onboarding guidance for unsaved local setups.
+- This pass intentionally removes the button instead of relocating it inside quick setup. The clearer import surface already exists outside this card.
+
+### Verification
+
+- `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
+
 ## 2026-06-02
 
 ### Review follow-up for session reauthentication
@@ -105,6 +145,38 @@
 
 - `./node_modules/.bin/vitest run apps/desktop/src/renderer/shared/LocalSetup.test.ts apps/desktop/src/renderer/shared/DisplayText.test.ts`
 - `npm run build -w @nile/desktop`
+
+### OpenAI usage recovery ordering
+
+- Tightened desktop/manual unauthorized recovery for saved `openai_session` connections so Nile now tries the current local Codex session before opening a fresh Codex login.
+- When the saved connection identity matches the current `~/.codex/auth.json` identity, Nile syncs that credential into the saved connection and retries usage first.
+- Only if that same-identity retry still returns `credential_unauthorized` does Nile escalate to `codex login`.
+- When the current Codex session belongs to a different identity, Nile now skips automatic login instead of prompting against the wrong saved connection.
+- Kept Gemini and other current-session recoveries on their existing flow; this change only reorders the eager pre-login sync path for `openai_session`.
+
+#### Key findings
+
+- The previous recovery order could raise a real Codex login prompt even when the current local Codex session was already valid and only the saved connection token had drifted.
+- The new guard is identity-based, so saved OpenAI sessions without a resolvable identity key still fall back to the existing recovery path.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/builtins/src/runtime/RecoveringUsage.test.ts`
+
+### Desktop unauthorized usage prompts
+
+- Removed proactive interactive reauthentication from desktop usage refresh.
+- Connection usage refresh now leaves unauthorized session-backed connections in the existing `reauthentication required` state instead of automatically opening Codex, Gemini, or other interactive login flows.
+- The explicit `Reauthenticate` action remains the only desktop path that should launch an interactive sign-in for saved session-backed connections.
+
+#### Key findings
+
+- The previous manual refresh behavior drifted from the intended surface contract: the UI already had connection-card unauthorized messaging and a dedicated `Reauthenticate` action, but manual refresh still invoked current-session recovery behind the scenes.
+- Keeping recovery logic in the runtime is still useful for non-desktop callers, but desktop usage refresh must opt out so renderer refreshes stay observational rather than mutating.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/state/UsageCache.test.ts packages/builtins/src/runtime/RecoveringUsage.test.ts`
 
 ### Desktop state review follow-up cleanup
 

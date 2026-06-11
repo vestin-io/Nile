@@ -10,7 +10,6 @@ const REFRESH_TIMEOUT_MS = 15_000;
 const REFRESH_SETTLE_MS = 1_500;
 const OUTPUT_SNIPPET_LIMIT = 400;
 const REFRESH_ARGS = ["--skip-trust", "--prompt", "refresh auth"] as const;
-
 type OutputStream = {
   setEncoding(encoding: BufferEncoding): void;
   on(event: "data", listener: (chunk: string) => void): unknown;

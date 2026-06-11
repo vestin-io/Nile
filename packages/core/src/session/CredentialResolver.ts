@@ -42,6 +42,13 @@ export class SessionCredentialResolver {
     return this.currentSessionResolver.resolve(request);
   }
 
+  async recoverUnauthorizedCurrentSession(request: SessionCredentialRequest): Promise<boolean> {
+    if (request.source === "login") {
+      return false;
+    }
+    return await this.currentSessionResolver.recoverUnauthorizedUsage(request);
+  }
+
   async resolveAsync(request: SessionCredentialRequest): Promise<SessionStoredCredential> {
     if (request.source !== "login") {
       return this.resolve(request);

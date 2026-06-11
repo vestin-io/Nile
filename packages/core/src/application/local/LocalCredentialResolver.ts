@@ -50,6 +50,13 @@ export class LocalCredentialResolver {
     return await this.sessionCredentialResolver.resolveAsync(request);
   }
 
+  async recoverUnauthorizedCurrentSession(request: LocalCredentialRequest): Promise<boolean> {
+    if (request.authMode === "api_key") {
+      return false;
+    }
+    return await this.sessionCredentialResolver.recoverUnauthorizedCurrentSession(request);
+  }
+
   resolveProbeCredential(request: LocalCredentialRequest): StoredCredential {
     if (request.authMode !== "api_key") {
       return this.resolve(request);

@@ -86,47 +86,30 @@ var RecoveringUsage = class {
     if (!request) {
       return null;
     }
+    if (access.authMode === "openai_session") {
+      const synced = await this.retryWithResolvedCurrentSession(connectionId, access.authMode, request);
+      if (synced?.skipRecovery) {
+        return synced.result;
+      }
+      if (synced?.result && !this.isCredentialUnauthorized(synced.result)) {
+        return synced.result;
+      }
+    }
     await this.recoverUnauthorizedCurrentSession(connectionId, access.authMode, request);
-    let credential;
-    try {
-      credential = this.currentSessionResolver.resolve(request);
-    } catch (error) {
-      this.logger.warn("connection-usage.current-session-sync.failed", {
-        connectionId,
-        authMode: access.authMode,
-        source: request.source,
-        reason: "resolve_failed",
-        message: error instanceof Error ? error.message : String(error)
-      });
+    const credential = this.resolveCurrentSessionCredential(connectionId, access.authMode, request);
+    if (!credential) {
       return null;
     }
-    const savedIdentityKey = access.identityKey?.trim() || null;
-    const currentIdentityKey = this.identityKeyResolver.resolve(access.authMode, credential);
-    if (!savedIdentityKey || !currentIdentityKey || currentIdentityKey !== savedIdentityKey) {
-      this.logger.warn("connection-usage.current-session-sync.skipped", {
-        connectionId,
-        authMode: access.authMode,
-        source: request.source,
-        reason: "identity_mismatch",
-        savedIdentityKey,
-        currentIdentityKey
-      });
+    if (this.syncCurrentSessionCredential(
+      connectionId,
+      access.authMode,
+      request,
+      access.identityKey?.trim() || null,
+      credential
+    ) !== "synced") {
       return null;
     }
-    this.accessRegistry.syncCredential(connectionId, credential);
-    this.logger.info("connection-usage.current-session-sync.succeeded", {
-      connectionId,
-      authMode: access.authMode,
-      source: request.source
-    });
-    const retried = await this.usage.get(connectionId);
-    this.logger.info("connection-usage.current-session-sync.retried", {
-      connectionId,
-      authMode: access.authMode,
-      status: retried.status,
-      errorCode: retried.errorCode
-    });
-    return retried;
+    return await this.retryUsageAfterCurrentSessionSync(connectionId, access.authMode, request);
   }
   async recoverUnauthorizedCurrentSession(connectionId, authMode, request) {
     try {
@@ -156,6 +139,93 @@ var RecoveringUsage = class {
     const request = this.requestBuilder.buildCurrentByAuthMode(authMode);
     const manifest = CURRENT_SESSION_SOURCE_REGISTRY.read(request.source);
     return manifest.usageUnauthorizedRecovery === "sync_current_session_and_retry" ? request : null;
+  }
+  async retryWithResolvedCurrentSession(connectionId, authMode, request) {
+    const access = this.accessRegistry.get(connectionId);
+    if (!access) {
+      return null;
+    }
+    const credential = this.resolveCurrentSessionCredential(connectionId, authMode, request);
+    if (!credential) {
+      return null;
+    }
+    const syncOutcome = this.syncCurrentSessionCredential(
+      connectionId,
+      authMode,
+      request,
+      access.identityKey?.trim() || null,
+      credential
+    );
+    if (syncOutcome === "identity_mismatch") {
+      return { result: await this.usage.get(connectionId), skipRecovery: true };
+    }
+    if (syncOutcome !== "synced") {
+      return null;
+    }
+    return {
+      result: await this.retryUsageAfterCurrentSessionSync(connectionId, authMode, request),
+      skipRecovery: false
+    };
+  }
+  resolveCurrentSessionCredential(connectionId, authMode, request) {
+    try {
+      return this.currentSessionResolver.resolve(request);
+    } catch (error) {
+      this.logger.warn("connection-usage.current-session-sync.failed", {
+        connectionId,
+        authMode,
+        source: request.source,
+        reason: "resolve_failed",
+        message: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    }
+  }
+  syncCurrentSessionCredential(connectionId, authMode, request, savedIdentityKey, credential) {
+    const currentIdentityKey = this.identityKeyResolver.resolve(authMode, credential);
+    if (!savedIdentityKey || !currentIdentityKey) {
+      this.logger.warn("connection-usage.current-session-sync.skipped", {
+        connectionId,
+        authMode,
+        source: request.source,
+        reason: "identity_unresolved",
+        savedIdentityKey,
+        currentIdentityKey
+      });
+      return "identity_unresolved";
+    }
+    if (currentIdentityKey !== savedIdentityKey) {
+      this.logger.warn("connection-usage.current-session-sync.skipped", {
+        connectionId,
+        authMode,
+        source: request.source,
+        reason: "identity_mismatch",
+        savedIdentityKey,
+        currentIdentityKey
+      });
+      return "identity_mismatch";
+    }
+    this.accessRegistry.syncCredential(connectionId, credential);
+    this.logger.info("connection-usage.current-session-sync.succeeded", {
+      connectionId,
+      authMode,
+      source: request.source
+    });
+    return "synced";
+  }
+  async retryUsageAfterCurrentSessionSync(connectionId, authMode, request) {
+    const retried = await this.usage.get(connectionId);
+    this.logger.info("connection-usage.current-session-sync.retried", {
+      connectionId,
+      authMode,
+      source: request.source,
+      status: retried.status,
+      errorCode: retried.errorCode
+    });
+    return retried;
+  }
+  isCredentialUnauthorized(result) {
+    return result.status === "error" && result.errorCode === "credential_unauthorized";
   }
 };
 

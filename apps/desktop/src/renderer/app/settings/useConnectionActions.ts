@@ -113,6 +113,14 @@ export function useSettingsConnectionActions({
     }
 
     await runWithEncryptedLocalUnlockRecovery(async () => {
+      if (connection.authMode === "gemini_cli_session") {
+        await updateConnection({
+          connectionId,
+          recoverUnauthorizedCurrentSession: true,
+          sessionSource: "current_gemini",
+        });
+        return;
+      }
       await updateConnection({
         connectionId,
         sessionSource: "login",
@@ -140,6 +148,7 @@ export function useSettingsConnectionActions({
     apiKeySource?: "direct" | "env_key";
     apiKey?: string;
     envKey?: string;
+    recoverUnauthorizedCurrentSession?: boolean;
     sessionSource?: "login" | "current_codex" | "current_claude" | "current_gemini" | "current_cursor";
     sessionAuthJsonPath?: string;
     syncSelectedAgents?: boolean;

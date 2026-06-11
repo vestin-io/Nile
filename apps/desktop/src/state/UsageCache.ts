@@ -130,7 +130,7 @@ export class DesktopUsageCache {
   ): Promise<{ cacheable: boolean; summary: DesktopUsageState | null }> {
     try {
       const result = await session.getConnectionUsage(connectionId, {
-        recoverUnauthorizedCurrentSession: refreshMode === "manual",
+        recoverUnauthorizedCurrentSession: false,
       });
       const summary = UsageSummary.fromResult(result);
       this.logGeminiQuotaResult(result, summary);

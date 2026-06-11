@@ -140,6 +140,11 @@ export class SavedConnections {
     return this.accessRegistry.readCredential(connectionId);
   }
 
+  syncCredential(connectionId: string, credential: StoredCredential): SavedConnectionSummary {
+    const updated = this.accessRegistry.syncCredential(connectionId, credential);
+    return this.buildCurrentSummary(updated);
+  }
+
   setDirectApiKeyEnvKey(connectionId: string, envKey: string | null): SavedConnectionSummary {
     const access = this.accessRegistry.get(connectionId);
     if (!access) {

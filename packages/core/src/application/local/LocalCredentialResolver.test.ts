@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { EnvironmentSource } from "../../services/EnvironmentSource";
@@ -8,6 +8,7 @@ import type { InteractiveSessionLoginRegistry } from "../../session";
 import { LocalCredentialResolver } from "./LocalCredentialResolver";
 
 const tempDirs: string[] = [];
+const originalPath = process.env.PATH;
 
 afterEach(() => {
   while (tempDirs.length > 0) {
@@ -15,6 +16,7 @@ afterEach(() => {
   }
   currentStubCodexHome = "";
   currentStubClaudeHome = "";
+  process.env.PATH = originalPath;
 });
 
 describe("LocalCredentialResolver", () => {
@@ -214,6 +216,39 @@ describe("LocalCredentialResolver", () => {
       expiryDate: 1777427411000,
     });
   });
+
+  it("can refresh the current Gemini CLI session before reading it again", async () => {
+    const geminiHome = createGeminiHome();
+    const root = dirname(geminiHome);
+    const binDir = join(root, "bin");
+    mkdirSync(binDir, { recursive: true });
+    writeGeminiSessionFiles(geminiHome, "gemini.user@example.com", "gemini-sub-123");
+    writeFakeGeminiRefreshCommand(binDir, "gemini.user@example.com", "gemini-sub-123");
+    const resolver = new LocalCredentialResolver(
+      { gemini: geminiHome },
+      EnvironmentSource.from({ PATH: binDir, HOME: root }),
+    );
+
+    await expect(
+      resolver.recoverUnauthorizedCurrentSession({
+        authMode: "gemini_cli_session",
+        source: "current_gemini",
+      }),
+    ).resolves.toBe(true);
+
+    expect(
+      resolver.resolve({
+        authMode: "gemini_cli_session",
+        source: "current_gemini",
+      }),
+    ).toEqual({
+      kind: "gemini_cli_session",
+      accessToken: "fresh-gemini-access-token",
+      refreshToken: "fresh-gemini-refresh-token",
+      idToken: buildIdToken("gemini.user@example.com", "gemini-sub-123"),
+      expiryDate: 1800000000000,
+    });
+  });
 });
 
 function createCodexHome(): string {
@@ -379,6 +414,25 @@ function writeGeminiSessionFiles(geminiHome: string, email: string, subject: str
       expiry_date: 1777427411000,
     }, null, 2)}\n`,
     "utf8",
+  );
+}
+
+function writeFakeGeminiRefreshCommand(binDir: string, email: string, subject: string): void {
+  writeFileSync(
+    join(binDir, "gemini"),
+    [
+      "#!/bin/sh",
+      "cat > \"$GEMINI_CLI_HOME/oauth_creds.json\" <<'EOF'",
+      JSON.stringify({
+        access_token: "fresh-gemini-access-token",
+        refresh_token: "fresh-gemini-refresh-token",
+        id_token: buildIdToken(email, subject),
+        expiry_date: 1800000000000,
+      }, null, 2),
+      "EOF",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
   );
 }
 
