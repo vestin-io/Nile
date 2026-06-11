@@ -26,6 +26,18 @@
 - `./node_modules/.bin/vitest run packages/core/src/application/local/LocalCredentialResolver.test.ts apps/desktop/src/electron/connections/DesktopConnectionManager.test.ts packages/agents/gemini/src/GeminiSessionLogin.test.ts packages/agents/gemini/src/SessionRefresh.test.ts apps/desktop/src/state/UsageCache.test.ts packages/builtins/src/runtime/RecoveringUsage.test.ts`
 - `./node_modules/.bin/tsc -p tsconfig.renderer.json --noEmit`
 
+### Desktop release follow-up
+
+- Fixed the `RecoveringUsage` Codex login test fixture so its fake packaged vendor binary now follows the current runner platform instead of hardcoding the Apple Silicon macOS path.
+
+#### Key findings
+
+- The release workflow failure was a test-fixture portability bug, not a production regression in the new recovery flow. The fake Codex install only matched local macOS resolution, so Linux CI never reached the mocked login recovery path after the same-account sync retry remained unauthorized.
+
+### Verification
+
+- `./node_modules/.bin/vitest run packages/builtins/src/runtime/RecoveringUsage.test.ts`
+
 ### Quick setup guide CTA cleanup
 
 - Removed the `Import package` button from the `Nile Guide` card in quick setup so the unsaved-local-setup message no longer competes with portability import actions in the same block.

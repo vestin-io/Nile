@@ -624,9 +624,19 @@ function writeFakeCodexInstall(
   },
 ): { launcherPath: string; vendorPath: string } {
   const installRoot = join(rootDir, "fake-codex-install");
-  const vendorPath = join(installRoot, "vendor", "aarch64-apple-darwin", "bin", "codex");
+  const targetTriple = readCodexTargetTriple();
+  if (!targetTriple) {
+    throw new Error(`Unsupported test platform: ${process.platform}/${process.arch}`);
+  }
+  const vendorPath = join(
+    installRoot,
+    "vendor",
+    targetTriple,
+    "bin",
+    readCodexVendorBinaryName(),
+  );
   const launcherPath = join(installRoot, "codex");
-  mkdirSync(join(installRoot, "vendor", "aarch64-apple-darwin", "bin"), { recursive: true });
+  mkdirSync(join(installRoot, "vendor", targetTriple, "bin"), { recursive: true });
   writeFileSync(
     vendorPath,
     [
@@ -648,6 +658,32 @@ function writeFakeCodexInstall(
   );
   chmodSync(launcherPath, 0o755);
   return { launcherPath, vendorPath };
+}
+
+function readCodexVendorBinaryName(): string {
+  return process.platform === "win32" ? "codex.exe" : "codex";
+}
+
+function readCodexTargetTriple(): string | null {
+  if (process.platform === "darwin" && process.arch === "arm64") {
+    return "aarch64-apple-darwin";
+  }
+  if (process.platform === "darwin" && process.arch === "x64") {
+    return "x86_64-apple-darwin";
+  }
+  if (process.platform === "linux" && process.arch === "arm64") {
+    return "aarch64-unknown-linux-gnu";
+  }
+  if (process.platform === "linux" && process.arch === "x64") {
+    return "x86_64-unknown-linux-gnu";
+  }
+  if (process.platform === "win32" && process.arch === "arm64") {
+    return "aarch64-pc-windows-msvc";
+  }
+  if (process.platform === "win32" && process.arch === "x64") {
+    return "x86_64-pc-windows-msvc";
+  }
+  return null;
 }
 
 function openAiAuthFile(
