@@ -19,6 +19,7 @@
 - The real bug was at the desktop action boundary, not in the generic Gemini login source. Saved Gemini connections need “refresh my current local Gemini session”, while `login` means “start an interactive sign-in flow that may target a different account”.
 - Gemini family updates already reject auth updates through the normal connection updater path. The reauthentication fix therefore has to sync credentials directly after recovery instead of pretending Gemini supports the same auth-update shape as OpenAI or Claude.
 - This keeps the existing AppleScript/Terminal login implementation intact for true Gemini sign-in flows and confines the recovery behavior to the explicit reauthentication path.
+- Full pre-push typecheck exposed one extra follow-up in `RecoveringUsage`: the current-session recovery path needed an explicit recoverable-auth-mode narrowing instead of relying on branch-local inference that only the focused tests exercised.
 
 ### Verification
 

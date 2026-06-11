@@ -86,8 +86,12 @@ var RecoveringUsage = class {
     if (!request) {
       return null;
     }
-    if (access.authMode === "openai_session") {
-      const synced = await this.retryWithResolvedCurrentSession(connectionId, access.authMode, request);
+    const recoverableAuthMode = this.toRecoverableSessionAuthMode(access.authMode);
+    if (!recoverableAuthMode) {
+      return null;
+    }
+    if (recoverableAuthMode === "openai_session") {
+      const synced = await this.retryWithResolvedCurrentSession(connectionId, recoverableAuthMode, request);
       if (synced?.skipRecovery) {
         return synced.result;
       }
@@ -95,21 +99,21 @@ var RecoveringUsage = class {
         return synced.result;
       }
     }
-    await this.recoverUnauthorizedCurrentSession(connectionId, access.authMode, request);
-    const credential = this.resolveCurrentSessionCredential(connectionId, access.authMode, request);
+    await this.recoverUnauthorizedCurrentSession(connectionId, recoverableAuthMode, request);
+    const credential = this.resolveCurrentSessionCredential(connectionId, recoverableAuthMode, request);
     if (!credential) {
       return null;
     }
     if (this.syncCurrentSessionCredential(
       connectionId,
-      access.authMode,
+      recoverableAuthMode,
       request,
       access.identityKey?.trim() || null,
       credential
     ) !== "synced") {
       return null;
     }
-    return await this.retryUsageAfterCurrentSessionSync(connectionId, access.authMode, request);
+    return await this.retryUsageAfterCurrentSessionSync(connectionId, recoverableAuthMode, request);
   }
   async recoverUnauthorizedCurrentSession(connectionId, authMode, request) {
     try {
@@ -226,6 +230,12 @@ var RecoveringUsage = class {
   }
   isCredentialUnauthorized(result) {
     return result.status === "error" && result.errorCode === "credential_unauthorized";
+  }
+  toRecoverableSessionAuthMode(authMode) {
+    if (authMode === "api_key" || authMode === "openclaw_openai_session") {
+      return null;
+    }
+    return authMode;
   }
 };
 
@@ -496,6 +506,9 @@ var NileSession = class _NileSession {
   }
   readConnectionCredential(connectionId) {
     return this.resources.getSavedConnections().readCredential(connectionId);
+  }
+  syncConnectionCredential(connectionId, credential) {
+    return this.resources.getSavedConnections().syncCredential(connectionId, credential);
   }
   setConnectionDirectApiKeyEnvKey(connectionId, envKey) {
     return this.resources.getSavedConnections().setDirectApiKeyEnvKey(connectionId, envKey);

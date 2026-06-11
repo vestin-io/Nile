@@ -8,6 +8,12 @@ import type { StoredCredential } from "@nile/core/services/credential/Types";
 import type { NileLogger } from "@nile/core/services/NileLogger";
 import { ConnectionIdentityKeyResolver } from "@nile/connections/support";
 
+type RecoverableSessionAuthMode =
+  | "claude_session"
+  | "cursor_session"
+  | "gemini_cli_session"
+  | "openai_session";
+
 export class RecoveringUsage {
   private readonly requestBuilder = new SessionCredentialRequestBuilder();
   private readonly identityKeyResolver = new ConnectionIdentityKeyResolver();
@@ -49,9 +55,13 @@ export class RecoveringUsage {
     if (!request) {
       return null;
     }
+    const recoverableAuthMode = this.toRecoverableSessionAuthMode(access.authMode);
+    if (!recoverableAuthMode) {
+      return null;
+    }
 
-    if (access.authMode === "openai_session") {
-      const synced = await this.retryWithResolvedCurrentSession(connectionId, access.authMode, request);
+    if (recoverableAuthMode === "openai_session") {
+      const synced = await this.retryWithResolvedCurrentSession(connectionId, recoverableAuthMode, request);
       if (synced?.skipRecovery) {
         return synced.result;
       }
@@ -60,28 +70,28 @@ export class RecoveringUsage {
       }
     }
 
-    await this.recoverUnauthorizedCurrentSession(connectionId, access.authMode, request);
+    await this.recoverUnauthorizedCurrentSession(connectionId, recoverableAuthMode, request);
 
-    const credential = this.resolveCurrentSessionCredential(connectionId, access.authMode, request);
+    const credential = this.resolveCurrentSessionCredential(connectionId, recoverableAuthMode, request);
     if (!credential) {
       return null;
     }
 
     if (this.syncCurrentSessionCredential(
       connectionId,
-      access.authMode,
+      recoverableAuthMode,
       request,
       access.identityKey?.trim() || null,
       credential,
     ) !== "synced") {
       return null;
     }
-    return await this.retryUsageAfterCurrentSessionSync(connectionId, access.authMode, request);
+    return await this.retryUsageAfterCurrentSessionSync(connectionId, recoverableAuthMode, request);
   }
 
   private async recoverUnauthorizedCurrentSession(
     connectionId: string,
-    authMode: "api_key" | "claude_session" | "cursor_session" | "gemini_cli_session" | "openai_session" | "openclaw_openai_session",
+    authMode: RecoverableSessionAuthMode,
     request: CurrentSessionCredentialRequest,
   ): Promise<void> {
     try {
@@ -107,7 +117,7 @@ export class RecoveringUsage {
   }
 
   private readRecoveryRequest(
-    authMode: "api_key" | "claude_session" | "cursor_session" | "gemini_cli_session" | "openai_session" | "openclaw_openai_session",
+    authMode: "api_key" | RecoverableSessionAuthMode | "openclaw_openai_session",
   ): CurrentSessionCredentialRequest | null {
     if (authMode === "api_key" || authMode === "openclaw_openai_session") {
       return null;
@@ -122,7 +132,7 @@ export class RecoveringUsage {
 
   private async retryWithResolvedCurrentSession(
     connectionId: string,
-    authMode: "claude_session" | "cursor_session" | "gemini_cli_session" | "openai_session",
+    authMode: RecoverableSessionAuthMode,
     request: CurrentSessionCredentialRequest,
   ): Promise<{ result: ConnectionUsageResult; skipRecovery: boolean } | null> {
     const access = this.accessRegistry.get(connectionId);
@@ -156,7 +166,7 @@ export class RecoveringUsage {
 
   private resolveCurrentSessionCredential(
     connectionId: string,
-    authMode: "claude_session" | "cursor_session" | "gemini_cli_session" | "openai_session",
+    authMode: RecoverableSessionAuthMode,
     request: CurrentSessionCredentialRequest,
   ): StoredCredential | null {
     try {
@@ -175,7 +185,7 @@ export class RecoveringUsage {
 
   private syncCurrentSessionCredential(
     connectionId: string,
-    authMode: "claude_session" | "cursor_session" | "gemini_cli_session" | "openai_session",
+    authMode: RecoverableSessionAuthMode,
     request: CurrentSessionCredentialRequest,
     savedIdentityKey: string | null,
     credential: StoredCredential,
@@ -215,7 +225,7 @@ export class RecoveringUsage {
 
   private async retryUsageAfterCurrentSessionSync(
     connectionId: string,
-    authMode: "claude_session" | "cursor_session" | "gemini_cli_session" | "openai_session",
+    authMode: RecoverableSessionAuthMode,
     request: CurrentSessionCredentialRequest,
   ): Promise<ConnectionUsageResult> {
     const retried = await this.usage.get(connectionId);
@@ -231,5 +241,14 @@ export class RecoveringUsage {
 
   private isCredentialUnauthorized(result: ConnectionUsageResult): boolean {
     return result.status === "error" && result.errorCode === "credential_unauthorized";
+  }
+
+  private toRecoverableSessionAuthMode(
+    authMode: "api_key" | RecoverableSessionAuthMode | "openclaw_openai_session",
+  ): RecoverableSessionAuthMode | null {
+    if (authMode === "api_key" || authMode === "openclaw_openai_session") {
+      return null;
+    }
+    return authMode;
   }
 }
