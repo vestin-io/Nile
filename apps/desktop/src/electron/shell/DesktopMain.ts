@@ -97,7 +97,7 @@ export class DesktopMain {
 
   constructor(private readonly options: DesktopMainOptions) {
     this.logger = NileLogger.createDefault({ module: "desktop-main" });
-    this.credentialStore = options.credentialStore ?? createDesktopCredentialStore(options.databasePath);
+    this.credentialStore = options.credentialStore ?? createPlatformWorkspaceCredentialStore(options.databasePath);
     this.environmentStore = new DesktopEnvironmentStore(options.databasePath);
     this.shellEnvironment = new DesktopShellEnvironment();
     this.credentialStorageSession = new DesktopCredentialStorageSession(
@@ -494,8 +494,4 @@ function readDesktopPackageVersion(): string {
   const packageJsonPath = join(currentDir, "..", "..", "package.json");
   const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: string };
   return parsed.version?.trim() || "0.0.0";
-}
-
-function createDesktopCredentialStore(databasePath: string): CredentialStore {
-  return createPlatformWorkspaceCredentialStore(databasePath);
 }
