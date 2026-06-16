@@ -140,7 +140,10 @@ export class NileSession {
 
   getConnectionUsage(
     connectionId: string,
-    options?: { recoverUnauthorizedCurrentSession?: boolean },
+    options?: {
+      recoverUnauthorizedCurrentSession?: boolean;
+      allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+    },
   ): Promise<ConnectionUsageResult> {
     return this.resources.getUsage().get(connectionId, options);
   }

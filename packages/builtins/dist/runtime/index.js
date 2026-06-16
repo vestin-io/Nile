@@ -78,6 +78,7 @@ var RecoveringUsage = class {
     if (options?.recoverUnauthorizedCurrentSession === false) {
       return null;
     }
+    const allowInteractiveRecovery = options?.allowInteractiveUnauthorizedCurrentSessionRecovery !== false;
     const access = this.accessRegistry.get(connectionId);
     if (!access) {
       return null;
@@ -90,14 +91,15 @@ var RecoveringUsage = class {
     if (!recoverableAuthMode) {
       return null;
     }
-    if (recoverableAuthMode === "openai_session") {
-      const synced = await this.retryWithResolvedCurrentSession(connectionId, recoverableAuthMode, request);
-      if (synced?.skipRecovery) {
-        return synced.result;
-      }
-      if (synced?.result && !this.isCredentialUnauthorized(synced.result)) {
-        return synced.result;
-      }
+    const synced = await this.retryWithResolvedCurrentSession(connectionId, recoverableAuthMode, request);
+    if (synced?.skipRecovery) {
+      return synced.result;
+    }
+    if (synced?.result && !this.isCredentialUnauthorized(synced.result)) {
+      return synced.result;
+    }
+    if (!allowInteractiveRecovery) {
+      return synced?.result ?? result;
     }
     await this.recoverUnauthorizedCurrentSession(connectionId, recoverableAuthMode, request);
     const credential = this.resolveCurrentSessionCredential(connectionId, recoverableAuthMode, request);

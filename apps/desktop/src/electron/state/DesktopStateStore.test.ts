@@ -146,7 +146,11 @@ describe("DesktopStateStore", () => {
       connectionManager: new StubConnectionManager() as never,
     });
 
-    const settingsState = await store.refreshDesktopState({ usageRefreshMode: "manual" });
+    const settingsState = await store.refreshDesktopState({
+      allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      forceSettingsUsageRefresh: true,
+      usageRefreshMode: "manual",
+    });
 
     expect(settingsState).toEqual({
       onboarding: null,
@@ -172,7 +176,15 @@ describe("DesktopStateStore", () => {
       },
     });
     expect(surface.refreshDesktopStateCalls).toEqual([{
+      allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      forceSettingsUsageRefresh: true,
       refreshSettingsUsage: false,
+      usageRefreshMode: "manual",
+    }]);
+    expect(surface.getSettingsStateOptions).toEqual([{
+      allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      forceUsageRefresh: true,
+      refreshUsage: false,
       usageRefreshMode: "manual",
     }]);
     expect(surface.getStatusEntryStateCalls).toBe(0);
@@ -525,10 +537,20 @@ function createDatabasePath(): string {
 class StubSurface {
   getStatusEntryStateCalls = 0;
   getSettingsStateCalls = 0;
-  getSettingsStateOptions: Array<{ refreshUsage?: boolean; usageRefreshMode?: "auto" | "manual" }> = [];
+  getSettingsStateOptions: Array<{
+    allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+    forceUsageRefresh?: boolean;
+    refreshUsage?: boolean;
+    usageRefreshMode?: "auto" | "manual";
+  }> = [];
   getHistoryStateCalls = 0;
   primeStartupStateCalls = 0;
-  refreshDesktopStateCalls: Array<{ refreshSettingsUsage?: boolean; usageRefreshMode?: "auto" | "manual" }> = [];
+  refreshDesktopStateCalls: Array<{
+    allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+    forceSettingsUsageRefresh?: boolean;
+    refreshSettingsUsage?: boolean;
+    usageRefreshMode?: "auto" | "manual";
+  }> = [];
   refreshUsageByConnectionIdCalls: Array<{
     connectionIds: Array<string | null>;
     options?: { force?: boolean; mode?: "auto" | "manual" };
@@ -542,7 +564,12 @@ class StubSurface {
   }
 
   async getSettingsState(
-    options: { refreshUsage?: boolean; usageRefreshMode?: "auto" | "manual" } = {},
+    options: {
+      allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+      forceUsageRefresh?: boolean;
+      refreshUsage?: boolean;
+      usageRefreshMode?: "auto" | "manual";
+    } = {},
   ): Promise<SettingsState> {
     this.getSettingsStateCalls += 1;
     this.getSettingsStateOptions.push(options);
@@ -596,7 +623,12 @@ class StubSurface {
   }
 
   async refreshDesktopState(
-    options: { refreshSettingsUsage?: boolean; usageRefreshMode?: "auto" | "manual" } = {},
+    options: {
+      allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+      forceSettingsUsageRefresh?: boolean;
+      refreshSettingsUsage?: boolean;
+      usageRefreshMode?: "auto" | "manual";
+    } = {},
   ): Promise<{ statusEntryState: DesktopStatusEntryState; settingsState: SettingsState }> {
     this.refreshDesktopStateCalls.push(options);
     return {
@@ -604,6 +636,9 @@ class StubSurface {
         agents: [],
       },
       settingsState: await this.getSettingsState({
+        allowInteractiveUnauthorizedCurrentSessionRecovery:
+          options.allowInteractiveUnauthorizedCurrentSessionRecovery,
+        forceUsageRefresh: options.forceSettingsUsageRefresh,
         refreshUsage: options.refreshSettingsUsage,
         usageRefreshMode: options.usageRefreshMode,
       }),

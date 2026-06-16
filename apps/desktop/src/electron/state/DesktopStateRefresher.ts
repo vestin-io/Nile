@@ -5,6 +5,8 @@ import { ConnectionUsageAlertEvaluator } from "../alerts/Evaluator";
 import { DesktopStateStore } from "./DesktopStateStore";
 
 type RefreshDesktopStateOptions = {
+  allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+  forceSettingsUsageRefresh?: boolean;
   forceStatusEntryUsageRefresh?: boolean;
   invalidate: boolean;
   notifyRenderer: boolean;
@@ -34,6 +36,12 @@ export class DesktopStateRefresher {
     }
 
     const settingsState = await this.options.stateStore.refreshDesktopState({
+      ...(typeof options.allowInteractiveUnauthorizedCurrentSessionRecovery === "boolean"
+        ? { allowInteractiveUnauthorizedCurrentSessionRecovery: options.allowInteractiveUnauthorizedCurrentSessionRecovery }
+        : {}),
+      ...(typeof options.forceSettingsUsageRefresh === "boolean"
+        ? { forceSettingsUsageRefresh: options.forceSettingsUsageRefresh }
+        : {}),
       ...(typeof options.forceStatusEntryUsageRefresh === "boolean"
         ? { forceStatusEntryUsageRefresh: options.forceStatusEntryUsageRefresh }
         : {}),

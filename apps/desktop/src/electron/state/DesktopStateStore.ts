@@ -53,11 +53,15 @@ type DesktopStateStoreOptions = {
 };
 
 type GetSettingsStateOptions = {
+  allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+  forceUsageRefresh?: boolean;
   refreshUsage?: boolean;
   usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
 type RefreshDesktopStateOptions = {
+  allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+  forceSettingsUsageRefresh?: boolean;
   forceStatusEntryUsageRefresh?: boolean;
   refreshSettingsUsage?: boolean;
   refreshStatusEntryUsage?: boolean;
@@ -182,6 +186,12 @@ export class DesktopStateStore {
 
   async refreshDesktopState(options: RefreshDesktopStateOptions = {}): Promise<SettingsState> {
     const result = await this.options.surface.refreshDesktopState({
+      ...(typeof options.allowInteractiveUnauthorizedCurrentSessionRecovery === "boolean"
+        ? { allowInteractiveUnauthorizedCurrentSessionRecovery: options.allowInteractiveUnauthorizedCurrentSessionRecovery }
+        : {}),
+      ...(typeof options.forceSettingsUsageRefresh === "boolean"
+        ? { forceSettingsUsageRefresh: options.forceSettingsUsageRefresh }
+        : {}),
       ...(typeof options.forceStatusEntryUsageRefresh === "boolean"
         ? { forceStatusEntryUsageRefresh: options.forceStatusEntryUsageRefresh }
         : {}),

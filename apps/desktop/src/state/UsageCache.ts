@@ -40,12 +40,18 @@ export class DesktopUsageCache {
   async readByConnectionId(
     session: NileSession,
     savedConnections: SavedConnectionSummary[],
-    options?: { mode?: DesktopUsageRefreshMode },
+    options?: {
+      allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+      force?: boolean;
+      mode?: DesktopUsageRefreshMode;
+    },
   ): Promise<Map<string, DesktopUsageState | null>> {
     const result = await this.refreshByConnectionId(
       session,
       savedConnections.map((connection) => connection.id),
       {
+        allowInteractiveUnauthorizedCurrentSessionRecovery: options?.allowInteractiveUnauthorizedCurrentSessionRecovery,
+        force: options?.force,
         mode: options?.mode,
       },
     );
@@ -59,18 +65,27 @@ export class DesktopUsageCache {
   async refreshByConnectionId(
     session: NileSession,
     connectionIds: Array<string | null>,
-    options?: { force?: boolean; mode?: DesktopUsageRefreshMode },
+    options?: {
+      allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+      force?: boolean;
+      mode?: DesktopUsageRefreshMode;
+    },
   ): Promise<DesktopUsageRefreshResult> {
     const uniqueConnectionIds = [...new Set(connectionIds.filter((connectionId): connectionId is string => Boolean(connectionId)))];
     const forceRefresh = options?.force ?? false;
     const refreshMode = options?.mode ?? "auto";
     const refreshedConnectionIds = uniqueConnectionIds.filter((connectionId) =>
-      (refreshMode === "manual" || !this.autoRefreshPausedConnectionIds.has(connectionId))
+      (forceRefresh || refreshMode === "manual" || !this.autoRefreshPausedConnectionIds.has(connectionId))
         && (forceRefresh || !this.hasFreshUsageCache(connectionId)),
     );
 
     if (refreshedConnectionIds.length > 0) {
-      await this.refreshBatch(session, refreshedConnectionIds, refreshMode);
+      await this.refreshBatch(
+        session,
+        refreshedConnectionIds,
+        refreshMode,
+        options?.allowInteractiveUnauthorizedCurrentSessionRecovery,
+      );
     }
 
     const now = Date.now();
@@ -92,6 +107,7 @@ export class DesktopUsageCache {
     session: NileSession,
     connectionIds: string[],
     refreshMode: DesktopUsageRefreshMode,
+    allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean,
   ): Promise<void> {
     const queue = [...connectionIds];
     const workerCount = Math.min(DesktopUsageCache.REFRESH_CONCURRENCY, queue.length);
@@ -101,7 +117,12 @@ export class DesktopUsageCache {
         if (!connectionId) {
           return;
         }
-        const result = await this.readUsageSummary(session, connectionId, refreshMode);
+        const result = await this.readUsageSummary(
+          session,
+          connectionId,
+          refreshMode,
+          allowInteractiveUnauthorizedCurrentSessionRecovery,
+        );
         this.usageByConnectionId.set(connectionId, result.summary);
         if (result.cacheable) {
           this.usageReadAt.set(connectionId, Date.now());
@@ -127,10 +148,13 @@ export class DesktopUsageCache {
     session: NileSession,
     connectionId: string,
     refreshMode: DesktopUsageRefreshMode,
+    allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean,
   ): Promise<{ cacheable: boolean; summary: DesktopUsageState | null }> {
     try {
       const result = await session.getConnectionUsage(connectionId, {
-        recoverUnauthorizedCurrentSession: false,
+        recoverUnauthorizedCurrentSession: true,
+        allowInteractiveUnauthorizedCurrentSessionRecovery:
+          allowInteractiveUnauthorizedCurrentSessionRecovery ?? refreshMode === "manual",
       });
       const summary = UsageSummary.fromResult(result);
       this.logGeminiQuotaResult(result, summary);

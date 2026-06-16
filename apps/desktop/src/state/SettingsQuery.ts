@@ -28,6 +28,8 @@ type DesktopSettingsStateQueryOptions = {
 };
 
 type DesktopSettingsStateReadOptions = {
+  allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+  forceUsageRefresh?: boolean;
   refreshUsage?: boolean;
   usageRefreshMode?: DesktopUsageRefreshMode;
 };
@@ -56,6 +58,9 @@ export class DesktopSettingsStateQuery {
     const usageByConnectionId = options.refreshUsage === false
       ? this.usage.snapshotByConnectionId(savedConnections)
       : await this.usage.readByConnectionId(session, savedConnections, {
+        allowInteractiveUnauthorizedCurrentSessionRecovery:
+          options.allowInteractiveUnauthorizedCurrentSessionRecovery,
+        force: options.forceUsageRefresh,
         mode: options.usageRefreshMode,
       });
     const agentStates = this.buildAgentStates(session, savedConnections, usageByConnectionId, statuses);

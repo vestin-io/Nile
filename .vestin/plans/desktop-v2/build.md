@@ -447,6 +447,35 @@
 
 - `npm run build -w @nile/desktop`
 
+### Manual settings refresh usage bypass
+
+- Tightened the Agents/settings refresh button semantics so `desktop:refresh-settings` now does a true manual usage refresh:
+  - it marks the refresh as `manual`
+  - it forces the settings usage read to bypass the 5-minute usage cache
+  - it still reuses the same same-identity silent current-session sync before retrying usage
+- Kept the force flag scoped to the settings refresh path only:
+  - automatic usage refreshes remain cache-aware
+  - menubar/status-entry refresh behavior is unchanged unless explicitly forced through its own flag
+- Threaded the new force option through the desktop refresh stack:
+  - `electron/ipc/DesktopIpcStateRoutes.ts`
+  - `electron/state/DesktopStateRefresher.ts`
+  - `electron/state/DesktopStateStore.ts`
+  - `state/Surface.ts`
+  - `state/SettingsQuery.ts`
+  - `state/UsageCache.ts`
+
+#### Key findings
+
+- Before this change, the highlighted refresh button already used `manual` recovery semantics, but it could still reuse a fresh settings usage cache entry. That meant a user-triggered refresh was not guaranteed to re-read usage immediately.
+- I intentionally did not make `switchConnection` or background refreshes force-bypass the settings usage cache in this pass. The change is scoped to the explicit refresh button the user clicked.
+- The first version of this fix still reused `manual` as a proxy for "interactive recovery allowed". Because the settings refresh is a bulk read across all saved connections, that caused unrelated Gemini saved sessions to launch Terminal-based login while refreshing Codex usage. I split those concerns so bulk desktop refreshes can be `manual` for force-refresh purposes while staying silent-only for unauthorized recovery.
+- I then tightened the model again: bulk desktop refresh now uses `force + auto` instead of `manual` to express "refresh now even if paused/cached". That keeps same-identity silent sync enabled while removing the last mode-based path that could be mistaken for interactive recovery.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/state/DesktopStateStore.test.ts apps/desktop/src/electron/state/DesktopStateRefresher.test.ts apps/desktop/src/state/UsageCache.test.ts packages/builtins/src/runtime/RecoveringUsage.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+- `npm run typecheck -- --pretty false`
+
 ### Agent card switch loading feedback
 
 - Added visible in-card switching feedback on the Agents list so a connection change no longer looks idle while the backend apply flow is still running:
@@ -5183,6 +5212,33 @@
 
 - `./node_modules/.bin/vitest run packages/core/src/models/connection/Creator.test.ts packages/core/src/models/connection/Updater.test.ts packages/core/src/models/connection/SavedConnections.test.ts`
 - `npm run typecheck`
+
+### Profile apply reuses current connection after home override
+
+- Fixed desktop profile apply so it still reapplies an assignment's saved connection when that profile changes the same agent's home path.
+- Root cause:
+  the profile manager updated home overrides first, but then skipped `switchConnection()` whenever the selected `connectionId` already matched current state.
+- This left the new home without a rewritten `auth.json` / `config.toml` payload for same-connection profile switches.
+- Added a desktop regression test that covers:
+  same `connectionId`
+  changed `homePath`
+  expected `home -> switch` event order
+- Fixed desktop manual refresh after `switchConnection()` so it now refreshes settings/status usage in manual mode instead of only invalidating cached state.
+- Fixed desktop usage refresh so `openai_session` connections can always attempt a same-identity current-session sync after a saved credential returns `credential_unauthorized`.
+- Automatic refresh now stops after that silent sync-and-retry path and does not launch interactive reauthentication.
+- Manual refresh still allows the existing interactive reauthentication fallback after the silent sync attempt.
+
+#### Key findings
+
+- The production machine state I inspected had no persisted `desktop_agent_homes` or `desktop_workspace_profiles` rows at the time of debugging, so the bug was confirmed from the apply path and from current live/saved-state evidence rather than by replaying an existing saved profile row.
+- The visible Codex card failure in production was a separate runtime issue at the same time: Nile was trying to read quota with a saved credential stored in `encrypted_local_storage` while that local storage session was still locked.
+- In `npm run desktop:dev`, switching Codex to a saved same-identity OpenAI session updated `agent_selections`, and live setup detection matched the selected connection, but the settings card could still stay on `OpenAI session is expired or unauthorized` because the desktop usage cache explicitly disabled automatic same-identity current-session sync and the post-switch renderer refresh did not request a usage refresh.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/profiles/Manager.test.ts`
+- `./node_modules/.bin/vitest run packages/builtins/src/runtime/RecoveringUsage.test.ts apps/desktop/src/state/UsageCache.test.ts apps/desktop/src/electron/profiles/Manager.test.ts`
+- `npm run typecheck -- --pretty false`
 
 ### Desktop gateway detected-agent selection
 

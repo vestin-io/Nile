@@ -27,7 +27,10 @@ export class RecoveringUsage {
 
   async get(
     connectionId: string,
-    options?: { recoverUnauthorizedCurrentSession?: boolean },
+    options?: {
+      recoverUnauthorizedCurrentSession?: boolean;
+      allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+    },
   ): Promise<ConnectionUsageResult> {
     const result = await this.usage.get(connectionId);
     const recovered = await this.retryAfterCurrentSessionSync(connectionId, result, options);
@@ -37,7 +40,10 @@ export class RecoveringUsage {
   private async retryAfterCurrentSessionSync(
     connectionId: string,
     result: ConnectionUsageResult,
-    options?: { recoverUnauthorizedCurrentSession?: boolean },
+    options?: {
+      recoverUnauthorizedCurrentSession?: boolean;
+      allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+    },
   ): Promise<ConnectionUsageResult | null> {
     if (result.status !== "error" || result.errorCode !== "credential_unauthorized") {
       return null;
@@ -45,6 +51,7 @@ export class RecoveringUsage {
     if (options?.recoverUnauthorizedCurrentSession === false) {
       return null;
     }
+    const allowInteractiveRecovery = options?.allowInteractiveUnauthorizedCurrentSessionRecovery !== false;
 
     const access = this.accessRegistry.get(connectionId);
     if (!access) {
@@ -60,14 +67,15 @@ export class RecoveringUsage {
       return null;
     }
 
-    if (recoverableAuthMode === "openai_session") {
-      const synced = await this.retryWithResolvedCurrentSession(connectionId, recoverableAuthMode, request);
-      if (synced?.skipRecovery) {
-        return synced.result;
-      }
-      if (synced?.result && !this.isCredentialUnauthorized(synced.result)) {
-        return synced.result;
-      }
+    const synced = await this.retryWithResolvedCurrentSession(connectionId, recoverableAuthMode, request);
+    if (synced?.skipRecovery) {
+      return synced.result;
+    }
+    if (synced?.result && !this.isCredentialUnauthorized(synced.result)) {
+      return synced.result;
+    }
+    if (!allowInteractiveRecovery) {
+      return synced?.result ?? result;
     }
 
     await this.recoverUnauthorizedCurrentSession(connectionId, recoverableAuthMode, request);

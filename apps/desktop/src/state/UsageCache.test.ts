@@ -138,14 +138,51 @@ describe("DesktopUsageCache", () => {
     ]);
 
     await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
-    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { mode: "auto" });
     await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "manual" });
-    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { mode: "auto" });
 
-    expect(session.calls).toBe(3);
+    expect(session.calls).toBe(2);
   });
 
-  it("disables interactive session recovery for both automatic and manual refresh", async () => {
+  it("lets forced automatic refreshes bypass paused auto-refresh state", async () => {
+    const logger = new StubLogger();
+    const cache = new DesktopUsageCache(logger as never);
+    const session = createSequenceSession([
+      {
+        connectionId: "openai-session",
+        connectionLabel: "openai@example.com",
+        endpointFamily: "openai",
+        endpointLabel: "OpenAI",
+        status: "error",
+        source: "remote_api",
+        message: "Quota request timed out after 10000ms",
+        windows: [],
+      },
+      {
+        connectionId: "openai-session",
+        connectionLabel: "openai@example.com",
+        endpointFamily: "openai",
+        endpointLabel: "OpenAI",
+        status: "available",
+        source: "remote_api",
+        planLabel: "Plus",
+        windows: [
+          {
+            label: "weekly",
+            remainingPercent: 66,
+          },
+        ],
+      },
+    ]);
+
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
+    await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
+
+    expect(session.calls).toBe(2);
+  });
+
+  it("syncs current sessions for automatic and manual refresh, but only allows interactive recovery manually", async () => {
     const logger = new StubLogger();
     const cache = new DesktopUsageCache(logger as never);
     const session = createRecoveryTrackingSession();
@@ -153,7 +190,35 @@ describe("DesktopUsageCache", () => {
     await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "auto" });
     await cache.refreshByConnectionId(session as never, ["openai-session"], { force: true, mode: "manual" });
 
-    expect(session.recoveryFlags).toEqual([false, false]);
+    expect(session.recoveryFlags).toEqual([
+      {
+        recoverUnauthorizedCurrentSession: true,
+        allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      },
+      {
+        recoverUnauthorizedCurrentSession: true,
+        allowInteractiveUnauthorizedCurrentSessionRecovery: true,
+      },
+    ]);
+  });
+
+  it("can disable interactive current-session recovery even for manual refreshes", async () => {
+    const logger = new StubLogger();
+    const cache = new DesktopUsageCache(logger as never);
+    const session = createRecoveryTrackingSession();
+
+    await cache.refreshByConnectionId(session as never, ["openai-session"], {
+      allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      force: true,
+      mode: "manual",
+    });
+
+    expect(session.recoveryFlags).toEqual([
+      {
+        recoverUnauthorizedCurrentSession: true,
+        allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      },
+    ]);
   });
 });
 
@@ -243,16 +308,26 @@ function createSequenceSession(results: Array<{
 }
 
 function createRecoveryTrackingSession() {
-  const recoveryFlags: boolean[] = [];
+  const recoveryFlags: Array<{
+    recoverUnauthorizedCurrentSession: boolean;
+    allowInteractiveUnauthorizedCurrentSessionRecovery: boolean;
+  }> = [];
   return {
     get recoveryFlags() {
       return recoveryFlags;
     },
     async getConnectionUsage(
       _connectionId?: string,
-      options?: { recoverUnauthorizedCurrentSession?: boolean },
+      options?: {
+        recoverUnauthorizedCurrentSession?: boolean;
+        allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+      },
     ) {
-      recoveryFlags.push(options?.recoverUnauthorizedCurrentSession === true);
+      recoveryFlags.push({
+        recoverUnauthorizedCurrentSession: options?.recoverUnauthorizedCurrentSession === true,
+        allowInteractiveUnauthorizedCurrentSessionRecovery:
+          options?.allowInteractiveUnauthorizedCurrentSessionRecovery === true,
+      });
       return {
         connectionId: "openai-session",
         connectionLabel: "openai@example.com",

@@ -69,6 +69,23 @@ describe("WorkspaceProfileManager", () => {
     expect(setup.events).toEqual([]);
   });
 
+  it("reapplies the current connection when the profile changes that agent's home", async () => {
+    const setup = createManager(createSettingsState());
+    const profile = setup.store.create({
+      name: "Alt Codex Home",
+      assignments: [
+        { agentId: "codex", connectionId: "codex-work", homePath: "/tmp/codex-alt" },
+      ],
+    });
+
+    await setup.manager.apply(profile.id);
+
+    expect(setup.events).toEqual([
+      "home:codex:/tmp/codex-alt",
+      "switch:codex:codex-work",
+    ]);
+  });
+
   it("rejects deleted or incompatible profile connections before applying anything", async () => {
     const setup = createManager(createSettingsState());
     const profile = setup.store.create({

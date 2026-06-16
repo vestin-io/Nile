@@ -27,3 +27,6 @@ await build({
 });
 
 chmodSync(outputPath, 0o755);
+
+
+

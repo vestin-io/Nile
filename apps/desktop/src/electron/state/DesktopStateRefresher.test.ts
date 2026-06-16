@@ -96,6 +96,72 @@ describe("DesktopStateRefresher", () => {
     });
   });
 
+  it("passes forced settings usage refresh through desktop refreshes", async () => {
+    const refreshDesktopState = vi.fn(async () => ({}));
+    const refresher = new DesktopStateRefresher({
+      logger: createLoggerStub(),
+      notifyRenderer: vi.fn(),
+      stateStore: {
+        invalidateAll: vi.fn(),
+        refreshCachedCurrentUsage: async () => ({
+          changed: false,
+          hasCachedState: true,
+          refreshed: false,
+          settingsState: null,
+        }),
+        refreshDesktopState,
+        getSettingsState: async () => ({}) as never,
+      } as never,
+    });
+
+    await refresher.refreshDesktopState({
+      forceSettingsUsageRefresh: true,
+      invalidate: false,
+      notifyRenderer: false,
+      refreshSettingsUsage: true,
+      usageRefreshMode: "manual",
+    });
+
+    expect(refreshDesktopState).toHaveBeenCalledWith({
+      forceSettingsUsageRefresh: true,
+      refreshSettingsUsage: true,
+      usageRefreshMode: "manual",
+    });
+  });
+
+  it("passes interactive recovery overrides through desktop refreshes", async () => {
+    const refreshDesktopState = vi.fn(async () => ({}));
+    const refresher = new DesktopStateRefresher({
+      logger: createLoggerStub(),
+      notifyRenderer: vi.fn(),
+      stateStore: {
+        invalidateAll: vi.fn(),
+        refreshCachedCurrentUsage: async () => ({
+          changed: false,
+          hasCachedState: true,
+          refreshed: false,
+          settingsState: null,
+        }),
+        refreshDesktopState,
+        getSettingsState: async () => ({}) as never,
+      } as never,
+    });
+
+    await refresher.refreshDesktopState({
+      allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      invalidate: false,
+      notifyRenderer: false,
+      refreshSettingsUsage: true,
+      usageRefreshMode: "manual",
+    });
+
+    expect(refreshDesktopState).toHaveBeenCalledWith({
+      allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      refreshSettingsUsage: true,
+      usageRefreshMode: "manual",
+    });
+  });
+
   it("keeps automatic usage refreshes silent when nothing changed", async () => {
     const notifyRenderer = vi.fn();
     const refresher = new DesktopStateRefresher({

@@ -24,9 +24,12 @@ type DesktopIpcStateRoutesOptions = {
   notifyPreferencesChanged(): void;
   refreshAll(): void;
   refreshDesktopState(options: {
+    allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+    forceSettingsUsageRefresh?: boolean;
     invalidate: boolean;
     notifyRenderer: boolean;
     refreshSettingsUsage?: boolean;
+    refreshStatusEntryUsage?: boolean;
     usageRefreshMode?: DesktopUsageRefreshMode;
   }): Promise<void>;
   migrateDesktopPreferences(raw: string | null): DesktopPreferences;
@@ -120,7 +123,14 @@ export class DesktopIpcStateRoutes {
         inputs.readAgentId(agentId),
         inputs.readRequiredString(connectionId, "connectionId"),
       );
-      this.options.refreshAll();
+      await this.options.refreshDesktopState({
+        allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+        invalidate: false,
+        notifyRenderer: true,
+        refreshSettingsUsage: true,
+        refreshStatusEntryUsage: true,
+        usageRefreshMode: "auto",
+      });
       return result;
     });
     ipcMain.handle("desktop:rollback-latest-mutation", async (_event, agentId: unknown) => {
@@ -136,18 +146,21 @@ export class DesktopIpcStateRoutes {
     });
     ipcMain.handle("desktop:refresh-settings", async () => {
       await this.options.refreshDesktopState({
+        allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+        forceSettingsUsageRefresh: true,
         invalidate: true,
         notifyRenderer: false,
         refreshSettingsUsage: true,
-        usageRefreshMode: "manual",
+        usageRefreshMode: "auto",
       });
       return await stateStore.getSettingsState();
     });
     ipcMain.handle("desktop:refresh-status-entry", async () => {
       await this.options.refreshDesktopState({
+        allowInteractiveUnauthorizedCurrentSessionRecovery: false,
         invalidate: true,
         notifyRenderer: true,
-        usageRefreshMode: "manual",
+        usageRefreshMode: "auto",
       });
     });
     ipcMain.handle("desktop:update-agent-home", async (_event, agentId: unknown, path: unknown) => {

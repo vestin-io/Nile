@@ -39,11 +39,15 @@ type DesktopSurfaceOptions = {
 };
 
 type DesktopSettingsStateOptions = {
+  allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+  forceUsageRefresh?: boolean;
   refreshUsage?: boolean;
   usageRefreshMode?: DesktopUsageRefreshMode;
 };
 
 type DesktopRefreshStateOptions = {
+  allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+  forceSettingsUsageRefresh?: boolean;
   forceStatusEntryUsageRefresh?: boolean;
   refreshSettingsUsage?: boolean;
   refreshStatusEntryUsage?: boolean;
@@ -132,6 +136,9 @@ export class DesktopSurface {
       }
       const statusEntryState = this.statusEntry.readFromContext(context);
       const settingsState = await this.settings.readFromContext(session, context, {
+        allowInteractiveUnauthorizedCurrentSessionRecovery:
+          options.allowInteractiveUnauthorizedCurrentSessionRecovery,
+        forceUsageRefresh: options.forceSettingsUsageRefresh,
         refreshUsage: options.refreshSettingsUsage,
         usageRefreshMode: options.usageRefreshMode,
       });

@@ -459,6 +459,8 @@ export class DesktopMain {
   }
 
   private async refreshDesktopState(options: {
+    allowInteractiveUnauthorizedCurrentSessionRecovery?: boolean;
+    forceSettingsUsageRefresh?: boolean;
     forceStatusEntryUsageRefresh?: boolean;
     invalidate: boolean;
     notifyRenderer: boolean;

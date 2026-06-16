@@ -41,7 +41,8 @@ export class WorkspaceProfileManager {
     }
 
     for (const assignment of profile.assignments) {
-      if (assignment.connectionId && this.shouldApplyConnection(assignment, state)) {
+      const homeChanged = assignment.homePath !== undefined && this.shouldApplyHome(assignment, state);
+      if (assignment.connectionId && (homeChanged || this.shouldApplyConnection(assignment, state))) {
         await this.options.stateStore.switchConnection(assignment.agentId, assignment.connectionId);
       }
     }

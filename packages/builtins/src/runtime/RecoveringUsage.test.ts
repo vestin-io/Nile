@@ -56,6 +56,9 @@ describe("RecoveringUsage", () => {
         if (authorization === "Bearer stale-access") {
           return new Response(null, { status: 401 });
         }
+        if (authorization === "Bearer stale-local-access") {
+          return new Response(null, { status: 401 });
+        }
         if (authorization === "Bearer fresh-access") {
           return new Response(JSON.stringify({
             cloudaicompanionProject: "alien-superstate-rq4hk",
@@ -96,7 +99,9 @@ describe("RecoveringUsage", () => {
     });
 
     try {
-      const result = await session.getConnectionUsage("gemini-session");
+      const result = await session.getConnectionUsage("gemini-session", {
+        recoverUnauthorizedCurrentSession: true,
+      });
 
       expect(result).toEqual({
         connectionId: "gemini-session",
@@ -136,6 +141,7 @@ describe("RecoveringUsage", () => {
 
     expect(authorizationHeaders).toEqual([
       "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Bearer stale-access",
+      "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Bearer stale-local-access",
       "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Bearer fresh-access",
       "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota Bearer fresh-access",
     ]);
@@ -173,7 +179,9 @@ describe("RecoveringUsage", () => {
     });
 
     try {
-      const result = await session.getConnectionUsage("gemini-session");
+      const result = await session.getConnectionUsage("gemini-session", {
+        recoverUnauthorizedCurrentSession: true,
+      });
 
       expect(result).toMatchObject({
         connectionId: "gemini-session",
@@ -203,6 +211,76 @@ describe("RecoveringUsage", () => {
 
     expect(authorizationHeaders).toEqual([
       "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Bearer stale-access",
+      "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Bearer stale-access",
+    ]);
+  });
+
+  it("does not attempt Gemini interactive recovery when auto recovery disables interactive flows", async () => {
+    const setup = createSetup();
+    process.env.PATH = join(setup.rootDir, "empty-bin");
+    seedSavedGeminiConnection(setup.dbPath, setup.credentialStore, {
+      accessToken: "stale-access",
+      refreshToken: "stale-refresh",
+      email: "gemini.primary@example.test",
+      subject: "google-sub-123",
+    });
+    seedGeminiLocalSession(setup.geminiHome, {
+      accessToken: "stale-local-access",
+      refreshToken: "stale-local-refresh",
+      email: "gemini.primary@example.test",
+      subject: "google-sub-123",
+    });
+
+    const authorizationHeaders: string[] = [];
+    globalThis.fetch = (async (input, init) => {
+      const url = String(input);
+      const authorization = new Headers(init?.headers).get("authorization") ?? "";
+      authorizationHeaders.push(`${url} ${authorization}`);
+      return new Response(null, { status: 401 });
+    }) as typeof fetch;
+
+    const session = NileSession.open({
+      agentHomes: { gemini: setup.geminiHome },
+      credentialStore: setup.credentialStore as never,
+      databasePath: setup.dbPath,
+      logger: NileLogger.silent(),
+    });
+
+    try {
+      const result = await session.getConnectionUsage("gemini-session", {
+        recoverUnauthorizedCurrentSession: true,
+        allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      });
+
+      expect(result).toMatchObject({
+        connectionId: "gemini-session",
+        status: "error",
+        errorCode: "credential_unauthorized",
+        message: "Gemini session is expired or unauthorized. Refresh the Gemini CLI session and try again.",
+      });
+    } finally {
+      session.close();
+    }
+
+    const verificationAccesses = AccessRegistry.open(setup.dbPath, setup.credentialStore);
+    try {
+      expect(verificationAccesses.readCredential("gemini-session")).toEqual({
+        kind: "gemini_cli_session",
+        accessToken: "stale-local-access",
+        refreshToken: "stale-local-refresh",
+        idToken: createJwt({
+          email: "gemini.primary@example.test",
+          sub: "google-sub-123",
+        }),
+        expiryDate: 1800000000000,
+      });
+    } finally {
+      verificationAccesses.close();
+    }
+
+    expect(authorizationHeaders).toEqual([
+      "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Bearer stale-access",
+      "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist Bearer stale-local-access",
     ]);
   });
 
@@ -427,6 +505,76 @@ describe("RecoveringUsage", () => {
       "Bearer stale-access",
       "Bearer fresh-access",
       "Bearer recovered-access",
+    ]);
+  });
+
+  it("syncs the current Codex session without attempting login when interactive recovery is disabled", async () => {
+    const setup = createSetup();
+    const markerPath = join(setup.rootDir, "codex-login-attempted");
+    const fakeCodex = writeFakeCodexInstall(setup.rootDir, markerPath, {
+      accessToken: "recovered-access",
+      refreshToken: "recovered-refresh",
+      email: "jay.ji@spotto.ai",
+      accountId: "acct-123",
+    });
+    seedSavedOpenAiConnection(setup.dbPath, setup.credentialStore, {
+      accessToken: "stale-access",
+      refreshToken: "stale-refresh",
+      email: "jay.ji@spotto.ai",
+      accountId: "acct-123",
+    });
+    seedCodexLocalSession(setup.codexHome, {
+      accessToken: "fresh-access",
+      refreshToken: "fresh-refresh",
+      email: "jay.ji@spotto.ai",
+      accountId: "acct-123",
+    });
+
+    const authorizationHeaders: string[] = [];
+    globalThis.fetch = (async (_input, init) => {
+      const authorization = new Headers(init?.headers).get("authorization") ?? "";
+      authorizationHeaders.push(authorization);
+      return new Response(null, { status: 401 });
+    }) as typeof fetch;
+
+    const session = NileSession.open({
+      agentHomes: { codex: setup.codexHome },
+      agentRuntimeCommandOverrides: { codex: fakeCodex.vendorPath },
+      credentialStore: setup.credentialStore as never,
+      databasePath: setup.dbPath,
+      logger: NileLogger.silent(),
+    });
+
+    try {
+      const result = await session.getConnectionUsage("codex-session", {
+        recoverUnauthorizedCurrentSession: true,
+        allowInteractiveUnauthorizedCurrentSessionRecovery: false,
+      });
+
+      expect(result).toMatchObject({
+        connectionId: "codex-session",
+        status: "error",
+        errorCode: "credential_unauthorized",
+        message: "OpenAI session is expired or unauthorized. Sign in to Codex again and retry.",
+      });
+    } finally {
+      session.close();
+    }
+
+    expect(existsSync(markerPath)).toBe(false);
+
+    const verificationAccesses = AccessRegistry.open(setup.dbPath, setup.credentialStore);
+    try {
+      expect(verificationAccesses.readCredential("codex-session")).toEqual(
+        openAiSessionCredential("jay.ji@spotto.ai", "fresh-access", "fresh-refresh", "acct-123"),
+      );
+    } finally {
+      verificationAccesses.close();
+    }
+
+    expect(authorizationHeaders).toEqual([
+      "Bearer stale-access",
+      "Bearer fresh-access",
     ]);
   });
 });
