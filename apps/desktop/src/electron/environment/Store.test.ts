@@ -81,6 +81,29 @@ describe("DesktopEnvironmentStore", () => {
     expect(store.read("NILE_GATEWAY_TEST_API_KEY")).toBe("resolved-secret");
   });
 
+  it("stores managed env values in the desktop file store when the system keychain path is disabled", () => {
+    const setup = createDatabase({
+      credentialStorageMode: null,
+    });
+    const writer = {
+      read: vi.fn(),
+      write: vi.fn(),
+      remove: vi.fn(),
+    };
+    const store = new DesktopEnvironmentStore(
+      setup.databasePath,
+      "nile.test.environment",
+      writer,
+      "darwin",
+      { allowSystemStore: false },
+    );
+
+    store.write("NILE_GATEWAY_TEST_API_KEY", "resolved-secret");
+
+    expect(writer.write).not.toHaveBeenCalled();
+    expect(store.read("NILE_GATEWAY_TEST_API_KEY")).toBe("resolved-secret");
+  });
+
   it("re-evaluates the desktop storage mode for the current session instead of caching the startup backend", () => {
     const setup = createDatabase({
       credentialStorageMode: null,

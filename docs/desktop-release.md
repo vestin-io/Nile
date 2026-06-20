@@ -162,3 +162,96 @@ Windows packaging currently uses the unsigned path and does not require the Appl
 ```bash
 npm run build:app:unsigned --prefix apps/desktop
 ```
+
+## Mac App Store Build
+
+This repository now has a separate local packaging entrypoint for Mac App Store work:
+
+```bash
+npm run build:app:mas --prefix apps/desktop
+```
+
+What this does today:
+
+- builds the desktop app with the dedicated `mas` Electron Builder target
+- defaults MAS packaging to a `universal` macOS app so App Store Connect validation still supports Intel Macs while keeping Apple Silicon support
+- points Electron Builder at `build/icons/icon.icns` for macOS and MAS packaging so the submitted bundle keeps the full ICNS size set, including `512x512@2x`
+- accepts an explicit architecture override when you need to debug one variant locally:
+  - `node --import tsx ./package-app.ts --mas --x64`
+  - `node --import tsx ./package-app.ts --mas --arm64`
+  - `node --import tsx ./package-app.ts --mas --universal`
+- applies App Sandbox entitlements from:
+  - `apps/desktop/build/entitlements.mas.plist`
+  - `apps/desktop/build/entitlements.mas.inherit.plist`
+- constrains MAS signing to the `Vestin Limited` identity instead of generic macOS auto-discovery
+- auto-discovers a local provisioning profile for `io.vestin.nile` from:
+  - `~/Library/MobileDevice/Provisioning Profiles`
+  - `~/Downloads`
+- accepts `NILE_DESKTOP_MAS_PROVISIONING_PROFILE` and `NILE_DESKTOP_MAS_SIGNING_IDENTITY` when you need to override the local defaults
+- disables the runtime behaviors that depend on GitHub Releases updates, direct shell profile mutation, or the non-sandbox desktop keychain helper
+- stores the desktop SQLite state under Electron `userData` for MAS builds instead of `~/.nile-switcher`
+
+What this does **not** do yet:
+
+- the GitHub Actions desktop release workflow does not build or submit MAS artifacts
+- provisioning profiles, App Store signing certificates, and App Store Connect upload credentials are still external Apple-side setup
+
+Practical expectation:
+
+- this command is the engineering readiness path for MAS work, not a one-command publish flow yet
+- expect at least one more validation pass with the real provisioning profile, installer-signing setup, and Apple submission tooling before first submission
+
+## Mac App Store TestFlight Upload
+
+This repository now includes a separate GitHub Actions workflow for Mac App Store TestFlight uploads:
+
+- `.github/workflows/desktop-mas-release.yml`
+
+What it does:
+
+- validates the release tag and desktop package version
+- imports Mac App Store signing assets into a temporary CI keychain
+- installs the Mac App Store provisioning profile on the runner
+- runs `npm run build:app:mas --prefix apps/desktop`
+- validates the resulting `.pkg` with App Store Connect using `xcrun altool`
+- uploads the `.pkg` to App Store Connect using `xcrun altool`
+
+What it does **not** do yet:
+
+- it does not automate App Review submission
+- it does not auto-release the version after approval
+- it does not verify that every screenshot, questionnaire answer, and regional metadata field is ready for production submission
+
+Trigger model:
+
+- `workflow_dispatch` is the only trigger
+- `release_tag` picks the desktop version to build
+
+Recommended GitHub environment:
+
+- create an environment named `mac-app-store`
+- store the MAS upload secrets there so first-time rollout can use environment approvals before the upload job runs
+
+Required GitHub secrets for MAS upload:
+
+| Purpose | Secret |
+| --- | --- |
+| Base64 `.p12` for `3rd Party Mac Developer Application` | `NILE_DESKTOP_MAS_APP_CERTIFICATE_P12` |
+| Export password for the MAS application `.p12` | `NILE_DESKTOP_MAS_APP_CERTIFICATE_PASSWORD` |
+| Base64 `.p12` for `3rd Party Mac Developer Installer` | `NILE_DESKTOP_MAS_INSTALLER_CERTIFICATE_P12` |
+| Export password for the MAS installer `.p12` | `NILE_DESKTOP_MAS_INSTALLER_CERTIFICATE_PASSWORD` |
+| Base64 provisioning profile content | `NILE_DESKTOP_MAS_PROVISIONING_PROFILE_BASE64` |
+| App Store Connect Apple ID | `NILE_DESKTOP_APPLE_ID` or `APPLE_ID` |
+| App-specific password for the Apple ID | `NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD` or `APPLE_APP_SPECIFIC_PASSWORD` |
+
+Optional GitHub variable or secret:
+
+| Purpose | Name |
+| --- | --- |
+| Override App Store Connect provider when the Apple ID sees multiple providers | `NILE_DESKTOP_MAS_ASC_PROVIDER` |
+
+Practical setup notes:
+
+- the certificate and provisioning-profile secrets should contain raw file bytes encoded with `base64`
+- the workflow intentionally stays separate from the existing GitHub Release workflow so MAS setup can be rolled out without risking the current Developer ID release path
+- after upload, the build should appear under App Store Connect / TestFlight processing for the macOS app record

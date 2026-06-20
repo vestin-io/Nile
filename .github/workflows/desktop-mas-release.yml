@@ -1,0 +1,242 @@
+name: Desktop Mac App Store TestFlight Upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to build, for example v0.1.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-mas-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate-release:
+    name: Validate MAS release
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      release_tag: ${{ steps.version.outputs.tag }}
+      release_version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Derive release version
+        id: version
+        env:
+          MANUAL_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            tag="${MANUAL_RELEASE_TAG}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            printf 'Release tag must be v<semver>, got %s\n' "${tag}" >&2
+            exit 1
+          fi
+
+          version="${tag#v}"
+
+          printf 'tag=%s\n' "${tag}" >> "${GITHUB_OUTPUT}"
+          printf 'version=%s\n' "${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Resolve release notes
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          notes_file="release-notes/${RELEASE_TAG}.md"
+
+          if [[ ! -f "${notes_file}" ]]; then
+            printf 'Missing required desktop release notes: %s\n' "${notes_file}" >&2
+            exit 1
+          fi
+
+      - name: Validate desktop package version
+        env:
+          DESKTOP_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFileSync } from "node:fs";
+
+          const packageJsonPath = "apps/desktop/package.json";
+          const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf8"));
+          const expectedVersion = process.env.DESKTOP_VERSION;
+
+          if (packageJson.version !== expectedVersion) {
+            console.error(
+              `apps/desktop/package.json version must match release tag version. Expected ${expectedVersion}, got ${packageJson.version}`,
+            );
+            process.exit(1);
+          }
+          EOF
+
+  upload-mas-package:
+    name: Build and upload MAS package
+    runs-on: macos-latest
+    needs: validate-release
+    environment: mac-app-store
+    defaults:
+      run:
+        shell: bash
+    env:
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.NILE_DESKTOP_APPLE_APP_SPECIFIC_PASSWORD || secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_ID: ${{ secrets.NILE_DESKTOP_APPLE_ID || secrets.APPLE_ID }}
+      MAS_APP_CERTIFICATE_P12: ${{ secrets.NILE_DESKTOP_MAS_APP_CERTIFICATE_P12 }}
+      MAS_APP_CERTIFICATE_PASSWORD: ${{ secrets.NILE_DESKTOP_MAS_APP_CERTIFICATE_PASSWORD }}
+      MAS_ASC_PROVIDER: ${{ secrets.NILE_DESKTOP_MAS_ASC_PROVIDER || vars.NILE_DESKTOP_MAS_ASC_PROVIDER }}
+      MAS_INSTALLER_CERTIFICATE_P12: ${{ secrets.NILE_DESKTOP_MAS_INSTALLER_CERTIFICATE_P12 }}
+      MAS_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.NILE_DESKTOP_MAS_INSTALLER_CERTIFICATE_PASSWORD }}
+      MAS_PROVISIONING_PROFILE_BASE64: ${{ secrets.NILE_DESKTOP_MAS_PROVISIONING_PROFILE_BASE64 }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            packages/core/package-lock.json
+            packages/host-local/package-lock.json
+            apps/cli/package-lock.json
+            apps/desktop/package-lock.json
+
+      - name: Validate MAS secrets
+        run: |
+          missing=()
+          for name in \
+            MAS_APP_CERTIFICATE_P12 \
+            MAS_APP_CERTIFICATE_PASSWORD \
+            MAS_INSTALLER_CERTIFICATE_P12 \
+            MAS_INSTALLER_CERTIFICATE_PASSWORD \
+            MAS_PROVISIONING_PROFILE_BASE64 \
+            APPLE_ID \
+            APPLE_APP_SPECIFIC_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+
+          if ((${#missing[@]} > 0)); then
+            printf 'Missing required Mac App Store release secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install MAS signing assets
+        run: |
+          keychain_path="${RUNNER_TEMP}/nile-mas-signing.keychain-db"
+          keychain_password="$(openssl rand -base64 24)"
+          profile_path="${HOME}/Library/MobileDevice/Provisioning Profiles/Nile_Mac_App_Store.provisionprofile"
+
+          mkdir -p "$(dirname "${profile_path}")"
+          echo "${MAS_APP_CERTIFICATE_P12}" | base64 --decode > "${RUNNER_TEMP}/mas-app.p12"
+          echo "${MAS_INSTALLER_CERTIFICATE_P12}" | base64 --decode > "${RUNNER_TEMP}/mas-installer.p12"
+          echo "${MAS_PROVISIONING_PROFILE_BASE64}" | base64 --decode > "${profile_path}"
+
+          security create-keychain -p "${keychain_password}" "${keychain_path}"
+          security set-keychain-settings -lut 21600 "${keychain_path}"
+          security unlock-keychain -p "${keychain_password}" "${keychain_path}"
+          security default-keychain -d user -s "${keychain_path}"
+          security list-keychains -d user -s "${keychain_path}"
+
+          security import "${RUNNER_TEMP}/mas-app.p12" \
+            -k "${keychain_path}" \
+            -P "${MAS_APP_CERTIFICATE_PASSWORD}" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/productbuild \
+            -T /usr/bin/security
+
+          security import "${RUNNER_TEMP}/mas-installer.p12" \
+            -k "${keychain_path}" \
+            -P "${MAS_INSTALLER_CERTIFICATE_PASSWORD}" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/productbuild \
+            -T /usr/bin/security
+
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${keychain_password}" "${keychain_path}"
+          security find-identity -v -p codesigning "${keychain_path}"
+
+          printf 'NILE_DESKTOP_MAS_PROVISIONING_PROFILE=%s\n' "${profile_path}" >> "${GITHUB_ENV}"
+
+      - name: Build MAS package
+        run: npm run build:app:mas --prefix apps/desktop
+
+      - name: Locate MAS artifacts
+        run: |
+          pkg_path="$(find apps/desktop/release -type f -name 'Nile-*.pkg' | sort | tail -n 1)"
+          app_path="$(find apps/desktop/release -type d -path '*/Nile.app' | sort | tail -n 1)"
+
+          if [[ -z "${pkg_path}" || -z "${app_path}" ]]; then
+            printf 'Unable to locate MAS artifacts under apps/desktop/release.\n' >&2
+            exit 1
+          fi
+
+          printf 'MAS_APP_PATH=%s\n' "${app_path}" >> "${GITHUB_ENV}"
+          printf 'MAS_PKG_PATH=%s\n' "${pkg_path}" >> "${GITHUB_ENV}"
+
+      - name: Verify MAS signatures
+        run: |
+          pkgutil --check-signature "${MAS_PKG_PATH}"
+          codesign -dv --verbose=4 "${MAS_APP_PATH}" 2>&1 | sed -n '1,30p'
+
+      - name: Upload MAS package artifact
+        if: ${{ always() && env.MAS_PKG_PATH != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: mac-app-store-package-${{ needs.validate-release.outputs.release_tag }}
+          path: |
+            ${{ env.MAS_PKG_PATH }}
+            apps/desktop/release/builder-effective-config.yaml
+
+      - name: Validate package with App Store Connect
+        run: |
+          provider_args=()
+          if [[ -n "${MAS_ASC_PROVIDER:-}" ]]; then
+            provider_args+=(--asc-provider "${MAS_ASC_PROVIDER}")
+          fi
+
+          xcrun altool \
+            --validate-app \
+            --file "${MAS_PKG_PATH}" \
+            --type osx \
+            --username "${APPLE_ID}" \
+            --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
+            "${provider_args[@]}"
+
+      - name: Upload package to App Store Connect
+        run: |
+          provider_args=()
+          if [[ -n "${MAS_ASC_PROVIDER:-}" ]]; then
+            provider_args+=(--asc-provider "${MAS_ASC_PROVIDER}")
+          fi
+
+          xcrun altool \
+            --upload-app \
+            --file "${MAS_PKG_PATH}" \
+            --type osx \
+            --username "${APPLE_ID}" \
+            --password "${APPLE_APP_SPECIFIC_PASSWORD}" \
+            "${provider_args[@]}"

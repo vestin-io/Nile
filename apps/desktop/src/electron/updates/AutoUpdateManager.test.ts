@@ -68,6 +68,30 @@ describe("AutoUpdateManager", () => {
     });
   });
 
+  it("disables in-app auto updates for Mac App Store builds", () => {
+    const runAutoUpdate = vi.fn();
+    const manager = new AutoUpdateManager({
+      enabled: false,
+      logger: new StubLogger(),
+      isPackaged: true,
+      platform: "darwin",
+      runAutoUpdate,
+      updater: new StubUpdater(),
+      version: "0.1.0",
+    });
+
+    manager.start();
+
+    expect(runAutoUpdate).not.toHaveBeenCalled();
+    expect(manager.getReleaseInfo()).toEqual({
+      version: "0.1.0",
+      updateAvailability: "unsupported_platform",
+      status: "idle",
+      availableVersion: null,
+      errorMessage: null,
+    });
+  });
+
   it("reconciles manual checks against the update feed before reporting up to date", async () => {
     const updater = new StubUpdater();
     const runAutoUpdate = vi.fn();

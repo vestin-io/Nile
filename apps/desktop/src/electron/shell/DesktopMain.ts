@@ -1,7 +1,5 @@
 import { app } from "electron";
-import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { StateReset } from "@nile/builtins/local";
 import type { AgentHomes, AgentRuntimeCommandOverrides } from "@nile/core/models/agent";
 import { mergeAgentHomes, type AgentId } from "@nile/core/models/agent";
@@ -42,6 +40,7 @@ import { WorkspaceProfileManager } from "../profiles/Manager";
 import { WorkspaceProfileStore } from "../profiles/Store";
 import { DesktopShell } from "./DesktopShell";
 import { DesktopTrayMenu } from "./TrayMenu";
+import { readDesktopCurrentDir, readDesktopPackageVersion } from "./RuntimeMetadata";
 import { DesktopStateReset } from "../state/Reset";
 import { DesktopPreferencesStore } from "../state/DesktopPreferencesStore";
 import { DesktopNotificationMuteStore } from "../state/NotificationMuteStore";
@@ -54,9 +53,12 @@ import { DesktopManagedEnvironmentLifecycle } from "./ManagedEnvironmentLifecycl
 import { DesktopStatusEntryController } from "./StatusEntryController";
 import { DesktopUsageAutoRefresh } from "./UsageAutoRefresh";
 
-const currentDir = typeof __dirname === "string" ? __dirname : dirname(fileURLToPath(import.meta.url));
-
-type DesktopMainOptions = { databasePath: string; agentHomes?: AgentHomes; credentialStore?: CredentialStore };
+type DesktopMainOptions = {
+  databasePath: string;
+  agentHomes?: AgentHomes;
+  credentialStore?: CredentialStore;
+  isMacAppStore?: boolean;
+};
 
 export class DesktopMain {
   private readonly logger: NileLogger;
@@ -96,9 +98,13 @@ export class DesktopMain {
   private isQuitting = false;
 
   constructor(private readonly options: DesktopMainOptions) {
+    const isMacAppStore = options.isMacAppStore === true;
+    const currentDir = readDesktopCurrentDir(import.meta.url);
     this.logger = NileLogger.createDefault({ module: "desktop-main" });
     this.credentialStore = options.credentialStore ?? createPlatformWorkspaceCredentialStore(options.databasePath);
-    this.environmentStore = new DesktopEnvironmentStore(options.databasePath);
+    this.environmentStore = new DesktopEnvironmentStore(options.databasePath, undefined, undefined, undefined, {
+      allowSystemStore: !isMacAppStore,
+    });
     this.shellEnvironment = new DesktopShellEnvironment();
     this.credentialStorageSession = new DesktopCredentialStorageSession(
       isCredentialStorageSession(this.credentialStore) ? this.credentialStore : null,
@@ -137,6 +143,7 @@ export class DesktopMain {
         this.environmentStore,
         this.shellEnvironment,
         this.logger.child({ scope: "managed-api-key-environment", path: "connection-manager" }),
+        { allowShellIntegration: !isMacAppStore },
       ),
       credentialStore: this.credentialStore,
       credentialStorageSession: this.credentialStorageSession,
@@ -151,13 +158,14 @@ export class DesktopMain {
         this.environmentStore,
         this.shellEnvironment,
         this.logger.child({ scope: "managed-api-key-environment", path: "connection-gateway" }),
+        { allowShellIntegration: !isMacAppStore },
       ),
       credentialStore: this.credentialStore,
       credentialStorageSession: this.credentialStorageSession,
       logger: this.logger.child({ scope: "connection-gateway" }),
     });
     this.portableTransferGateway = new DesktopPortableTransferGateway({
-      appVersion: readDesktopPackageVersion(),
+      appVersion: readDesktopPackageVersion(currentDir),
       credentialStore: this.credentialStore,
       credentialStorageSession: this.credentialStorageSession,
       databasePath: options.databasePath,
@@ -206,7 +214,12 @@ export class DesktopMain {
     });
     this.managedEnvironmentLifecycle = new DesktopManagedEnvironmentLifecycle({
       agentHomes: this.agentHomes,
-      environment: new ManagedApiKeyEnvironment(this.environmentStore, this.shellEnvironment),
+      environment: new ManagedApiKeyEnvironment(
+        this.environmentStore,
+        this.shellEnvironment,
+        this.logger.child({ scope: "managed-api-key-environment", path: "managed-environment-lifecycle" }),
+        { allowShellIntegration: !isMacAppStore },
+      ),
       logger: this.logger,
       openSession: () => this.connectionGateway.openSession(),
     });
@@ -270,6 +283,7 @@ export class DesktopMain {
       },
     });
     this.autoUpdateManager = new AutoUpdateManager({
+      enabled: !isMacAppStore,
       logger: this.logger.child({ scope: "auto-update" }),
       isPackaged: app.isPackaged,
       platform: process.platform,
@@ -411,19 +425,9 @@ export class DesktopMain {
     }).register();
   }
 
-  private reloadAll(): void {
-    void this.refreshDesktopState({
-      invalidate: false,
-      notifyRenderer: true,
-    });
-  }
+  private reloadAll(): void { void this.refreshDesktopState({ invalidate: false, notifyRenderer: true }); }
 
-  private invalidateAndReloadAll(): void {
-    void this.refreshDesktopState({
-      invalidate: true,
-      notifyRenderer: true,
-    });
-  }
+  private invalidateAndReloadAll(): void { void this.refreshDesktopState({ invalidate: true, notifyRenderer: true }); }
 
   private installDesktopUpdate() { this.isQuitting = true; this.shell.prepareForUpdateInstall(); return this.autoUpdateManager.installUpdate(); }
 
@@ -488,10 +492,4 @@ export class DesktopMain {
   private clearManagedApiKeyEnvironment(): void {
     this.managedEnvironmentLifecycle.clearBeforeReset();
   }
-}
-
-function readDesktopPackageVersion(): string {
-  const packageJsonPath = join(currentDir, "..", "..", "package.json");
-  const parsed = JSON.parse(readFileSync(packageJsonPath, "utf8")) as { version?: string };
-  return parsed.version?.trim() || "0.0.0";
 }

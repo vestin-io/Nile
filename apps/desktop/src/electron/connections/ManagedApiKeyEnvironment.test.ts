@@ -132,6 +132,68 @@ describe("ManagedApiKeyEnvironment", () => {
     expect(ensureShell).toHaveBeenCalledWith("NILE_GATEWAY_SHARED_API_KEY_API_KEY");
   });
 
+  it("keeps managed env keys out of shell profiles when shell integration is disabled", async () => {
+    const write = vi.fn();
+    const ensureShell = vi.fn();
+    const removeShell = vi.fn();
+    const removeSystemCopy = vi.fn();
+    const environment = new ManagedApiKeyEnvironment(
+      {
+        read: vi.fn().mockReturnValue(null),
+        write,
+        removeSystemCopy,
+      } as never,
+      {
+        ensure: ensureShell,
+        remove: removeShell,
+      } as never,
+      undefined,
+      { allowShellIntegration: false },
+    );
+
+    await environment.ensureForConnection({
+      listSavedConnections: () => [{
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        endpointUrl: "https://llmfk.dpdns.org/v1",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway",
+        authMode: "api_key",
+        apiKeySource: "direct",
+        enabledAgents: ["claude", "openclaw"],
+        configurableAgents: ["codex", "claude", "openclaw"],
+        selectedByAgents: ["claude"],
+      }],
+      readConnectionCredential: (): StoredCredential => ({
+        kind: "api_key",
+        apiKey: "gateway-secret",
+      }),
+      setConnectionDirectApiKeyEnvKey: vi.fn().mockReturnValue({
+        id: "gateway-shared-api-key",
+        endpointId: "gateway-shared",
+        endpointUrl: "https://llmfk.dpdns.org/v1",
+        label: "Gateway (llmfk.dpdns.org) API Key",
+        endpointLabel: "Gateway (llmfk.dpdns.org)",
+        endpointFamily: "gateway",
+        authMode: "api_key",
+        apiKeySource: "direct",
+        envKey: "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+        enabledAgents: ["claude", "openclaw"],
+        configurableAgents: ["codex", "claude", "openclaw"],
+        selectedByAgents: ["claude"],
+      } satisfies SavedConnectionSummary),
+    } as never, "gateway-shared-api-key");
+
+    expect(write).toHaveBeenCalledWith(
+      "NILE_GATEWAY_SHARED_API_KEY_API_KEY",
+      "gateway-secret",
+    );
+    expect(ensureShell).not.toHaveBeenCalled();
+    expect(removeShell).not.toHaveBeenCalled();
+    expect(removeSystemCopy).not.toHaveBeenCalled();
+  });
+
   it("removes shell exports immediately when an existing managed env key is no longer needed by shell-backed agents", async () => {
     const read = vi.fn().mockReturnValue("gateway-secret");
     const write = vi.fn();

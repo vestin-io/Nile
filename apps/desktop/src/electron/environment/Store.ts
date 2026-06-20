@@ -22,10 +22,15 @@ type DesktopEnvironmentWriteOptions = {
   mirrorToSystem?: boolean;
 };
 
+type DesktopEnvironmentStoreOptions = {
+  allowSystemStore?: boolean;
+};
+
 export class DesktopEnvironmentStore {
   private readonly cache = new Map<string, string | null>();
   private readonly databasePath: string | null;
   private readonly storageModeReader: DesktopEnvironmentStorageModeReader | null;
+  private readonly allowSystemStore: boolean;
   private cacheStoreKind: "file" | "system" | null = null;
 
   constructor(
@@ -36,11 +41,13 @@ export class DesktopEnvironmentStore {
       () => readDesktopKeychainHelperPath(),
     ),
     private readonly platform: NodeJS.Platform = process.platform,
+    options: DesktopEnvironmentStoreOptions = {},
   ) {
     this.databasePath = databasePath ?? null;
     this.storageModeReader = this.databasePath
       ? new DesktopEnvironmentStorageModeReader(this.databasePath)
       : null;
+    this.allowSystemStore = options.allowSystemStore ?? true;
   }
 
   read(envKey: string): string | null {
@@ -128,7 +135,9 @@ export class DesktopEnvironmentStore {
     | { kind: "file"; store: DesktopSecretFileStore }
     | { kind: "system" } {
     const storageMode = this.storageModeReader?.read() ?? null;
-    const kind = this.databasePath && shouldUseDesktopEnvironmentFileStore(this.platform, storageMode)
+    const kind = this.databasePath && (
+      !this.allowSystemStore || shouldUseDesktopEnvironmentFileStore(this.platform, storageMode)
+    )
       ? "file"
       : "system";
     if (this.cacheStoreKind !== kind) {

@@ -36,6 +36,7 @@ type AutoUpdaterLike = {
 type FetchUpdateFeedRelease = typeof fetchElectronUpdateFeedRelease;
 
 type AutoUpdateManagerOptions = {
+  enabled?: boolean;
   logger: AutoUpdateLogger;
   isPackaged?: boolean;
   platform?: NodeJS.Platform;
@@ -50,6 +51,7 @@ type AutoUpdateManagerOptions = {
 
 export class AutoUpdateManager {
   private static readonly repository = "vestin-io/Nile";
+  private readonly enabled: boolean;
   private readonly logger: AutoUpdateLogger;
   private readonly isPackaged: boolean;
   private readonly platform: NodeJS.Platform;
@@ -69,6 +71,7 @@ export class AutoUpdateManager {
   private errorMessage: string | null = null;
 
   constructor(options: AutoUpdateManagerOptions) {
+    this.enabled = options.enabled ?? true;
     this.logger = options.logger;
     this.isPackaged = options.isPackaged ?? false;
     this.platform = options.platform ?? process.platform;
@@ -81,6 +84,14 @@ export class AutoUpdateManager {
     this.version = options.version?.trim() || "0.0.0";
     this.onReleaseInfoChanged = options.onReleaseInfoChanged ?? (() => {});
     this.fetchUpdateFeedRelease = options.fetchUpdateFeedRelease ?? fetchElectronUpdateFeedRelease;
+  }
+
+  private readUpdateAvailability(): DesktopUpdateAvailability {
+    if (!this.enabled) {
+      return "unsupported_platform";
+    }
+
+    return readDesktopUpdateAvailability(this.isPackaged, this.version, this.platform);
   }
 
   start(): void {
@@ -364,9 +375,5 @@ export class AutoUpdateManager {
     if (changed) {
       this.onReleaseInfoChanged();
     }
-  }
-
-  private readUpdateAvailability(): DesktopUpdateAvailability {
-    return readDesktopUpdateAvailability(this.isPackaged, this.version, this.platform);
   }
 }

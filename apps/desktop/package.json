@@ -26,6 +26,7 @@
     "clean:release": "node --import tsx ./clean-release.ts",
     "build:app": "npm run clean:release && npm run build:release && node --import tsx ./package-app.ts",
     "build:app:dir": "npm run clean:release && npm run build:release && node --import tsx ./package-app.ts --dir",
+    "build:app:mas": "npm run clean:release && npm run build:release && node --import tsx ./package-app.ts --mas",
     "build:app:unsigned": "npm run clean:release && npm run build:release && node --import tsx ./package-app.ts --unsigned",
     "dev": "node --import tsx ./dev.ts",
     "icons": "node --import tsx ./generate-icons.ts",
@@ -59,7 +60,7 @@
     "tailwindcss": "^3.4.19"
   },
   "build": {
-    "appId": "dev.nile.desktop",
+    "appId": "io.vestin.nile",
     "productName": "Nile",
     "electronVersion": "36.9.5",
     "asarUnpack": [
@@ -84,7 +85,7 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.inherit.plist",
       "hardenedRuntime": true,
-      "icon": "build/icons/icon.png",
+      "icon": "build/icons/icon.icns",
       "target": [
         {
           "target": "dmg",
@@ -101,6 +102,15 @@
           ]
         }
       ]
+    },
+    "mas": {
+      "category": "public.app-category.developer-tools",
+      "entitlements": "build/entitlements.mas.plist",
+      "entitlementsInherit": "build/entitlements.mas.inherit.plist",
+      "hardenedRuntime": false,
+      "icon": "build/icons/icon.icns",
+      "provisioningProfile": null,
+      "type": "distribution"
     },
     "win": {
       "icon": "build/icons/icon.png",

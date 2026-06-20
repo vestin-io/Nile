@@ -447,6 +447,102 @@
 
 - `npm run build -w @nile/desktop`
 
+### Mac App Store runtime and packaging scaffold
+
+- Added a dedicated desktop storage-path reader so MAS builds stop using `~/.nile-switcher` and instead keep the SQLite database under Electron `userData`, which is compatible with the App Sandbox container.
+- Added MAS-aware runtime downgrades:
+  - disabled the GitHub Releases auto-update path for MAS builds
+  - disabled managed shell-profile export injection for MAS builds
+  - forced managed env secrets onto the local desktop file store instead of the desktop keychain helper path when running in MAS mode
+- Added a separate local packaging command:
+  - `npm run build:app:mas --prefix apps/desktop`
+  - this drives Electron Builder with the `mas` target without disturbing the existing Developer ID / GitHub Release path
+- Added checked-in MAS entitlements:
+  - `apps/desktop/build/entitlements.mas.plist`
+  - `apps/desktop/build/entitlements.mas.inherit.plist`
+- Updated `docs/desktop-release.md` to document the new MAS packaging path and the remaining external Apple-side blockers.
+
+#### Key findings
+
+- This pass is only the first App Store adaptation layer. It makes the app materially closer to a sandbox-compatible build, but it does not turn the existing GitHub release workflow into an App Store submission pipeline.
+- The current desktop `appId` is still the pre-existing value. A real App Store submission still needs the final App Store Connect bundle id and matching provisioning setup.
+- The update UI currently reuses the existing "unsupported platform" availability path when auto-update is disabled for MAS. That keeps the runtime safe without expanding the translation surface in the same patch.
+
+### Verification
+
+- `./node_modules/.bin/vitest run apps/desktop/src/electron/app/Paths.test.ts apps/desktop/src/electron/environment/Store.test.ts apps/desktop/src/electron/connections/ManagedApiKeyEnvironment.test.ts apps/desktop/src/electron/updates/AutoUpdateManager.test.ts`
+- `npm run typecheck`
+
+### Mac App Store bundle identifier alignment
+
+- Updated the desktop Electron Builder `appId` from the historical desktop id to the real Mac App Store bundle identifier: `io.vestin.nile`.
+- Updated the MAS storage-path test fixture so the expected sandbox container path matches the App Store bundle id:
+  - `~/Library/Containers/io.vestin.nile/...`
+- Updated `docs/desktop-release.md` so the MAS section no longer describes the bundle id as an unresolved blocker.
+
+#### Key findings
+
+- The runtime/path behavior was already MAS-safe; this pass mainly aligns packaging identity with the Apple-side App ID and provisioning profile that now exist.
+- A first App Store provisioning profile is now available locally, but MAS packaging may still require an installer-signing certificate or additional Electron Builder signing overrides before the first successful submission artifact.
+
+### Mac App Store signing selection tightening
+
+- Updated `apps/desktop/package-app.ts` so `npm run build:app:mas --prefix apps/desktop` no longer relies on generic macOS keychain auto-discovery.
+- MAS packaging now:
+  - constrains signing selection to the `Vestin Limited` identity
+  - auto-discovers a matching provisioning profile for `6N2P2T69SK.io.vestin.nile`
+  - prefers the standard installed provisioning-profile directory, then falls back to `~/Downloads`
+  - allows explicit overrides through `NILE_DESKTOP_MAS_SIGNING_IDENTITY` and `NILE_DESKTOP_MAS_PROVISIONING_PROFILE`
+
+#### Key findings
+
+- This fixed the earlier misrouting where Electron Builder started the MAS build with `Developer ID Application` and no provisioning profile.
+- The current local MAS build now reaches the correct MAS signing path, but the full artifact pipeline still needs one more pass to confirm whether packaging continues cleanly past framework signing and whether an installer-signing certificate is required.
+
+### Mac App Store universal-architecture default
+
+- Updated `apps/desktop/package-app.ts` so MAS packaging now defaults to `--universal` instead of inheriting the host machine architecture.
+- Kept explicit local debug overrides for one-off builds:
+  - `--x64`
+  - `--arm64`
+  - `--universal`
+- Updated `docs/desktop-release.md` so the MAS section now documents the universal default and the explicit override paths.
+
+#### Key findings
+
+- App Store Connect rejected the first successful MAS upload with `Validation failed (409)` because the uploaded `Nile.app` supported `arm64` only while the app still declared macOS 11 support.
+- Raising the deployment target to macOS 12 would have been another valid fix, but the chosen product direction is to keep Intel Mac support. Defaulting MAS packaging to a universal app resolves that policy mismatch without changing the public minimum supported macOS version.
+
+### Mac App Store ICNS packaging fix
+
+- Updated `apps/desktop/package.json` so both `mac` and `mas` packaging now point Electron Builder at `build/icons/icon.icns` instead of `build/icons/icon.png`.
+- Updated `docs/desktop-release.md` to document the ICNS requirement alongside the MAS universal-architecture guidance.
+
+#### Key findings
+
+- App Store Connect rejected the next MAS upload with `Validation failed (409)` because the packaged app icon was missing the `512x512@2x` ICNS slot.
+- Verified the source `apps/desktop/build/icons/icon.icns` was complete, but the packaged `Nile.app/Contents/Resources/icon.icns` had been regenerated without the full size set because Electron Builder was packaging from the 512px PNG input.
+- The local app still launched, so this only surfaced once App Store Connect revalidated the submitted bundle. Pointing packaging at the checked-in ICNS keeps the bundle icon intact through MAS export.
+
+### Mac App Store GitHub upload workflow
+
+- Added a separate GitHub Actions workflow at `.github/workflows/desktop-mas-release.yml` for Mac App Store CI uploads.
+- Kept the MAS workflow separate from the existing GitHub Release pipeline so missing MAS secrets or rollout-specific approvals do not break the current Developer ID release path.
+- The workflow now:
+  - validates the release tag and `apps/desktop/package.json` version
+  - imports the Mac App Store application and installer certificates into a temporary CI keychain
+  - installs the provisioning profile on the runner
+  - builds the universal MAS package with `npm run build:app:mas --prefix apps/desktop`
+  - validates and uploads the resulting `.pkg` to App Store Connect with `xcrun altool`
+- Simplified the workflow to a manual-only TestFlight/App Store Connect upload path and removed the unfinished App Review submission automation.
+- Updated `docs/desktop-release.md` so the workflow is documented as an upload-only path with only the secrets needed for signing and App Store Connect upload.
+
+#### Key findings
+
+- The first useful automation boundary is upload, not review submission. Build delivery can be stabilized in CI before version selection, metadata edits, and review submission are automated.
+- The workflow now stays manual-only by design. That is a better fit for the first MAS rollout than tag-triggered uploads because the immediate goal is stable TestFlight/App Store Connect delivery, not full release submission.
+- Removing the review-submission path lowers the GitHub secret surface substantially and keeps the rollout focused on the one capability that is already proven locally: signed MAS packaging plus Transporter-style upload.
+
 ### Manual settings refresh usage bypass
 
 - Tightened the Agents/settings refresh button semantics so `desktop:refresh-settings` now does a true manual usage refresh:
